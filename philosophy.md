@@ -36,9 +36,13 @@ Agent 应该更忠于用户，还是更忠于事实？
 
 小猫智能体的核心固定为 `read / edit / write / bash`。这四个工具负责基础编程闭环。
 
-复杂能力通过 extension 独立存在。当前 extension 是 `todo`、`worktree`、`network`、`spec`。它们可启用、可禁用，打开后进入同一个 agent 工具面，关闭后从工具面移除。
+复杂能力通过 extension 独立存在。当前 extension 是 `todo`、`worktree`、`network`、`background`、`subagent`、`team`、`skills`、`spec`。它们可启用、可禁用，打开后进入同一个 agent 工具面，关闭后从工具面移除。
+
+默认 agent 打开 `todo`、`worktree`、`network`、`background`、`subagent`、`team`、`skills`。`spec` 不默认混进普通 agent；需要计划工作流时，通过 `kitty spec` 进入隔离的 spec 模式。
 
 扩展是工具集合。核心保持清楚，扩展保持独立。
+
+Skills 也是 extension，不是第三套工具体系。它把可复用方法、资料、脚本、示例和素材组织成 runtime 能力包。默认上下文只出现 skill 索引和资源索引；是否加载正文、读取资源、运行脚本，由模型根据当前目标决定。机器只负责发现、读取、执行和记录事实。
 
 ## 📐 Spec
 
@@ -55,6 +59,37 @@ Spec 的主流程是 requirements、design、tasks 三阶段；implement、valid
 
 任务拆解进入 `tasks.md`，事实笔记和审阅痕迹进入 `notes.md`。checkpoint 保存 spec 状态、四个文档和隔离 worktree 的代码位置。
 
+Spec 不是普通文档目录。它负责把模糊目标变成可审阅的计划资产：需求、设计、任务、过程笔记、验证证据和 checkpoint。重要的 session memory 可以沉淀进 spec notes，成为后续继续工作的证据。
+
+## 💾 记忆与沉淀
+
+记忆应该留在哪里？
+
+只留在模型上下文里，下一轮容易丢。只留在日志里，模型不容易用。全量塞回上下文，又会把旧目标拖回现在。
+
+小猫智能体把记忆分成运行连续性和长期资产：
+
+- session memory 由模型在 turn 收口时根据事实写出。
+- working memory 保存当前目标的执行事实。
+- `.kitty/memory/sessions/*.md` 是可审阅的 memory asset。
+- memory asset 可以被用户读取、搜索、删除，也可以沉淀到 spec `notes.md` 或 runtime skill `references/`。
+
+机器保存记忆文本和文件位置。模型判断哪些经验值得复用，哪些历史只适合取证。
+
+## 🧾 运行现场
+
+长任务应该靠模型记住，还是靠本地现场接住？
+
+模型可以理解任务，但不能可靠地替代运行账本。长任务、后台进程、子执行、team 协作和唤醒事实需要一个本地事实层。
+
+小猫智能体用 control plane 保存这些死事实：background、subagent、team execution、派工边界、team 成员、team 消息、pid、状态、退出码、输出摘要、wait policy 和 wake signal。
+
+`kitty status` 让用户看到运行现场：session、memory、execution、team、wake、spec。它只呈现事实，不替模型做判断。
+
+Background 是长任务现场。它记录运行输出摘要，能检查、终止、reconcile，也能在完成后把事实暴露给 lead。
+
+Subagent 和 team 是协作现场。lead 派出有边界的任务后让出当前轮；worker 完成后把 summary/output 写回 execution；host 用内部 wake facts 恢复 lead。wake 是内部事实，不是用户新要求。
+
 ## ⚙️ 模型与机器
 
 判断应该交给模型，还是交给机器？
@@ -63,7 +98,7 @@ Spec 的主流程是 requirements、design、tasks 三阶段；implement、valid
 
 小猫智能体让模型负责活判断，让机器负责死事实。模型决定路线，机器执行工具、保存现场、记录证据、维护边界和暴露验证结果。
 
-Runtime 提供运行边界。Observability 记录事实。Checkpoint 保存可恢复现场。工具执行明确的机器操作。
+Runtime 提供运行边界。Control plane 保存执行账本。Observability 记录事实。Checkpoint 保存可恢复现场。工具执行明确的机器操作。
 
 Agent turn 生命周期负责把当前输入、工具批次、provider 恢复、checkpoint、session diff 和记忆更新串成可恢复的现场。生命周期只保存和暴露事实，不决定路线。
 
