@@ -178,13 +178,14 @@ npm.cmd run verify
 npm.cmd run verify
 ```
 
-## 📜 项目规则
+## 📜 规则与规范
 
-当前架构事实、项目偏好和宪法原则都在 `spec/`。
+当前架构事实和宪法原则在 `spec/`。运行时 agent 规则在 `AGENTS.md`。维护本仓库源码的 Codex 开发规范在 `.codex/skills/kitty-agent-development/SKILL.md`。
 
 重要入口：
 
-- `spec/用户审阅/项目规则/用户偏好.md`
+- `AGENTS.md`
+- `.codex/skills/kitty-agent-development/SKILL.md`
 - `spec/用户审阅/系统核心/核心地图.md`
 - `spec/用户审阅/宪法原则/`
 - `spec/技术实现/`
