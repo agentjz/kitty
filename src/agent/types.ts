@@ -37,6 +37,7 @@ export interface RunTurnOptions {
   abortSignal?: AbortSignal;
   callbacks?: AgentCallbacks;
   fetchAssistantResponse?: (input: ModelRequestInput) => Promise<AssistantResponse>;
+  fetchSessionMemoryResponse?: (input: ModelRequestInput) => Promise<AssistantResponse>;
   recoverySleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
 }
 

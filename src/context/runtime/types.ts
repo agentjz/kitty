@@ -22,7 +22,7 @@ export interface ContextRuntimeSnapshot {
 export interface BuildContextRuntimeSnapshotInput {
   session: Pick<
     SessionRecord,
-    "messages" | "todoItems" | "taskState" | "checkpoint"
+    "messages" | "sessionMemory" | "todoItems" | "taskState" | "checkpoint"
   >;
 }
 
@@ -34,6 +34,7 @@ export interface BuildContextRuntimePromptLayersInput {
   todoItems?: SessionRecord["todoItems"];
   runtimeState?: PromptRuntimeState;
   checkpoint?: SessionCheckpoint;
+  sessionMemory?: SessionRecord["sessionMemory"];
   messages?: SessionRecord["messages"];
 }
 

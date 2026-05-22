@@ -9,6 +9,7 @@ import {
 import { createProviderRecoveryTransition } from "../runtimeTransition.js";
 import { resolveAgentProfile } from "../profiles/registry.js";
 import { emitAssistantFinalOutput, emitAssistantReasoning } from "./finalize.js";
+import { updateSessionMemoryAfterTurn } from "./lifecycle.js";
 import {
   initializeTurnSession,
   persistRecoveryTurn,
@@ -16,7 +17,7 @@ import {
 import { processToolCallBatch } from "./toolBatchLifecycle.js";
 import { resolveToollessTurn } from "./toolless.js";
 import { extendPromptLayersForTurnState } from "./state.js";
-import type { AgentIdentity, RunTurnOptions, RunTurnResult } from "../types.js";
+import type { RunTurnOptions, RunTurnResult } from "../types.js";
 import { ChangeStore } from "../changes/store.js";
 import { loadProjectContext } from "../../context/projectContext.js";
 import { createDefaultAgentToolRegistry } from "../../tools/registry.js";
@@ -55,6 +56,7 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
         projectContext,
         taskState: session.taskState,
         todoItems: session.todoItems,
+        sessionMemory: session.sessionMemory,
         runtimeState: turnRuntimeState,
         checkpoint: session.checkpoint,
         profile,
@@ -143,6 +145,16 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
           session = completed.session;
           continue;
         }
+        completed.result.session = await updateSessionMemoryAfterTurn({
+          session: completed.result.session,
+          input: options.input,
+          response,
+          options,
+          client,
+          requestModel,
+          identity,
+          rootDir: projectContext.stateRootDir,
+        });
         emitAssistantFinalOutput(response, options);
         return completed.result;
       }

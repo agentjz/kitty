@@ -80,7 +80,6 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
     } else if (metadata?.sessionDiff) {
       session = await options.sessionStore.save(noteSessionDiff(session, metadata.sessionDiff));
     }
-
     await recordObservabilityEvent(projectContext.stateRootDir, {
       event: "tool.execution",
       status: result.ok ? "completed" : "failed",

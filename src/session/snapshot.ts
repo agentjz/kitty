@@ -4,6 +4,7 @@ import type {
   ToolCallRecord,
 } from "../types.js";
 import { normalizeSessionCheckpoint } from "./checkpoint.js";
+import { normalizeSessionMemory } from "./memory.js";
 import { normalizeSessionDiffState } from "./sessionDiff.js";
 import {
   createInvalidSessionJsonError,
@@ -24,6 +25,7 @@ const SESSION_SNAPSHOT_KEYS = new Set([
   "title",
   "messageCount",
   "messages",
+  "sessionMemory",
   "todoItems",
   "taskState",
   "checkpoint",
@@ -67,6 +69,7 @@ export function parseSessionSnapshot(raw: string, sessionPath: string): SessionR
     title: readOptionalString(record.title, "title", sessionPath),
     messageCount: typeof record.messageCount === "number" ? Math.trunc(record.messageCount) : 0,
     messages: readMessages(record.messages, sessionPath),
+    sessionMemory: normalizeSessionMemory(record.sessionMemory),
     todoItems: readTodoItems(record.todoItems, sessionPath),
     taskState: readOptionalObject(record.taskState, "taskState", sessionPath) as SessionRecord["taskState"],
     checkpoint: readOptionalObject(record.checkpoint, "checkpoint", sessionPath) as SessionRecord["checkpoint"],
@@ -84,6 +87,7 @@ export function prepareSessionRecordForSave(session: SessionRecord): SessionReco
     title: session.title ?? deriveSessionTitle(normalizedMessages),
     messageCount: normalizedMessages.length,
     messages: normalizedMessages,
+    sessionMemory: normalizeSessionMemory(session.sessionMemory),
     todoItems: deriveTodoItems(normalizedMessages, session.todoItems ?? []),
     taskState: deriveTaskState(normalizedMessages, session.taskState),
   };

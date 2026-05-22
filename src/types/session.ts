@@ -28,10 +28,17 @@ export interface SessionRecord {
   title?: string;
   messageCount: number;
   messages: StoredMessage[];
+  sessionMemory?: SessionMemoryState;
   todoItems?: TodoItem[];
   taskState?: TaskState;
   checkpoint?: SessionCheckpoint;
   sessionDiff?: SessionDiffState;
+}
+
+export interface SessionMemoryState {
+  version: 1;
+  summary: string;
+  updatedAt: string;
 }
 
 export interface SessionDiffChange {

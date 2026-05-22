@@ -28,6 +28,7 @@ export type {
   SessionCheckpointToolBatch,
   SessionDiffChange,
   SessionDiffState,
+  SessionMemoryState,
   SessionRecord,
   SessionRunState,
   SessionRunStateSource,
