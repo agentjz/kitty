@@ -1,4 +1,4 @@
-import { terminateBackgroundExecution } from "../../../../execution/background.js";
+import { terminateBackgroundExecution, waitForRegisteredBackgroundProcess } from "../../../../execution/background.js";
 import { okResult, parseArgs, readString } from "../../../../tools/core/shared.js";
 import type { RegisteredTool } from "../../../../tools/core/types.js";
 
@@ -22,6 +22,7 @@ export const backgroundTerminateTool: RegisteredTool = {
     const args = parseArgs(rawArgs);
     const id = readString(args.id, "id");
     const execution = terminateBackgroundExecution(context.projectContext.stateRootDir, id);
+    await waitForRegisteredBackgroundProcess(id);
     return okResult(JSON.stringify({
       id: execution.id,
       status: execution.status,

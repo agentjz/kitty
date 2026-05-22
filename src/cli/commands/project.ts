@@ -4,6 +4,8 @@ import type { CliOverrides, RuntimeConfig } from "../../types.js";
 import { ui } from "../../utils/console.js";
 import { writeStdoutLine } from "../../utils/stdio.js";
 import { truncateCliValue } from "../cliValues.js";
+import { registerMemoryCommand } from "./memory.js";
+import { registerRuntimeStatusCommand } from "./runtimeStatus.js";
 
 export function registerProjectCommands(
   program: Command,
@@ -17,6 +19,9 @@ export function registerProjectCommands(
     }>;
   },
 ): void {
+  registerRuntimeStatusCommand(program, options);
+  registerMemoryCommand(program, options);
+
   program
     .command("init")
     .description("Create local .kitty/.env and .kitty/.kittyignore files in the current project.")

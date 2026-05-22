@@ -12,6 +12,8 @@ export const subagentLaunchTool: RegisteredTool = {
         type: "object",
         properties: {
           objective: { type: "string" },
+          boundary: { type: "string" },
+          expected_output: { type: "string" },
           prompt: { type: "string" },
           role: { type: "string" },
         },
@@ -27,6 +29,8 @@ export const subagentLaunchTool: RegisteredTool = {
       cwd: context.cwd,
       requestedBy: context.identity.name,
       objective: readString(args.objective, "objective"),
+      boundary: typeof args.boundary === "string" ? args.boundary : undefined,
+      expectedOutput: typeof args.expected_output === "string" ? args.expected_output : undefined,
       prompt: readString(args.prompt, "prompt"),
       role: readString(args.role, "role"),
       config: context.config,
@@ -36,6 +40,7 @@ export const subagentLaunchTool: RegisteredTool = {
       status: execution.status,
       actorName: execution.actorName,
       actorRole: execution.actorRole,
+      assignment: execution.assignment,
       pid: execution.pid,
     }, null, 2));
   },

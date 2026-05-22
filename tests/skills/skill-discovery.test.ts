@@ -74,7 +74,7 @@ test("skills extension lists summaries and explicitly loads full skill content",
     projectContext,
   };
   const registry = createToolRegistry({
-    onlyNames: ["skill_list", "skill_load", "skill_read_resource"],
+    onlyNames: ["skill_list", "skill_load", "skill_read_resource", "skill_run_script", "skill_check"],
     sources: [{
       kind: "host",
       id: "test:skills",
@@ -118,6 +118,85 @@ test("skills extension lists summaries and explicitly loads full skill content",
   assert.match(privateRead.output, /does not declare resource/);
 });
 
+test("skills extension exposes examples and checks declared command dependencies", async (t) => {
+  const root = await createTempWorkspace("skill-check", t);
+  await writeSkill(
+    root,
+    "skills/runner/SKILL.md",
+    "runner",
+    "Script runner method.",
+    "Use scripts when needed.",
+    "node, definitely_missing_kitty_command",
+  );
+  await writeFile(root, "skills/runner/examples/basic.md", "EXAMPLE_BODY");
+  const projectContext = await loadProjectContext(root, { projectDocMaxBytes: 24_576 });
+  const context = {
+    ...createToolContext(root),
+    projectContext,
+  };
+  const registry = createToolRegistry({
+    onlyNames: ["skill_list", "skill_read_resource", "skill_check"],
+    sources: [{
+      kind: "host",
+      id: "test:skills",
+      tools: createSkillTools(),
+    }],
+  });
+
+  const list = parseToolJson((await registry.execute("skill_list", "{}", context)).output);
+  const skill = (list.skills as Array<Record<string, unknown>>)[0]!;
+  assert.deepEqual(skill.dependencies, [{ command: "node" }, { command: "definitely_missing_kitty_command" }]);
+  assert.deepEqual((skill.resources as Array<Record<string, unknown>>).map((resource) => resource.path), [
+    path.join("skills", "runner", "examples", "basic.md"),
+  ]);
+
+  const example = parseToolJson((await registry.execute("skill_read_resource", JSON.stringify({
+    name: "runner",
+    path: path.join("skills", "runner", "examples", "basic.md"),
+  }), context)).output);
+  assert.equal(example.content, "EXAMPLE_BODY");
+
+  const check = parseToolJson((await registry.execute("skill_check", JSON.stringify({ name: "runner" }), context)).output);
+  assert.equal(check.ok, false);
+  const dependencies = check.dependencies as Array<Record<string, unknown>>;
+  assert.equal(dependencies.find((item) => item.command === "node")?.available, true);
+  assert.equal(dependencies.find((item) => item.command === "definitely_missing_kitty_command")?.available, false);
+});
+
+test("skills extension runs only declared script resources", async (t) => {
+  const root = await createTempWorkspace("skill-script", t);
+  await writeSkill(root, "skills/runner/SKILL.md", "runner", "Script runner method.", "Use scripts when needed.");
+  await writeFile(root, "skills/runner/scripts/hello.js", "console.log('hello from skill script');\n");
+  await writeFile(root, "skills/runner/references/not-script.md", "not executable");
+  const projectContext = await loadProjectContext(root, { projectDocMaxBytes: 24_576 });
+  const context = {
+    ...createToolContext(root),
+    projectContext,
+  };
+  const registry = createToolRegistry({
+    onlyNames: ["skill_run_script"],
+    sources: [{
+      kind: "host",
+      id: "test:skills",
+      tools: createSkillTools(),
+    }],
+  });
+
+  const result = parseToolJson((await registry.execute("skill_run_script", JSON.stringify({
+    name: "runner",
+    path: path.join("skills", "runner", "scripts", "hello.js"),
+  }), context)).output);
+  assert.equal(result.ok, true);
+  assert.match(String(result.output), /hello from skill script/);
+
+  const denied = await registry.execute("skill_run_script", JSON.stringify({
+    name: "runner",
+    path: path.join("skills", "runner", "references", "not-script.md"),
+  }), context);
+  assert.equal(denied.ok, false);
+  assert.match(denied.output, /outside scripts/);
+});
+
 async function writeFile(root: string, relativePath: string, body: string): Promise<void> {
   const filePath = path.join(root, relativePath);
   await fs.mkdir(path.dirname(filePath), { recursive: true });
@@ -130,6 +209,7 @@ async function writeSkill(
   name: string,
   description: string,
   body: string,
+  requires?: string,
 ): Promise<void> {
   const filePath = path.join(root, relativePath);
   await fs.mkdir(path.dirname(filePath), { recursive: true });
@@ -137,6 +217,7 @@ async function writeSkill(
     "---",
     `name: ${name}`,
     `description: ${description}`,
+    ...(requires ? [`requires: ${requires}`] : []),
     "---",
     "",
     body,

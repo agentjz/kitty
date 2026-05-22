@@ -38,3 +38,15 @@ test("disabled extensions are not callable", async (t) => {
     /Unknown tool: spec_create/,
   );
 });
+
+test("skills extension registry exposes package loading, resources, scripts, and checks", () => {
+  const names = getExtensionDefinition("skills").createTools().map((tool) => tool.definition.function.name).sort();
+
+  assert.deepEqual(names, [
+    "skill_check",
+    "skill_list",
+    "skill_load",
+    "skill_read_resource",
+    "skill_run_script",
+  ]);
+});

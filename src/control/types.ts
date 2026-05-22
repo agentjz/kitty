@@ -8,6 +8,7 @@ export interface ExecutionRecord {
   id: string;
   kind: ExecutionKind;
   status: ExecutionStatus;
+  assignment?: ExecutionAssignment;
   command?: string;
   prompt?: string;
   actorName?: string;
@@ -25,6 +26,12 @@ export interface ExecutionRecord {
   updatedAt: string;
   finishedAt?: string;
   timeoutMs?: number;
+}
+
+export interface ExecutionAssignment {
+  objective?: string;
+  boundary?: string;
+  expectedOutput?: string;
 }
 
 export interface WakeSignalRecord {
@@ -51,4 +58,3 @@ export interface TeamMessageRecord {
   message: string;
   createdAt: string;
 }
-

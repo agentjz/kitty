@@ -21,6 +21,11 @@ test("execution store tracks background, subagent, and teammate as one lifecycle
   const subagent = store.create({
     kind: "subagent",
     prompt: "inspect provider code",
+    assignment: {
+      objective: "inspect provider",
+      boundary: "read-only",
+      expectedOutput: "summary",
+    },
     cwd: root,
     requestedBy: "lead",
     actorName: "explorer-provider",
@@ -47,6 +52,11 @@ test("execution store tracks background, subagent, and teammate as one lifecycle
   assert.equal(store.load(background.id)?.kind, "background");
   assert.equal(store.load(background.id)?.waitPolicy?.lead, "none");
   assert.equal(store.load(subagent.id)?.status, "completed");
+  assert.deepEqual(store.load(subagent.id)?.assignment, {
+    objective: "inspect provider",
+    boundary: "read-only",
+    expectedOutput: "summary",
+  });
   assert.equal(store.load(subagent.id)?.waitPolicy?.lead, "while_execution_active");
   assert.equal(store.load(subagent.id)?.sessionId, "sub-session");
   assert.equal(store.load(teammate.id)?.kind, "team");

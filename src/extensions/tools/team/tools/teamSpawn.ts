@@ -13,6 +13,9 @@ export const teamSpawnTool: RegisteredTool = {
         properties: {
           name: { type: "string" },
           role: { type: "string" },
+          objective: { type: "string" },
+          boundary: { type: "string" },
+          expected_output: { type: "string" },
           prompt: { type: "string" },
         },
         required: ["name", "role", "prompt"],
@@ -25,6 +28,9 @@ export const teamSpawnTool: RegisteredTool = {
     const result = new TeamStore(context.projectContext.stateRootDir).spawnMember({
       name: readString(args.name, "name"),
       role: readString(args.role, "role"),
+      objective: typeof args.objective === "string" ? args.objective : undefined,
+      boundary: typeof args.boundary === "string" ? args.boundary : undefined,
+      expectedOutput: typeof args.expected_output === "string" ? args.expected_output : undefined,
       prompt: readString(args.prompt, "prompt"),
       cwd: context.cwd,
       requestedBy: context.identity.name,
@@ -33,6 +39,7 @@ export const teamSpawnTool: RegisteredTool = {
     return okResult(JSON.stringify({
       member: result.member,
       executionId: result.execution.id,
+      assignment: result.execution.assignment,
       status: result.execution.status,
     }, null, 2));
   },

@@ -60,10 +60,16 @@ export function buildLeadWakeFacts(executions: readonly ExecutionRecord[]): {
   userInput: string;
   promptBlock: string;
 } {
-  const lines = executions.map((execution) => {
+  const lines = executions.flatMap((execution) => {
     const subject = execution.actorName ?? execution.command ?? execution.id;
     const summary = execution.summary ?? execution.output ?? "";
-    return `- ${execution.kind} ${execution.id}: ${execution.status}; ${subject}${summary ? `; ${summary}` : ""}`;
+    return [
+      `- ${execution.kind} ${execution.id}: ${execution.status}; ${subject}${summary ? `; ${summary}` : ""}`,
+      execution.assignment?.objective ? `  objective: ${execution.assignment.objective}` : undefined,
+      execution.assignment?.boundary ? `  boundary: ${execution.assignment.boundary}` : undefined,
+      execution.assignment?.expectedOutput ? `  expected output: ${execution.assignment.expectedOutput}` : undefined,
+      execution.output && execution.summary !== execution.output ? `  output: ${truncateWakeFact(execution.output)}` : undefined,
+    ].filter((line): line is string => Boolean(line));
   });
 
   const promptBlock = [
@@ -78,4 +84,9 @@ export function buildLeadWakeFacts(executions: readonly ExecutionRecord[]): {
     userInput: createInternalReminder("Delegated execution wake facts are available in the runtime fact block."),
     promptBlock,
   };
+}
+
+function truncateWakeFact(value: string): string {
+  const normalized = value.trim();
+  return normalized.length <= 500 ? normalized : `${normalized.slice(0, 500)}...`;
 }

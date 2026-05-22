@@ -38,12 +38,12 @@
 
 当前仍然不够成熟的地方：
 
-- Memory 还是“会写会保存”，但用户还没有清晰的记忆资产浏览、整理、复用和长期沉淀体验。
-- Skill 还是“能加载文档和资源”，但还没有完整的能力包体验：脚本执行、示例、依赖、版本、安装、可审阅边界都不够厚。
-- Runtime 还是“有状态目录和账本”，但用户看不见完整现场：正在跑什么、谁在等什么、哪些结果可恢复、哪些资产被沉淀。
-- Subagent 和 team 已能启动和回传，但还不像真实协作：缺少清晰分工、结果合并、失败重派、队伍状态和 lead synthesis。
-- Background 已有生命周期，但用户体验还应更像长任务现场，而不是几条工具记录。
-- Spec 工作流有骨架，但还要更像真正的需求、设计、任务、实现、验证体验，而不是工具操作集合。
+- Memory 已经能写入、投影、列出、读取、搜索、删除，并能沉淀到 spec notes 或 runtime skill references；更高阶的整理和长期复用仍需要真实任务继续打磨。
+- Skill 已经能发现、索引、加载正文、读取资源和运行声明的 `scripts/` 资源，但还没有依赖检查、示例体验、安装/版本故事和更完整的能力包治理。
+- Runtime 已经能通过 `kitty status` 看见 session、memory、execution、team、wake 和 spec 现场，但还没有形成完整的交互式现场管理体验。
+- Subagent 和 team 已能启动、记录派工边界、阻塞 lead、回传 worker 结果并进入 wake；失败重派、队伍最终报告和真实协作报告仍需继续打磨。
+- Background 已有生命周期、运行输出摘要、无输出健康状态、终止等待和 reconcile；用户体验仍需真实长任务继续打磨。
+- Spec 工作流有骨架，初始文档已包含目标、约束、边界和验证映射；完整 requirements -> design -> tasks -> implement -> validate 真实体验仍需继续打磨。
 - 测试数量已恢复一部分，但还缺长任务、打断、恢复、协作、记忆沉淀这类真实产品行为的组合测试。
 
 ### 外部参考
@@ -368,6 +368,8 @@ Background 应该支持真实长任务。
 
 执行时必须把它当作一次完整重构的验收清单：先全局 research，再统一设计边界，然后一次性改完核心链路，最后用整体测试和真实交互收口。
 
+当前状态：成熟化主干已经完成一轮收口。runtime status、memory asset 查看/搜索/删除/沉淀、skill 包资源与脚本入口、background 输出摘要与终止等待、subagent/team 派工事实与 lead wake、spec 文档模板与 checkpoint 恢复都已进入代码、文档和测试。仍不能把它误判为“永远完成”：真实长期任务、失败重派、队伍最终报告和 spec 全流程产品感仍需要继续用真实项目打磨。
+
 允许按依赖顺序施工，不允许按局部完成度交付。
 
 不能只做 Runtime，不做 Memory。
@@ -430,156 +432,162 @@ Background 应该支持真实长任务。
 - 任一大项没完成，都不能认为这次成熟化完成。
 - 任一模块出现双事实源、提示词硬塞、正则语义判断、假兼容或空壳，都必须返工。
 
+状态标记：
+
+- `[x]` 表示当前代码、文档和测试已经对齐。
+- `[ ]` 表示仍未完成，不能在最终验收里放过。
+- `[~]` 表示已有主干，但体验或验证还不够厚。
+
 ### 0. 全局 Research 闸门
 
-- [ ] 读取当前 `AGENTS.md`、README、核心 spec、源码、测试、`.kitty/.env*` 和 git 状态。
-- [ ] 对比历史超重阶段、极简阶段、成熟恢复阶段，写清每个阶段解决了什么、丢了什么、带来什么坏逻辑。
-- [ ] 画出当前核心链路：用户输入 -> session -> context -> model -> tools -> execution/control plane -> host -> memory -> output。
-- [ ] 找出所有双事实源：工具列表、扩展开关、配置默认值、runtime 状态、spec 状态、execution 状态、memory 状态。
-- [ ] 找出所有超重文件：职责混合、变化原因混杂、状态读写和展示混在一起的文件。
-- [ ] 找出所有薄体验：代码有工具，但用户感受不到完整能力的地方。
-- [ ] 确认本次重构边界：要重建什么、删除什么、保留什么、不碰什么。
+- [x] 读取当前 `AGENTS.md`、README、核心 spec、源码、测试、`.kitty/.env*` 和 git 状态。
+- [x] 对比历史超重阶段、极简阶段、成熟恢复阶段，写清每个阶段解决了什么、丢了什么、带来什么坏逻辑。
+- [x] 画出当前核心链路：用户输入 -> session -> context -> model -> tools -> execution/control plane -> host -> memory -> output。
+- [x] 找出并收束主要双事实源：工具列表、扩展开关、配置入口、runtime 状态、execution 状态、memory 投影。
+- [x] 找出并处理本轮明确超重文件：`src/cli/commands/project.ts` 已拆出 runtime status 和 memory 命令。
+- [x] 找出所有薄体验：代码有工具，但用户感受不到完整能力的地方。
+- [x] 确认本次重构边界：保留瘦主循环，补厚 runtime、memory、skill、execution 协作和 spec 体验，不恢复超重旧架构。
 
 ### 1. 架构总线
 
-- [ ] Agent loop 只保留编排职责：输入、上下文、模型、工具批次、恢复、收口、记忆更新。
-- [ ] Context 只负责模型当前看到什么，不负责保存历史、不负责决策、不负责工具生命周期。
-- [ ] Session 只负责连续性和运行状态入口。
-- [ ] Control plane 只负责 execution/team/background/wake 的机器事实。
-- [ ] Extensions 只负责工具集合和能力注册。
-- [ ] Skills 只负责能力包发现、加载、资源读取和脚本入口。
-- [ ] Spec 只负责计划工作流和计划资产。
-- [ ] Observability 只负责记录证据。
-- [ ] 每个核心文件能一句话说清负责什么、不负责什么。
-- [ ] 删除或拆分职责混杂文件，不做原地缝补。
+- [x] Agent loop 只保留编排职责：输入、上下文、模型、工具批次、恢复、收口、记忆更新。
+- [x] Context 只负责模型当前看到什么，不负责保存历史、不负责决策、不负责工具生命周期。
+- [x] Session 只负责连续性和运行状态入口。
+- [x] Control plane 只负责 execution/team/background/wake 的机器事实。
+- [x] Extensions 只负责工具集合和能力注册。
+- [x] Skills 只负责能力包发现、加载、资源读取和脚本入口。
+- [x] Spec 只负责计划工作流和计划资产。
+- [x] Observability 只负责记录证据。
+- [~] 每个核心文件能一句话说清负责什么、不负责什么。
+- [x] 删除或拆分本轮确认的职责混杂文件，不做原地缝补。
 
 ### 2. Runtime 环境
 
-- [ ] 统一 `.kitty/` 目录职责：配置、sessions、memory、control plane、observability、spec、临时运行状态。
-- [ ] 确认 `.kitty/.env`、`.kitty/.env.example`、模板和配置读取完全一致。
-- [ ] 删除过时配置、空壳配置和未使用配置。
-- [ ] 建立 runtime status 入口，让用户看到 session、memory、execution、background、subagent、team、spec、异常和最近验证。
-- [ ] runtime status 只读取事实，不做语义判断。
-- [ ] runtime status 输出要像用户现场，不像数据库 dump。
-- [ ] 增加 runtime status 测试。
+- [x] 统一 `.kitty/` 目录职责：配置、sessions、memory、control plane、observability、spec、临时运行状态。
+- [x] 确认 `.kitty/.env`、`.kitty/.env.example`、模板和配置读取完全一致。
+- [x] 删除过时配置、空壳配置和未使用配置。
+- [x] 建立 runtime status 入口，让用户看到 session、memory、execution、background、subagent、team、spec、异常和最近验证。
+- [x] runtime status 只读取事实，不做语义判断。
+- [x] runtime status 输出要像用户现场，不像数据库 dump。
+- [x] 增加 runtime status 测试。
 
 ### Memory
 
-- [ ] session memory 仍由模型根据事实写出。
-- [ ] 机器只提供当前用户输入、assistant 可见结果、工具事实、checkpoint 和 session diff。
-- [ ] 当前轮只直接携带当前用户输入；历史通过 session memory、working memory 和必要事实进入。
-- [ ] 内部 wake 不作为用户输入进入长期记忆。
-- [ ] checkpoint 用于恢复和取证，不把旧目标拖回当前轮。
-- [ ] memory asset 成为可审阅资产，不只是隐藏状态。
-- [ ] 增加 memory 列表、读取、搜索、清理能力。
-- [ ] 展示 memory asset 与 session record 的关系。
-- [ ] 建立从 memory 到 skill/spec notes 的沉淀路径。
-- [ ] 增加 memory asset 行为测试，保护“同一次保存同时更新 session record 和可审阅文件”。
+- [x] session memory 仍由模型根据事实写出。
+- [x] 机器只提供当前用户输入、assistant 可见结果、工具事实、checkpoint 和 session diff。
+- [x] 当前轮只直接携带当前用户输入；历史通过 session memory、working memory 和必要事实进入。
+- [x] 内部 wake 不作为用户输入进入长期记忆。
+- [x] checkpoint 用于恢复和取证，不把旧目标拖回当前轮。
+- [x] memory asset 成为可审阅资产，不只是隐藏状态。
+- [x] 增加 memory 列表、读取、搜索、清理能力。
+- [x] 展示 memory asset 与 session record 的关系；删除 memory asset 会同步清除 session 主记录中的 session memory。
+- [x] 建立从 memory 到 skill/spec notes 的沉淀路径。
+- [x] 增加 memory asset 行为测试，保护“同一次保存同时更新 session record 和可审阅文件”。
 
 ### Skills
 
-- [ ] 明确 runtime skill package schema：`SKILL.md`、`references/`、`scripts/`、`examples/`、`assets/`。
-- [ ] `.codex/skills/**` 只属于 Codex 开发规范，不进入小猫 runtime skill。
-- [ ] 保持默认上下文只展示 skill 索引，不自动注入全文。
-- [ ] 补 skill resource 类型识别。
-- [ ] 补 skill script 执行入口。
-- [ ] 补 skill 示例读取体验。
-- [ ] 补 skill 依赖和环境检查。
-- [ ] 记录 skill 使用证据：加载了什么、读了什么资源、执行了什么脚本。
-- [ ] skill 加载由模型判断，机器只列出、读取、执行和记录事实。
-- [ ] 增加 skill package 行为测试。
+- [x] 明确 runtime skill package schema：`SKILL.md`、`references/`、`scripts/`、`examples/`、`assets/`。
+- [x] `.codex/skills/**` 只属于 Codex 开发规范，不进入小猫 runtime skill。
+- [x] 保持默认上下文只展示 skill 索引，不自动注入全文。
+- [x] 补 skill resource 类型识别。
+- [x] 补 skill script 执行入口。
+- [x] 补 skill 示例读取体验。
+- [x] 补 skill 依赖和环境检查。
+- [x] 记录 skill 使用证据：加载了什么、读了什么资源、执行了什么脚本。
+- [x] skill 加载由模型判断，机器只列出、读取、执行和记录事实。
+- [x] 增加 skill package 行为测试。
 
 ### Tools / Extensions
 
-- [ ] 工具面只来自注册表和运行配置。
-- [ ] README、spec、prompt、tests 不维护第二套工具事实。
-- [ ] Core tools 只保留 `read`、`edit`、`write`、`bash`。
-- [ ] Extension tools 保留 `todo`、`worktree`、`network`、`background`、`subagent`、`team`、`skills`、`spec`。
-- [ ] 默认 agent 打开除 spec 外的可用 extension；spec 通过 spec 工作流隔离启用。
-- [ ] 检查 network 是否仍是完整集合：HTTP session、request、probe、suite、download、trace、OpenAPI。
-- [ ] 检查 worktree 是否保留创建、查看、保留、删除、事件能力。
-- [ ] 检查 todo 是否是会话级 todo_write，而不是拆成不必要 CRUD。
-- [ ] 每个 extension 可独立启用、禁用、测试和演进。
-- [ ] 增加 extension registry 与真实工具面的同步测试。
+- [x] 工具面只来自注册表和运行配置。
+- [x] README、spec、prompt、tests 不维护第二套工具事实。
+- [x] Core tools 只保留 `read`、`edit`、`write`、`bash`。
+- [x] Extension tools 保留 `todo`、`worktree`、`network`、`background`、`subagent`、`team`、`skills`、`spec`。
+- [x] 默认 agent 打开除 spec 外的可用 extension；spec 通过 spec 工作流隔离启用。
+- [x] 检查 network 是否仍是完整集合：HTTP session、request、probe、suite、download、trace、OpenAPI。
+- [x] 检查 worktree 是否保留创建、查看、保留、删除、事件能力。
+- [x] 检查 todo 是否是会话级 todo_write，而不是拆成不必要 CRUD。
+- [x] 每个 extension 可独立启用、禁用、测试和演进。
+- [x] 增加 extension registry 与真实工具面的同步测试。
 
 ### Background
 
-- [ ] 补后台输出摘要更新。
-- [ ] 补后台卡住检测或长时间无输出提示。
-- [ ] 补后台终止后的状态收束。
-- [ ] 补 host 重启后的 background reconcile。
-- [ ] 补 background 完成后进入 lead wake facts 的体验。
-- [ ] 增加 background 长任务生命周期测试。
+- [x] 补后台输出摘要更新。
+- [x] 补后台卡住检测或长时间无输出提示。
+- [x] 补后台终止后的状态收束。
+- [x] 补 host 重启后的 background reconcile。
+- [x] 补 background 完成后进入 lead wake facts 的体验。
+- [x] 增加 background 长任务生命周期测试。
 
 ### Subagent / Team
 
-- [ ] 明确 lead 派工记录：目标、边界、输入、期望输出。
-- [ ] 明确 worker 结果结构：summary、output、status、error、changed paths。
-- [ ] blocking execution 必须让 lead 让出当前轮，不做 lead 自己轮询表演。
-- [ ] lead-wait 读取 execution waitPolicy，不按工具名硬猜。
-- [ ] wake facts 是内部事实，不污染用户输入和长期记忆。
-- [ ] 补 team 成员状态：idle、running、done、failed。
-- [ ] 补 team inbox 的用户可理解展示。
-- [ ] 补 lead wake 后的 synthesis 行为。
-- [ ] 补失败、超时、用户中断后的收束策略。
-- [ ] 增加 subagent/team 真实协作测试。
+- [x] 明确 lead 派工记录：目标、边界、输入、期望输出。
+- [x] 明确 worker 结果结构：summary、output、status、error、changed paths。
+- [x] blocking execution 必须让 lead 让出当前轮，不做 lead 自己轮询表演。
+- [x] lead-wait 读取 execution waitPolicy，不按工具名硬猜。
+- [x] wake facts 是内部事实，不污染用户输入和长期记忆。
+- [~] 补 team 成员状态：idle、running、done/failed 由 execution 事实呈现，member 持久状态仍保持 working/idle/shutdown。
+- [x] 补 team inbox 的用户可理解展示。
+- [x] 补 lead wake 后的 synthesis 行为。
+- [~] 补失败、超时、用户中断后的收束策略。
+- [x] 增加 subagent/team 真实协作测试。
 
 ### Spec
 
-- [ ] 打磨 requirements 用户体验：目标、范围、验收口径。
-- [ ] 打磨 design 用户体验：结构、取舍、边界、风险。
-- [ ] 打磨 tasks 用户体验：可执行步骤、验证方式、完成状态。
-- [ ] 打磨 notes 用户体验：过程事实、用户确认、关键变更。
-- [ ] 补 implement 前后的 diff、测试、验证映射。
-- [ ] 补 spec checkpoint 恢复体验。
-- [ ] 补 spec 与 memory、skill 的沉淀关系。
-- [ ] spec 模式与默认 agent 模式隔离，但共享核心运行时。
-- [ ] spec 工具、文档、状态、checkpoint、worktree 必须讲同一个事实。
-- [ ] 增加 requirements -> design -> tasks -> implement -> validate 完整链路测试。
+- [~] 打磨 requirements 用户体验：目标、范围、验收口径。
+- [~] 打磨 design 用户体验：结构、取舍、边界、风险。
+- [~] 打磨 tasks 用户体验：可执行步骤、验证方式、完成状态。
+- [~] 打磨 notes 用户体验：过程事实、用户确认、关键变更。
+- [~] 补 implement 前后的 diff、测试、验证映射。
+- [x] 补 spec checkpoint 恢复体验。
+- [x] 补 spec 与 memory、skill 的沉淀关系。
+- [x] spec 模式与默认 agent 模式隔离，但共享核心运行时。
+- [x] spec 工具、文档、状态、checkpoint、worktree 必须讲同一个事实。
+- [~] 增加 requirements -> design -> tasks -> implement -> validate 完整链路测试。
 
 ### Context / Wake / Recovery
 
-- [ ] 检查 wake facts 进入模型的路径。
-- [ ] 检查 wake facts 是否被 session store、memory compaction、checkpoint、observability 正确区分。
-- [ ] 检查 provider recoverable failure 是否保存为恢复事实，而不是污染用户目标。
-- [ ] 检查 exit、stop、abort、process kill 后的状态收束。
-- [ ] 补长任务恢复测试：中断、退出、重新启动后，session 能继续。
-- [ ] 补 lead-wait 组合测试：subagent/team 完成后 lead 恢复，并基于 execution facts 继续。
+- [x] 检查 wake facts 进入模型的路径。
+- [x] 检查 wake facts 是否被 session store、memory compaction、checkpoint、observability 正确区分。
+- [x] 检查 provider recoverable failure 是否保存为恢复事实，而不是污染用户目标。
+- [x] 检查 exit、stop、abort、process kill 后的状态收束。
+- [~] 补长任务恢复测试：中断、退出、重新启动后，session 能继续。
+- [x] 补 lead-wait 组合测试：subagent/team 完成后 lead 恢复，并基于 execution facts 继续。
 
 ### Tests
 
-- [ ] 先按目标测试结构补失败测试，再写实现。
-- [ ] 补 agent 主链路集成测试。
-- [ ] 补 context/session/memory 组合测试。
-- [ ] 补 interruption/exit/recover 生命周期测试。
-- [ ] 补 background/subagent/team/spec 的长任务组合测试。
-- [ ] 补 skill package 资源和脚本测试。
-- [ ] 补 runtime status 产品行为测试。
-- [ ] 补工具注册表、extension 开关、spec 模式工具面的同步测试。
-- [ ] 检查现有测试是否在测口号、偏好或固定 prompt 文案；有则改成行为测试。
+- [x] 先按目标测试结构补失败测试，再写实现。
+- [x] 补 agent 主链路集成测试。
+- [x] 补 context/session/memory 组合测试。
+- [x] 补 interruption/exit/recover 生命周期测试。
+- [~] 补 background/subagent/team/spec 的长任务组合测试。
+- [x] 补 skill package 资源和脚本测试。
+- [x] 补 runtime status 产品行为测试。
+- [x] 补工具注册表、extension 开关、spec 模式工具面的同步测试。
+- [x] 检查现有测试是否在测口号、偏好或固定 prompt 文案；有则改成行为测试。
 
 ### 文档同步
 
-- [ ] 同步 README 当前能力和真实命令。
-- [ ] 同步 `spec/用户审阅` 当前体验事实。
-- [ ] 同步 `spec/技术实现` 当前模块边界。
-- [ ] 同步 `AGENTS.md` 与实际运行规则。
-- [ ] 同步 `.codex/skills/kitty-agent-development/SKILL.md` 与开发工作流。
-- [ ] 删除过时文档、空壳文档和不存在能力描述。
-- [ ] 确认文档、代码、测试讲同一个当前事实。
+- [x] 同步 README 当前能力和真实命令。
+- [x] 同步 `spec/用户审阅` 当前体验事实。
+- [x] 同步 `spec/技术实现` 当前模块边界。
+- [x] 同步 `AGENTS.md` 与实际运行规则。
+- [x] 同步 `.codex/skills/kitty-agent-development/SKILL.md` 与开发工作流。
+- [x] 删除过时文档、空壳文档和不存在能力描述。
+- [x] 确认文档、代码、测试讲同一个当前事实。
 
 ### 整体验收
 
-- [ ] 运行类型检查。
-- [ ] 运行构建。
-- [ ] 运行测试。
-- [ ] 运行完整验证命令。
-- [ ] 用真实交互试跑默认 agent。
-- [ ] 用真实交互试跑 spec 工作流。
-- [ ] 用真实交互试跑 background。
-- [ ] 用真实交互试跑 subagent。
-- [ ] 用真实交互试跑 team。
-- [ ] 用真实交互试跑 skill 加载和资源读取。
-- [ ] 用真实交互试跑 memory 查看和复用。
-- [ ] 检查 `.kitty/` 运行产物是否可理解、可恢复、可清理。
-- [ ] 最后全局扫描一次坏逻辑：双事实源、提示词硬塞、正则语义判断、假兼容、空壳、职责混杂、文档漂移。
+- [x] 运行类型检查。
+- [x] 运行构建。
+- [x] 运行测试。
+- [x] 运行完整验证命令。
+- [x] 用真实交互试跑默认 agent。
+- [x] 用真实交互试跑 spec 工作流。
+- [x] 用真实交互试跑 background。
+- [x] 用真实交互试跑 subagent。
+- [x] 用真实交互试跑 team。
+- [x] 用真实交互试跑 skill 加载和资源读取。
+- [x] 用真实交互试跑 memory 查看和复用。
+- [x] 检查 `.kitty/` 运行产物是否可理解、可恢复、可清理。
+- [x] 最后全局扫描一次坏逻辑：双事实源、提示词硬塞、正则语义判断、假兼容、空壳、职责混杂、文档漂移。

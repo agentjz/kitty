@@ -51,3 +51,24 @@ test("background reconcile marks dead running pid as stale", async (t) => {
   assert.equal(reloaded?.status, "stale");
   assert.match(String(reloaded?.summary), /disappeared/i);
 });
+
+test("background execution store records running output summaries", async (t) => {
+  const root = await createTempWorkspace("background-running-output", t);
+  const store = new BackgroundExecutionStore(root);
+  const job = store.create({
+    command: "long command",
+    cwd: root,
+    requestedBy: "lead",
+  });
+  store.markRunning(job.id, { pid: process.pid });
+
+  store.updateRunningOutput(job.id, {
+    output: "step one\nstep two\n",
+    summary: "step two",
+  });
+  const running = store.load(job.id);
+
+  assert.equal(running?.status, "running");
+  assert.equal(running?.summary, "step two");
+  assert.match(running?.output ?? "", /step one/);
+});

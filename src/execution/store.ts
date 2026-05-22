@@ -9,6 +9,7 @@ export class ExecutionStore {
 
   create(input: {
     kind: ExecutionKind;
+    assignment?: ExecutionRecord["assignment"];
     command?: string;
     prompt?: string;
     cwd: string;

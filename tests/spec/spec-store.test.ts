@@ -24,10 +24,18 @@ test("spec store persists documents, state, session binding, and checkpoints", a
   assert.ok(created.workspace?.path);
   assert.match(created.workspace?.branch ?? "", /^spec\//);
   assert.match(await store.readDocument(created.id, "requirements"), /^# Requirements/);
+  assert.match(await store.readDocument(created.id, "requirements"), /## Goal/);
   assert.match(await store.readDocument(created.id, "requirements"), /## Success Criteria/);
+  assert.match(await store.readDocument(created.id, "requirements"), /## Constraints/);
   assert.match(await store.readDocument(created.id, "design"), /^# Design/);
+  assert.match(await store.readDocument(created.id, "design"), /## Boundaries/);
+  assert.match(await store.readDocument(created.id, "design"), /## Verification/);
   assert.match(await store.readDocument(created.id, "tasks"), /Confirm requirements/);
+  assert.match(await store.readDocument(created.id, "tasks"), /## Validation Map/);
+  assert.match(await store.readDocument(created.id, "tasks"), /## Implementation Evidence/);
   assert.match(await store.readDocument(created.id, "notes"), /factual interview notes/);
+  assert.match(await store.readDocument(created.id, "notes"), /## User Wording/);
+  assert.match(await store.readDocument(created.id, "notes"), /## Review Evidence/);
 
   const requirements = "# Requirements\n\n- Confirm local developer user.\n";
   await store.writeDocument(created.id, "requirements", requirements);

@@ -7,7 +7,7 @@ import { InProcessSessionStore } from "../../src/session/store.js";
 import { readUserInput } from "../../src/session/turnFrame.js";
 import { createToolRegistry } from "../../src/tools/core/registry.js";
 import { ExecutionStore } from "../../src/execution/store.js";
-import { hasUnsettledLeadWaitExecutions } from "../../src/execution/leadWait.js";
+import { buildLeadWakeFacts, hasUnsettledLeadWaitExecutions } from "../../src/execution/leadWait.js";
 import { createTestRuntimeConfig, createTempWorkspace } from "../helpers.js";
 import type { AssistantResponse } from "../../src/agent/types.js";
 import type { RegisteredTool } from "../../src/tools/core/types.js";
@@ -224,6 +224,35 @@ test("lead wait settlement follows the execution wait policy terminal statuses",
   });
 
   assert.equal(hasUnsettledLeadWaitExecutions(root, [execution.id]), false);
+});
+
+test("lead wake facts include assignment boundaries and worker output for synthesis", async (t) => {
+  const root = await createTempWorkspace("lead-wake-assignment-facts", t);
+  const store = new ExecutionStore(root);
+  const execution = store.create({
+    kind: "subagent",
+    prompt: "inspect context code",
+    assignment: {
+      objective: "Inspect context runtime",
+      boundary: "Read-only source review",
+      expectedOutput: "List the lifecycle risks",
+    },
+    cwd: root,
+    requestedBy: "lead",
+    actorName: "explorer",
+  });
+  const closed = store.close(execution.id, {
+    status: "completed",
+    summary: "context lifecycle reviewed",
+    output: "Risk: wake facts must stay internal.",
+  });
+
+  const facts = buildLeadWakeFacts([closed]).promptBlock;
+
+  assert.match(facts, /objective: Inspect context runtime/);
+  assert.match(facts, /boundary: Read-only source review/);
+  assert.match(facts, /expected output: List the lifecycle risks/);
+  assert.match(facts, /Risk: wake facts must stay internal/);
 });
 
 function createDelegatingTool(createExecution: () => string, name = "delegate_once"): RegisteredTool {

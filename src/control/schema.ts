@@ -6,6 +6,7 @@ export function initializeControlPlaneSchema(db: Database.Database): void {
       id TEXT PRIMARY KEY,
       kind TEXT NOT NULL,
       status TEXT NOT NULL,
+      assignment_json TEXT,
       command TEXT,
       prompt TEXT,
       actor_name TEXT,
@@ -59,6 +60,7 @@ export function initializeControlPlaneSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_team_messages_recipient ON team_messages(recipient);
   `);
   ensureColumn(db, "executions", "prompt", "TEXT");
+  ensureColumn(db, "executions", "assignment_json", "TEXT");
   ensureColumn(db, "executions", "actor_name", "TEXT");
   ensureColumn(db, "executions", "actor_role", "TEXT");
   ensureColumn(db, "executions", "wait_policy_json", "TEXT");
@@ -71,4 +73,3 @@ function ensureColumn(db: Database.Database, table: string, column: string, defi
   }
   db.prepare(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`).run();
 }
-

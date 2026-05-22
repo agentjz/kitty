@@ -27,6 +27,8 @@ test("subagent extension launches a recorded agent execution", async (t) => {
 
   const result = await launch.execute(JSON.stringify({
     objective: "Inspect provider config.",
+    boundary: "Read provider files only.",
+    expected_output: "Return config path summary.",
     prompt: "Read src/provider and summarize the config path.",
     role: "explorer",
   }), context);
@@ -38,4 +40,9 @@ test("subagent extension launches a recorded agent execution", async (t) => {
   assert.equal(execution?.kind, "subagent");
   assert.equal(execution?.actorRole, "explorer");
   assert.equal(execution?.requestedBy, "lead");
+  assert.deepEqual(execution?.assignment, {
+    objective: "Inspect provider config.",
+    boundary: "Read provider files only.",
+    expectedOutput: "Return config path summary.",
+  });
 });

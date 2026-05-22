@@ -8,6 +8,8 @@ export function launchSubagentExecution(input: {
   requestedBy: string;
   role: string;
   objective: string;
+  boundary?: string;
+  expectedOutput?: string;
   prompt: string;
   config: RuntimeConfig;
 }): ExecutionRecord {
@@ -15,6 +17,11 @@ export function launchSubagentExecution(input: {
   const execution = store.create({
     kind: "subagent",
     prompt: input.prompt,
+    assignment: {
+      objective: input.objective,
+      boundary: input.boundary,
+      expectedOutput: input.expectedOutput,
+    },
     cwd: input.cwd,
     requestedBy: input.requestedBy,
     actorName: buildSubagentName(input.role, input.objective),

@@ -3,12 +3,17 @@ export interface SkillResourceSummary {
   size: number;
 }
 
+export interface SkillDependencySummary {
+  command: string;
+}
+
 export interface LoadedSkill {
   name: string;
   description: string;
   path: string;
   absolutePath: string;
   body: string;
+  dependencies: SkillDependencySummary[];
   resources: SkillResourceSummary[];
 }
 

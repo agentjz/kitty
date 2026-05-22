@@ -10,6 +10,7 @@ interface ExecutionRow {
   id: string;
   kind: string;
   status: string;
+  assignment_json: string | null;
   command: string | null;
   prompt: string | null;
   actor_name: string | null;
@@ -38,6 +39,7 @@ export class ExecutionLedgerRepo {
     status?: Extract<ExecutionStatus, "created" | "running">;
     command?: string;
     prompt?: string;
+    assignment?: ExecutionRecord["assignment"];
     actorName?: string;
     actorRole?: string;
     cwd: string;
@@ -52,6 +54,7 @@ export class ExecutionLedgerRepo {
       id: input.id ?? createControlPlaneId("exec"),
       kind: input.kind,
       status: input.status ?? "created",
+      assignment: normalizeExecutionAssignment(input.assignment),
       command: input.command,
       prompt: input.prompt,
       actorName: input.actorName,
@@ -68,10 +71,10 @@ export class ExecutionLedgerRepo {
     };
     this.db.prepare(`
       INSERT INTO executions (
-        id, kind, status, command, prompt, actor_name, actor_role, cwd, requested_by, session_id, pid, exit_code,
+        id, kind, status, assignment_json, command, prompt, actor_name, actor_role, cwd, requested_by, session_id, pid, exit_code,
         output, summary, wait_policy_json, created_at, started_at, updated_at, finished_at, timeout_ms
       ) VALUES (
-        @id, @kind, @status, @command, @prompt, @actorName, @actorRole, @cwd, @requestedBy, @sessionId, @pid, @exitCode,
+        @id, @kind, @status, @assignmentJson, @command, @prompt, @actorName, @actorRole, @cwd, @requestedBy, @sessionId, @pid, @exitCode,
         @output, @summary, @waitPolicyJson, @createdAt, @startedAt, @updatedAt, @finishedAt, @timeoutMs
       )
     `).run(toExecutionRow(record));
@@ -141,6 +144,7 @@ export class ExecutionLedgerRepo {
       UPDATE executions SET
         kind=@kind,
         status=@status,
+        assignment_json=@assignmentJson,
         command=@command,
         prompt=@prompt,
         actor_name=@actorName,
@@ -173,6 +177,7 @@ function toExecutionRow(record: ExecutionRecord): Record<string, unknown> {
     id: record.id,
     kind: record.kind,
     status: record.status,
+    assignmentJson: record.assignment ? JSON.stringify(record.assignment) : null,
     command: record.command,
     prompt: record.prompt,
     actorName: record.actorName,
@@ -198,6 +203,7 @@ function fromExecutionRow(row: ExecutionRow): ExecutionRecord {
     id: row.id,
     kind: row.kind as ExecutionKind,
     status: row.status as ExecutionStatus,
+    assignment: readAssignment(row.assignment_json),
     command: row.command ?? undefined,
     prompt: row.prompt ?? undefined,
     actorName: row.actor_name ?? undefined,
@@ -216,6 +222,36 @@ function fromExecutionRow(row: ExecutionRow): ExecutionRecord {
     finishedAt: row.finished_at ?? undefined,
     timeoutMs: row.timeout_ms ?? undefined,
   };
+}
+
+function normalizeExecutionAssignment(value: ExecutionRecord["assignment"]): ExecutionRecord["assignment"] {
+  if (!value) {
+    return undefined;
+  }
+
+  const assignment = {
+    objective: normalizeAssignmentField(value.objective),
+    boundary: normalizeAssignmentField(value.boundary),
+    expectedOutput: normalizeAssignmentField(value.expectedOutput),
+  };
+  return assignment.objective || assignment.boundary || assignment.expectedOutput ? assignment : undefined;
+}
+
+function readAssignment(value: string | null): ExecutionRecord["assignment"] {
+  if (!value) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as ExecutionRecord["assignment"];
+    return normalizeExecutionAssignment(parsed);
+  } catch {
+    return undefined;
+  }
+}
+
+function normalizeAssignmentField(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 function normalizeExecutionWaitPolicy(kind: ExecutionKind, value?: LeadWaitPolicyInput): LeadWaitPolicy {
@@ -259,4 +295,3 @@ function isSameOrDescendant(targetPath: string, possibleAncestor: string): boole
   const relative = path.relative(possibleAncestor, targetPath);
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
-

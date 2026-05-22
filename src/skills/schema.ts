@@ -32,6 +32,7 @@ export function parseSkillSource(
     path: path.relative(input.rootDir, input.absolutePath) || "SKILL.md",
     absolutePath: input.absolutePath,
     body,
+    dependencies: parseDependencies(metadata.requires),
     resources: [],
   };
 }
@@ -59,4 +60,16 @@ function readRequiredText(value: string | undefined, key: string, filePath: stri
     throw new SkillSchemaError(`Skill metadata field "${key}" is required.`, filePath);
   }
   return normalized;
+}
+
+function parseDependencies(value: string | undefined): LoadedSkill["dependencies"] {
+  if (!value?.trim()) {
+    return [];
+  }
+
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((command) => ({ command }));
 }

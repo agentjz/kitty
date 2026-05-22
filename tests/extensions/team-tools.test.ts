@@ -32,6 +32,9 @@ test("team extension records teammates, messages, inbox reads, and teammate exec
   const spawned = parseToolJson((await spawn.execute(JSON.stringify({
     name: "alpha",
     role: "implementer",
+    objective: "Implement config change.",
+    boundary: "Only inspect src/config.",
+    expected_output: "Return changed paths.",
     prompt: "Implement the config change.",
   }), context)).output);
   await send.execute(JSON.stringify({
@@ -44,6 +47,11 @@ test("team extension records teammates, messages, inbox reads, and teammate exec
   assert.equal(typeof spawned.executionId, "string");
   assert.equal(member?.status, "working");
   assert.equal(member?.role, "implementer");
+  assert.deepEqual(spawned.assignment, {
+    objective: "Implement config change.",
+    boundary: "Only inspect src/config.",
+    expectedOutput: "Return changed paths.",
+  });
   assert.equal(Array.isArray(inbox.messages), true);
   assert.equal((inbox.messages as unknown[]).length, 1);
 });

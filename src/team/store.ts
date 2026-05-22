@@ -13,6 +13,9 @@ export class TeamStore {
   spawnMember(input: {
     name: string;
     role: string;
+    objective?: string;
+    boundary?: string;
+    expectedOutput?: string;
     prompt: string;
     cwd: string;
     requestedBy: string;
@@ -22,6 +25,11 @@ export class TeamStore {
     const created = executionStore.create({
       kind: "team",
       prompt: input.prompt,
+      assignment: {
+        objective: input.objective,
+        boundary: input.boundary,
+        expectedOutput: input.expectedOutput,
+      },
       cwd: input.cwd,
       requestedBy: input.requestedBy,
       actorName: input.name,
