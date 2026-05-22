@@ -1,4 +1,6 @@
-export const KITTY_ENV = {
+import { EXTENSION_ENV_KEYS } from "../extensions/definitions.js";
+
+export const KITTY_BASE_ENV = {
   apiKey: "KITTY_API_KEY",
   provider: "KITTY_PROVIDER",
   baseUrl: "KITTY_BASE_URL",
@@ -14,10 +16,6 @@ export const KITTY_ENV = {
   projectDocMaxBytes: "KITTY_PROJECT_DOC_MAX_BYTES",
   commandStallTimeoutMs: "KITTY_COMMAND_STALL_TIMEOUT_MS",
   showReasoning: "KITTY_SHOW_REASONING",
-  extensionTodo: "KITTY_EXTENSION_TODO",
-  extensionWorktree: "KITTY_EXTENSION_WORKTREE",
-  extensionNetwork: "KITTY_EXTENSION_NETWORK",
-  extensionSpec: "KITTY_EXTENSION_SPEC",
   telegramToken: "KITTY_TELEGRAM_TOKEN",
   telegramAllowedUserIds: "KITTY_TELEGRAM_ALLOWED_USER_IDS",
   telegramApiBaseUrl: "KITTY_TELEGRAM_API_BASE_URL",
@@ -32,4 +30,9 @@ export const KITTY_ENV = {
   telegramDeliveryMaxDelayMs: "KITTY_TELEGRAM_DELIVERY_MAX_DELAY_MS",
 } as const;
 
-export type KittyEnvKey = (typeof KITTY_ENV)[keyof typeof KITTY_ENV];
+export const KITTY_ENV = {
+  ...KITTY_BASE_ENV,
+  extensions: EXTENSION_ENV_KEYS,
+} as const;
+
+export type KittyEnvKey = (typeof KITTY_BASE_ENV)[keyof typeof KITTY_BASE_ENV] | (typeof EXTENSION_ENV_KEYS)[keyof typeof EXTENSION_ENV_KEYS];

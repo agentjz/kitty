@@ -14,6 +14,7 @@ export interface ProjectStatePaths {
   rootDir: string;
   kittyDir: string;
   extensionsDir: string;
+  controlPlaneLedgerFile: string;
   observabilityDir: string;
   observabilityEventsDir: string;
   observabilityCrashesDir: string;
@@ -28,6 +29,7 @@ export function getProjectStatePaths(rootDir: string): ProjectStatePaths {
     rootDir: normalizedRoot,
     kittyDir,
     extensionsDir,
+    controlPlaneLedgerFile: path.join(kittyDir, "control-plane.sqlite"),
     observabilityDir,
     observabilityEventsDir: path.join(observabilityDir, "events"),
     observabilityCrashesDir: path.join(observabilityDir, "crashes"),

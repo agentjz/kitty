@@ -7,7 +7,8 @@ test("cli program exposes current top-level commands", () => {
   const program = buildCliProgram();
   const commands = program.commands.map((command) => command.name());
 
-  for (const name of ["agent", "spec", "resume", "sessions", "config", "init", "changes", "undo", "diff", "doctor", "telegram", "version"]) {
+  for (const name of ["agent", "spec", "resume", "sessions", "config", "init", "changes", "undo", "diff", "doctor", "telegram", "version", "__worker__"]) {
     assert.equal(commands.includes(name), true, `${name} command should exist`);
   }
+  assert.equal(program.helpInformation().includes("__worker__"), false);
 });

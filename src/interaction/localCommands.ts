@@ -1,5 +1,6 @@
 import { resetProjectRuntime } from "../project/reset.js";
 import type { RuntimeConfig, SessionRecord } from "../types.js";
+import { formatLocalCommandHelpLine, isLocalCommand, normalizeLocalCommand } from "./localCommandDefinitions.js";
 import type { ShellOutputPort } from "./shell.js";
 
 export interface LocalCommandContext {
@@ -10,15 +11,8 @@ export interface LocalCommandContext {
 
 export type LocalCommandResult = "continue" | "handled" | "quit" | "multiline";
 
-const EXIT_COMMANDS = new Set(["q", "quit", "exit", "/q", "/quit", "/exit"]);
-const RESET_COMMANDS = new Set(["reset", "/reset"]);
-const HELP_COMMANDS = new Set(["/help"]);
-const SESSION_COMMANDS = new Set(["/session"]);
-const CONFIG_COMMANDS = new Set(["/config"]);
-const MULTILINE_COMMANDS = new Set(["/multi"]);
-
 export function isExplicitExitCommand(input: string): boolean {
-  return EXIT_COMMANDS.has(input.trim().toLowerCase());
+  return isLocalCommand(input, "exit");
 }
 
 export async function handleLocalCommand(
@@ -26,17 +20,17 @@ export async function handleLocalCommand(
   context: LocalCommandContext,
   output: ShellOutputPort,
 ): Promise<LocalCommandResult> {
-  const normalized = input.trim().toLowerCase();
-
-  if (!normalized) {
+  if (!input.trim()) {
     return "handled";
   }
 
-  if (isExplicitExitCommand(normalized)) {
+  const command = normalizeLocalCommand(input);
+
+  if (command === "exit") {
     return "quit";
   }
 
-  if (RESET_COMMANDS.has(normalized)) {
+  if (command === "reset") {
     await resetProjectRuntime({
       cwd: context.cwd,
       config: context.config,
@@ -46,17 +40,15 @@ export async function handleLocalCommand(
     return "quit";
   }
 
-  if (HELP_COMMANDS.has(normalized)) {
+  if (command === "help") {
     output.plain(
       [
-        "/help        Show help",
-        "/session     Show current session ID",
-        "/config      Show current runtime config",
-        "/multi       Enter multiline input; use ::end to submit and ::cancel to cancel",
-        "/reset       Clear current project runtime state and exit",
-        "quit         Exit the session",
-        "q            Exit the session",
-        "/quit /exit  Exit the session",
+        formatLocalCommandHelpLine("help"),
+        formatLocalCommandHelpLine("session"),
+        formatLocalCommandHelpLine("config"),
+        formatLocalCommandHelpLine("multiline"),
+        formatLocalCommandHelpLine("reset"),
+        formatLocalCommandHelpLine("exit"),
         "",
         "Any other input is sent directly to kitty.",
       ].join("\n"),
@@ -64,16 +56,16 @@ export async function handleLocalCommand(
     return "handled";
   }
 
-  if (MULTILINE_COMMANDS.has(normalized)) {
+  if (command === "multiline") {
     return "multiline";
   }
 
-  if (SESSION_COMMANDS.has(normalized)) {
+  if (command === "session") {
     output.info(`Current session: ${context.session.id}`);
     return "handled";
   }
 
-  if (CONFIG_COMMANDS.has(normalized)) {
+  if (command === "config") {
     output.info(`model=${context.config.model} baseUrl=${context.config.baseUrl}`);
     return "handled";
   }

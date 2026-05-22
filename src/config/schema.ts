@@ -1,4 +1,5 @@
 import { normalizeTelegramConfig } from "../config/hosts.js";
+import { normalizeModelReasoningEffort, normalizeModelThinkingMode } from "./modelOptions.js";
 import { normalizeExtensions } from "./extensions.js";
 import type { AppConfig } from "../types.js";
 
@@ -18,8 +19,8 @@ export function normalizeRuntimeConfig(
     baseUrl: requireTextConfig(config.baseUrl, "baseUrl"),
     model: requireTextConfig(config.model, "model"),
     profile: requireTextConfig(config.profile, "profile"),
-    thinking: normalizeThinking(config.thinking),
-    reasoningEffort: normalizeReasoningEffort(config.reasoningEffort),
+    thinking: normalizeModelThinkingMode(config.thinking),
+    reasoningEffort: normalizeModelReasoningEffort(config.reasoningEffort),
     maxOutputTokens: clampNumber(config.maxOutputTokens, 1, 384_000, "maxOutputTokens"),
     contextWindowMessages: clampNumber(config.contextWindowMessages, 6, 480, "contextWindowMessages"),
     maxContextChars: clampNumber(config.maxContextChars, 8_000, 1_000_000, "maxContextChars"),
@@ -36,36 +37,6 @@ export function normalizeRuntimeConfig(
     telegram: normalizeTelegramConfig(config.telegram),
     extensions: normalizeExtensions(config.extensions),
   };
-}
-
-function normalizeReasoningEffort(value: unknown): AppConfig["reasoningEffort"] | undefined {
-  switch (String(value ?? "").trim().toLowerCase()) {
-    case "minimal":
-      return "minimal";
-    case "low":
-      return "low";
-    case "medium":
-      return "medium";
-    case "high":
-      return "high";
-    case "xhigh":
-      return "xhigh";
-    case "max":
-      return "max";
-    default:
-      return undefined;
-  }
-}
-
-function normalizeThinking(value: unknown): AppConfig["thinking"] | undefined {
-  switch (String(value ?? "").trim().toLowerCase()) {
-    case "enabled":
-      return "enabled";
-    case "disabled":
-      return "disabled";
-    default:
-      return undefined;
-  }
 }
 
 function requireTextConfig(value: unknown, name: string): string {

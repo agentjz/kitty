@@ -1,28 +1,34 @@
-export interface InteractiveExitProcess {
-  kind: "process";
-  id: string;
-  pid: number;
-  summary: string;
-}
+import {
+  collectRunningExecutionProcesses,
+  terminateRunningExecutionProcesses,
+  type RunningExecutionProcess,
+  type TerminationResult,
+} from "../execution/lifecycle.js";
+import { resolveProjectRoots } from "../context/repoRoots.js";
 
-export interface InteractiveExitTerminationResult {
-  terminatedPids: number[];
-  failedPids: number[];
-}
+export type InteractiveExitProcess = RunningExecutionProcess;
+
+export type InteractiveExitTerminationResult = TerminationResult;
 
 export interface InteractiveExitGuard {
   collectRunningProcesses(cwd: string): Promise<InteractiveExitProcess[]>;
-  terminateProcesses(processes: InteractiveExitProcess[]): Promise<InteractiveExitTerminationResult>;
+  terminateProcesses(processes: InteractiveExitProcess[], cwd: string): Promise<InteractiveExitTerminationResult>;
 }
 
 export const defaultInteractiveExitGuard: InteractiveExitGuard = {
-  async collectRunningProcesses() {
-    return [];
-  },
-  async terminateProcesses() {
-    return {
-      terminatedPids: [],
-      failedPids: [],
-    };
-  },
+  collectRunningProcesses,
+  terminateProcesses,
 };
+
+export async function collectRunningProcesses(cwd: string): Promise<InteractiveExitProcess[]> {
+  const roots = await resolveProjectRoots(cwd);
+  return collectRunningExecutionProcesses(roots.stateRootDir, cwd);
+}
+
+export async function terminateProcesses(
+  processes: InteractiveExitProcess[],
+  cwd: string,
+): Promise<InteractiveExitTerminationResult> {
+  const roots = await resolveProjectRoots(cwd);
+  return terminateRunningExecutionProcesses(roots.stateRootDir, processes);
+}

@@ -5,6 +5,8 @@ import type {
   SessionCheckpoint,
   SessionCheckpointToolBatch,
 } from "../../types.js";
+import { normalizeTimestamp } from "../../utils/normalize.js";
+export { normalizeTimestamp } from "../../utils/normalize.js";
 
 export const MAX_COMPLETED_STEPS = 8;
 export const MAX_BATCH_TOOLS = 6;
@@ -49,10 +51,6 @@ export function takeLastUnique(values: string[], limit: number): string[] {
   }
 
   return result;
-}
-
-export function normalizeTimestamp(value: unknown, fallback: string): string {
-  return typeof value === "string" && value.trim().length > 0 ? value : fallback;
 }
 
 export function safeParseObject(raw: string | null | undefined): Record<string, unknown> | null {

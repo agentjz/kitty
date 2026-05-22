@@ -20,3 +20,4 @@ Extension 先注册工具集合，再通过 capability package 暴露能力边�
 - lead agent 决定是否调用工具、何时调用工具、如何解释结果。
 - 声明的 tools 必须和真实暴露的工具收敛。
 - capability 描述、适用场景和成本等级不在 adapter 里分散维护。
+- `background`、`subagent`、`team` extension 的 capability package 仍只暴露工具边界；执行生命周期、成员和消息事实归 `src/control/ledger.ts`、`src/execution/` 和 `src/team/store.ts`。

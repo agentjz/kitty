@@ -132,7 +132,7 @@ export class InteractiveSessionDriver {
     }
 
     try {
-      const result = await exitGuard.terminateProcesses(runningProcesses);
+      const result = await exitGuard.terminateProcesses(runningProcesses, this.options.cwd);
       if (result.failedPids.length > 0) {
         this.options.shell.output.error(
           `Could not stop all background processes. Still running: ${result.failedPids.join(", ")}. Exit cancelled.`,
@@ -235,7 +235,7 @@ export class InteractiveSessionDriver {
 
       this.options.shell.output.warn(reason);
       this.options.shell.output.plain(runningProcesses.map((processInfo) => processInfo.summary).join("\n"));
-      const result = await exitGuard.terminateProcesses(runningProcesses);
+      const result = await exitGuard.terminateProcesses(runningProcesses, this.options.cwd);
       if (result.failedPids.length > 0) {
         this.options.shell.output.error(`Could not stop all running processes. Still running: ${result.failedPids.join(", ")}.`);
         return;

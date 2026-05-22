@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { getInitialRuntimeConfig } from "../../src/config/initialConfig.js";
+import { MODEL_REASONING_EFFORTS, MODEL_THINKING_MODES } from "../../src/config/modelOptions.js";
 import { getDefaultProviderPreset } from "../../src/config/providerPresets.js";
 import { normalizeRuntimeConfig } from "../../src/config/schema.js";
 
@@ -35,6 +36,16 @@ test("runtime config schema normalizes model, context, telegram, and extensions"
   assert.equal(config.contextSummaryChars, 120_000);
   assert.equal(config.maxOutputTokens, 384_000);
   assert.equal(normalized.extensions.network, true);
+});
+
+test("runtime config schema accepts model option registries from the shared model option source", () => {
+  const config = getInitialRuntimeConfig();
+  for (const thinking of MODEL_THINKING_MODES) {
+    assert.equal(normalizeRuntimeConfig({ ...config, thinking }).thinking, thinking);
+  }
+  for (const reasoningEffort of MODEL_REASONING_EFFORTS) {
+    assert.equal(normalizeRuntimeConfig({ ...config, reasoningEffort }).reasoningEffort, reasoningEffort);
+  }
 });
 
 test("runtime config schema rejects missing required values instead of hiding defaults", () => {

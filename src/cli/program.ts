@@ -10,6 +10,7 @@ import { registerProjectCommands } from "./commands/project.js";
 import { registerAgentCommand } from "./commands/agent.js";
 import { registerSpecCommand } from "./commands/spec.js";
 import { registerSessionCommands } from "./commands/session.js";
+import { registerWorkerCommand } from "./commands/worker.js";
 import { writeStderr, writeStdout, writeStdoutLine } from "../utils/stdio.js";
 import { registerTelegramCommands } from "../telegram/cli.js";
 
@@ -77,6 +78,10 @@ export function buildCliProgram(dependencies: CliProgramDependencies = {}): Comm
     resolveRuntime,
     createTelegramService: dependencies.createTelegramService,
     acquireProcessLock: dependencies.acquireProcessLock,
+  });
+  registerWorkerCommand(program, {
+    getCliOverrides,
+    resolveRuntime,
   });
   return program;
 }

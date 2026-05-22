@@ -1,3 +1,5 @@
+export { normalizeTimestamp } from "../../utils/normalize.js";
+
 const MAX_REASON_ITEMS = 6;
 const MAX_REASON_TEXT_CHARS = 220;
 
@@ -27,10 +29,6 @@ export function truncate(value: string): string {
 
 export function normalizeText(value: unknown): string {
   return String(value ?? "").replace(/\s+/g, " ").trim();
-}
-
-export function normalizeTimestamp(value: unknown, fallback: string): string {
-  return typeof value === "string" && value.trim().length > 0 ? value : fallback;
 }
 
 export function clampWholeNumber(

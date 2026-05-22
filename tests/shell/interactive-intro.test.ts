@@ -18,7 +18,7 @@ test("interactive intro prints session, cwd, and local commands", () => {
   assert.match(rendered, /cwd: C:\\workspace\\kitty/);
   assert.doesNotMatch(rendered, /Tools:/);
   assert.match(rendered, /\/multi\s+Enter multiline input/);
-  assert.match(rendered, /quit\s+Exit/);
+  assert.match(rendered, /quit\s+Exit the session/);
 });
 
 test("interactive intro can print a supplied active tool surface label", () => {

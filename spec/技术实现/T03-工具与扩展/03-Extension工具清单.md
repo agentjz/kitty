@@ -24,6 +24,24 @@
 - `openapi_inspect`：读取 OpenAPI JSON 并列出 operations。
 - `openapi_lint`：检查 OpenAPI JSON 的核心结构事实。
 
+## background
+
+- `background_run`：启动后台命令，写入 control-plane execution 账本，返回 execution id、pid 和状态。
+- `background_check`：读取后台 execution 事实，并 reconcile 已丢失的 running pid。
+- `background_terminate`：终止一个后台 execution，并把生命周期关闭为 aborted。
+
+## subagent
+
+- `subagent_launch`：启动聚焦 subagent execution，写入 control-plane，返回 execution id、actor 和状态。
+- `subagent_check`：列出 subagent execution 事实。
+
+## team
+
+- `team_spawn`：注册 teammate 并创建 team execution。
+- `team_list`：列出 teammate 成员事实。
+- `team_message_send`：写入 teammate 或 lead 的消息。
+- `team_inbox_read`：读取并清空指定成员 inbox。
+
 ## spec
 
 - `spec_list`：列出 `.kitty/specs/changes` 下的 durable spec。

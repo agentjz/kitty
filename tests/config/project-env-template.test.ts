@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
-import { KITTY_ENV } from "../../src/config/envKeys.js";
+import { KITTY_BASE_ENV, KITTY_ENV } from "../../src/config/envKeys.js";
 import { getInitialRuntimeConfig } from "../../src/config/initialConfig.js";
 import {
   PROJECT_STATE_DIR_NAME,
@@ -122,10 +122,7 @@ function assertCommonOptionalEntries(content: string): void {
     KITTY_ENV.telegramDeliveryMaxRetries,
     KITTY_ENV.telegramDeliveryBaseDelayMs,
     KITTY_ENV.telegramDeliveryMaxDelayMs,
-    KITTY_ENV.extensionTodo,
-    KITTY_ENV.extensionWorktree,
-    KITTY_ENV.extensionNetwork,
-    KITTY_ENV.extensionSpec,
+    ...Object.values(KITTY_ENV.extensions),
     KITTY_ENV.maxOutputTokens,
     KITTY_ENV.contextWindowMessages,
     KITTY_ENV.maxContextChars,
@@ -150,37 +147,8 @@ function assertActiveProviderMatchesKnownPreset(assignments: Map<string, string>
 
 function expectedActiveEnvKeys(): string[] {
   return [
-    KITTY_ENV.apiKey,
-    KITTY_ENV.provider,
-    KITTY_ENV.baseUrl,
-    KITTY_ENV.model,
-    KITTY_ENV.profile,
-    KITTY_ENV.thinking,
-    KITTY_ENV.reasoningEffort,
-    KITTY_ENV.telegramToken,
-    KITTY_ENV.telegramAllowedUserIds,
-    KITTY_ENV.telegramApiBaseUrl,
-    KITTY_ENV.telegramProxyUrl,
-    KITTY_ENV.telegramPollingTimeoutSeconds,
-    KITTY_ENV.telegramPollingLimit,
-    KITTY_ENV.telegramPollingRetryBackoffMs,
-    KITTY_ENV.telegramMessageChunkChars,
-    KITTY_ENV.telegramTypingIntervalMs,
-    KITTY_ENV.telegramDeliveryMaxRetries,
-    KITTY_ENV.telegramDeliveryBaseDelayMs,
-    KITTY_ENV.telegramDeliveryMaxDelayMs,
-    KITTY_ENV.extensionTodo,
-    KITTY_ENV.extensionWorktree,
-    KITTY_ENV.extensionNetwork,
-    KITTY_ENV.extensionSpec,
-    KITTY_ENV.maxOutputTokens,
-    KITTY_ENV.contextWindowMessages,
-    KITTY_ENV.maxContextChars,
-    KITTY_ENV.contextSummaryChars,
-    KITTY_ENV.maxReadBytes,
-    KITTY_ENV.projectDocMaxBytes,
-    KITTY_ENV.commandStallTimeoutMs,
-    KITTY_ENV.showReasoning,
+    ...Object.values(KITTY_BASE_ENV),
+    ...Object.values(KITTY_ENV.extensions),
   ].sort();
 }
 

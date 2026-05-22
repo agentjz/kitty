@@ -17,6 +17,9 @@ Extension 真相源：
 - `todo`
 - `worktree`
 - `network`
+- `background`
+- `subagent`
+- `team`
 - `spec`
 
 当前默认开关：
@@ -24,6 +27,9 @@ Extension 真相源：
 - `todo`: 开
 - `worktree`: 开
 - `network`: 开
+- `background`: 开
+- `subagent`: 开
+- `team`: 开
 - `spec`: 关
 
 Registry：

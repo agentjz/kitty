@@ -6,7 +6,8 @@ import {
   parseReasoningEffortEnv,
   parseThinkingEnv,
 } from "./runtimeEnv.js";
-import { KITTY_ENV } from "./envKeys.js";
+import { KITTY_BASE_ENV, KITTY_ENV } from "./envKeys.js";
+import { EXTENSION_IDS } from "../extensions/definitions.js";
 import { normalizeRuntimeConfig } from "./schema.js";
 import { resolveAgentProfile } from "../agent/profiles/registry.js";
 import { resolveProjectRoots } from "../context/repoRoots.js";
@@ -58,12 +59,7 @@ export async function resolveRuntimeConfig(overrides: CliOverrides = {}): Promis
       messageChunkChars: readIntegerEnv("telegramMessageChunkChars", env.telegramMessageChunkChars),
       typingIntervalMs: readIntegerEnv("telegramTypingIntervalMs", env.telegramTypingIntervalMs),
     },
-    extensions: {
-      todo: readBooleanEnv("extensionTodo", env.extensionTodo),
-      worktree: readBooleanEnv("extensionWorktree", env.extensionWorktree),
-      network: readBooleanEnv("extensionNetwork", env.extensionNetwork),
-      spec: readBooleanEnv("extensionSpec", env.extensionSpec),
-    },
+    extensions: readExtensionEnv(),
   });
 
   if (!merged.profile) {
@@ -79,24 +75,34 @@ export async function resolveRuntimeConfig(overrides: CliOverrides = {}): Promis
   };
 }
 
-function readRuntimeEnv(): Record<keyof typeof KITTY_ENV, string> {
+function readRuntimeEnv(): Record<keyof typeof KITTY_BASE_ENV, string> {
   return Object.fromEntries(
-    Object.entries(KITTY_ENV).map(([name, key]) => [name, process.env[key] ?? ""]),
-  ) as Record<keyof typeof KITTY_ENV, string>;
+    Object.entries(KITTY_BASE_ENV).map(([name, key]) => [name, process.env[key] ?? ""]),
+  ) as Record<keyof typeof KITTY_BASE_ENV, string>;
 }
 
-function readIntegerEnv(name: keyof typeof KITTY_ENV, value: string): number {
+function readExtensionEnv() {
+  return Object.fromEntries(
+    EXTENSION_IDS.map((id) => [id, readBooleanValue(KITTY_ENV.extensions[id], process.env[KITTY_ENV.extensions[id]] ?? "")]),
+  ) as Record<(typeof EXTENSION_IDS)[number], boolean>;
+}
+
+function readIntegerEnv(name: keyof typeof KITTY_BASE_ENV, value: string): number {
   const parsed = parseIntegerEnv(value);
   if (parsed === undefined) {
-    throw new Error(`Missing or invalid ${KITTY_ENV[name]} in the project's .kitty/.env file.`);
+    throw new Error(`Missing or invalid ${KITTY_BASE_ENV[name]} in the project's .kitty/.env file.`);
   }
   return parsed;
 }
 
-function readBooleanEnv(name: keyof typeof KITTY_ENV, value: string): boolean {
+function readBooleanEnv(name: keyof typeof KITTY_BASE_ENV, value: string): boolean {
+  return readBooleanValue(KITTY_BASE_ENV[name], value);
+}
+
+function readBooleanValue(envKey: string, value: string): boolean {
   const parsed = parseBooleanEnv(value);
   if (parsed === undefined) {
-    throw new Error(`Missing or invalid ${KITTY_ENV[name]} in the project's .kitty/.env file.`);
+    throw new Error(`Missing or invalid ${envKey} in the project's .kitty/.env file.`);
   }
   return parsed;
 }

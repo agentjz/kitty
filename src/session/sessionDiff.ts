@@ -1,4 +1,5 @@
 import type { SessionDiffChange, SessionDiffState, SessionRecord } from "../types.js";
+import { normalizeTimestamp } from "../utils/normalize.js";
 
 const MAX_SESSION_DIFF_CHANGES = 20;
 const MAX_SESSION_DIFF_PATHS = 24;
@@ -117,10 +118,6 @@ function normalizeCount(value: unknown): number {
 
 function normalizeText(value: unknown): string {
   return String(value ?? "").trim();
-}
-
-function normalizeTimestamp(value: unknown, fallback: string): string {
-  return typeof value === "string" && value.trim().length > 0 ? value : fallback;
 }
 
 function truncate(value: string | undefined, maxChars: number): string | undefined {

@@ -31,6 +31,8 @@ test("local commands classify empty, exit, help, session, config, and multiline 
   assert.equal(await handleLocalCommand("explain this repo", context, output), "continue");
 
   assert.match(output.plainText.join("\n"), /Any other input is sent directly to kitty/);
+  assert.match(output.plainText.join("\n"), /\/multi\s+Enter multiline input/);
+  assert.match(output.plainText.join("\n"), /quit\s+Exit the session/);
   assert.deepEqual(output.infoText, [
     "Current session: session-local-command",
     "model=gpt-5.5 baseUrl=https://api.openai.com/v1",

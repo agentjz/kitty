@@ -1,4 +1,5 @@
 import { KITTY_ENV } from "./envKeys.js";
+import { EXTENSION_DEFINITIONS } from "../extensions/definitions.js";
 import { INITIAL_TELEGRAM_CONFIG } from "./hosts.js";
 import { INITIAL_PROJECT_DOC_MAX_BYTES } from "./projectDocs.js";
 import { getInitialRuntimeConfig } from "./initialConfig.js";
@@ -70,10 +71,8 @@ function formatCommonEnvSections(input: {
     `${KITTY_ENV.telegramDeliveryMaxDelayMs}=${INITIAL_TELEGRAM_CONFIG.delivery.maxDelayMs}`,
     "",
     "# Extension switches",
-    `${KITTY_ENV.extensionTodo}=${String(input.initialConfig.extensions.todo)}`,
-    `${KITTY_ENV.extensionWorktree}=${String(input.initialConfig.extensions.worktree)}`,
-    `${KITTY_ENV.extensionNetwork}=${String(input.initialConfig.extensions.network)}`,
-    `${KITTY_ENV.extensionSpec}=${String(input.initialConfig.extensions.spec)}`,
+    ...EXTENSION_DEFINITIONS.map((definition) =>
+      `${definition.envKey}=${String(input.initialConfig.extensions[definition.id])}`),
     "",
     "# Runtime configuration",
     `${KITTY_ENV.maxOutputTokens}=${input.initialConfig.maxOutputTokens}`,

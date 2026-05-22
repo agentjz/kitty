@@ -16,8 +16,10 @@ test("project state paths centralize extension and observability state", async (
 
   assert.equal(path.basename(paths.kittyDir), PROJECT_STATE_DIR_NAME);
   assert.equal(paths.extensionsDir.startsWith(paths.kittyDir), true);
+  assert.equal(paths.controlPlaneLedgerFile.startsWith(paths.kittyDir), true);
   assert.equal(paths.observabilityEventsDir.includes("observability"), true);
   assert.deepEqual(Object.keys(paths).sort(), [
+    "controlPlaneLedgerFile",
     "extensionsDir",
     "kittyDir",
     "observabilityCrashesDir",
