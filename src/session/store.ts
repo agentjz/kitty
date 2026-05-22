@@ -7,6 +7,7 @@ import { createEmptyCheckpoint } from "./checkpoint.js";
 import { createEmptyTaskState } from "./taskState.js";
 import { createEmptySessionDiff } from "./sessionDiff.js";
 import { createSessionNotFoundError, SessionStoreError } from "./errors.js";
+import { writeSessionMemoryAsset } from "./memoryAsset.js";
 import { parseSessionSnapshot, prepareSessionRecordForSave, serializeSessionSnapshot } from "./snapshot.js";
 
 export interface SkippedSessionSnapshot {
@@ -29,7 +30,12 @@ export interface SessionStoreLike {
 }
 
 export class SessionStore implements SessionStoreLike {
-  constructor(private readonly sessionsDir: string) {}
+  constructor(
+    private readonly sessionsDir: string,
+    private readonly options: {
+      memorySessionsDir?: string;
+    } = {},
+  ) {}
 
   async create(cwd: string): Promise<SessionRecord> {
     return createSessionRecord(cwd);
@@ -39,6 +45,10 @@ export class SessionStore implements SessionStoreLike {
     const updated = prepareSessionRecordForSave(session);
     await fs.mkdir(this.sessionsDir, { recursive: true });
     await fs.writeFile(this.getPath(updated.id), serializeSessionSnapshot(updated), "utf8");
+    await writeSessionMemoryAsset({
+      memorySessionsDir: this.options.memorySessionsDir ?? this.defaultMemorySessionsDir(),
+      session: updated,
+    });
     return updated;
   }
 
@@ -94,6 +104,10 @@ export class SessionStore implements SessionStoreLike {
 
   private getPath(id: string): string {
     return path.join(this.sessionsDir, `${id}.json`);
+  }
+
+  private defaultMemorySessionsDir(): string {
+    return path.join(path.dirname(this.sessionsDir), "memory", "sessions");
   }
 
   private async readSnapshotFile(id: string, sessionPath: string): Promise<string> {

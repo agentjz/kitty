@@ -32,7 +32,7 @@
 | --- | --- |
 | 🧭 Agent 循环 | 模型、工具、session、收尾都在同一个主循环里推进 |
 | 🧠 Context | 项目上下文、运行时上下文、工作记忆、长上下文压缩 |
-| 💾 Session | 会话记录、checkpoint、todo、恢复现场 |
+| 💾 Session | 会话记录、checkpoint、todo、恢复现场、可审阅 memory 文件 |
 | 🔌 Provider | OpenAI-compatible provider、请求恢复、连接诊断 |
 | 🛠️ Core tools | `read`、`edit`、`write`、`bash` |
 | 🧩 Extensions | `todo`、`worktree`、`network`、`background`、`subagent`、`team`、`skills`、`spec` |
@@ -110,14 +110,14 @@ Extension 是可启用、可禁用、独立存在的工具集合：
 | `worktree` | Git worktree 事实、创建、保留和删除 |
 | `network` | HTTP session、请求、探测、下载、trace、OpenAPI 检查 |
 | `background` | 后台命令执行、检查、终止和生命周期记录 |
-| `subagent` | 聚焦子执行启动、状态检查、wait policy、lead 挂起与 wake 恢复 |
-| `team` | teammate 注册、执行、消息、inbox、wait policy、lead 挂起与成员状态收束 |
-| `skills` | 项目运行时 skill 索引和按需加载；模型自己判断是否加载，机器只负责列出和读取 |
+| `subagent` | 聚焦子执行启动、状态检查、worker 结论回传、wait policy、lead 挂起与 wake 恢复 |
+| `team` | teammate 注册、执行、消息、inbox、worker 结论回传、wait policy、lead 挂起与成员状态收束 |
+| `skills` | 项目运行时 skill 包索引、正文加载和资源读取；模型自己判断是否加载，机器只负责列出和读取 |
 | `spec` | durable spec 文档、状态、任务、checkpoint 和隔离 worktree |
 
 默认 agent 会启用 `todo`、`worktree`、`network`、`background`、`subagent`、`team`、`skills`。`spec` 不随默认 agent 自动启用；需要 spec 工作流时使用 `kitty spec`。
 
-Runtime skills 放在项目 `SKILL.md`、`.skills/**/SKILL.md` 或 `skills/**/SKILL.md`。默认上下文只显示 skill 名称、说明和路径；完整内容必须由模型明确调用 `skill_load` 后进入当前轮。`.codex/skills/**` 是 Codex 维护本仓库用的开发规范，不属于小猫运行时 skill。
+Runtime skills 放在项目 `SKILL.md`、`.skills/**/SKILL.md` 或 `skills/**/SKILL.md`。默认上下文只显示 skill 名称、说明和路径；完整正文必须由模型明确调用 `skill_load` 后进入当前轮。Skill 包内的 `references/`、`scripts/`、`examples/` 和 `assets/` 会作为资源索引出现，需要时用 `skill_read_resource` 读取。`.codex/skills/**` 是 Codex 维护本仓库用的开发规范，不属于小猫运行时 skill。
 
 查看配置：
 
@@ -158,6 +158,7 @@ kitty config show
 | Core tools | `src/tools/` |
 | Extensions | `src/extensions/` |
 | Runtime skills | `src/skills/`, `skills/` |
+| Memory assets | `.kitty/memory/sessions/` |
 | Control plane | `src/control/`, `src/execution/` |
 | Spec runtime | `src/spec/` |
 | Host 边界 | `src/host/` |

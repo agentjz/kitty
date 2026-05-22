@@ -7,6 +7,21 @@ import type { LoadedSkill, ProjectIgnoreRule } from "../types.js";
 import { isPathIgnored } from "../utils/ignore.js";
 import { parseSkillSource } from "./schema.js";
 
+const SKILL_RESOURCE_GLOBS = [
+  "references/**",
+  "reference/**",
+  "scripts/**",
+  "examples/**",
+  "assets/**",
+] as const;
+
+const IGNORED_SKILL_RESOURCE_GLOBS = [
+  "**/node_modules/**",
+  "**/.git/**",
+  "**/dist/**",
+  "**/SKILL.md",
+] as const;
+
 export async function discoverSkills(
   rootDir: string,
   cwd: string,
@@ -28,6 +43,7 @@ export async function discoverSkills(
       absolutePath: normalizedPath,
       rootDir,
     });
+    skill.resources = await listSkillResources(skill.absolutePath, rootDir, ignoreRules);
     const existingPath = seenNames.get(skill.name);
     if (existingPath && existingPath !== skill.absolutePath) {
       throw new Error(`Duplicate skill name "${skill.name}" found in ${existingPath} and ${skill.absolutePath}.`);
@@ -37,6 +53,34 @@ export async function discoverSkills(
   }
 
   return skills.sort((left, right) => left.name.localeCompare(right.name));
+}
+
+async function listSkillResources(
+  skillPath: string,
+  rootDir: string,
+  ignoreRules: ProjectIgnoreRule[],
+): Promise<LoadedSkill["resources"]> {
+  const skillDir = path.dirname(skillPath);
+  const files = await fg([...SKILL_RESOURCE_GLOBS], {
+    cwd: skillDir,
+    absolute: true,
+    dot: true,
+    onlyFiles: true,
+    suppressErrors: true,
+    ignore: [...IGNORED_SKILL_RESOURCE_GLOBS],
+  });
+  const resources = [];
+  for (const file of uniquePaths(files).sort((left, right) => left.localeCompare(right))) {
+    if (isPathIgnored(file, ignoreRules)) {
+      continue;
+    }
+    const stat = await fs.stat(file);
+    resources.push({
+      path: path.relative(rootDir, file),
+      size: stat.size,
+    });
+  }
+  return resources;
 }
 
 async function findSkillFiles(rootDir: string, cwd: string): Promise<string[]> {

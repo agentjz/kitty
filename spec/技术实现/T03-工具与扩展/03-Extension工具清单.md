@@ -32,12 +32,12 @@
 
 ## subagent
 
-- `subagent_launch`：启动聚焦 subagent execution，写入 control-plane，返回 execution id、actor 和状态。execution 默认带阻塞型 `waitPolicy`；lead 调用后会让出当前轮，由 host 等 execution 结束后唤醒 lead。
+- `subagent_launch`：启动聚焦 subagent execution，写入 control-plane，返回 execution id、actor 和状态。execution 默认带阻塞型 `waitPolicy`；lead 调用后会让出当前轮，由 host 等 execution 结束后唤醒 lead。worker 最终可见回答写入 execution summary/output。
 - `subagent_check`：列出 subagent execution 事实。
 
 ## team
 
-- `team_spawn`：注册 teammate 并创建 team execution。execution 默认带阻塞型 `waitPolicy`；lead 调用后会让出当前轮，由 host 等 execution 结束后唤醒 lead；worker 完成后 teammate 状态回到 idle。
+- `team_spawn`：注册 teammate 并创建 team execution。execution 默认带阻塞型 `waitPolicy`；lead 调用后会让出当前轮，由 host 等 execution 结束后唤醒 lead；worker 最终可见回答写入 execution summary/output，完成后 teammate 状态回到 idle。
 - `team_list`：列出 teammate 成员事实。
 - `team_message_send`：写入 teammate 或 lead 的消息。
 - `team_inbox_read`：读取并清空指定成员 inbox。
@@ -46,6 +46,7 @@
 
 - `skill_list`：列出项目运行时 skill 的名称、说明和路径，不读取完整正文。
 - `skill_load`：按精确名称读取一个 skill 的完整正文。模型决定是否加载；机器不做关键词匹配、语义路由或自动加载。
+- `skill_read_resource`：按 skill 名称和资源路径读取该 skill 包声明的资源文件。资源只能来自该 skill 的资源索引。
 
 ## spec
 

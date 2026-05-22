@@ -11,7 +11,7 @@ export function buildSkillIndexPromptBlock(skills: readonly LoadedSkill[]): stri
   return buildFieldBlock("Available skills", [
     {
       label: "Policy",
-      value: "Skills 是项目知识包。当前只给索引；需要完整方法时由模型自己调用 skill_load。",
+      value: "Skills are project knowledge packages. This context shows only the index. Call skill_load for the full method, and skill_read_resource for declared package resources.",
     },
     {
       label: "Index",
@@ -20,12 +20,13 @@ export function buildSkillIndexPromptBlock(skills: readonly LoadedSkill[]): stri
     skills.length > MAX_VISIBLE_SKILLS
       ? {
           label: "Hidden",
-          value: `还有 ${skills.length - MAX_VISIBLE_SKILLS} 个 skill。用 skill_list 查看完整索引。`,
+          value: `${skills.length - MAX_VISIBLE_SKILLS} more skill(s) are hidden. Call skill_list for the full index.`,
         }
       : { label: "Hidden", value: undefined },
   ]);
 }
 
 function formatSkill(skill: LoadedSkill): string {
-  return `${skill.name}: ${skill.description} (${skill.path})`;
+  const resources = skill.resources.length > 0 ? `; resources=${skill.resources.length}` : "";
+  return `${skill.name}: ${skill.description} (${skill.path}${resources})`;
 }

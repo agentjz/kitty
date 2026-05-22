@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import path from "node:path";
 import test from "node:test";
 
 import { getAppPaths } from "../../src/config/paths.js";
@@ -17,4 +19,24 @@ test("session store persists and reloads session snapshots", async (t) => {
 
   const latest = await store.loadLatest();
   assert.equal(latest?.id, session.id);
+});
+
+test("session store projects model-written session memory into a readable asset", async (t) => {
+  const root = await createTempWorkspace("session-memory-asset", t);
+  const paths = getAppPaths(root);
+  const store = new SessionStore(paths.sessionsDir);
+  const session = await store.create(root);
+  await store.save({
+    ...session,
+    sessionMemory: {
+      version: 1,
+      summary: "用户要求本 session 用 txt 纯文本回答。",
+      updatedAt: "2026-05-22T00:00:00.000Z",
+    },
+  });
+
+  const asset = await fs.readFile(path.join(paths.sessionMemoryDir, `${session.id}.md`), "utf8");
+  assert.match(asset, /^# Session Memory/);
+  assert.match(asset, /Session:/);
+  assert.match(asset, /txt 纯文本回答/);
 });

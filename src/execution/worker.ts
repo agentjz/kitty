@@ -46,10 +46,13 @@ export async function runExecutionWorker(input: {
   });
 
   const status = outcome.status === "completed" ? "completed" : outcome.status === "aborted" ? "aborted" : "failed";
+  const workerAnswer = outcome.status === "completed"
+    ? readLastAssistantText(outcome.result?.session ?? outcome.session)
+    : undefined;
   const closed = store.close(execution.id, {
     status,
-    summary: outcome.status,
-    resultText: outcome.status === "completed" ? "Agent execution completed." : outcome.errorMessage,
+    summary: workerAnswer ?? outcome.status,
+    resultText: workerAnswer ?? (outcome.status === "completed" ? "Agent execution completed." : outcome.errorMessage),
   });
 
   if (closed.kind === "team" && closed.actorName && closed.actorRole) {
@@ -62,4 +65,18 @@ export async function runExecutionWorker(input: {
       pid: closed.pid,
     });
   }
+}
+
+function readLastAssistantText(session: { messages: Array<{ role: string; content: string | null }> }): string | undefined {
+  for (let index = session.messages.length - 1; index >= 0; index -= 1) {
+    const message = session.messages[index];
+    if (message?.role !== "assistant") {
+      continue;
+    }
+    const content = message.content?.trim();
+    if (content) {
+      return content;
+    }
+  }
+  return undefined;
 }

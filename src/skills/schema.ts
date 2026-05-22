@@ -32,6 +32,7 @@ export function parseSkillSource(
     path: path.relative(input.rootDir, input.absolutePath) || "SKILL.md",
     absolutePath: input.absolutePath,
     body,
+    resources: [],
   };
 }
 
