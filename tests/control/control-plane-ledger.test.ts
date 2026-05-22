@@ -33,8 +33,37 @@ test("control plane ledger persists execution lifecycle facts", async (t) => {
   assert.equal(reloaded?.pid, 1234);
   assert.equal(reloaded?.exitCode, 0);
   assert.equal(reloaded?.sessionId, "session-1");
+  assert.equal(reloaded?.waitPolicy?.lead, "none");
   assert.ok(reloaded?.startedAt);
   assert.ok(reloaded?.finishedAt);
+
+  ledger.close();
+});
+
+test("control plane ledger persists execution wait policy facts", async (t) => {
+  const root = await createTempWorkspace("control-wait-policy", t);
+  const ledger = new ControlPlaneLedger(root);
+
+  const created = ledger.executions.create({
+    kind: "subagent",
+    status: "created",
+    prompt: "inspect context",
+    cwd: root,
+    requestedBy: "lead",
+    waitPolicy: {
+      lead: "while_execution_active",
+      wake: "required",
+      scope: "global",
+    },
+  });
+
+  const reader = new ControlPlaneLedger(root);
+  const reloaded = reader.executions.load(created.id);
+  reader.close();
+
+  assert.equal(reloaded?.waitPolicy?.lead, "while_execution_active");
+  assert.equal(reloaded?.waitPolicy?.wake, "required");
+  assert.equal(reloaded?.waitPolicy?.scope, "global");
 
   ledger.close();
 });

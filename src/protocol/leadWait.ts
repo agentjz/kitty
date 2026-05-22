@@ -1,6 +1,6 @@
 export const LEAD_WAIT_PROTOCOL = "kitty.lead-wait-policy" as const;
 
-export const LEAD_WAIT_TERMINAL_STATUSES = ["completed", "failed", "aborted", "paused"] as const;
+export const LEAD_WAIT_TERMINAL_STATUSES = ["completed", "failed", "aborted", "paused", "stale"] as const;
 
 export type LeadWaitMode = "none" | "while_execution_active";
 export type LeadWakePolicy = "optional" | "required";
@@ -79,6 +79,13 @@ export function assertLeadWaitPolicy(policy: LeadWaitPolicy): void {
 
 export function isLeadBlockingPolicy(policy: LeadWaitPolicy | undefined): boolean {
   return policy?.lead === "while_execution_active";
+}
+
+export function isLeadWaitTerminalStatus(
+  policy: LeadWaitPolicy | undefined,
+  status: string,
+): boolean {
+  return (policy ?? createLeadWaitPolicy()).terminalStatuses.includes(status as LeadWaitTerminalStatus);
 }
 
 export function normalizeLeadWaitPolicy(value: unknown): LeadWaitPolicy {

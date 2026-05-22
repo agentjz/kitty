@@ -36,7 +36,7 @@
 | 🔌 Provider | OpenAI-compatible provider、请求恢复、连接诊断 |
 | 🛠️ Core tools | `read`、`edit`、`write`、`bash` |
 | 🧩 Extensions | `todo`、`worktree`、`network`、`background`、`subagent`、`team`、`spec` |
-| 🧾 Control plane | SQLite 账本记录后台执行、pid、状态和 wake 事实 |
+| 🧾 Control plane | SQLite 账本记录执行、wait policy、pid、状态和 wake 事实；host 负责等待和恢复 lead |
 | 📐 Spec 模式 | `requirements.md`、`design.md`、`tasks.md`、`notes.md` 和隔离 worktree |
 | 💬 产品面 | CLI、交互终端、Telegram 私聊服务 |
 | 📎 证据记录 | 事件、终端日志、崩溃记录、文件变更记录 |
@@ -110,8 +110,8 @@ Extension 是可启用、可禁用、独立存在的工具集合：
 | `worktree` | Git worktree 事实、创建、保留和删除 |
 | `network` | HTTP session、请求、探测、下载、trace、OpenAPI 检查 |
 | `background` | 后台命令执行、检查、终止和生命周期记录 |
-| `subagent` | 聚焦子执行启动和状态检查 |
-| `team` | teammate 注册、执行、消息和 inbox |
+| `subagent` | 聚焦子执行启动、状态检查、wait policy、lead 挂起与 wake 恢复 |
+| `team` | teammate 注册、执行、消息、inbox、wait policy、lead 挂起与成员状态收束 |
 | `spec` | durable spec 文档、状态、任务、checkpoint 和隔离 worktree |
 
 默认 agent 会启用 `todo`、`worktree`、`network`、`background`、`subagent`、`team`。`spec` 不随默认 agent 自动启用；需要 spec 工作流时使用 `kitty spec`。

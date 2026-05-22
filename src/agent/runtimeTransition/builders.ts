@@ -5,6 +5,7 @@ import type {
   RuntimeFinalizeTransition,
   RuntimeRecoverTransition,
   RuntimeTerminalTransition,
+  RuntimeYieldTransition,
   SessionRecord,
 } from "../../types.js";
 import { normalizeText, takeLastUnique, truncate } from "./shared.js";
@@ -78,6 +79,24 @@ export function createFinalizeTransition(
     reason: {
       code: "finalize.completed",
       changedPaths: takeLastUnique([...input.changedPaths]),
+    },
+    timestamp,
+  };
+}
+
+export function createExecutionWaitYieldTransition(
+  input: {
+    executionIds: Iterable<string>;
+    toolNames: Iterable<string>;
+  },
+  timestamp = new Date().toISOString(),
+): RuntimeYieldTransition {
+  return {
+    action: "yield",
+    reason: {
+      code: "yield.execution_wait",
+      executionIds: takeLastUnique([...input.executionIds]),
+      toolNames: takeLastUnique([...input.toolNames]),
     },
     timestamp,
   };

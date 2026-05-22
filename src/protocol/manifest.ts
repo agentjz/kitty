@@ -218,7 +218,7 @@ function parseLeadWaitPolicyInput(value: unknown): CapabilityPortInput["runner"]
   const terminalStatuses = readOptionalTextArray(record, "terminalStatuses");
   if (terminalStatuses) {
     result.terminalStatuses = terminalStatuses.filter((status) =>
-      status === "completed" || status === "failed" || status === "aborted" || status === "paused") as NonNullable<typeof result.terminalStatuses>;
+      status === "completed" || status === "failed" || status === "aborted" || status === "paused" || status === "stale") as NonNullable<typeof result.terminalStatuses>;
   }
   return result;
 }

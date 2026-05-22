@@ -6,7 +6,7 @@ import { PROJECT_STATE_DIR_NAME } from "../project/statePaths.js";
 
 export const WAKE_SIGNAL_PROTOCOL = "kitty.wake-signal" as const;
 
-export type WakeSignalReason = "completed" | "failed" | "budget_exhausted" | "aborted" | "paused";
+export type WakeSignalReason = "completed" | "failed" | "budget_exhausted" | "aborted" | "paused" | "stale";
 
 export interface WakeSignal {
   protocol: typeof WAKE_SIGNAL_PROTOCOL;

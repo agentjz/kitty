@@ -7,6 +7,7 @@ import { renderPromptLayers } from "../../src/agent/prompt/format.js";
 import { runAgentTurn } from "../../src/agent/turn/run.js";
 import { buildContextRuntimePromptLayers } from "../../src/context/runtime/prompt.js";
 import { buildContextRuntimeRequest } from "../../src/context/runtime/request.js";
+import { buildLeadWakeFacts } from "../../src/execution/leadWait.js";
 import { InProcessSessionStore } from "../../src/session/store.js";
 import { createToolRegistry } from "../../src/tools/core/registry.js";
 import { createTestRuntimeConfig, createTempWorkspace } from "../helpers.js";
@@ -107,7 +108,7 @@ test("next turn injects model-written session memory while raw provider messages
   const prompt = renderPromptLayers(promptLayers);
   const rawMessages = request.messages.slice(1).map((message) => String(message.content ?? "")).join("\n");
 
-  assert.match(prompt, /Model-written session memory/);
+  assert.match(prompt, /Session memory/);
   assert.match(prompt, /txt 纯文本回答/);
   assert.match(prompt, /agentjz\/777f/);
   assert.match(prompt, /agentjz\/ohmyflight/);
@@ -206,6 +207,47 @@ test("session memory lifecycle records failed memory updates without failing the
     event.status === "failed" &&
     event.error?.message === "memory model unavailable"
   ), true);
+});
+
+test("internal wake turns do not rewrite same-session memory as user intent", async (t) => {
+  const root = await createTempWorkspace("session-memory-internal-wake", t);
+  const config = createTestRuntimeConfig(root);
+  const sessionStore = new InProcessSessionStore();
+  const session = await sessionStore.create(root);
+  let memoryRequestCount = 0;
+
+  const result = await runAgentTurn({
+    input: buildLeadWakeFacts([{
+      id: "exec-1",
+      kind: "subagent",
+      status: "completed",
+      cwd: root,
+      requestedBy: "lead",
+      actorName: "worker",
+      summary: "done",
+      createdAt: "2026-05-22T00:00:00.000Z",
+      updatedAt: "2026-05-22T00:00:01.000Z",
+    }]).userInput,
+    cwd: root,
+    config,
+    session,
+    sessionStore,
+    toolRegistry: createToolRegistry({ onlyNames: [] }),
+    fetchAssistantResponse: async (): Promise<AssistantResponse> => ({
+      content: "继续当前目标。",
+      toolCalls: [],
+    }),
+    fetchSessionMemoryResponse: async (): Promise<AssistantResponse> => {
+      memoryRequestCount += 1;
+      return {
+        content: "should not be written",
+        toolCalls: [],
+      };
+    },
+  });
+
+  assert.equal(memoryRequestCount, 0);
+  assert.equal(result.session.sessionMemory, undefined);
 });
 
 function createWriteStatusTool(root: string): RegisteredTool {

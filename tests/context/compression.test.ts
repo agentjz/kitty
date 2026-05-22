@@ -126,9 +126,10 @@ test("runtime prompt carries same-session memory while raw request stays on curr
   );
   const rawMessages = request.messages.slice(1).map((message) => String(message.content ?? "")).join("\n");
 
-  assert.match(prompt, /Current session conversation brief/);
+  assert.match(prompt, /Internal continuity state/);
   assert.match(prompt, /不要 Markdown，用 txt 格式/);
   assert.match(prompt, /agentjz\/777f/);
   assert.match(prompt, /agentjz\/ohmyflight/);
+  assert.doesNotMatch(prompt, /我会用 txt 纯文本格式回答/);
   assert.equal(rawMessages, "你还记得刚刚让我做什么吗？");
 });

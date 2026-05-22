@@ -83,7 +83,7 @@ function buildHistoryBoundaryBlock(memory: AgentWorkingMemory): string | undefin
   return buildFieldBlock("History boundary", [
     {
       label: "Policy",
-      value: "Raw session history stays in session state; same-session conversation brief and this current-objective working memory are the only automatic continuity surfaces.",
+      value: "Raw session history stays out of the current request. Internal continuity state and current workset are automatic facts for judgment, not text to narrate.",
     },
   ]);
 }

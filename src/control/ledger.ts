@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { ExecutionKind } from "../execution/kinds.js";
+import { createLeadWaitPolicy, normalizeLeadWaitPolicy, type LeadWaitPolicy, type LeadWaitPolicyInput } from "../protocol/leadWait.js";
 import { getProjectStatePaths } from "../project/statePaths.js";
 
 export type ExecutionStatus = "created" | "running" | "paused" | "completed" | "failed" | "aborted" | "stale";
@@ -23,6 +24,7 @@ export interface ExecutionRecord {
   exitCode?: number | null;
   output?: string;
   summary?: string;
+  waitPolicy?: LeadWaitPolicy;
   createdAt: string;
   startedAt?: string;
   updatedAt: string;
@@ -94,6 +96,7 @@ export class ExecutionLedgerRepo {
     sessionId?: string;
     pid?: number;
     timeoutMs?: number;
+    waitPolicy?: LeadWaitPolicyInput;
   }): ExecutionRecord {
     const now = new Date().toISOString();
     const record: ExecutionRecord = {
@@ -108,6 +111,7 @@ export class ExecutionLedgerRepo {
       requestedBy: input.requestedBy,
       sessionId: input.sessionId,
       pid: input.pid,
+      waitPolicy: normalizeExecutionWaitPolicy(input.kind, input.waitPolicy),
       createdAt: now,
       startedAt: input.status === "running" ? now : undefined,
       updatedAt: now,
@@ -116,10 +120,10 @@ export class ExecutionLedgerRepo {
     this.db.prepare(`
       INSERT INTO executions (
         id, kind, status, command, prompt, actor_name, actor_role, cwd, requested_by, session_id, pid, exit_code,
-        output, summary, created_at, started_at, updated_at, finished_at, timeout_ms
+        output, summary, wait_policy_json, created_at, started_at, updated_at, finished_at, timeout_ms
       ) VALUES (
         @id, @kind, @status, @command, @prompt, @actorName, @actorRole, @cwd, @requestedBy, @sessionId, @pid, @exitCode,
-        @output, @summary, @createdAt, @startedAt, @updatedAt, @finishedAt, @timeoutMs
+        @output, @summary, @waitPolicyJson, @createdAt, @startedAt, @updatedAt, @finishedAt, @timeoutMs
       )
     `).run(toExecutionRow(record));
     return record;
@@ -199,6 +203,7 @@ export class ExecutionLedgerRepo {
         exit_code=@exitCode,
         output=@output,
         summary=@summary,
+        wait_policy_json=@waitPolicyJson,
         created_at=@createdAt,
         started_at=@startedAt,
         updated_at=@updatedAt,
@@ -260,7 +265,15 @@ export class TeamLedgerRepo {
         session_id=excluded.session_id,
         pid=excluded.pid,
         updated_at=excluded.updated_at
-    `).run(member);
+    `).run({
+      name: member.name,
+      role: member.role,
+      status: member.status,
+      executionId: member.executionId ?? null,
+      sessionId: member.sessionId ?? null,
+      pid: member.pid ?? null,
+      updatedAt: member.updatedAt,
+    });
     return member;
   }
 
@@ -310,6 +323,7 @@ interface ExecutionRow {
   exit_code: number | null;
   output: string | null;
   summary: string | null;
+  wait_policy_json: string | null;
   created_at: string;
   started_at: string | null;
   updated_at: string;
@@ -359,6 +373,7 @@ function initializeSchema(db: Database.Database): void {
       exit_code INTEGER,
       output TEXT,
       summary TEXT,
+      wait_policy_json TEXT,
       created_at TEXT NOT NULL,
       started_at TEXT,
       updated_at TEXT NOT NULL,
@@ -402,6 +417,7 @@ function initializeSchema(db: Database.Database): void {
   ensureColumn(db, "executions", "prompt", "TEXT");
   ensureColumn(db, "executions", "actor_name", "TEXT");
   ensureColumn(db, "executions", "actor_role", "TEXT");
+  ensureColumn(db, "executions", "wait_policy_json", "TEXT");
 }
 
 function ensureColumn(db: Database.Database, table: string, column: string, definition: string): void {
@@ -428,6 +444,7 @@ function toExecutionRow(record: ExecutionRecord): Record<string, unknown> {
     exitCode: record.exitCode,
     output: record.output,
     summary: record.summary,
+    waitPolicyJson: record.waitPolicy ? JSON.stringify(record.waitPolicy) : null,
     createdAt: record.createdAt,
     startedAt: record.startedAt,
     updatedAt: record.updatedAt,
@@ -452,12 +469,43 @@ function fromExecutionRow(row: ExecutionRow): ExecutionRecord {
     exitCode: row.exit_code,
     output: row.output ?? undefined,
     summary: row.summary ?? undefined,
+    waitPolicy: readWaitPolicy(row.wait_policy_json, row.kind as ExecutionKind),
     createdAt: row.created_at,
     startedAt: row.started_at ?? undefined,
     updatedAt: row.updated_at,
     finishedAt: row.finished_at ?? undefined,
     timeoutMs: row.timeout_ms ?? undefined,
   };
+}
+
+function normalizeExecutionWaitPolicy(kind: ExecutionKind, value?: LeadWaitPolicyInput): LeadWaitPolicy {
+  if (value) {
+    return normalizeLeadWaitPolicy(value);
+  }
+
+  return kind === "subagent" || kind === "team"
+    ? createLeadWaitPolicy({
+        lead: "while_execution_active",
+        wake: "required",
+        scope: "objective",
+      })
+    : createLeadWaitPolicy({
+        lead: "none",
+        wake: "optional",
+        scope: "objective",
+      });
+}
+
+function readWaitPolicy(value: string | null, kind: ExecutionKind): LeadWaitPolicy {
+  if (!value) {
+    return normalizeExecutionWaitPolicy(kind);
+  }
+
+  try {
+    return normalizeLeadWaitPolicy(JSON.parse(value));
+  } catch {
+    return normalizeExecutionWaitPolicy(kind);
+  }
 }
 
 function fromTeamMemberRow(row: TeamMemberRow): TeamMemberRecord {

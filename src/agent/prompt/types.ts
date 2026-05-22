@@ -5,6 +5,7 @@ export interface PromptRuntimeState {
   taskSummary?: string;
   mode?: "agent" | "spec";
   extraStaticBlocks?: string[];
+  internalFactBlocks?: string[];
 }
 
 export interface PromptLayers {

@@ -39,7 +39,7 @@ export function buildContextRuntimePromptLayers(
     }),
     profilePersonaBlocks: buildProfilePersonaPromptBlocks(resolvedProfile),
     runtimeFactBlocks: sessionBriefBlock
-      ? [sessionBriefBlock, ...runtimeFactBlocks]
-      : [...runtimeFactBlocks],
+      ? [sessionBriefBlock, ...(input.runtimeState?.internalFactBlocks ?? []), ...runtimeFactBlocks]
+      : [...(input.runtimeState?.internalFactBlocks ?? []), ...runtimeFactBlocks],
   };
 }

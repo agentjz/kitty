@@ -52,6 +52,9 @@ export type {
   RuntimeRecoverTransition,
   RuntimeTerminalTransition,
   RuntimeTransition,
+  RuntimeYieldExecutionWaitReason,
+  RuntimeYieldReason,
+  RuntimeYieldTransition,
 } from "./types/runtimeTransitions.js";
 export type {
   ToolExecutionMetadata,

@@ -11,8 +11,8 @@ export interface SessionConversationBrief {
   userTurnCount: number;
   assistantTurnCount: number;
   omittedLongTurnCount: number;
-  anchorTurns: SessionBriefTurn[];
-  recentTurns: SessionBriefTurn[];
+  userAnchors: string[];
+  recentUserInputs: string[];
   toolActivity: string[];
   currentThread?: string;
   updatedAt: string;

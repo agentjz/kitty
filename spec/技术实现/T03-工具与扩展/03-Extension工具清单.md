@@ -32,12 +32,12 @@
 
 ## subagent
 
-- `subagent_launch`：启动聚焦 subagent execution，写入 control-plane，返回 execution id、actor 和状态。
+- `subagent_launch`：启动聚焦 subagent execution，写入 control-plane，返回 execution id、actor 和状态。execution 默认带阻塞型 `waitPolicy`；lead 调用后会让出当前轮，由 host 等 execution 结束后唤醒 lead。
 - `subagent_check`：列出 subagent execution 事实。
 
 ## team
 
-- `team_spawn`：注册 teammate 并创建 team execution。
+- `team_spawn`：注册 teammate 并创建 team execution。execution 默认带阻塞型 `waitPolicy`；lead 调用后会让出当前轮，由 host 等 execution 结束后唤醒 lead；worker 完成后 teammate 状态回到 idle。
 - `team_list`：列出 teammate 成员事实。
 - `team_message_send`：写入 teammate 或 lead 的消息。
 - `team_inbox_read`：读取并清空指定成员 inbox。

@@ -18,7 +18,7 @@ export function buildContextRuntimeSnapshot(
     historyBoundary: {
       rawHistoryPolicy: "evidence_lookup_only",
       automaticSurfaces: [
-        "same-session conversation brief",
+        "internal continuity state",
         "current-objective working memory",
       ],
     },

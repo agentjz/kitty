@@ -1,6 +1,7 @@
 import { createSessionStore } from "../cli/commands/sessionHelpers.js";
 import { runHostTurn } from "../host/turn.js";
 import { createHostSession } from "../host/session.js";
+import { TeamStore } from "../team/store.js";
 import type { RuntimeConfig } from "../types.js";
 import { isAgentWorkerExecutionKind, toAgentWorkerIdentityKind } from "./kinds.js";
 import { ExecutionStore } from "./store.js";
@@ -10,6 +11,7 @@ export async function runExecutionWorker(input: {
   cwd: string;
   config: RuntimeConfig;
   executionId: string;
+  runTurn?: typeof runHostTurn;
 }): Promise<void> {
   const store = new ExecutionStore(input.rootDir);
   const execution = store.load(input.executionId);
@@ -27,7 +29,8 @@ export async function runExecutionWorker(input: {
     sessionId: session.id,
   });
 
-  const outcome = await runHostTurn({
+  const runTurn = input.runTurn ?? runHostTurn;
+  const outcome = await runTurn({
     host: execution.kind,
     input: execution.prompt ?? "",
     cwd: execution.cwd || input.cwd,
@@ -42,9 +45,21 @@ export async function runExecutionWorker(input: {
     },
   });
 
-  store.close(execution.id, {
-    status: outcome.status === "completed" ? "completed" : outcome.status === "aborted" ? "aborted" : "failed",
+  const status = outcome.status === "completed" ? "completed" : outcome.status === "aborted" ? "aborted" : "failed";
+  const closed = store.close(execution.id, {
+    status,
     summary: outcome.status,
     resultText: outcome.status === "completed" ? "Agent execution completed." : outcome.errorMessage,
   });
+
+  if (closed.kind === "team" && closed.actorName && closed.actorRole) {
+    new TeamStore(input.rootDir).upsertMember({
+      name: closed.actorName,
+      role: closed.actorRole,
+      status: "idle",
+      executionId: closed.id,
+      sessionId: closed.sessionId,
+      pid: closed.pid,
+    });
+  }
 }

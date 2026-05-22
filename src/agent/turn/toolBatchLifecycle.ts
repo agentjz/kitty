@@ -1,6 +1,8 @@
 ﻿import { noteSessionDiff } from "../../session/sessionDiff.js";
 import { createMessage, createToolMessage } from "../../session/messages.js";
+import { collectNewLeadWaitExecutionIds, listLeadWaitExecutions } from "../../execution/leadWait.js";
 import { projectToolResultForModel } from "../toolResults/modelProjection.js";
+import { buildRunTurnResult, createExecutionWaitYieldTransition } from "../runtimeTransition.js";
 import { persistToolBatchCheckpoint } from "./persistence.js";
 import { executeToolBatch } from "./toolBatch.js";
 import { recordObservabilityEvent } from "../../observability/writer.js";
@@ -8,7 +10,7 @@ import { throwIfAborted } from "../../utils/abort.js";
 import type { ChangeStore } from "../changes/store.js";
 import type { ProjectContext, SessionRecord, StoredMessage, ToolExecutionResult } from "../../types.js";
 import type { ToolRegistry } from "../../tools/core/types.js";
-import type { AgentIdentity, AssistantResponse, RunTurnOptions } from "../types.js";
+import type { AgentIdentity, AssistantResponse, RunTurnOptions, RunTurnResult } from "../types.js";
 import { readToolFailureError } from "./toolFailure.js";
 
 export interface ProcessToolCallBatchInput {
@@ -25,6 +27,7 @@ export interface ProcessToolCallBatchInput {
 export interface ProcessToolCallBatchResult {
   session: SessionRecord;
   changedPaths: Set<string>;
+  yieldResult?: RunTurnResult;
 }
 
 export async function processToolCallBatch(input: ProcessToolCallBatchInput): Promise<ProcessToolCallBatchResult> {
@@ -44,6 +47,9 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
 
   const batchToolMessages: StoredMessage[] = [];
   const batchChangedPaths = new Set<string>();
+  const leadWaitExecutionsBefore = identity.kind === "lead"
+    ? listLeadWaitExecutions(projectContext.stateRootDir)
+    : [];
   for (const toolCall of response.toolCalls) {
     throwIfAborted(options.abortSignal, "Turn aborted by user.");
     options.callbacks?.onToolCall?.(toolCall.function.name, toolCall.function.arguments);
@@ -114,6 +120,24 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
     toolMessages: batchToolMessages,
     changedPaths: [...batchChangedPaths],
   });
+  const leadWaitExecutionIds = identity.kind === "lead"
+    ? collectNewLeadWaitExecutionIds(leadWaitExecutionsBefore, listLeadWaitExecutions(projectContext.stateRootDir))
+    : [];
+  if (leadWaitExecutionIds.length > 0) {
+    const transition = createExecutionWaitYieldTransition({
+      executionIds: leadWaitExecutionIds,
+      toolNames: response.toolCalls.map((toolCall) => toolCall.function.name),
+    });
+    return {
+      session,
+      changedPaths,
+      yieldResult: buildRunTurnResult({
+        session,
+        changedPaths,
+        transition,
+      }),
+    };
+  }
   return {
     session,
     changedPaths,

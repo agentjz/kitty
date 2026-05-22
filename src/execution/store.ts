@@ -1,5 +1,6 @@
 import { ControlPlaneLedger, type ExecutionRecord, type ExecutionStatus } from "../control/ledger.js";
 import type { ExecutionKind } from "./kinds.js";
+import type { LeadWaitPolicyInput } from "../protocol/leadWait.js";
 
 export type { ExecutionKind, ExecutionRecord, ExecutionStatus };
 
@@ -16,6 +17,7 @@ export class ExecutionStore {
     actorRole?: string;
     sessionId?: string;
     timeoutMs?: number;
+    waitPolicy?: LeadWaitPolicyInput;
   }): ExecutionRecord {
     const ledger = new ControlPlaneLedger(this.rootDir);
     try {

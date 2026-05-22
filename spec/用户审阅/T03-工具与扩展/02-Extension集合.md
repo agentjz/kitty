@@ -22,8 +22,8 @@ extension 是工具集合。`spec` 同时有隔离的 spec 模式入口，用于
 
 `network` 是一组网络工作工具：HTTP session、请求、探测、下载、trace 和 OpenAPI 检查放在同一个扩展集合里。
 
-`background` 是后台命令 execution 工具集合。它把后台进程写入 control-plane 账本，支持检查、终止和异常终止后的 reconcile。
+`background` 是后台命令 execution 工具集合。它把后台进程写入 control-plane 账本，支持检查、终止和异常终止后的 reconcile。它默认不阻塞 lead。
 
-`subagent` 是聚焦 agent execution 工具集合。它把子执行写入 control-plane，支持启动和检查。
+`subagent` 是聚焦 agent execution 工具集合。它把子执行写入 control-plane，支持启动和检查。subagent execution 默认带阻塞型 `waitPolicy`；lead 启动后让出当前轮，host 等 subagent 结束后用 internal wake 事实恢复 lead。
 
-`team` 是 teammate execution、成员和消息工具集合。成员、消息和队友执行都进入 control-plane。
+`team` 是 teammate execution、成员和消息工具集合。成员、消息和队友执行都进入 control-plane。team execution 默认带阻塞型 `waitPolicy`；lead 启动 teammate 后让出当前轮，worker 完成后 teammate 状态回到 idle。

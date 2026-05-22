@@ -33,7 +33,9 @@ export function buildSessionMemoryCompactionMessages(
       content: [
         "Update same-session memory from the supplied facts.",
         "Write only the memory text.",
-        "Keep user preferences, active task continuity, important decisions, and unresolved next steps.",
+        "Keep stable user constraints only when they affect future action.",
+        "Keep active task continuity, important decisions, and unresolved next steps.",
+        "Write compact operational memory, not a transcript or review narrative.",
         "Base every statement on supplied facts.",
       ].join("\n"),
     },

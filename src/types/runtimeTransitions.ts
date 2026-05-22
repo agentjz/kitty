@@ -25,6 +25,12 @@ export interface RuntimeFinalizeCompletedReason {
   changedPaths: string[];
 }
 
+export interface RuntimeYieldExecutionWaitReason {
+  code: "yield.execution_wait";
+  executionIds: string[];
+  toolNames: string[];
+}
+
 export type RuntimeContinueReason =
   | RuntimeContinueToolBatchReason
   | RuntimeContinueEmptyAssistantResponseReason;
@@ -32,6 +38,8 @@ export type RuntimeContinueReason =
 export type RuntimeRecoverReason = RuntimeRecoverProviderRequestReason;
 
 export type RuntimeFinalizeReason = RuntimeFinalizeCompletedReason;
+
+export type RuntimeYieldReason = RuntimeYieldExecutionWaitReason;
 
 export interface RuntimeContinueTransition {
   action: "continue";
@@ -51,9 +59,16 @@ export interface RuntimeFinalizeTransition {
   timestamp: string;
 }
 
+export interface RuntimeYieldTransition {
+  action: "yield";
+  reason: RuntimeYieldReason;
+  timestamp: string;
+}
+
 export type RuntimeTransition =
   | RuntimeContinueTransition
   | RuntimeRecoverTransition
-  | RuntimeFinalizeTransition;
+  | RuntimeFinalizeTransition
+  | RuntimeYieldTransition;
 
-export type RuntimeTerminalTransition = RuntimeFinalizeTransition;
+export type RuntimeTerminalTransition = RuntimeFinalizeTransition | RuntimeYieldTransition;

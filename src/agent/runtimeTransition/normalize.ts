@@ -3,6 +3,7 @@ import type {
   RuntimeFinalizeTransition,
   RuntimeRecoverTransition,
   RuntimeTransition,
+  RuntimeYieldTransition,
 } from "../../types.js";
 import {
   clampWholeNumber,
@@ -34,6 +35,8 @@ export function normalizeRuntimeTransition(
       return normalizeRecoverTransition(reason as RuntimeRecoverTransition["reason"], normalizedTimestamp);
     case "finalize":
       return normalizeFinalizeTransition(reason as RuntimeFinalizeTransition["reason"], normalizedTimestamp);
+    case "yield":
+      return normalizeYieldTransition(reason as RuntimeYieldTransition["reason"], normalizedTimestamp);
     default:
       return undefined;
   }
@@ -115,8 +118,32 @@ function normalizeFinalizeTransition(
   };
 }
 
+function normalizeYieldTransition(
+  reason: RuntimeYieldTransition["reason"],
+  timestamp: string,
+): RuntimeYieldTransition | undefined {
+  if (reason.code !== "yield.execution_wait") {
+    return undefined;
+  }
+
+  const executionIds = takeLastUnique(reason.executionIds ?? []);
+  if (executionIds.length === 0) {
+    return undefined;
+  }
+
+  return {
+    action: "yield",
+    reason: {
+      code: reason.code,
+      executionIds,
+      toolNames: takeLastUnique(reason.toolNames ?? []),
+    },
+    timestamp,
+  };
+}
+
 function normalizeAction(value: unknown): RuntimeTransition["action"] | undefined {
-  return value === "continue" || value === "recover" || value === "finalize"
+  return value === "continue" || value === "recover" || value === "finalize" || value === "yield"
     ? value
     : undefined;
 }

@@ -170,6 +170,9 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
       });
       session = batchResult.session;
       changedPaths = batchResult.changedPaths;
+      if (batchResult.yieldResult) {
+        return batchResult.yieldResult;
+      }
     }
   } catch (error) {
     const timestamp = new Date().toISOString();

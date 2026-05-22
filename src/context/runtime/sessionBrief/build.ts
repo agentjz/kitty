@@ -3,13 +3,11 @@ import { isInternalMessage, readUserInput } from "../../../session/turnFrame.js"
 import type { SessionMemoryState, StoredMessage } from "../../../types.js";
 import type { SessionBriefTurn, SessionConversationBrief } from "./types.js";
 
-const MAX_RECENT_TURNS = 12;
-const MAX_ANCHOR_TURNS = 6;
-const MAX_HEAD_ANCHOR_TURNS = 4;
+const MAX_RECENT_USER_INPUTS = 4;
+const MAX_USER_ANCHORS = 4;
 const MAX_TURN_CHARS = 700;
 const MAX_ANCHOR_CHARS = 360;
 const MAX_THREAD_CHARS = 900;
-const MAX_SIGNAL_CHARS = 160;
 const MAX_SIGNALS_PER_KIND = 4;
 
 export interface BuildSessionConversationBriefInput {
@@ -30,8 +28,9 @@ export function buildSessionConversationBrief(
     return undefined;
   }
 
-  const recentTurns = includedTurns.slice(-MAX_RECENT_TURNS);
-  const anchorTurns = collectAnchorTurns(includedTurns, recentTurns);
+  const userTurns = includedTurns.filter((turn) => turn.role === "user");
+  const recentUserInputs = userTurns.slice(-MAX_RECENT_USER_INPUTS).map((turn) => turn.text);
+  const userAnchors = collectUserAnchors(userTurns, recentUserInputs);
   const userTurnCount = includedTurns.filter((turn) => turn.role === "user").length;
   const assistantTurnCount = includedTurns.filter((turn) => turn.role === "assistant").length;
 
@@ -42,10 +41,10 @@ export function buildSessionConversationBrief(
     userTurnCount,
     assistantTurnCount,
     omittedLongTurnCount: 0,
-    anchorTurns,
-    recentTurns,
+    userAnchors,
+    recentUserInputs,
     toolActivity: collectToolActivity(includedTurns),
-    currentThread: inferCurrentThread(recentTurns),
+    currentThread: inferCurrentThread(recentUserInputs),
     updatedAt: input.timestamp ?? new Date().toISOString(),
   };
 }
@@ -53,21 +52,21 @@ export function buildSessionConversationBrief(
 export function buildSessionConversationBriefBlock(
   brief: SessionConversationBrief | undefined,
 ): string | undefined {
-  if (!brief || (brief.recentTurns.length <= 1 && !brief.modelSummary)) {
+  if (!brief || (brief.recentUserInputs.length <= 1 && !brief.modelSummary)) {
     return undefined;
   }
 
-  return buildFieldBlock("Current session conversation brief", [
+  return buildFieldBlock("Internal continuity state", [
     {
       label: "Purpose",
-      value: "Same-session memory surface. Model-written summary is preserved as memory; structural excerpts are factual evidence only.",
+      value: "Use these facts as private continuity state. Answer the current request directly. Quote prior turns only when the user asks.",
     },
     brief.modelSummary
       ? {
-          label: "Model-written session memory",
+          label: "Session memory",
           value: brief.modelSummary,
         }
-      : { label: "Model-written session memory", value: undefined },
+      : { label: "Session memory", value: undefined },
     brief.modelSummaryUpdatedAt
       ? {
           label: "Memory updated at",
@@ -85,13 +84,13 @@ export function buildSessionConversationBriefBlock(
         }
       : { label: "Omitted long turns", value: undefined },
     {
-      label: "Recent thread",
+      label: "Current user thread",
       value: brief.currentThread,
     },
     {
-      label: "Session anchors",
-      value: brief.anchorTurns.length > 0
-        ? formatLimitedList(brief.anchorTurns.map(formatTurn), MAX_ANCHOR_TURNS)
+      label: "User anchors",
+      value: brief.userAnchors.length > 0
+        ? formatLimitedList(brief.userAnchors, MAX_USER_ANCHORS)
         : undefined,
     },
     {
@@ -99,8 +98,8 @@ export function buildSessionConversationBriefBlock(
       value: formatSignals(brief.toolActivity),
     },
     {
-      label: "Recent turns",
-      value: formatLimitedList(brief.recentTurns.map(formatTurn), MAX_RECENT_TURNS),
+      label: "Recent user inputs",
+      value: formatLimitedList(brief.recentUserInputs, MAX_RECENT_USER_INPUTS),
     },
   ]);
 }
@@ -135,13 +134,12 @@ function toVisibleTurn(message: StoredMessage): VisibleTurnCandidate {
   return visibleTextCandidate(content, "assistant");
 }
 
-function inferCurrentThread(turns: SessionBriefTurn[]): string | undefined {
-  const userTurns = turns.filter((turn) => turn.role === "user").map((turn) => turn.text);
-  if (userTurns.length === 0) {
+function inferCurrentThread(userInputs: string[]): string | undefined {
+  if (userInputs.length === 0) {
     return undefined;
   }
 
-  return truncate(userTurns.slice(-3).join(" -> "), MAX_THREAD_CHARS);
+  return truncate(userInputs.slice(-3).join(" -> "), MAX_THREAD_CHARS);
 }
 
 function collectToolActivity(turns: SessionBriefTurn[]): string[] {
@@ -150,25 +148,18 @@ function collectToolActivity(turns: SessionBriefTurn[]): string[] {
   return takeLastUnique(values, MAX_SIGNALS_PER_KIND);
 }
 
-function collectAnchorTurns(
-  turns: SessionBriefTurn[],
-  recentTurns: SessionBriefTurn[],
-): SessionBriefTurn[] {
-  const recent = new Set(recentTurns);
-  const olderTurns = turns.filter((turn) => !recent.has(turn));
+function collectUserAnchors(
+  userTurns: SessionBriefTurn[],
+  recentUserInputs: string[],
+): string[] {
+  const recent = new Set(recentUserInputs);
+  const olderTurns = userTurns.filter((turn) => !recent.has(turn.text));
   const candidates = [
-    ...olderTurns.slice(0, MAX_HEAD_ANCHOR_TURNS),
-    ...olderTurns.slice(-Math.max(0, MAX_ANCHOR_TURNS - MAX_HEAD_ANCHOR_TURNS)),
+    ...olderTurns.slice(0, 2),
+    ...olderTurns.slice(-2),
   ];
-  return takeLastUniqueTurns(candidates, MAX_ANCHOR_TURNS)
-    .map((turn) => ({
-      role: turn.role,
-      text: excerpt(turn.text, MAX_ANCHOR_CHARS),
-    }));
-}
-
-function formatTurn(turn: SessionBriefTurn): string {
-  return `${turn.role}: ${turn.text}`;
+  return takeLastUniqueTurns(candidates, MAX_USER_ANCHORS)
+    .map((turn) => excerpt(turn.text, MAX_ANCHOR_CHARS));
 }
 
 function formatSignals(values: string[]): string | undefined {

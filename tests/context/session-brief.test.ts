@@ -8,7 +8,7 @@ import {
 import { createSessionMemoryState } from "../../src/session/memory.js";
 import type { StoredMessage } from "../../src/types.js";
 
-test("session brief preserves recent turns without semantic labels", () => {
+test("session brief preserves user continuity without exposing a transcript surface", () => {
   const messages: StoredMessage[] = [
     {
       role: "assistant",
@@ -19,6 +19,11 @@ test("session brief preserves recent turns without semantic labels", () => {
       role: "user",
       content: "OK",
       createdAt: "2026-05-21T10:00:03.000Z",
+    },
+    {
+      role: "user",
+      content: "那继续。",
+      createdAt: "2026-05-21T10:00:05.000Z",
     },
   ];
 
@@ -31,8 +36,10 @@ test("session brief preserves recent turns without semantic labels", () => {
   assert.doesNotMatch(block ?? "", /Decisions/);
   assert.doesNotMatch(block ?? "", /Open questions/);
   assert.doesNotMatch(block ?? "", /Next signals/);
-  assert.match(block ?? "", /assistant: 最简单的 Node\.js 原生方案是 Eleventy/);
-  assert.match(block ?? "", /user: OK/);
+  assert.doesNotMatch(block ?? "", /Current session conversation brief/);
+  assert.doesNotMatch(block ?? "", /Recent turns/);
+  assert.doesNotMatch(block ?? "", /assistant: 最简单的 Node\.js 原生方案是 Eleventy/);
+  assert.match(block ?? "", /Recent user inputs: OK | 那继续。/);
 });
 
 test("session brief keeps same-session continuity without turning old turns into raw history", () => {
@@ -92,8 +99,8 @@ test("session brief keeps same-session continuity without turning old turns into
   assert.match(block ?? "", /agentjz\/ohmyflight/);
   assert.match(block ?? "", /clone 到桌面/);
   assert.match(block ?? "", /对比这两个项目/);
-  assert.match(block ?? "", /我会把两个仓库 clone 到桌面/);
   assert.match(block ?? "", /tools: bash/);
+  assert.doesNotMatch(block ?? "", /我会把两个仓库 clone 到桌面/);
 });
 
 test("session brief keeps head and tail excerpts for long visible turns", () => {
@@ -115,6 +122,11 @@ test("session brief keeps head and tail excerpts for long visible turns", () => 
         role: "assistant",
         content: "收到。",
         createdAt: "2026-05-21T19:56:03.000Z",
+      },
+      {
+        role: "user",
+        content: "你还记得关键任务吗？",
+        createdAt: "2026-05-21T19:56:10.000Z",
       },
     ],
     timestamp: "2026-05-21T19:56:04.000Z",
@@ -156,7 +168,7 @@ test("session brief keeps older anchors outside the recent turn window", () => {
     timestamp: "2026-05-21T20:00:01.000Z",
   }));
 
-  assert.match(block ?? "", /Session anchors/);
+  assert.match(block ?? "", /User anchors/);
   assert.match(block ?? "", /不要 Markdown，用 txt 格式/);
   assert.match(block ?? "", /agentjz\/777f/);
   assert.match(block ?? "", /agentjz\/ohmyflight/);
@@ -179,7 +191,7 @@ test("session brief injects model-written session memory without machine semanti
     timestamp: "2026-05-21T20:01:01.000Z",
   }));
 
-  assert.match(block ?? "", /Model-written session memory/);
+  assert.match(block ?? "", /Session memory/);
   assert.match(block ?? "", /用户要求本 session 用 txt 纯文本回答/);
   assert.match(block ?? "", /agentjz\/777f/);
   assert.match(block ?? "", /Memory updated at: 2026-05-21T20:00:00\.000Z/);

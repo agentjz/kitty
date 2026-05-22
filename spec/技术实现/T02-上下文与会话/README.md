@@ -10,7 +10,7 @@ Provider raw messages 由 `src/context/runtime/compression/` 从当前用户输�
 - `src/agent/turn/lifecycle.ts` 固定触发 session memory 更新，并把更新失败记录到 observability。
 - `src/context/runtime/sessionBrief/` 把模型写出的 session memory 和结构化事实摘录注入当前轮。
 
-记忆更新请求包含当前用户输入、assistant 可见结果、工具结果、checkpoint 和 session diff。结构化事实摘录包含会话开头锚点、近期对话、长文本首尾和工具活动名称。它不做语义压缩。
+记忆更新请求包含当前用户输入、assistant 可见结果、工具结果、checkpoint 和 session diff。结构化事实摘录包含用户锚点、近期用户输入、长用户输入首尾和工具活动名称。它不做语义压缩，也不把旧 assistant 回答变成 raw history。
 
 当前目标执行连续性由 `src/context/runtime/workingMemory/` 承接。
 

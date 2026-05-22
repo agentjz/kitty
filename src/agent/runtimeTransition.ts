@@ -11,6 +11,7 @@ export { normalizeRuntimeTransition } from "./runtimeTransition/normalize.js";
 export {
   createEmptyAssistantResponseTransition,
   buildRunTurnResult,
+  createExecutionWaitYieldTransition,
   createFinalizeTransition,
   createProviderRecoveryTransition,
   createToolBatchTransition,

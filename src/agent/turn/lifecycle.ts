@@ -1,6 +1,7 @@
 import { fetchAssistantResponse as fetchProviderAssistantResponse } from "../../provider/index.js";
 import { buildSessionMemoryCompactionMessages } from "../../session/memoryCompaction.js";
 import { updateSessionMemory } from "../../session/memory.js";
+import { readUserInput } from "../../session/turnFrame.js";
 import { recordObservabilityEvent } from "../../observability/writer.js";
 import type { createProviderClientPool } from "../../provider/client.js";
 import type { AgentIdentity, AssistantResponse, RunTurnOptions, RunTurnResult } from "../types.js";
@@ -22,10 +23,14 @@ export async function updateSessionMemoryAfterTurn(
   if (!input.response.content?.trim()) {
     return input.session;
   }
+  const userInput = readUserInput(input.input);
+  if (!userInput) {
+    return input.session;
+  }
 
   const messages = buildSessionMemoryCompactionMessages({
     session: input.session,
-    userInput: input.input,
+    userInput,
     assistantResponse: input.response,
   });
   const modelRequest = {

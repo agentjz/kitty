@@ -1,6 +1,7 @@
 import { AgentTurnError, getErrorMessage } from "../agent/errors.js";
 import { runAgentTurn } from "../agent/turn.js";
 import { resolveProjectRoots } from "../context/repoRoots.js";
+import { buildLeadWakeFacts, waitForLeadWaitExecutions } from "../execution/leadWait.js";
 import { enterCrashContext } from "../observability/crashRecorder.js";
 import { recordHostTurnFinished, recordHostTurnStarted } from "../observability/hostEvents.js";
 import { isAbortError } from "../utils/abort.js";
@@ -75,20 +76,50 @@ export async function runHostTurn(
       };
     }
 
-    const resultPromise = runTurn({
-      input: options.input,
-      cwd: options.cwd,
-      config: options.config,
-      session: options.session,
-      sessionStore: options.sessionStore,
-      abortSignal: options.abortSignal,
-      callbacks: options.callbacks,
-      toolRegistry,
-      identity: options.identity ?? DEFAULT_IDENTITY,
-      runtimePromptState: options.runtimePromptState,
-    });
-    dependencies.onRunTurnStarted?.();
-    const result = await resultPromise;
+    let nextInput = options.input;
+    let session = options.session;
+    let runtimePromptState = options.runtimePromptState;
+    let result: Awaited<ReturnType<typeof runTurn>>;
+    for (;;) {
+      const resultPromise = runTurn({
+        input: nextInput,
+        cwd: options.cwd,
+        config: options.config,
+        session,
+        sessionStore: options.sessionStore,
+        abortSignal: options.abortSignal,
+        callbacks: options.callbacks,
+        toolRegistry,
+        identity: options.identity ?? DEFAULT_IDENTITY,
+        runtimePromptState,
+      });
+      dependencies.onRunTurnStarted?.();
+      result = await resultPromise;
+      session = result.session;
+
+      const transition = result.transition;
+      const isLead = (options.identity ?? DEFAULT_IDENTITY).kind === "lead";
+      if (!isLead || transition?.action !== "yield" || transition.reason.code !== "yield.execution_wait") {
+        break;
+      }
+
+      options.callbacks?.onStatus?.("Lead yielded. Waiting for delegated execution wake signal.");
+      const executions = await waitForLeadWaitExecutions({
+        rootDir: stateRootDir,
+        executionIds: transition.reason.executionIds,
+        abortSignal: options.abortSignal,
+      });
+      const wakeFacts = buildLeadWakeFacts(executions);
+      nextInput = wakeFacts.userInput;
+      runtimePromptState = {
+        ...(runtimePromptState ?? {}),
+        internalFactBlocks: [
+          ...(runtimePromptState?.internalFactBlocks ?? []),
+          wakeFacts.promptBlock,
+        ],
+      };
+    }
+
     await recordHostTurnFinished(stateRootDir, {
       host,
       sessionId: result.session.id,
