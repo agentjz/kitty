@@ -76,6 +76,7 @@ export function createToolContext(root: string): ToolContext {
       instructionText: "",
       instructionTruncated: false,
       ignoreRules: [],
+      skills: [],
     },
     changeStore: new ChangeStore(config.paths.changesDir),
     createToolRegistry: () => ({

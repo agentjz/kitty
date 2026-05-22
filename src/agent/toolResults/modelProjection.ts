@@ -4,6 +4,7 @@ import type { ToolExecutionResult } from "../../types.js";
 const DEFAULT_MAX_CHARS = 4_000;
 const DIFF_MAX_CHARS = 3_000;
 const OUTPUT_MAX_CHARS = 1_500;
+const SKILL_BODY_MAX_CHARS = 16_000;
 
 export function projectToolResultForModel(input: {
   toolName: string;
@@ -27,6 +28,8 @@ export function projectToolResultForModel(input: {
       return projectWrite(parsed);
     case "bash":
       return projectBash(parsed);
+    case "skill_load":
+      return projectSkillLoad(parsed);
     default:
       return projectGenericSuccess(parsed, input.result.output);
   }
@@ -91,6 +94,19 @@ function projectBash(payload: Record<string, unknown>): string {
     lines.push("output truncated");
   }
   return joinLines(lines);
+}
+
+function projectSkillLoad(payload: Record<string, unknown>): string {
+  const skill = readObject(payload.skill);
+  const name = readString(skill?.name) ?? "skill";
+  const description = readString(skill?.description);
+  const path = readString(skill?.path);
+  const body = readString(payload.body) ?? "";
+  return joinLines([
+    `loaded skill: ${name}${path ? ` (${path})` : ""}`,
+    description,
+    truncateText(body, SKILL_BODY_MAX_CHARS),
+  ]);
 }
 
 function projectGenericSuccess(payload: Record<string, unknown>, rawOutput: string): string {

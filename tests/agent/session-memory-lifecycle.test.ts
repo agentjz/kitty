@@ -96,6 +96,7 @@ test("next turn injects model-written session memory while raw provider messages
       instructionText: "",
       instructionTruncated: false,
       ignoreRules: [],
+      skills: [],
     },
     messages: session.messages,
     sessionMemory: session.sessionMemory,

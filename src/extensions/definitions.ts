@@ -3,6 +3,7 @@ import type { RegisteredTool } from "../tools/core/types.js";
 import { createBackgroundTools } from "./tools/background/index.js";
 import { createNetworkTools } from "./tools/network/index.js";
 import { createSpecTools } from "./tools/spec/index.js";
+import { createSkillTools } from "./tools/skills/index.js";
 import { createSubagentTools } from "./tools/subagent/index.js";
 import { createTeamTools } from "./tools/team/index.js";
 import { createTodoTools } from "./tools/todo/index.js";
@@ -111,6 +112,21 @@ export const EXTENSION_DEFINITIONS = [
         "sending and reading teammate inbox messages",
       ],
       cost: "medium",
+    },
+  },
+  {
+    id: "skills",
+    envKey: "KITTY_EXTENSION_SKILLS",
+    defaultEnabled: true,
+    summary: "Project runtime skill discovery and explicit loading.",
+    createTools: createSkillTools,
+    capability: {
+      description: "Project runtime skill discovery and explicit SKILL.md loading without automatic routing.",
+      bestFor: [
+        "listing project skills",
+        "loading a specialized project method only when the model chooses it",
+      ],
+      cost: "low",
     },
   },
   {

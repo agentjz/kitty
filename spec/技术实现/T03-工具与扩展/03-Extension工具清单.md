@@ -42,6 +42,11 @@
 - `team_message_send`：写入 teammate 或 lead 的消息。
 - `team_inbox_read`：读取并清空指定成员 inbox。
 
+## skills
+
+- `skill_list`：列出项目运行时 skill 的名称、说明和路径，不读取完整正文。
+- `skill_load`：按精确名称读取一个 skill 的完整正文。模型决定是否加载；机器不做关键词匹配、语义路由或自动加载。
+
 ## spec
 
 - `spec_list`：列出 `.kitty/specs/changes` 下的 durable spec。

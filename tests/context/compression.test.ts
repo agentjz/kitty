@@ -110,6 +110,7 @@ test("runtime prompt carries same-session memory while raw request stays on curr
       instructionText: "",
       instructionTruncated: false,
       ignoreRules: [],
+      skills: [],
     },
     messages,
   });

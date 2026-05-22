@@ -1,6 +1,7 @@
 import { buildStaticPromptBlocks } from "../../agent/prompt/static.js";
 import { buildSessionConversationBriefBlock } from "./sessionBrief/index.js";
 import { buildProfilePersonaPromptBlocks, resolveAgentProfile } from "../../agent/profiles/registry.js";
+import { buildSkillIndexPromptBlock } from "../../skills/prompt.js";
 import type { PromptLayers } from "../../agent/prompt/types.js";
 import type { AgentProfile } from "../../agent/profiles/types.js";
 import type { BuildContextRuntimePromptLayersInput } from "./types.js";
@@ -20,6 +21,9 @@ export function buildContextRuntimePromptLayers(
     },
   });
   const sessionBriefBlock = buildSessionConversationBriefBlock(snapshot.sessionBrief);
+  const skillIndexBlock = input.config.extensions.skills
+    ? buildSkillIndexPromptBlock(input.projectContext.skills)
+    : undefined;
   const runtimeFactBlocks = resolvedProfile.runtimeFacts.buildBlocks({
     cwd: input.cwd,
     config: input.config,
@@ -39,7 +43,7 @@ export function buildContextRuntimePromptLayers(
     }),
     profilePersonaBlocks: buildProfilePersonaPromptBlocks(resolvedProfile),
     runtimeFactBlocks: sessionBriefBlock
-      ? [sessionBriefBlock, ...(input.runtimeState?.internalFactBlocks ?? []), ...runtimeFactBlocks]
-      : [...(input.runtimeState?.internalFactBlocks ?? []), ...runtimeFactBlocks],
+      ? [sessionBriefBlock, ...(skillIndexBlock ? [skillIndexBlock] : []), ...(input.runtimeState?.internalFactBlocks ?? []), ...runtimeFactBlocks]
+      : [...(skillIndexBlock ? [skillIndexBlock] : []), ...(input.runtimeState?.internalFactBlocks ?? []), ...runtimeFactBlocks],
   };
 }

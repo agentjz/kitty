@@ -18,6 +18,7 @@ test("agent static prompt names the lead loop without hardcoding the tool surfac
       instructionText: "",
       instructionTruncated: false,
       ignoreRules: [],
+      skills: [],
     },
     undefined,
     {
@@ -51,6 +52,7 @@ test("ordinary agent prompt stays outside spec mode until a spec runtime block i
       instructionText: "",
       instructionTruncated: false,
       ignoreRules: [],
+      skills: [],
     },
     undefined,
     {
@@ -79,6 +81,7 @@ test("spec runtime block leads the work loop when supplied", () => {
       instructionText: "",
       instructionTruncated: false,
       ignoreRules: [],
+      skills: [],
     },
     undefined,
     {

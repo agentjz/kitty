@@ -21,6 +21,10 @@ export type {
   ProjectIgnoreRule,
 } from "./types/project.js";
 export type {
+  LoadedSkill,
+  SkillSummary,
+} from "./types/skill.js";
+export type {
   SessionCheckpoint,
   SessionCheckpointFlow,
   SessionCheckpointPhase,
