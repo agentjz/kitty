@@ -5,6 +5,7 @@ import { buildContextRuntimePromptLayers } from "../../src/context/runtime/promp
 import { buildCompressedContextRequest } from "../../src/context/runtime/compression/builder.js";
 import { renderPromptLayers } from "../../src/agent/prompt/format.js";
 import { createTestRuntimeConfig } from "../helpers.js";
+import { createSessionMemoryState } from "../../src/session/memory.js";
 import type { StoredMessage } from "../../src/types.js";
 
 test("context compression keeps full current turn while under budget", () => {
@@ -113,6 +114,10 @@ test("runtime prompt carries same-session memory while raw request stays on curr
       skills: [],
     },
     messages,
+    sessionMemory: createSessionMemoryState(
+      "用户要求以后不要 Markdown，用 txt 格式。当前任务是 clone 并对比 agentjz/777f 和 agentjz/ohmyflight。",
+      "2026-05-21T20:00:00.000Z",
+    ),
   });
   const prompt = renderPromptLayers(promptLayers);
   const request = buildCompressedContextRequest(

@@ -8,10 +8,10 @@ Provider raw messages 由 `src/context/runtime/compression/` 从当前用户输�
 
 - `src/session/memoryCompaction.ts` 在可见 assistant 结果完成后构建内部模型请求，让模型更新 session memory。
 - `src/agent/turn/lifecycle.ts` 固定触发 session memory 更新，并把更新失败记录到 observability。
-- `src/context/runtime/sessionBrief/` 把模型写出的 session memory 和结构化事实摘录注入当前轮。
+- `src/context/runtime/sessionBrief/` 把模型写出的 session memory 和可验证运行事实注入当前轮。
 - `src/session/memoryAsset.ts` 把同一次保存里的 session memory 写到 `.kitty/memory/sessions/*.md`，作为可审阅文件资产。
 
-记忆更新请求包含当前用户输入、assistant 可见结果、工具结果、checkpoint 和 session diff。结构化事实摘录包含用户锚点、近期用户输入、长用户输入首尾和工具活动名称。它不做语义压缩，也不把旧 assistant 回答变成 raw history。
+记忆更新请求包含当前用户输入、assistant 可见结果、工具结果、checkpoint 和 session diff。`sessionBrief` 不从旧对话生成用户锚点、近期输入或长文本首尾摘录；语义连续性只来自模型写出的 session memory。机器只附带可见 turn 计数、工具活动名称和更新时间这类死事实。
 
 当前目标执行连续性由 `src/context/runtime/workingMemory/` 承接。
 

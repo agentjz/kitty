@@ -1,6 +1,6 @@
 import { ControlPlaneLedger, type ExecutionRecord, type TeamMemberRecord, type WakeSignalRecord } from "../control/ledger.js";
 import { getProjectStatePaths } from "../project/statePaths.js";
-import { listRuntimeMemoryAssets } from "./memoryAssets.js";
+import { listRuntimeMemoryAssets } from "./memory/index.js";
 import { SessionStore } from "../session/store.js";
 import { SpecStore } from "../spec/store.js";
 import type { SessionRecord } from "../types.js";

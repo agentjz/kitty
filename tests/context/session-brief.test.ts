@@ -8,7 +8,7 @@ import {
 import { createSessionMemoryState } from "../../src/session/memory.js";
 import type { StoredMessage } from "../../src/types.js";
 
-test("session brief preserves user continuity without exposing a transcript surface", () => {
+test("session brief does not infer semantic continuity from old turns without model memory", () => {
   const messages: StoredMessage[] = [
     {
       role: "assistant",
@@ -32,17 +32,10 @@ test("session brief preserves user continuity without exposing a transcript surf
     timestamp: "2026-05-21T10:00:04.000Z",
   }));
 
-  assert.doesNotMatch(block ?? "", /Confirmed facts/);
-  assert.doesNotMatch(block ?? "", /Decisions/);
-  assert.doesNotMatch(block ?? "", /Open questions/);
-  assert.doesNotMatch(block ?? "", /Next signals/);
-  assert.doesNotMatch(block ?? "", /Current session conversation brief/);
-  assert.doesNotMatch(block ?? "", /Recent turns/);
-  assert.doesNotMatch(block ?? "", /assistant: 最简单的 Node\.js 原生方案是 Eleventy/);
-  assert.match(block ?? "", /Recent user inputs: OK | 那继续。/);
+  assert.equal(block, undefined);
 });
 
-test("session brief keeps same-session continuity without turning old turns into raw history", () => {
+test("session brief relies on model-written memory for semantic continuity", () => {
   const messages: StoredMessage[] = [
     {
       role: "user",
@@ -89,21 +82,25 @@ test("session brief keeps same-session continuity without turning old turns into
   ];
 
   const block = buildSessionConversationBriefBlock(buildSessionConversationBrief({
+    sessionMemory: createSessionMemoryState(
+      "用户要求本 session 用 txt 纯文本回答；当前任务是 clone 并对比 agentjz/777f 和 agentjz/ohmyflight。",
+      "2026-05-21T20:00:00.000Z",
+    ),
     messages,
     timestamp: "2026-05-21T20:00:01.000Z",
   }));
 
-  assert.match(block ?? "", /不要再用markdown格式回答我/);
-  assert.match(block ?? "", /txt格式/);
+  assert.match(block ?? "", /txt 纯文本/);
   assert.match(block ?? "", /agentjz\/777f/);
   assert.match(block ?? "", /agentjz\/ohmyflight/);
-  assert.match(block ?? "", /clone 到桌面/);
-  assert.match(block ?? "", /对比这两个项目/);
-  assert.match(block ?? "", /tools: bash/);
+  assert.match(block ?? "", /clone 并对比/);
+  assert.match(block ?? "", /并对比 agentjz\/777f 和 agentjz\/ohmyflight/);
   assert.doesNotMatch(block ?? "", /我会把两个仓库 clone 到桌面/);
+  assert.doesNotMatch(block ?? "", /Recent user inputs/);
+  assert.doesNotMatch(block ?? "", /User anchors/);
 });
 
-test("session brief keeps head and tail excerpts for long visible turns", () => {
+test("session brief does not create head and tail excerpts from long old turns", () => {
   const longText = [
     "请记住这个关键任务：比较 https://github.com/agentjz/777f 和 https://github.com/agentjz/ohmyflight。",
     "中间有很多解释文字。",
@@ -132,14 +129,10 @@ test("session brief keeps head and tail excerpts for long visible turns", () => 
     timestamp: "2026-05-21T19:56:04.000Z",
   }));
 
-  assert.match(block ?? "", /agentjz\/777f/);
-  assert.match(block ?? "", /agentjz\/ohmyflight/);
-  assert.match(block ?? "", /输出 txt/);
-  assert.match(block ?? "", /不要 markdown/);
-  assert.doesNotMatch(block ?? "", /Omitted long turns.*1/);
+  assert.equal(block, undefined);
 });
 
-test("session brief keeps older anchors outside the recent turn window", () => {
+test("session brief does not synthesize older anchors outside model memory", () => {
   const messages: StoredMessage[] = [
     {
       role: "user",
@@ -168,11 +161,7 @@ test("session brief keeps older anchors outside the recent turn window", () => {
     timestamp: "2026-05-21T20:00:01.000Z",
   }));
 
-  assert.match(block ?? "", /User anchors/);
-  assert.match(block ?? "", /不要 Markdown，用 txt 格式/);
-  assert.match(block ?? "", /agentjz\/777f/);
-  assert.match(block ?? "", /agentjz\/ohmyflight/);
-  assert.match(block ?? "", /你还记得前面的格式要求和仓库任务吗/);
+  assert.equal(block, undefined);
 });
 
 test("session brief injects model-written session memory without machine semantic compression", () => {
@@ -195,4 +184,6 @@ test("session brief injects model-written session memory without machine semanti
   assert.match(block ?? "", /用户要求本 session 用 txt 纯文本回答/);
   assert.match(block ?? "", /agentjz\/777f/);
   assert.match(block ?? "", /Memory updated at: 2026-05-21T20:00:00\.000Z/);
+  assert.match(block ?? "", /Visible turns: 1 user turn/);
+  assert.doesNotMatch(block ?? "", /Recent user inputs/);
 });

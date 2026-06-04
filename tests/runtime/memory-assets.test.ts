@@ -10,7 +10,7 @@ import {
   listRuntimeMemoryAssets,
   readRuntimeMemoryAsset,
   searchRuntimeMemoryAssets,
-} from "../../src/runtime/memoryAssets.js";
+} from "../../src/runtime/memory/index.js";
 import { SessionStore } from "../../src/session/store.js";
 import { SpecStore } from "../../src/spec/store.js";
 import { createTempWorkspace, initGitRepo } from "../helpers.js";
@@ -38,6 +38,9 @@ test("runtime memory assets can be listed, read, and searched", async (t) => {
   assert.equal(search.length, 1);
   assert.equal(search[0]?.sessionId, session.id);
   assert.match(search[0]?.matches.join("\n") ?? "", /reusable/);
+
+  const splitPhraseSearch = await searchRuntimeMemoryAssets(root, "Runtime reusable");
+  assert.equal(splitPhraseSearch.length, 0);
 
   const deleted = await deleteRuntimeMemoryAsset(root, session.id);
   assert.equal(deleted.sessionId, session.id);

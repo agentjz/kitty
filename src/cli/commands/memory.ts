@@ -7,7 +7,7 @@ import {
   readRuntimeMemoryAsset,
   appendRuntimeMemoryAssetToSpecNotes,
   searchRuntimeMemoryAssets,
-} from "../../runtime/memoryAssets.js";
+} from "../../runtime/memory/index.js";
 import type { CliOverrides, RuntimeConfig } from "../../types.js";
 import { ui } from "../../utils/console.js";
 import { writeStdoutLine } from "../../utils/stdio.js";

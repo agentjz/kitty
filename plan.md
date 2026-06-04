@@ -1,593 +1,557 @@
-# 小猫智能体成熟化计划
+# 小猫智能体全局成熟化计划
 
-## 判断
+## 总判断
 
-成熟的 agent 不是一个更大的聊天机器人，也不是一个工具集合。
+小猫智能体现在不是缺少能力，而是缺少一条统一的任务生命周期主干。
 
-成熟的 agent 是一个能长期接住用户目标的本地工作台：用户交代目标后，它能理解当前任务，组织上下文，调用工具，沉淀记忆，启动后台工作，派出协作者，等待结果，恢复现场，验证交付，并把证据留在用户可审阅的位置。
+已有能力包括 agent loop、context、session memory、core tools、extension tools、spec、skills、background、subagent、team、worktree、network、runtime status、Telegram、observability 和测试。问题是这些能力还没有围绕同一个用户体验闭环稳定协作。
 
-小猫智能体当前已经有骨架：agent 主循环、context、session、core tools、extensions、control plane、spec、skills、memory asset、CLI、Telegram 和测试结构都在。问题不是从零开始，而是把这些能力做成稳定、厚实、自然的产品体验。
+成熟形态不是把外部项目拼贴进来，也不是让模型对每句话都进入大工程模式。
 
-## Research 结论
+成熟形态是：
 
-### 历史演进
+用户给出目标。模型判断任务边界。机器保存事实。简单任务直接回答。普通任务局部执行。复杂任务进入计划。长任务进入后台或协作。等待有边界。中断能恢复。记忆不失真。状态可审阅。交付有证据。
 
-历史里有三个明显阶段。
+核心原则：
 
-第一阶段是超重阶段。很多能力都存在，但职责挤在 agent、capability、runtime、tool preview、protocol 等局部里。它证明了项目曾经有足够厚的能力想象，也暴露了过度集中、协议过重、观测过重、文件职责混杂的问题。
-
-第二阶段是极简阶段。核心被压到很轻，四个 core tools 的边界变清楚了，但 extension、network、spec、todo、worktree、team、subagent、background、测试厚度和用户体验也被一起削薄。它证明了“瘦核心”是对的，也证明了“只剩核心”是不够的。
-
-第三阶段是恢复阶段。成熟方向逐渐变清楚：核心保持瘦，能力放进 extension；状态落到 control plane；spec 变成独立工作流；session memory 由模型写；memory 同步投影成可审阅资产；lead-wait 由 execution policy 驱动，而不是由工具名硬猜。
-
-结论：不能回到超重，也不能停在极简。正确方向是“瘦主循环，厚运行环境”。
-
-### 当前事实
-
-当前已经具备这些基础：
-
-- 一个 agent 主循环负责模型请求、工具批次、恢复、收口和记忆更新。
-- Context 只决定当前模型看到什么，不把 raw history 直接回灌。
-- Session 保存连续性，session memory 由模型根据事实写出。
-- Core tools 保持四个：`read`、`edit`、`write`、`bash`。
-- Extension 已恢复为 `todo`、`worktree`、`network`、`background`、`subagent`、`team`、`skills`、`spec`。
-- Control plane 用 SQLite 记录 execution、team、pid、状态、wait policy 和 wake facts。
-- Spec 已经有 requirements、design、tasks、notes、checkpoint 和隔离 worktree。
-- Skills 已经能发现、索引、加载正文和读取资源。
-- 测试覆盖了 core tools、extensions、spec、session、context、execution、host、interaction、telegram 等主要入口。
-
-当前仍然不够成熟的地方：
-
-- Memory 已经能写入、投影、列出、读取、搜索、删除，并能沉淀到 spec notes 或 runtime skill references；更高阶的整理和长期复用仍需要真实任务继续打磨。
-- Skill 已经能发现、索引、加载正文、读取资源和运行声明的 `scripts/` 资源，但还没有依赖检查、示例体验、安装/版本故事和更完整的能力包治理。
-- Runtime 已经能通过 `kitty status` 看见 session、memory、execution、team、wake 和 spec 现场，但还没有形成完整的交互式现场管理体验。
-- Subagent 和 team 已能启动、记录派工边界、阻塞 lead、回传 worker 结果并进入 wake；失败重派、队伍最终报告和真实协作报告仍需继续打磨。
-- Background 已有生命周期、运行输出摘要、无输出健康状态、终止等待和 reconcile；用户体验仍需真实长任务继续打磨。
-- Spec 工作流有骨架，初始文档已包含目标、约束、边界和验证映射；完整 requirements -> design -> tasks -> implement -> validate 真实体验仍需继续打磨。
-- 测试数量已恢复一部分，但还缺长任务、打断、恢复、协作、记忆沉淀这类真实产品行为的组合测试。
-
-### 外部参考
-
-当前主流 agent 方向给出的共同结论是：
-
-- Prompt 应稳定，动态内容应渐进式加载。
-- Planning 应变成可执行的长程任务组织，而不是提示词里的口号。
-- Memory 应从 raw history 走向结构化压缩和文件化资产。
-- Tools 应优先利用 CLI、脚本和本地环境能力，不为每个动作发明复杂 API。
-- Workflow 应从刚性流程转为 skill、script、spec 和少量确定性主干的混合体验。
-- Environment 应成为有状态运行时，而不是无状态工具调用。
-
-这和小猫当前方向一致：机器负责事实、模型负责判断；主干维护事实，边缘负责呈现。
-
-## 成熟体验
-
-一个成熟的小猫智能体，用户感受到的应该是这些。
-
-### 1. 不失忆
-
-用户不用反复解释刚确认过的目标、限制、路线和下一步。小猫能记住同一个 session 的关键脉络，也能避免把很久以前的目标误当成当前目标。
-
-好的体验不是把全部历史塞回模型，而是让模型看到当前任务需要的记忆：当前用户输入、session memory、working memory、运行事实和必要项目上下文。
-
-### 2. 不乱跑
-
-用户说一个目标，小猫能先判断边界，再选择工具。它不会因为看到旧日志、wake signal、checkpoint、工具输出，就把内部事实当成用户新要求。
-
-内部事件是证据，不是用户意图。
-
-### 3. 能继续
-
-长任务被打断、退出、后台执行、subagent 运行、team 执行后，小猫能恢复现场。用户回来时，不应该面对一堆技术状态，而应该看到：做到了哪里，谁还在跑，结果是什么，下一步是什么。
-
-### 4. 会沉淀
-
-一次任务结束后，重要经验应该沉淀成可审阅资产：session memory、spec、skill、notes、测试、变更记录。沉淀不是自动写一堆废话，而是让未来任务更快、更准、更少返工。
-
-### 5. 会协作
-
-Subagent 不是装饰。Team 也不是工具名。成熟体验应该是 lead 能把明确边界的工作派出去，自己让出控制，等待结果，再综合结论继续推进。
-
-用户看到的是“我让一队 agent 干活”，不是“我调用了几个状态查询工具”。
-
-### 6. 能验证
-
-小猫不是只给解释。它应该尽量运行能证明结果的命令、测试、检查或真实操作，并把验证结果作为交付的一部分。
-
-验证不是机器强迫模型走流程，而是模型根据任务判断什么证据足以交付。
-
-## 核心模块标准
-
-### Agent Loop
-
-Agent loop 只做编排。
-
-它负责接收输入、构建上下文、请求模型、执行工具、处理恢复、收口记忆和返回结果。它不承载业务生态，不写死工具列表，不替模型做语义判断。
-
-成熟标准：
-
-- 主循环短而稳定。
-- 生命周期清楚。
-- 每轮收口能更新 session memory。
-- 工具批次、provider 恢复、lead-wait、toolless turn 都有明确边界。
-
-### Context
-
-Context 负责模型当前看到什么。
-
-成熟标准：
-
-- 当前用户输入是当前轮中心。
-- 同 session 连续性来自 session memory 和 working memory。
-- 历史工具结果、checkpoint、observability 只在需要时作为证据进入。
-- 内部 wake、后台状态、execution 结果不能伪装成用户新输入。
-- 压缩由模型总结关键事实，机器只提供事实边界和存储。
-
-### Session / Memory
-
-Session 负责连续性，Memory 负责沉淀。
-
-成熟标准：
-
-- session record 是运行状态入口。
-- session memory 是模型写出的连续性摘要。
-- memory asset 是可审阅文件投影。
-- working memory 保存当前目标执行事实。
-- checkpoint 用于恢复和取证，不把旧目标拖回当前轮。
-- 用户能浏览、搜索、整理、删除和复用记忆资产。
-
-### Tools
-
-Tools 分两层。
-
-Core tools 是基础编程闭环：`read`、`edit`、`write`、`bash`。
-
-Extension tools 是可插拔能力包：`todo`、`worktree`、`network`、`background`、`subagent`、`team`、`skills`、`spec`。
-
-成熟标准：
-
-- 工具面来自注册表和当前运行配置。
-- 不在 prompt、测试、文档里维护第二套工具事实。
-- 机器只执行工具和返回证据。
-- 模型决定何时使用工具。
-- Extension 能独立启用、禁用、测试和演进。
-
-### Skills
-
-Skill 应该是能力包，不只是提示词片段。
-
-成熟标准：
-
-- `SKILL.md` 描述方法、边界、使用时机。
-- `references/` 放知识资料。
-- `scripts/` 放可执行脚本。
-- `examples/` 放示例。
-- `assets/` 放素材。
-- 上下文默认只出现 skill 索引。
-- 模型自己判断是否加载 skill。
-- 需要脚本时，脚本作为 skill 资源被执行或引用，而不是把所有细节塞进 prompt。
-
-### Spec
-
-Spec 是计划工作流，不是普通文档目录。
-
-成熟标准：
-
-- requirements 负责用户目标和验收口径。
-- design 负责结构和取舍。
-- tasks 负责执行路径。
-- notes 负责过程事实和用户确认。
-- implement 前必须有清楚的计划资产。
-- validate 阶段必须回到验收口径。
-- spec 可以使用隔离 worktree 和 checkpoint。
-- spec 模式和默认 agent 模式隔离，但共享同一个核心运行时。
-
-### Runtime
-
-Runtime 是小猫的本地工作环境。
-
-成熟标准：
-
-- `.kitty/` 是运行现场，不是垃圾桶。
-- `.kitty/.env` 是配置事实入口。
-- `.kitty/control-plane.sqlite` 是 execution 和协作账本。
-- `.kitty/memory/` 是记忆资产。
-- `.kitty/sessions/` 是会话记录。
-- `.kitty/observability/` 是证据记录。
-- 用户可以看到 runtime status：当前 session、执行、后台任务、team、memory、spec、最近验证和异常。
-
-### Background
-
-Background 是长任务现场。
-
-成熟标准：
-
-- 启动后有 execution record。
-- 可以检查状态、输出、退出码和摘要。
-- 可以终止。
-- 进程退出或宿主重启后能 reconcile。
-- lead 不靠猜测判断后台状态，而是读取账本事实。
-
-### Subagent / Team
-
-Subagent 和 team 是真实协作体验。
-
-成熟标准：
-
-- lead 能派发边界清楚的任务。
-- blocking execution 让 lead 暂停当前轮。
-- worker 完成后写回 summary/output。
-- wake 只作为内部事实进入，不污染用户输入。
-- lead 恢复后综合结果继续推进。
-- team 有成员状态、inbox、消息和最终 synthesis。
-- 失败能被看见，并支持重派或收束。
-
-### Observability
-
-Observability 是记录仪。
-
-成熟标准：
-
-- 记录事件、终端日志、崩溃、工具事实和执行状态。
-- 服务排查、复盘和恢复。
-- 不替模型做决策。
-- 不把可观测性做成产品主线。
-
-### Tests
-
-测试保护真实体验。
-
-成熟标准：
-
-- 单元测试保护模块边界。
-- 集成测试保护 agent 主链路。
-- 生命周期测试保护打断、退出、后台、wake、恢复。
-- 长任务测试保护 memory、spec、team、verification 的组合体验。
-- 测试不写口号，不测试偏好，不测试某句 prompt 必须出现。
-
-## 改造方向
-
-### 第一件事：把 Runtime 做成用户能理解的环境
-
-新增或补强 runtime status 体验。
-
-用户应该能一眼看到：
-
-- 当前 session 是什么。
-- 最近目标是什么。
-- memory 资产在哪里。
-- 有哪些 background、subagent、team execution。
-- 谁在运行，谁已完成，谁失败。
-- 哪些 wake facts 等待 lead 消化。
-- 当前 spec 是否存在，处于哪个阶段。
-
-这不是为了做 dashboard，而是为了让“能继续”变成用户可感知能力。
-
-### 第二件事：把 Memory 做成资产
-
-当前 memory asset 已经有入口，下一步要做成完整体验。
-
-应该补齐：
-
-- memory 列表。
-- memory 读取。
-- memory 搜索。
-- memory 清理。
-- memory 和 session 的关系展示。
-- 任务结束后把可复用经验沉淀为 skill 或 spec notes 的路径。
-
-Memory 的目标不是存更多，而是让长期任务少失忆、少重复、少跑偏。
-
-### 第三件事：把 Skill 做成包
-
-Skill 不应停留在 Markdown 加载。
-
-应该补齐：
-
-- skill package schema。
-- resource 类型识别。
-- scripts 执行入口。
-- skill 示例读取。
-- skill 依赖和环境检查。
-- skill 安装或复制路径。
-- skill 使用后的证据记录。
-
-模型读 skill 决定路线，机器执行 script 和记录事实。
-
-### 第四件事：把 Subagent / Team 做成协作
-
-当前已有执行和等待基础，下一步要补体验厚度。
-
-应该补齐：
-
-- lead 派工时的任务边界记录。
-- worker 结果结构化回传。
-- team 成员 idle/running/done/failed 的清楚状态。
-- lead wake 后的 synthesis 规范。
-- 失败、超时、用户中断后的收束策略。
-- team 级最终报告。
-
-重点不是增加更多 team 工具，而是让用户看到“协作完成了什么”。
-
-### 第五件事：把 Spec 做成高质量计划工作流
-
-Spec 应该像产品经理和架构师协作，而不是像文件编辑器。
-
-应该补齐：
-
-- requirements、design、tasks、notes 的用户可读体验。
-- 每阶段用户确认和变更记录。
-- implement 前后的 diff、测试、验证映射。
-- spec checkpoint 的恢复体验。
-- spec 与 memory、skill 的沉淀关系。
-
-Spec 不是默认模式的负担。它是需要时开启的深工作流。
-
-### 第六件事：把 Background 做成可恢复长任务
-
-Background 应该支持真实长任务。
-
-应该补齐：
-
-- 输出摘要更新。
-- 卡住检测。
-- 用户可见状态。
-- 终止与清理。
-- host 重启后的 reconcile。
-- 完成后进入 lead wake facts。
-
-### 第七件事：补长任务产品测试
-
-需要增加组合测试，而不是只测单个函数。
-
-重点测试：
-
-- 用户中断后恢复 session。
-- subagent 完成后 lead 恢复且不把 wake 当用户输入。
-- team 多成员完成后 lead synthesis。
-- background 运行、完成、终止、reconcile。
-- spec 从 requirements 到 validate 的完整闭环。
-- memory asset 在 turn 收口后可审阅。
-- skill 只索引、不自动全文注入，按模型选择加载。
+- 瘦 agent loop。
+- 厚 runtime。
+- 模型做活判断。
+- 机器做死事实。
+- 状态事实只有一处。
+- 工具面来自注册表。
+- 上下文服务当前轮。
+- 历史留作证据。
+- memory 负责连续性和沉淀。
+- background、subagent、team 必须可见、可恢复、可终止。
 
 ## 不做什么
 
-- 不把企业安全沙箱当主线。
-- 不为了工具多而堆工具。
-- 不为了核心瘦而删除真实体验。
-- 不把语义判断交给正则、关键词或机器分支。
-- 不把用户话术直接写进提示词。
-- 不做假兼容。
-- 不在 prompt、文档、测试和源码里维护多套事实。
+- 不复制 Codex、Goose、LangGraph、OpenHands、Letta 的外壳。
+- 不用关键词、正则、机器分支判断用户意图。
+- 不把用户一句话直接写进 prompt。
+- 不让简单输入触发全局工程。
+- 不让 lead 因后台、subagent 或 team 永久卡死。
+- 不把 wake、checkpoint、execution 状态伪装成用户新目标。
 - 不把 observability 做成决策层。
-- 不把历史提交当标准答案。
-- 不把当前实现当标准答案。
+- 不在 prompt、spec、tests、registry、config 里维护多套工具事实。
+- 不保留空壳兼容层。
+- 不靠“看起来有字段”冒充生命周期闭环。
 
-## 一次性重构原则
+## 外部参考的正确用法
 
-这份计划不是分期路线图。
+只取原则，不抄实现。
 
-执行时必须把它当作一次完整重构的验收清单：先全局 research，再统一设计边界，然后一次性改完核心链路，最后用整体测试和真实交互收口。
+Codex 参考：
 
-当前状态：成熟化主干已经完成一轮收口。runtime status、memory asset 查看/搜索/删除/沉淀、skill 包资源与脚本入口、background 输出摘要与终止等待、subagent/team 派工事实与 lead wake、spec 文档模板与 checkpoint 恢复都已进入代码、文档和测试。仍不能把它误判为“永远完成”：真实长期任务、失败重派、队伍最终报告和 spec 全流程产品感仍需要继续用真实项目打磨。
+- thread / rollout / interrupt / background cleanup / dynamic tools / compaction 边界。
+- 取其“运行时事实清楚、恢复路径清楚”，不复制 Rust 结构和完整协议复杂度。
 
-允许按依赖顺序施工，不允许按局部完成度交付。
+Goose 参考：
 
-不能只做 Runtime，不做 Memory。
+- agent-visible 与 user-visible 分层。
+- cancel token、session manager、extension/source/skill 思路。
+- 取其“可见性和取消边界”，不复制 MCP 重生态。
 
-不能只做 Skill，不做 Runtime。
+LangGraph 参考：
 
-不能只做 Subagent，不做 lead-wait 和 wake。
+- thread、run、checkpoint、interrupt 的状态分离。
+- 取其“状态机和恢复边界”，不把 Kitty 改成 graph 框架。
 
-不能只做 Spec，不做验证闭环。
+OpenHands 参考：
 
-不能只做代码，不同步 spec、README、AGENTS、测试。
+- 长任务现场、start task、pause/resume、事件轨迹。
+- 取其“用户能看懂任务现场”，不复制 app server。
 
-每个模块都要同时满足四件事：
+Letta 参考：
 
-- 用户体验说得通。
-- 源码职责说得清。
-- 状态事实只有一处。
-- 测试能保护真实行为。
+- memory 分层和长期记忆意识。
+- 取其“memory 是资产”，不把 Kitty 改成 memory-first 产品。
 
-## 最终形态
+## 一次性重构主线
 
-小猫智能体最终应该长成这样：
+本次重构必须先建立 Task Lifecycle，再把所有核心能力接到同一条主线上。
 
-用户给出目标。
+不能先修 background，后面再想 memory。
 
-小猫先理解边界，再组织上下文。
+不能先修 prompt，后面再想 runtime。
 
-简单任务直接用 core tools 完成。
+不能先修 subagent，后面再想 lead-wait。
 
-复杂任务写 todo。
+主线是：
 
-需要计划时进入 spec。
+输入 -> Task Lifecycle -> Context -> Model -> Tools / Execution -> Runtime State -> Memory -> Output -> Verification
 
-需要能力时加载 skill。
+## Task Lifecycle
 
-需要查外部时用 network。
+Task Lifecycle 是本次重构的核心。
 
-需要隔离改动时用 worktree。
+它不是机器语义分类器。它只保存模型声明和运行事实。
 
-需要长跑时开 background。
+模型负责判断当前任务属于什么工作形态。机器只保存：
 
-需要并行时派 subagent 或 team。
+- 当前 task id。
+- task stage。
+- objective。
+- scope。
+- boundary。
+- reason。
+- active execution ids。
+- active spec id。
+- active todo ids。
+- verification facts。
+- completion facts。
+- updatedAt。
 
-执行过程写入 control plane。
+建议阶段：
 
-关键经验沉淀进 memory asset。
+- `light_response`：简单问答、解释、状态说明，不应默认用工具。
+- `normal_work`：普通代码或文件任务，可以局部调查、修改、验证。
+- `deep_work`：架构、重构、跨模块任务，需要全局调查。
+- `spec_work`：requirements -> design -> tasks -> implement -> validate。
+- `background_wait`：后台执行已启动，lead 不阻塞。
+- `delegated_wait`：subagent/team 阻塞执行，lead 让出当前轮。
+- `recovery`：provider、execution、session、wake 或 checkpoint 恢复。
+- `completed`：当前目标完成，有输出和证据。
 
-完成后用验证证据收口。
+Task Lifecycle 的作用：
 
-下次回来，用户不用重新解释一切。
+- 防止小任务被误升级成大工程。
+- 防止旧目标拖回当前轮。
+- 防止内部 wake 变成用户意图。
+- 防止 lead 无限等待。
+- 让 runtime status 能显示“现在到底处于什么阶段”。
 
-这就是成熟 agent 的体验：不是更会聊天，而是更能把真实任务从开始带到完成。
+## Agent Loop
 
-## 一次性重构 Checklist
+Agent loop 只做编排：
 
-使用方式：
+- 接收当前输入。
+- 读取 Task Lifecycle。
+- 构建 context。
+- 请求模型。
+- 执行工具批次。
+- 处理 provider 恢复。
+- 处理 execution wait。
+- 收口 session memory。
+- 返回结果。
 
-- 开工前先完整勾勒当前事实和历史证据。
-- 开工后按依赖顺序施工，但所有大项都必须在同一次重构中收口。
-- 任一大项没完成，都不能认为这次成熟化完成。
-- 任一模块出现双事实源、提示词硬塞、正则语义判断、假兼容或空壳，都必须返工。
+Agent loop 不做：
 
-状态标记：
+- 不判断用户语义。
+- 不写死工具列表。
+- 不管理 memory asset。
+- 不管理 spec 文档细节。
+- 不管理 team 成员细节。
+- 不做 runtime status 展示。
 
-- `[x]` 表示当前代码、文档和测试已经对齐。
-- `[ ]` 表示仍未完成，不能在最终验收里放过。
-- `[~]` 表示已有主干，但体验或验证还不够厚。
+必须补齐：
 
-### 0. 全局 Research 闸门
+- 每轮开始写入 task lifecycle turn fact。
+- 模型输出没有工具且有可见回答时，按当前阶段收口。
+- 模型输出空响应时，保留现有继续机制，但要记录为 lifecycle fact。
+- task completed 时清理当前 run state，避免旧目标污染下一轮。
 
-- [x] 读取当前 `AGENTS.md`、README、核心 spec、源码、测试、`.kitty/.env*` 和 git 状态。
-- [x] 对比历史超重阶段、极简阶段、成熟恢复阶段，写清每个阶段解决了什么、丢了什么、带来什么坏逻辑。
-- [x] 画出当前核心链路：用户输入 -> session -> context -> model -> tools -> execution/control plane -> host -> memory -> output。
-- [x] 找出并收束主要双事实源：工具列表、扩展开关、配置入口、runtime 状态、execution 状态、memory 投影。
-- [x] 找出并处理本轮明确超重文件：`src/cli/commands/project.ts` 已拆出 runtime status 和 memory 命令。
-- [x] 找出所有薄体验：代码有工具，但用户感受不到完整能力的地方。
-- [x] 确认本次重构边界：保留瘦主循环，补厚 runtime、memory、skill、execution 协作和 spec 体验，不恢复超重旧架构。
+## Context
 
-### 1. 架构总线
+Context 负责模型当前看到什么。
 
-- [x] Agent loop 只保留编排职责：输入、上下文、模型、工具批次、恢复、收口、记忆更新。
-- [x] Context 只负责模型当前看到什么，不负责保存历史、不负责决策、不负责工具生命周期。
-- [x] Session 只负责连续性和运行状态入口。
-- [x] Control plane 只负责 execution/team/background/wake 的机器事实。
-- [x] Extensions 只负责工具集合和能力注册。
-- [x] Skills 只负责能力包发现、加载、资源读取和脚本入口。
-- [x] Spec 只负责计划工作流和计划资产。
-- [x] Observability 只负责记录证据。
-- [~] 每个核心文件能一句话说清负责什么、不负责什么。
-- [x] 删除或拆分本轮确认的职责混杂文件，不做原地缝补。
+当前事实：
 
-### 2. Runtime 环境
+- raw provider messages 只取当前用户输入帧。
+- 同 session 连续性来自模型写出的 session memory。
+- working memory 保存当前目标执行事实。
+- wake facts 作为 internal fact block 进入，不作为用户输入。
 
-- [x] 统一 `.kitty/` 目录职责：配置、sessions、memory、control plane、observability、spec、临时运行状态。
-- [x] 确认 `.kitty/.env`、`.kitty/.env.example`、模板和配置读取完全一致。
-- [x] 删除过时配置、空壳配置和未使用配置。
-- [x] 建立 runtime status 入口，让用户看到 session、memory、execution、background、subagent、team、spec、异常和最近验证。
-- [x] runtime status 只读取事实，不做语义判断。
-- [x] runtime status 输出要像用户现场，不像数据库 dump。
-- [x] 增加 runtime status 测试。
+必须补齐：
 
-### Memory
+- 注入 Task Lifecycle block。
+- `light_response` 阶段不注入过多工程化上下文。
+- `deep_work` 阶段才强调全局调查和完整验证。
+- `delegated_wait` 恢复时只注入 execution wake facts。
+- `background_wait` 只注入后台状态事实，不诱导 lead 轮询。
+- context compression 只压当前帧；长期连续性仍靠 session memory。
 
-- [x] session memory 仍由模型根据事实写出。
-- [x] 机器只提供当前用户输入、assistant 可见结果、工具事实、checkpoint 和 session diff。
-- [x] 当前轮只直接携带当前用户输入；历史通过 session memory、working memory 和必要事实进入。
-- [x] 内部 wake 不作为用户输入进入长期记忆。
-- [x] checkpoint 用于恢复和取证，不把旧目标拖回当前轮。
-- [x] memory asset 成为可审阅资产，不只是隐藏状态。
-- [x] 增加 memory 列表、读取、搜索、清理能力。
-- [x] 展示 memory asset 与 session record 的关系；删除 memory asset 会同步清除 session 主记录中的 session memory。
-- [x] 建立从 memory 到 skill/spec notes 的沉淀路径。
-- [x] 增加 memory asset 行为测试，保护“同一次保存同时更新 session record 和可审阅文件”。
+禁止：
 
-### Skills
+- 机器从旧用户输入抽 semantic anchors。
+- 机器用关键词判断“重要记忆”。
+- 把旧 assistant 回答变成可复述历史面。
 
-- [x] 明确 runtime skill package schema：`SKILL.md`、`references/`、`scripts/`、`examples/`、`assets/`。
-- [x] `.codex/skills/**` 只属于 Codex 开发规范，不进入小猫 runtime skill。
-- [x] 保持默认上下文只展示 skill 索引，不自动注入全文。
-- [x] 补 skill resource 类型识别。
-- [x] 补 skill script 执行入口。
-- [x] 补 skill 示例读取体验。
-- [x] 补 skill 依赖和环境检查。
-- [x] 记录 skill 使用证据：加载了什么、读了什么资源、执行了什么脚本。
-- [x] skill 加载由模型判断，机器只列出、读取、执行和记录事实。
-- [x] 增加 skill package 行为测试。
+## Session / Memory
 
-### Tools / Extensions
+Session 负责连续性。Memory 负责沉淀。
 
-- [x] 工具面只来自注册表和运行配置。
-- [x] README、spec、prompt、tests 不维护第二套工具事实。
-- [x] Core tools 只保留 `read`、`edit`、`write`、`bash`。
-- [x] Extension tools 保留 `todo`、`worktree`、`network`、`background`、`subagent`、`team`、`skills`、`spec`。
-- [x] 默认 agent 打开除 spec 外的可用 extension；spec 通过 spec 工作流隔离启用。
-- [x] 检查 network 是否仍是完整集合：HTTP session、request、probe、suite、download、trace、OpenAPI。
-- [x] 检查 worktree 是否保留创建、查看、保留、删除、事件能力。
-- [x] 检查 todo 是否是会话级 todo_write，而不是拆成不必要 CRUD。
-- [x] 每个 extension 可独立启用、禁用、测试和演进。
-- [x] 增加 extension registry 与真实工具面的同步测试。
+当前正确方向：
 
-### Background
+- session memory 由模型写。
+- 机器提供当前输入、assistant 可见输出、工具事实、checkpoint、session diff。
+- `.kitty/memory/sessions/*.md` 是可审阅资产。
 
-- [x] 补后台输出摘要更新。
-- [x] 补后台卡住检测或长时间无输出提示。
-- [x] 补后台终止后的状态收束。
-- [x] 补 host 重启后的 background reconcile。
-- [x] 补 background 完成后进入 lead wake facts 的体验。
-- [x] 增加 background 长任务生命周期测试。
+必须补齐：
 
-### Subagent / Team
+- memory update 输入结构化为固定区块：
+  - current objective
+  - user constraints
+  - decisions
+  - unresolved next steps
+  - verification facts
+  - reusable lessons
+- memory 输出仍由模型写，不由机器拼。
+- task completed 后 memory 应避免保留“继续当前重构”这类旧惯性，除非仍是未完成事项。
+- memory asset 支持归档、沉淀、删除。
+- memory search 只做字面证据检索，不判断重要性。
+- memory -> spec notes / skill references 保持 sink 边界，不混在 store 里。
 
-- [x] 明确 lead 派工记录：目标、边界、输入、期望输出。
-- [x] 明确 worker 结果结构：summary、output、status、error、changed paths。
-- [x] blocking execution 必须让 lead 让出当前轮，不做 lead 自己轮询表演。
-- [x] lead-wait 读取 execution waitPolicy，不按工具名硬猜。
-- [x] wake facts 是内部事实，不污染用户输入和长期记忆。
-- [~] 补 team 成员状态：idle、running、done/failed 由 execution 事实呈现，member 持久状态仍保持 working/idle/shutdown。
-- [x] 补 team inbox 的用户可理解展示。
-- [x] 补 lead wake 后的 synthesis 行为。
-- [~] 补失败、超时、用户中断后的收束策略。
-- [x] 增加 subagent/team 真实协作测试。
+验收：
 
-### Spec
+- 用户问“刚刚做什么”，能靠 session memory 回答。
+- 用户说一个简单问题，不会因旧 memory 开始全局重构。
+- internal wake 不更新 session memory。
+- 删除 memory asset 同步清 session record。
 
-- [~] 打磨 requirements 用户体验：目标、范围、验收口径。
-- [~] 打磨 design 用户体验：结构、取舍、边界、风险。
-- [~] 打磨 tasks 用户体验：可执行步骤、验证方式、完成状态。
-- [~] 打磨 notes 用户体验：过程事实、用户确认、关键变更。
-- [~] 补 implement 前后的 diff、测试、验证映射。
-- [x] 补 spec checkpoint 恢复体验。
-- [x] 补 spec 与 memory、skill 的沉淀关系。
-- [x] spec 模式与默认 agent 模式隔离，但共享核心运行时。
-- [x] spec 工具、文档、状态、checkpoint、worktree 必须讲同一个事实。
-- [~] 增加 requirements -> design -> tasks -> implement -> validate 完整链路测试。
+## Runtime
 
-### Context / Wake / Recovery
+Runtime 是本地工作环境，不是隐藏垃圾桶。
 
-- [x] 检查 wake facts 进入模型的路径。
-- [x] 检查 wake facts 是否被 session store、memory compaction、checkpoint、observability 正确区分。
-- [x] 检查 provider recoverable failure 是否保存为恢复事实，而不是污染用户目标。
-- [x] 检查 exit、stop、abort、process kill 后的状态收束。
-- [~] 补长任务恢复测试：中断、退出、重新启动后，session 能继续。
-- [x] 补 lead-wait 组合测试：subagent/team 完成后 lead 恢复，并基于 execution facts 继续。
+目录职责：
 
-### Tests
+- `.kitty/.env`：配置事实。
+- `.kitty/sessions/`：会话记录。
+- `.kitty/memory/`：记忆资产。
+- `.kitty/control-plane.sqlite`：execution、team、wake、task lifecycle。
+- `.kitty/specs/`：spec 资产。
+- `.kitty/observability/`：证据日志。
 
-- [x] 先按目标测试结构补失败测试，再写实现。
-- [x] 补 agent 主链路集成测试。
-- [x] 补 context/session/memory 组合测试。
-- [x] 补 interruption/exit/recover 生命周期测试。
-- [~] 补 background/subagent/team/spec 的长任务组合测试。
-- [x] 补 skill package 资源和脚本测试。
-- [x] 补 runtime status 产品行为测试。
-- [x] 补工具注册表、extension 开关、spec 模式工具面的同步测试。
-- [x] 检查现有测试是否在测口号、偏好或固定 prompt 文案；有则改成行为测试。
+必须补齐：
 
-### 文档同步
+- runtime status 输出“现场摘要”，不是数据库 dump。
+- status 显示当前 task lifecycle。
+- status 显示 active execution、deadline、last output、stalled/no output。
+- status 显示 wake facts 待处理。
+- status 显示 spec 当前阶段。
+- status 显示 memory 是否存在、最近更新时间。
+- status 显示 team 成员和 worker 结果。
 
-- [x] 同步 README 当前能力和真实命令。
-- [x] 同步 `spec/用户审阅` 当前体验事实。
-- [x] 同步 `spec/技术实现` 当前模块边界。
-- [x] 同步 `AGENTS.md` 与实际运行规则。
-- [x] 同步 `.codex/skills/kitty-agent-development/SKILL.md` 与开发工作流。
-- [x] 删除过时文档、空壳文档和不存在能力描述。
-- [x] 确认文档、代码、测试讲同一个当前事实。
+Runtime 不做：
 
-### 整体验收
+- 不建议“下一步应该做什么”。
+- 不判断任务语义。
+- 不隐藏失败。
 
-- [x] 运行类型检查。
-- [x] 运行构建。
-- [x] 运行测试。
-- [x] 运行完整验证命令。
-- [x] 用真实交互试跑默认 agent。
-- [x] 用真实交互试跑 spec 工作流。
-- [x] 用真实交互试跑 background。
-- [x] 用真实交互试跑 subagent。
-- [x] 用真实交互试跑 team。
-- [x] 用真实交互试跑 skill 加载和资源读取。
-- [x] 用真实交互试跑 memory 查看和复用。
-- [x] 检查 `.kitty/` 运行产物是否可理解、可恢复、可清理。
-- [x] 最后全局扫描一次坏逻辑：双事实源、提示词硬塞、正则语义判断、假兼容、空壳、职责混杂、文档漂移。
+## Background
+
+Background 是长任务现场。
+
+当前已有：
+
+- `background_run`
+- `background_check`
+- `background_terminate`
+- execution record
+- timeout_ms
+- output summary
+- stale reconcile
+
+必须补齐：
+
+- `lastOutputAt`
+- `startedAt`
+- `deadlineAt`
+- `noOutputForMs`
+- `timedOut`
+- `stalled`
+- `terminatedBy`
+- `closeReason`
+
+后台卡住处理：
+
+- 命令超过 timeout：close 为 `failed` 或 `stale`，记录 timedOut。
+- 长时间无输出：status health 显示 `no_output`，不自动语义判断。
+- pid 消失：reconcile 为 `stale`。
+- 用户 terminate：close 为 `aborted`。
+
+关键原则：
+
+- background 默认非阻塞。
+- lead 不轮询。
+- 模型需要状态时调用 check 或看 runtime facts。
+- 机器只暴露死事实。
+
+## Lead Wait / Subagent / Team
+
+这是当前最需要补厚的生命周期。
+
+当前已有：
+
+- subagent/team 创建 blocking execution。
+- lead yield。
+- host 等待 execution 完成。
+- wake facts 恢复 lead。
+- worker summary/output 写回 execution。
+
+问题：
+
+- lead-wait 没有等待上限。
+- worker 卡住时 lead 可能永久下线。
+- timeoutMs 没有统一参与 lead-wait。
+
+必须补齐：
+
+- blocking execution 必须有 wait deadline。
+- deadline 来自 execution timeoutMs 或 waitPolicy。
+- 超过 deadline 后，execution 标记 `paused` 或 `stale`。
+- 发布 wake signal。
+- lead 恢复，让模型判断继续等、终止、重派或收束。
+- team member 状态从 execution facts 派生，不另造第二事实源。
+- team synthesis 必须基于 worker output 和 assignment boundary。
+
+worker record 必须包含：
+
+- objective
+- boundary
+- expectedOutput
+- startedAt
+- deadlineAt
+- status
+- summary
+- output
+- changedPaths
+- error
+- closeReason
+
+验收：
+
+- subagent 完成后 lead 醒来。
+- subagent 卡住后 lead 也醒来。
+- team 某成员失败后 lead 能综合失败事实。
+- wake 不进入用户输入。
+- wake 不更新 session memory。
+
+## Tools / Extensions
+
+工具面只有两层：
+
+- Core tools：`read`、`edit`、`write`、`bash`
+- Extension tools：`todo`、`worktree`、`network`、`background`、`subagent`、`team`、`skills`、`spec`
+
+必须保持：
+
+- 工具事实来自 registry。
+- 默认 agent 打开除 spec 外的 extension。
+- spec 通过独立工作流启用。
+- tests/spec/README 不维护第二套工具事实。
+
+必须补齐：
+
+- extension capability 与真实 tools 自动对齐。
+- runtime status 展示当前启用 extension。
+- tool display 只负责呈现，不做策略判断。
+- network 保持集合能力：request、session、probe、suite、download、trace、OpenAPI。
+- todo 保持 `todo_write` 会话级体验，不拆成无意义 CRUD。
+
+## Skills
+
+Skill 是能力包，不是 prompt 大段注入。
+
+当前已有：
+
+- discovery
+- load
+- resource index
+- read resource
+- run declared script
+- check requires
+
+必须补齐：
+
+- skill 使用证据进入 observability。
+- skill 被加载后进入 task lifecycle facts。
+- skill script 输出进入 execution 或 tool evidence。
+- skill examples/resources 不自动全文进上下文。
+- skill 可以从 memory asset 沉淀 references。
+
+禁止：
+
+- 机器关键词自动加载 skill。
+- prompt 写死某个 skill 的内容。
+- `.codex/skills` 进入小猫 runtime skill。
+
+## Spec
+
+Spec 是深工作流，不是普通文档目录。
+
+当前已有：
+
+- isolated `kitty spec`
+- requirements/design/tasks/notes
+- checkpoint
+- isolated worktree
+- stage tool surface
+
+必须补齐：
+
+- spec stage 与 Task Lifecycle 对齐。
+- requirements 有验收口径。
+- design 有边界和取舍。
+- tasks 有验证方式。
+- notes 记录过程事实和用户确认。
+- implement 前必须有 confirmed requirements/design/tasks。
+- validate 阶段回到验收口径。
+- spec 完成后沉淀 memory 或 skill reference。
+
+验收：
+
+- spec 模式不污染普通 agent。
+- 普通 agent 不自动进入 spec。
+- spec checkpoint restore 不影响主仓库。
+- spec 全流程有测试。
+
+## Provider / Config
+
+Provider 负责模型连接。Config 负责配置事实。
+
+必须保持：
+
+- `.kitty/.env` 是配置入口。
+- provider presets 可见，但当前激活配置只读 env。
+- 不用隐藏默认值覆盖用户认知。
+
+必须补齐：
+
+- provider 临时失败进入 recovery lifecycle。
+- recovery facts 不污染用户目标。
+- token/context 信息进入 runtime facts。
+- 配置状态可被 `kitty status` 展示。
+
+## Host / Interaction / Telegram
+
+Host 是入口边界。
+
+当前已有：
+
+- interactive
+- Telegram
+- local commands
+- stop/abort
+- exit guard
+
+必须补齐：
+
+- simple input 不应天然进入深工作惯性。
+- stop 只中断当前 turn，不杀掉所有后台，除非用户明确退出。
+- exit 时清理 running execution。
+- Telegram 和 interactive 使用同一 HostTurn 生命周期。
+- Telegram active turn 卡住时能 stop。
+- HostTurn 等待 delegated execution 必须有 deadline。
+
+## Observability
+
+Observability 是记录仪。
+
+必须记录：
+
+- task lifecycle started/changed/completed
+- memory update started/completed/failed
+- execution started/running/paused/completed/failed/stale/aborted
+- lead wait started/timeout/resumed
+- background no output / timeout / terminate
+- provider recovery
+- skill load/script
+- spec stage transition
+
+禁止：
+
+- observability 做决策。
+- observability 变成用户主体验。
+- 日志内容反向进入当前目标，除非模型显式读取。
+
+## Runtime UI
+
+Runtime UI 负责用户看得懂。
+
+必须补齐：
+
+- background/subagent/team 显示统一 execution card。
+- todo_write 继续显示 checklist。
+- tool preview 保持短、准、可读。
+- long output 给摘要和路径。
+- wake facts 不显示成用户消息。
+
+## Tests
+
+测试保护真实产品行为，不测试口号。
+
+必须新增或改造：
+
+- 简单输入不触发工具。
+- 简单输入不触发 deep_work。
+- 普通代码任务只局部调查。
+- 明确重构任务进入 deep_work。
+- deep_work 才要求全局核心调查。
+- memory 不从旧用户输入机器摘语义。
+- memory task completed 后不保留错误继续惯性。
+- background timeout 被记录。
+- background no output health 可见。
+- lead-wait deadline 到期后 lead 恢复。
+- subagent 完成后 lead synthesis。
+- team 成员失败后 lead synthesis。
+- wake 不进入 user input。
+- wake 不更新 session memory。
+- spec 全流程闭环。
+- stop/abort/exit 后 runtime 可恢复。
+- status 显示 task lifecycle 和 execution health。
+
+## 一次性施工顺序
+
+必须按主干顺序做，不能散修。
+
+1. 重建 Task Lifecycle 类型、store、session/runtime 投影。
+2. 把 Agent Loop 接入 Task Lifecycle。
+3. 把 Context 接入 Task Lifecycle block。
+4. 把 Memory update 与 task completion 边界重新收口。
+5. 把 Runtime status 改成现场摘要。
+6. 把 Background 补齐 deadline、lastOutputAt、health facts。
+7. 把 Lead Wait 补齐 deadline、timeout wake、恢复。
+8. 把 Subagent/Team worker record 补齐 assignment/deadline/result。
+9. 把 Spec stage 接到 Task Lifecycle。
+10. 把 Skill 使用证据接到 lifecycle/observability。
+11. 同步 README、philosophy、spec 用户审阅、spec 技术实现。
+12. 补全产品链路测试。
+13. 运行完整验证。
+
+## 验收标准
+
+全部满足才算完成：
+
+- 用户简单问一句，Kitty 可以简单答，不进入全局工程。
+- 用户要求代码任务，Kitty 能局部调查、修改、验证。
+- 用户要求重构，Kitty 能进入 deep_work，先全局调查再改。
+- 用户进入 spec，Kitty 走 requirements -> design -> tasks -> implement -> validate。
+- background 卡住不会污染主循环。
+- subagent/team 卡住不会让 lead 永久下线。
+- stop/abort/exit 后 runtime 状态一致。
+- session memory 能接住连续体验，但不把旧目标拖回来。
+- skill 按需加载，不自动塞全文。
+- tools 事实只有 registry 一处。
+- runtime status 能让用户看懂现场。
+- tests/spec/code/README/philosophy 讲同一个当前事实。
+
+## 最终体验
+
+用户不需要理解内部模块。
+
+用户感受到的是：
+
+- 它知道当前目标。
+- 它不会小题大做。
+- 它复杂任务能做深。
+- 它长任务不会死等。
+- 它后台任务看得见。
+- 它能派人协作。
+- 它能恢复现场。
+- 它记得住关键连续性。
+- 它能把经验沉淀成资产。
+- 它交付时有验证证据。
+
+这就是小猫智能体的成熟方向。
