@@ -5,6 +5,7 @@ import test from "node:test";
 
 import { renderPromptLayers } from "../../src/agent/prompt/format.js";
 import { runAgentTurn } from "../../src/agent/turn/run.js";
+import { ControlPlaneLedger } from "../../src/control/ledger.js";
 import { buildContextRuntimePromptLayers } from "../../src/context/runtime/prompt.js";
 import { buildContextRuntimeRequest } from "../../src/context/runtime/request.js";
 import { buildLeadWakeFacts } from "../../src/execution/leadWait.js";
@@ -53,6 +54,11 @@ test("agent turn writes same-session memory as a fixed lifecycle behavior", asyn
   assert.match(result.session.sessionMemory?.summary ?? "", /txt 纯文本回答/);
   assert.match(result.session.sessionMemory?.summary ?? "", /agentjz\/777f/);
   assert.match(result.session.sessionMemory?.summary ?? "", /agentjz\/ohmyflight/);
+  const ledger = new ControlPlaneLedger(root);
+  const lifecycle = ledger.taskLifecycle.loadCurrent(result.session.id);
+  ledger.close();
+  assert.equal(lifecycle?.stage, "completed");
+  assert.equal(lifecycle?.objective, "请以后用 txt 纯文本回答，并记住现在要比较 agentjz/777f 和 agentjz/ohmyflight。");
 });
 
 test("next turn injects model-written session memory while raw provider messages keep only current user frame", async (t) => {
@@ -226,6 +232,7 @@ test("internal wake turns do not rewrite same-session memory as user intent", as
       requestedBy: "lead",
       actorName: "worker",
       summary: "done",
+      changedPaths: [],
       createdAt: "2026-05-22T00:00:00.000Z",
       updatedAt: "2026-05-22T00:00:01.000Z",
     }]).userInput,

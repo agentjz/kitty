@@ -1,6 +1,8 @@
 import path from "node:path";
 
 import { jsonResult } from "../../../shared.js";
+import { ControlPlaneLedger } from "../../../../control/ledger.js";
+import { recordObservabilityEvent } from "../../../../observability/writer.js";
 import { clampNumber, parseArgs, readString } from "../../../../tools/core/shared.js";
 import { runCommandWithPolicy } from "../../../../utils/commandRunner.js";
 import type { RegisteredTool } from "../../../../tools/core/types.js";
@@ -70,6 +72,14 @@ export const skillRunScriptTool: RegisteredTool = {
         sessionId: context.sessionId,
       },
     });
+    await recordSkillScriptUse(context.projectContext.stateRootDir, {
+      sessionId: context.sessionId,
+      identityKind: context.identity.kind,
+      identityName: context.identity.name,
+      skillName: skill.name,
+      scriptPath: resource.path,
+      ok: result.exitCode === 0 && !result.timedOut && !result.aborted && !result.stalled,
+    });
 
     return jsonResult({
       ok: result.exitCode === 0 && !result.timedOut && !result.aborted && !result.stalled,
@@ -93,6 +103,41 @@ export const skillRunScriptTool: RegisteredTool = {
 
 function normalizeResourcePath(value: string): string {
   return value.replace(/\\/g, "/");
+}
+
+async function recordSkillScriptUse(rootDir: string, input: {
+  sessionId: string;
+  identityKind: string;
+  identityName: string;
+  skillName: string;
+  scriptPath: string;
+  ok: boolean;
+}): Promise<void> {
+  await recordObservabilityEvent(rootDir, {
+    event: "skill.script",
+    status: input.ok ? "completed" : "failed",
+    sessionId: input.sessionId,
+    identityKind: input.identityKind,
+    identityName: input.identityName,
+    details: {
+      skillName: input.skillName,
+      scriptPath: input.scriptPath,
+    },
+  });
+  const ledger = new ControlPlaneLedger(rootDir);
+  try {
+    const current = ledger.taskLifecycle.loadCurrent(input.sessionId);
+    ledger.taskLifecycle.update({
+      sessionId: input.sessionId,
+      reason: "skill.script",
+      verificationFacts: [
+        ...(current?.verificationFacts ?? []),
+        `skill script ${input.ok ? "completed" : "failed"}: ${input.skillName} ${input.scriptPath}`,
+      ],
+    });
+  } finally {
+    ledger.close();
+  }
 }
 
 function quotePath(value: string): string {

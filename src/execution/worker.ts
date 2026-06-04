@@ -53,6 +53,9 @@ export async function runExecutionWorker(input: {
     status,
     summary: workerAnswer ?? outcome.status,
     resultText: workerAnswer ?? (outcome.status === "completed" ? "Agent execution completed." : outcome.errorMessage),
+    changedPaths: outcome.result?.changedPaths ?? [],
+    closeReason: outcome.status,
+    error: outcome.status === "failed" ? outcome.errorMessage : undefined,
   });
 
   if (closed.kind === "team" && closed.actorName && closed.actorRole) {

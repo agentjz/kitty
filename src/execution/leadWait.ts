@@ -4,6 +4,7 @@ import { createInternalReminder } from "../session/turnFrame.js";
 import { throwIfAborted } from "../utils/abort.js";
 
 const POLL_INTERVAL_MS = 250;
+const DEFAULT_LEAD_WAIT_TIMEOUT_MS = 30 * 60 * 1000;
 
 export function listLeadWaitExecutions(rootDir: string): ExecutionRecord[] {
   return new ExecutionStore(rootDir)
@@ -40,16 +41,51 @@ export async function waitForLeadWaitExecutions(input: {
   executionIds: readonly string[];
   abortSignal?: AbortSignal;
   sleep?: (ms: number) => Promise<void>;
+  now?: () => number;
 }): Promise<ExecutionRecord[]> {
   const sleep = input.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+  const now = input.now ?? (() => Date.now());
 
   for (;;) {
     throwIfAborted(input.abortSignal, "Lead wait was aborted.");
+    pauseExpiredLeadWaitExecutions(input.rootDir, input.executionIds, now());
     if (!hasUnsettledLeadWaitExecutions(input.rootDir, input.executionIds)) {
       return collectLeadWaitExecutionResults(input.rootDir, input.executionIds);
     }
     await sleep(POLL_INTERVAL_MS);
   }
+}
+
+export function pauseExpiredLeadWaitExecutions(
+  rootDir: string,
+  executionIds: readonly string[],
+  nowMs = Date.now(),
+): ExecutionRecord[] {
+  const store = new ExecutionStore(rootDir);
+  const paused: ExecutionRecord[] = [];
+  for (const execution of collectLeadWaitExecutionResults(rootDir, executionIds)) {
+    if (!isLeadBlockingPolicy(execution.waitPolicy) || isLeadWaitTerminalStatus(execution.waitPolicy, execution.status)) {
+      continue;
+    }
+    const deadline = getLeadWaitDeadlineMs(execution);
+    if (deadline > nowMs) {
+      continue;
+    }
+    paused.push(store.close(execution.id, {
+      status: "paused",
+      summary: `Lead wait deadline reached for execution ${execution.id}.`,
+    }));
+  }
+  return paused;
+}
+
+export function getLeadWaitDeadlineMs(execution: ExecutionRecord): number {
+  const startedAt = Date.parse(execution.startedAt ?? execution.createdAt);
+  const base = Number.isFinite(startedAt) ? startedAt : Date.parse(execution.createdAt);
+  const timeoutMs = typeof execution.timeoutMs === "number" && execution.timeoutMs > 0
+    ? execution.timeoutMs
+    : DEFAULT_LEAD_WAIT_TIMEOUT_MS;
+  return base + timeoutMs;
 }
 
 export function buildLeadWakeInput(executions: readonly ExecutionRecord[]): string {

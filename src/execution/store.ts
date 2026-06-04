@@ -19,6 +19,7 @@ export class ExecutionStore {
     sessionId?: string;
     timeoutMs?: number;
     waitPolicy?: LeadWaitPolicyInput;
+    deadlineAt?: string;
   }): ExecutionRecord {
     const ledger = new ControlPlaneLedger(this.rootDir);
     try {
@@ -69,6 +70,10 @@ export class ExecutionStore {
     output?: string;
     resultText?: string;
     summary?: string;
+    closeReason?: string;
+    terminatedBy?: string;
+    changedPaths?: readonly string[];
+    error?: string;
   }): ExecutionRecord {
     const ledger = new ControlPlaneLedger(this.rootDir);
     try {
@@ -77,6 +82,10 @@ export class ExecutionStore {
         exitCode: input.exitCode,
         output: input.output ?? input.resultText,
         summary: input.summary,
+        closeReason: input.closeReason,
+        terminatedBy: input.terminatedBy,
+        changedPaths: input.changedPaths,
+        error: input.error,
       });
       ledger.wakeSignals.publish({
         executionId: id,

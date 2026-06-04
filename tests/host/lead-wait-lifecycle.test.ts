@@ -7,7 +7,7 @@ import { InProcessSessionStore } from "../../src/session/store.js";
 import { readUserInput } from "../../src/session/turnFrame.js";
 import { createToolRegistry } from "../../src/tools/core/registry.js";
 import { ExecutionStore } from "../../src/execution/store.js";
-import { buildLeadWakeFacts, hasUnsettledLeadWaitExecutions } from "../../src/execution/leadWait.js";
+import { buildLeadWakeFacts, hasUnsettledLeadWaitExecutions, pauseExpiredLeadWaitExecutions } from "../../src/execution/leadWait.js";
 import { createTestRuntimeConfig, createTempWorkspace } from "../helpers.js";
 import type { AssistantResponse } from "../../src/agent/types.js";
 import type { RegisteredTool } from "../../src/tools/core/types.js";
@@ -253,6 +253,29 @@ test("lead wake facts include assignment boundaries and worker output for synthe
   assert.match(facts, /boundary: Read-only source review/);
   assert.match(facts, /expected output: List the lifecycle risks/);
   assert.match(facts, /Risk: wake facts must stay internal/);
+});
+
+test("lead wait deadline pauses stuck delegated execution", async (t) => {
+  const root = await createTempWorkspace("lead-wait-deadline", t);
+  const store = new ExecutionStore(root);
+  const execution = store.create({
+    kind: "subagent",
+    prompt: "stuck work",
+    cwd: root,
+    requestedBy: "lead",
+    actorName: "stuck-worker",
+    timeoutMs: 10,
+  });
+  const running = store.markRunning(execution.id, { pid: process.pid });
+  const deadline = Date.parse(running.startedAt ?? running.createdAt) + 11;
+
+  const paused = pauseExpiredLeadWaitExecutions(root, [execution.id], deadline);
+  const reloaded = store.load(execution.id);
+
+  assert.equal(paused.length, 1);
+  assert.equal(reloaded?.status, "paused");
+  assert.equal(hasUnsettledLeadWaitExecutions(root, [execution.id]), false);
+  assert.match(reloaded?.summary ?? "", /deadline reached/);
 });
 
 function createDelegatingTool(createExecution: () => string, name = "delegate_once"): RegisteredTool {

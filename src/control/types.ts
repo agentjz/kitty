@@ -21,6 +21,12 @@ export interface ExecutionRecord {
   output?: string;
   summary?: string;
   waitPolicy?: LeadWaitPolicy;
+  deadlineAt?: string;
+  lastOutputAt?: string;
+  closeReason?: string;
+  terminatedBy?: string;
+  changedPaths: string[];
+  error?: string;
   createdAt: string;
   startedAt?: string;
   updatedAt: string;
@@ -57,4 +63,32 @@ export interface TeamMessageRecord {
   to: string;
   message: string;
   createdAt: string;
+}
+
+export type TaskLifecycleStage =
+  | "light_response"
+  | "normal_work"
+  | "deep_work"
+  | "spec_work"
+  | "background_wait"
+  | "delegated_wait"
+  | "recovery"
+  | "completed";
+
+export interface TaskLifecycleRecord {
+  id: string;
+  sessionId: string;
+  stage: TaskLifecycleStage;
+  objective?: string;
+  scope?: string;
+  boundary?: string;
+  reason?: string;
+  activeExecutionIds: string[];
+  activeSpecId?: string;
+  activeTodoIds: string[];
+  verificationFacts: string[];
+  completionFacts: string[];
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
 }

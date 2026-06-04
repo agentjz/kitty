@@ -26,18 +26,18 @@
 
 ## background
 
-- `background_run`：启动后台命令，写入 control-plane execution 账本，持续记录运行输出预览和摘要，返回 execution id、pid 和状态。
+- `background_run`：启动后台命令，写入 control-plane execution 账本，持续记录运行输出预览、摘要、last output 和 deadline，返回 execution id、pid、deadline 和状态。
 - `background_check`：读取后台 execution 事实，并 reconcile 已丢失的 running pid。
 - `background_terminate`：终止一个后台 execution，等待当前宿主进程内的后台 handle 释放，并把生命周期关闭为 aborted。
 
 ## subagent
 
-- `subagent_launch`：启动聚焦 subagent execution，写入 objective、boundary、expected output 等派工事实，返回 execution id、actor 和状态。execution 默认带阻塞型 `waitPolicy`；lead 调用后会让出当前轮，由 host 等 execution 结束后唤醒 lead。worker 最终可见回答写入 execution summary/output。
+- `subagent_launch`：启动聚焦 subagent execution，写入 objective、boundary、expected output、timeout/deadline 等派工事实，返回 execution id、actor、deadline 和状态。execution 默认带阻塞型 `waitPolicy`；lead 调用后会让出当前轮，由 host 等 execution 结束后唤醒 lead。worker 最终可见回答写入 execution summary/output/changed paths。
 - `subagent_check`：列出 subagent execution 事实。
 
 ## team
 
-- `team_spawn`：注册 teammate 并创建 team execution，写入 objective、boundary、expected output 等派工事实。execution 默认带阻塞型 `waitPolicy`；lead 调用后会让出当前轮，由 host 等 execution 结束后唤醒 lead；worker 最终可见回答写入 execution summary/output，完成后 teammate 状态回到 idle。
+- `team_spawn`：注册 teammate 并创建 team execution，写入 objective、boundary、expected output、timeout/deadline 等派工事实。execution 默认带阻塞型 `waitPolicy`；lead 调用后会让出当前轮，由 host 等 execution 结束后唤醒 lead；worker 最终可见回答写入 execution summary/output/changed paths，完成后 teammate 状态回到 idle。
 - `team_list`：列出 teammate 成员事实。
 - `team_message_send`：写入 teammate 或 lead 的消息。
 - `team_inbox_read`：读取并清空指定成员 inbox。
@@ -45,18 +45,18 @@
 ## skills
 
 - `skill_list`：列出项目运行时 skill 的名称、说明和路径，不读取完整正文。
-- `skill_load`：按精确名称读取一个 skill 的完整正文。模型决定是否加载；机器不做关键词匹配、语义路由或自动加载。
+- `skill_load`：按精确名称读取一个 skill 的完整正文。模型决定是否加载；机器不做关键词匹配、语义路由或自动加载。使用事实记录到 observability 和 task lifecycle。
 - `skill_read_resource`：按 skill 名称和资源路径读取该 skill 包声明的资源文件。资源只能来自该 skill 的资源索引。
-- `skill_run_script`：按 skill 名称和资源路径运行该 skill 包声明的 `scripts/` 资源。它不是第二个 bash；只能执行 skill 资源索引里属于 `scripts/` 的文件，并记录命令输出事实。
+- `skill_run_script`：按 skill 名称和资源路径运行该 skill 包声明的 `scripts/` 资源。它不是第二个 bash；只能执行 skill 资源索引里属于 `scripts/` 的文件，并记录命令输出事实、observability 事件和 task lifecycle 事实。
 - `skill_check`：检查 skill frontmatter 里 `requires` 声明的命令依赖是否可用。它只检查声明事实，不替模型判断是否应该使用该 skill。
 
 ## spec
 
 - `spec_list`：列出 `.kitty/specs/changes` 下的 durable spec。
 - `spec_search`：按 title、summary 和四个文档内容搜索 spec。
-- `spec_create`：创建 spec、初始化带骨架的四个文档、绑定当前 session，并创建隔离 git worktree。
-- `spec_open`：按 `specId` 打开 spec，绑定当前 session，并返回四个文档。
-- `spec_update_state`：更新 title、summary、stage、status 和确认标记。
+- `spec_create`：创建 spec、初始化带骨架的四个文档、绑定当前 session、创建隔离 git worktree，并把 Task Lifecycle 切到 `spec_work`。
+- `spec_open`：按 `specId` 打开 spec，绑定当前 session，返回四个文档，并记录 active spec。
+- `spec_update_state`：更新 title、summary、stage、status 和确认标记，并同步 Task Lifecycle 的 active spec/stage 事实。
 - `spec_append_note`：追加事实笔记到 `notes.md`。
 - `spec_write_document`：写入 `requirements`、`design`、`tasks` 或 `notes` 文档。
 - `spec_read_document`：读取单个文档，或读取全部文档。

@@ -100,7 +100,11 @@ Subagent 和 team 是协作现场。lead 派出有边界的任务后让出当前
 
 Runtime 提供运行边界。Control plane 保存执行账本。Observability 记录事实。Checkpoint 保存可恢复现场。工具执行明确的机器操作。
 
+Task Lifecycle 保存当前任务阶段和运行事实：目标、阶段、原因、active execution、spec、todo、验证事实和完成事实。它是 control plane 里的事实账本，不是机器语义分类器。
+
 Agent turn 生命周期负责把当前输入、工具批次、provider 恢复、checkpoint、session diff 和记忆更新串成可恢复的现场。生命周期只保存和暴露事实，不决定路线。
+
+Lead wait 必须有边界。阻塞型 subagent/team execution 会让 lead 让出当前轮；execution 完成或等待 deadline 到达后，host 用 internal wake facts 恢复 lead。wake 是运行事实，不是用户新要求。
 
 ## 🧱 删除与重建
 

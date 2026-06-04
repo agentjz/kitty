@@ -1,5 +1,5 @@
 import { launchSubagentExecution } from "../../../../subagent/launch.js";
-import { okResult, parseArgs, readString } from "../../../../tools/core/shared.js";
+import { clampNumber, okResult, parseArgs, readString } from "../../../../tools/core/shared.js";
 import type { RegisteredTool } from "../../../../tools/core/types.js";
 
 export const subagentLaunchTool: RegisteredTool = {
@@ -16,6 +16,7 @@ export const subagentLaunchTool: RegisteredTool = {
           expected_output: { type: "string" },
           prompt: { type: "string" },
           role: { type: "string" },
+          timeout_ms: { type: "number" },
         },
         required: ["objective", "prompt", "role"],
         additionalProperties: false,
@@ -34,6 +35,7 @@ export const subagentLaunchTool: RegisteredTool = {
       prompt: readString(args.prompt, "prompt"),
       role: readString(args.role, "role"),
       config: context.config,
+      timeoutMs: clampNumber(args.timeout_ms, 1_000, 86_400_000, 600_000),
     });
     return okResult(JSON.stringify({
       id: execution.id,
@@ -42,6 +44,7 @@ export const subagentLaunchTool: RegisteredTool = {
       actorRole: execution.actorRole,
       assignment: execution.assignment,
       pid: execution.pid,
+      deadlineAt: execution.deadlineAt,
     }, null, 2));
   },
 };

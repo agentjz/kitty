@@ -1,4 +1,6 @@
 import { buildLoadedSkillPayload } from "../../../../skills/loading.js";
+import { ControlPlaneLedger } from "../../../../control/ledger.js";
+import { recordObservabilityEvent } from "../../../../observability/writer.js";
 import { jsonResult } from "../../../shared.js";
 import { parseArgs, readString } from "../../../../tools/core/shared.js";
 import type { RegisteredTool } from "../../../../tools/core/types.js";
@@ -35,6 +37,48 @@ export const skillLoadTool: RegisteredTool = {
       );
     }
 
+    await recordSkillUse(context.projectContext.stateRootDir, {
+      sessionId: context.sessionId,
+      identityKind: context.identity.kind,
+      identityName: context.identity.name,
+      action: "load",
+      skillName: skill.name,
+    });
+
     return jsonResult(buildLoadedSkillPayload(skill));
   },
 };
+
+async function recordSkillUse(rootDir: string, input: {
+  sessionId: string;
+  identityKind: string;
+  identityName: string;
+  action: string;
+  skillName: string;
+}): Promise<void> {
+  await recordObservabilityEvent(rootDir, {
+    event: "skill.usage",
+    status: "completed",
+    sessionId: input.sessionId,
+    identityKind: input.identityKind,
+    identityName: input.identityName,
+    details: {
+      action: input.action,
+      skillName: input.skillName,
+    },
+  });
+  const ledger = new ControlPlaneLedger(rootDir);
+  try {
+    const current = ledger.taskLifecycle.loadCurrent(input.sessionId);
+    ledger.taskLifecycle.update({
+      sessionId: input.sessionId,
+      reason: "skill.usage",
+      verificationFacts: [
+        ...(current?.verificationFacts ?? []),
+        `skill ${input.action}: ${input.skillName}`,
+      ],
+    });
+  } finally {
+    ledger.close();
+  }
+}

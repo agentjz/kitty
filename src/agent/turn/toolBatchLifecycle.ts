@@ -2,6 +2,7 @@
 import { createMessage, createToolMessage } from "../../session/messages.js";
 import { collectNewLeadWaitExecutionIds, listLeadWaitExecutions } from "../../execution/leadWait.js";
 import { projectToolResultForModel } from "../toolResults/modelProjection.js";
+import { ControlPlaneLedger } from "../../control/ledger.js";
 import { buildRunTurnResult, createExecutionWaitYieldTransition } from "../runtimeTransition.js";
 import { persistToolBatchCheckpoint } from "./persistence.js";
 import { executeToolBatch } from "./toolBatch.js";
@@ -124,6 +125,16 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
     ? collectNewLeadWaitExecutionIds(leadWaitExecutionsBefore, listLeadWaitExecutions(projectContext.stateRootDir))
     : [];
   if (leadWaitExecutionIds.length > 0) {
+    const ledger = new ControlPlaneLedger(projectContext.stateRootDir);
+    try {
+      ledger.taskLifecycle.appendExecutionWait({
+        sessionId: session.id,
+        executionIds: leadWaitExecutionIds,
+        reason: "yield.execution_wait",
+      });
+    } finally {
+      ledger.close();
+    }
     const transition = createExecutionWaitYieldTransition({
       executionIds: leadWaitExecutionIds,
       toolNames: response.toolCalls.map((toolCall) => toolCall.function.name),

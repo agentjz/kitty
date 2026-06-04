@@ -20,6 +20,7 @@ export class TeamStore {
     cwd: string;
     requestedBy: string;
     config: RuntimeConfig;
+    timeoutMs?: number;
   }): { member: TeamMemberRecord; execution: ExecutionRecord } {
     const executionStore = new ExecutionStore(this.rootDir);
     const created = executionStore.create({
@@ -34,6 +35,7 @@ export class TeamStore {
       requestedBy: input.requestedBy,
       actorName: input.name,
       actorRole: input.role,
+      timeoutMs: input.timeoutMs,
     });
     const execution = executionStore.markRunning(created.id, {
       pid: spawnExecutionWorker({

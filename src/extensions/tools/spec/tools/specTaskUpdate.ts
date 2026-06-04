@@ -4,6 +4,7 @@ import { getSpecPaths } from "../../../../spec/layout.js";
 import { SpecStore, summarizeSpec } from "../../../../spec/store.js";
 import { changedJsonResult } from "../../../shared.js";
 import { readSpecTaskStatus, SPEC_TASK_STATUSES } from "../shared.js";
+import { recordSpecLifecycle } from "../lifecycle.js";
 
 export const specTaskUpdateTool: RegisteredTool = {
   definition: {
@@ -43,6 +44,7 @@ export const specTaskUpdateTool: RegisteredTool = {
     if (typeof args.checkpointLabel === "string" && args.checkpointLabel.trim()) {
       checkpoint = await store.createCheckpoint(state.id, { label: args.checkpointLabel });
     }
+    recordSpecLifecycle(context, state, "spec_task_update");
     const paths = getSpecPaths(context.projectContext.stateRootDir, state.id);
     const changedPaths = [paths.stateFile];
     if (checkpoint) {

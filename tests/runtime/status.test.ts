@@ -28,6 +28,11 @@ test("runtime status projects the current project runtime facts", async (t) => {
 
   const ledger = new ControlPlaneLedger(root);
   try {
+    ledger.taskLifecycle.startTurn({
+      sessionId: session.id,
+      objective: "Inspect runtime visibility",
+      reason: "turn_started",
+    });
     const execution = ledger.executions.create({
       kind: "subagent",
       status: "running",
@@ -65,6 +70,8 @@ test("runtime status projects the current project runtime facts", async (t) => {
   assert.equal(status.sessions.latest?.id, session.id);
   assert.equal(status.memory.sessions.length, 1);
   assert.equal(status.memory.sessions[0]?.sessionId, session.id);
+  assert.equal(status.taskLifecycle?.stage, "normal_work");
+  assert.equal(status.taskLifecycle?.objective, "Inspect runtime visibility");
   assert.equal(status.executions.total, 1);
   assert.equal(status.executions.active.length, 1);
   assert.equal(status.executions.active[0]?.assignment?.objective, "Inspect runtime visibility");

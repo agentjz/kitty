@@ -65,10 +65,12 @@ test("background execution store records running output summaries", async (t) =>
   store.updateRunningOutput(job.id, {
     output: "step one\nstep two\n",
     summary: "step two",
+    lastOutputAt: "2026-05-22T00:00:00.000Z",
   });
   const running = store.load(job.id);
 
   assert.equal(running?.status, "running");
   assert.equal(running?.summary, "step two");
+  assert.equal(running?.lastOutputAt, "2026-05-22T00:00:00.000Z");
   assert.match(running?.output ?? "", /step one/);
 });

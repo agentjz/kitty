@@ -80,6 +80,7 @@ export class BackgroundExecutionStore {
   updateRunningOutput(id: string, input: {
     output?: string;
     summary?: string;
+    lastOutputAt?: string;
   }): ExecutionRecord {
     const ledger = new ControlPlaneLedger(this.rootDir);
     try {
@@ -94,6 +95,7 @@ export class BackgroundExecutionStore {
         ...execution,
         output: input.output ?? execution.output,
         summary: input.summary ?? execution.summary,
+        lastOutputAt: input.lastOutputAt ?? new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
     } finally {
@@ -106,6 +108,9 @@ export class BackgroundExecutionStore {
     exitCode?: number | null;
     output?: string;
     summary?: string;
+    closeReason?: string;
+    terminatedBy?: string;
+    error?: string;
   }): ExecutionRecord {
     const ledger = new ControlPlaneLedger(this.rootDir);
     try {
@@ -140,6 +145,7 @@ export function reconcileBackgroundExecutions(rootDir: string): { staleExecution
     staleExecutions.push(store.close(execution.id, {
       status: "stale",
       summary: `Background process disappeared before reporting completion: pid=${execution.pid}`,
+      closeReason: "process_disappeared",
     }));
   }
   return { staleExecutions };
@@ -161,6 +167,8 @@ export function terminateBackgroundExecution(rootDir: string, id: string): Execu
   return store.close(id, {
     status: "aborted",
     summary: "Background execution terminated by host lifecycle.",
+    closeReason: "terminated",
+    terminatedBy: "host",
   });
 }
 

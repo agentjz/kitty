@@ -31,12 +31,14 @@ test("subagent extension launches a recorded agent execution", async (t) => {
     expected_output: "Return config path summary.",
     prompt: "Read src/provider and summarize the config path.",
     role: "explorer",
+    timeout_ms: 20_000,
   }), context);
   const payload = parseToolJson(result.output);
   const execution = new ExecutionStore(root).load(String(payload.id));
 
   assert.equal(result.ok, true);
   assert.equal(payload.status, "running");
+  assert.equal(typeof payload.deadlineAt, "string");
   assert.equal(execution?.kind, "subagent");
   assert.equal(execution?.actorRole, "explorer");
   assert.equal(execution?.requestedBy, "lead");

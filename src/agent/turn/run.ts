@@ -19,8 +19,10 @@ import { resolveToollessTurn } from "./toolless.js";
 import { extendPromptLayersForTurnState } from "./state.js";
 import type { RunTurnOptions, RunTurnResult } from "../types.js";
 import { ChangeStore } from "../changes/store.js";
+import { ControlPlaneLedger } from "../../control/ledger.js";
 import { loadProjectContext } from "../../context/projectContext.js";
 import { createDefaultAgentToolRegistry } from "../../tools/registry.js";
+import { readUserInput } from "../../session/turnFrame.js";
 import { throwIfAborted } from "../../utils/abort.js";
 
 export type { AgentCallbacks, RunTurnOptions } from "../types.js";
@@ -36,6 +38,16 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
     throw new Error("Missing API key. Open the project's .env file and add KITTY_API_KEY.");
   }
   let session = await initializeTurnSession(options.session, options.input, options.sessionStore);
+  const controlLedger = new ControlPlaneLedger(projectContext.stateRootDir);
+  try {
+    controlLedger.taskLifecycle.startTurn({
+      sessionId: session.id,
+      objective: readUserInput(options.input),
+      reason: "turn_started",
+    });
+  } finally {
+    controlLedger.close();
+  }
   const client = createProviderClientPool(turnModelConfig);
   const ownsToolRegistry = !options.toolRegistry;
   const toolRegistry = options.toolRegistry ?? (await createDefaultAgentToolRegistry(options.config));
@@ -50,10 +62,18 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
         ...(options.runtimePromptState ?? {}),
         identity,
       };
+      const lifecycleLedger = new ControlPlaneLedger(projectContext.stateRootDir);
+      let taskLifecycle;
+      try {
+        taskLifecycle = lifecycleLedger.taskLifecycle.loadCurrent(session.id);
+      } finally {
+        lifecycleLedger.close();
+      }
       let promptLayers = buildContextRuntimePromptLayers({
         cwd: options.cwd,
         config: turnModelConfig,
         projectContext,
+        taskLifecycle,
         taskState: session.taskState,
         todoItems: session.todoItems,
         sessionMemory: session.sessionMemory,
@@ -124,6 +144,16 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
           requestConfig,
           delayMs,
         });
+        const recoveryLedger = new ControlPlaneLedger(projectContext.stateRootDir);
+        try {
+          recoveryLedger.taskLifecycle.update({
+            sessionId: session.id,
+            stage: "recovery",
+            reason: transition.reason.code,
+          });
+        } finally {
+          recoveryLedger.close();
+        }
         session = await persistRecoveryTurn(session, options.sessionStore, transition);
         options.callbacks?.onStatus?.(buildRecoveryStatus(transition));
         await (options.recoverySleep ?? sleep)(delayMs, options.abortSignal);
@@ -155,6 +185,19 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
           identity,
           rootDir: projectContext.stateRootDir,
         });
+        const completionLedger = new ControlPlaneLedger(projectContext.stateRootDir);
+        try {
+          completionLedger.taskLifecycle.complete({
+            sessionId: completed.result.session.id,
+            reason: "finalize.completed",
+            completionFacts: response.content ? [response.content] : undefined,
+            verificationFacts: completed.result.changedPaths.length > 0
+              ? [`Changed paths: ${completed.result.changedPaths.join(", ")}`]
+              : undefined,
+          });
+        } finally {
+          completionLedger.close();
+        }
         emitAssistantFinalOutput(response, options);
         return completed.result;
       }

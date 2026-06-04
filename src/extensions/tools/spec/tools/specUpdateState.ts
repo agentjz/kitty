@@ -9,6 +9,7 @@ import {
   SPEC_STAGES,
   SPEC_STATUSES,
 } from "../shared.js";
+import { recordSpecLifecycle } from "../lifecycle.js";
 
 export const specUpdateStateTool: RegisteredTool = {
   definition: {
@@ -52,6 +53,7 @@ export const specUpdateStateTool: RegisteredTool = {
         sessionId: context.sessionId,
       },
     );
+    recordSpecLifecycle(context, state, "spec_update_state");
     return changedJsonResult(
       { ok: true, spec: summarizeSpec(state), confirmed: state.confirmed },
       [

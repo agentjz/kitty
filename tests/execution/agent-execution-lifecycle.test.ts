@@ -166,4 +166,6 @@ test("agent worker completion records the worker final answer for lead wake", as
   assert.equal(closed?.status, "completed");
   assert.equal(closed?.summary, "Context code uses session memory and working memory correctly.");
   assert.equal(closed?.output, "Context code uses session memory and working memory correctly.");
+  assert.deepEqual(closed?.changedPaths, []);
+  assert.equal(closed?.closeReason, "completed");
 });

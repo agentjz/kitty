@@ -36,6 +36,7 @@ test("team extension records teammates, messages, inbox reads, and teammate exec
     boundary: "Only inspect src/config.",
     expected_output: "Return changed paths.",
     prompt: "Implement the config change.",
+    timeout_ms: 20_000,
   }), context)).output);
   await send.execute(JSON.stringify({
     to: "alpha",
@@ -45,6 +46,7 @@ test("team extension records teammates, messages, inbox reads, and teammate exec
   const member = new TeamStore(root).findMember("alpha");
 
   assert.equal(typeof spawned.executionId, "string");
+  assert.equal(typeof spawned.deadlineAt, "string");
   assert.equal(member?.status, "working");
   assert.equal(member?.role, "implementer");
   assert.deepEqual(spawned.assignment, {

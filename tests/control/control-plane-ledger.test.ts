@@ -95,3 +95,39 @@ test("control plane ledger records wake signals as facts", async (t) => {
 
   ledger.close();
 });
+
+test("control plane ledger persists task lifecycle facts", async (t) => {
+  const root = await createTempWorkspace("control-task-lifecycle", t);
+  const ledger = new ControlPlaneLedger(root);
+
+  const started = ledger.taskLifecycle.startTurn({
+    sessionId: "session-1",
+    objective: "Inspect lifecycle",
+    reason: "turn_started",
+  });
+  const waiting = ledger.taskLifecycle.appendExecutionWait({
+    sessionId: "session-1",
+    executionIds: ["exec-1"],
+    reason: "yield.execution_wait",
+  });
+  const completed = ledger.taskLifecycle.complete({
+    sessionId: "session-1",
+    verificationFacts: ["npm test passed"],
+    completionFacts: ["Lifecycle persisted"],
+  });
+
+  const reader = new ControlPlaneLedger(root);
+  const reloaded = reader.taskLifecycle.loadCurrent("session-1");
+  reader.close();
+
+  assert.equal(started.stage, "normal_work");
+  assert.equal(waiting.stage, "delegated_wait");
+  assert.equal(completed.stage, "completed");
+  assert.equal(reloaded?.id, started.id);
+  assert.equal(reloaded?.objective, "Inspect lifecycle");
+  assert.deepEqual(reloaded?.activeExecutionIds, []);
+  assert.deepEqual(reloaded?.verificationFacts, ["npm test passed"]);
+  assert.deepEqual(reloaded?.completionFacts, ["Lifecycle persisted"]);
+
+  ledger.close();
+});

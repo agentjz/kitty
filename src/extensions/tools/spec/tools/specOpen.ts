@@ -3,6 +3,7 @@ import type { RegisteredTool } from "../../../../tools/core/types.js";
 import { getSpecSessionBindingFile } from "../../../../spec/layout.js";
 import { SpecStore, summarizeSpec } from "../../../../spec/store.js";
 import { changedJsonResult } from "../../../shared.js";
+import { recordSpecLifecycle } from "../lifecycle.js";
 
 export const specOpenTool: RegisteredTool = {
   definition: {
@@ -29,6 +30,7 @@ export const specOpenTool: RegisteredTool = {
     const specId = readString(args.specId, "specId");
     const state = await store.load(specId);
     await store.bindSession(context.sessionId, specId);
+    recordSpecLifecycle(context, state, "spec_open");
     return changedJsonResult({
       ok: true,
       spec: summarizeSpec(state),

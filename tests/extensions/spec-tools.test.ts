@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { createDefaultAgentToolRegistry } from "../../src/tools/registry.js";
+import { ControlPlaneLedger } from "../../src/control/ledger.js";
 import { SpecStore } from "../../src/spec/store.js";
 import { createTempWorkspace, createToolContext, initGitRepo, parseToolJson } from "../helpers.js";
 
@@ -49,6 +50,11 @@ test("spec extension persists durable documents, state, tasks, notes, and checkp
   }), context);
   assert.equal(state.ok, true);
   assert.equal((parseToolJson(state.output).confirmed as Record<string, unknown>).requirements, true);
+  const lifecycleLedger = new ControlPlaneLedger(root);
+  const lifecycle = lifecycleLedger.taskLifecycle.loadCurrent(context.sessionId);
+  lifecycleLedger.close();
+  assert.equal(lifecycle?.stage, "spec_work");
+  assert.equal(lifecycle?.activeSpecId, specId);
 
   const task = await registry.execute("spec_task_update", JSON.stringify({
     specId,

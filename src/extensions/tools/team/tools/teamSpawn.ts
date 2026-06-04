@@ -1,5 +1,5 @@
 import { TeamStore } from "../../../../team/store.js";
-import { okResult, parseArgs, readString } from "../../../../tools/core/shared.js";
+import { clampNumber, okResult, parseArgs, readString } from "../../../../tools/core/shared.js";
 import type { RegisteredTool } from "../../../../tools/core/types.js";
 
 export const teamSpawnTool: RegisteredTool = {
@@ -17,6 +17,7 @@ export const teamSpawnTool: RegisteredTool = {
           boundary: { type: "string" },
           expected_output: { type: "string" },
           prompt: { type: "string" },
+          timeout_ms: { type: "number" },
         },
         required: ["name", "role", "prompt"],
         additionalProperties: false,
@@ -35,12 +36,14 @@ export const teamSpawnTool: RegisteredTool = {
       cwd: context.cwd,
       requestedBy: context.identity.name,
       config: context.config,
+      timeoutMs: clampNumber(args.timeout_ms, 1_000, 86_400_000, 600_000),
     });
     return okResult(JSON.stringify({
       member: result.member,
       executionId: result.execution.id,
       assignment: result.execution.assignment,
       status: result.execution.status,
+      deadlineAt: result.execution.deadlineAt,
     }, null, 2));
   },
 };

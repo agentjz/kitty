@@ -12,6 +12,7 @@ export function launchSubagentExecution(input: {
   expectedOutput?: string;
   prompt: string;
   config: RuntimeConfig;
+  timeoutMs?: number;
 }): ExecutionRecord {
   const store = new ExecutionStore(input.rootDir);
   const execution = store.create({
@@ -26,6 +27,7 @@ export function launchSubagentExecution(input: {
     requestedBy: input.requestedBy,
     actorName: buildSubagentName(input.role, input.objective),
     actorRole: input.role,
+    timeoutMs: input.timeoutMs,
   });
   const pid = spawnExecutionWorker({
     rootDir: input.rootDir,

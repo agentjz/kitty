@@ -5,6 +5,7 @@ import test from "node:test";
 
 import { buildContextRuntimePromptLayers } from "../../src/context/runtime/prompt.js";
 import { projectToolResultForModel } from "../../src/agent/toolResults/modelProjection.js";
+import { ControlPlaneLedger } from "../../src/control/ledger.js";
 import { loadProjectContext } from "../../src/context/projectContext.js";
 import { createSkillTools } from "../../src/extensions/tools/skills/index.js";
 import { createToolRegistry } from "../../src/tools/core/registry.js";
@@ -104,6 +105,10 @@ test("skills extension lists summaries and explicitly loads full skill content",
   });
   assert.match(modelView, /loaded skill: skepticism/);
   assert.match(modelView, /FULL_SKILL_BODY/);
+  const lifecycleLedger = new ControlPlaneLedger(root);
+  const lifecycle = lifecycleLedger.taskLifecycle.loadCurrent(context.sessionId);
+  lifecycleLedger.close();
+  assert.equal(lifecycle?.verificationFacts.some((fact) => fact.includes("skill load: skepticism")), true);
 
   const resource = parseToolJson((await registry.execute("skill_read_resource", JSON.stringify({
     name: "skepticism",

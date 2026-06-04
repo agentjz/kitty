@@ -42,6 +42,7 @@ export const backgroundRunTool: RegisteredTool = {
       store.updateRunningOutput(job.id, {
         output,
         summary: summarizeBackgroundOutput(output),
+        lastOutputAt: new Date().toISOString(),
       });
     });
     subprocess.all?.on("data", (chunk) => {
@@ -58,6 +59,7 @@ export const backgroundRunTool: RegisteredTool = {
         exitCode: result.exitCode,
         output,
         summary: summarizeBackgroundOutput(output) ?? (result.exitCode === 0 ? "Background command completed." : "Background command failed."),
+        closeReason: result.exitCode === 0 ? "completed" : "exit_code",
       });
     }, async (error) => {
       outputTracker.flush();
@@ -69,6 +71,8 @@ export const backgroundRunTool: RegisteredTool = {
         exitCode: typeof (error as { exitCode?: unknown }).exitCode === "number" ? (error as { exitCode: number }).exitCode : null,
         output,
         summary: summarizeBackgroundOutput(output) ?? "Background command failed.",
+        closeReason: Boolean((error as { timedOut?: unknown }).timedOut) ? "timeout" : "error",
+        error: error instanceof Error ? error.message : String(error),
       });
     });
 
@@ -79,6 +83,7 @@ export const backgroundRunTool: RegisteredTool = {
       cwd,
       pid: running?.pid,
       status: running?.status,
+      deadlineAt: running?.deadlineAt,
     }, null, 2), {
       runtime: {
         status: "completed",

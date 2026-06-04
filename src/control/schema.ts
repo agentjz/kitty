@@ -19,6 +19,12 @@ export function initializeControlPlaneSchema(db: Database.Database): void {
       output TEXT,
       summary TEXT,
       wait_policy_json TEXT,
+      deadline_at TEXT,
+      last_output_at TEXT,
+      close_reason TEXT,
+      terminated_by TEXT,
+      changed_paths_json TEXT NOT NULL DEFAULT '[]',
+      error TEXT,
       created_at TEXT NOT NULL,
       started_at TEXT,
       updated_at TEXT NOT NULL,
@@ -58,12 +64,42 @@ export function initializeControlPlaneSchema(db: Database.Database): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_team_messages_recipient ON team_messages(recipient);
+
+    CREATE TABLE IF NOT EXISTS task_lifecycle (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      stage TEXT NOT NULL,
+      objective TEXT,
+      scope TEXT,
+      boundary TEXT,
+      reason TEXT,
+      active_execution_ids_json TEXT NOT NULL,
+      active_spec_id TEXT,
+      active_todo_ids_json TEXT NOT NULL,
+      verification_facts_json TEXT NOT NULL,
+      completion_facts_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      completed_at TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_task_lifecycle_session ON task_lifecycle(session_id, updated_at);
   `);
   ensureColumn(db, "executions", "prompt", "TEXT");
   ensureColumn(db, "executions", "assignment_json", "TEXT");
   ensureColumn(db, "executions", "actor_name", "TEXT");
   ensureColumn(db, "executions", "actor_role", "TEXT");
   ensureColumn(db, "executions", "wait_policy_json", "TEXT");
+  ensureColumn(db, "executions", "deadline_at", "TEXT");
+  ensureColumn(db, "executions", "last_output_at", "TEXT");
+  ensureColumn(db, "executions", "close_reason", "TEXT");
+  ensureColumn(db, "executions", "terminated_by", "TEXT");
+  ensureColumn(db, "executions", "changed_paths_json", "TEXT NOT NULL DEFAULT '[]'");
+  ensureColumn(db, "executions", "error", "TEXT");
+  ensureColumn(db, "task_lifecycle", "active_execution_ids_json", "TEXT NOT NULL DEFAULT '[]'");
+  ensureColumn(db, "task_lifecycle", "active_todo_ids_json", "TEXT NOT NULL DEFAULT '[]'");
+  ensureColumn(db, "task_lifecycle", "verification_facts_json", "TEXT NOT NULL DEFAULT '[]'");
+  ensureColumn(db, "task_lifecycle", "completion_facts_json", "TEXT NOT NULL DEFAULT '[]'");
 }
 
 function ensureColumn(db: Database.Database, table: string, column: string, definition: string): void {

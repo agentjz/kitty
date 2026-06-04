@@ -506,19 +506,19 @@ Runtime UI 负责用户看得懂。
 
 必须按主干顺序做，不能散修。
 
-1. 重建 Task Lifecycle 类型、store、session/runtime 投影。
-2. 把 Agent Loop 接入 Task Lifecycle。
-3. 把 Context 接入 Task Lifecycle block。
-4. 把 Memory update 与 task completion 边界重新收口。
-5. 把 Runtime status 改成现场摘要。
-6. 把 Background 补齐 deadline、lastOutputAt、health facts。
-7. 把 Lead Wait 补齐 deadline、timeout wake、恢复。
-8. 把 Subagent/Team worker record 补齐 assignment/deadline/result。
-9. 把 Spec stage 接到 Task Lifecycle。
-10. 把 Skill 使用证据接到 lifecycle/observability。
-11. 同步 README、philosophy、spec 用户审阅、spec 技术实现。
-12. 补全产品链路测试。
-13. 运行完整验证。
+1. [x] 重建 Task Lifecycle 类型、store、session/runtime 投影。
+2. [x] 把 Agent Loop 接入 Task Lifecycle。
+3. [x] 把 Context 接入 Task Lifecycle block。
+4. [x] 把 Memory update 与 task completion 边界重新收口。
+5. [x] 把 Runtime status 接入 Task Lifecycle 和 execution deadline，并按单一职责拆分类型与 health 计算。
+6. [x] 把 Background 补齐 deadline、lastOutputAt、health facts。
+7. [x] 把 Lead Wait 补齐 deadline、timeout pause 和 wake 恢复入口。
+8. [x] 把 Subagent/Team worker record 补齐 assignment/deadline/result。
+9. [x] 把 Spec stage 接到 Task Lifecycle。
+10. [x] 把 Skill 使用证据接到 lifecycle/observability。
+11. [x] 同步 README、philosophy、spec 用户审阅、spec 技术实现中的本轮事实。
+12. [x] 补全 Task Lifecycle、lead wait deadline、runtime status、background、subagent/team、spec、skill 产品链路测试。
+13. [x] 运行完整验证。
 
 ## 验收标准
 

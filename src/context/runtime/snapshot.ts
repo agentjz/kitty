@@ -10,6 +10,7 @@ export function buildContextRuntimeSnapshot(
       messages: input.session.messages,
       sessionMemory: input.session.sessionMemory,
     }),
+    taskLifecycle: input.taskLifecycle,
     workingMemory: buildAgentWorkingMemory({
       taskState: input.session.taskState,
       todoItems: input.session.todoItems,

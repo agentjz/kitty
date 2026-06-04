@@ -2,6 +2,7 @@ import type { ProviderMessage } from "../../provider/contract.js";
 import type { PromptLayerMetrics, PromptLayers, PromptRuntimeState } from "../../agent/prompt/types.js";
 import type { SessionConversationBrief } from "./sessionBrief/types.js";
 import type { AgentWorkingMemory } from "./workingMemory/types.js";
+import type { TaskLifecycleRecord } from "../../control/ledger.js";
 import type {
   ProjectContext,
   RuntimeConfig,
@@ -12,6 +13,7 @@ import type {
 
 export interface ContextRuntimeSnapshot {
   sessionBrief?: SessionConversationBrief;
+  taskLifecycle?: TaskLifecycleRecord;
   workingMemory: AgentWorkingMemory;
   historyBoundary: {
     rawHistoryPolicy: "evidence_lookup_only";
@@ -24,6 +26,7 @@ export interface BuildContextRuntimeSnapshotInput {
     SessionRecord,
     "messages" | "sessionMemory" | "todoItems" | "taskState" | "checkpoint"
   >;
+  taskLifecycle?: TaskLifecycleRecord;
 }
 
 export interface BuildContextRuntimePromptLayersInput {
@@ -33,6 +36,7 @@ export interface BuildContextRuntimePromptLayersInput {
   taskState?: TaskState;
   todoItems?: SessionRecord["todoItems"];
   runtimeState?: PromptRuntimeState;
+  taskLifecycle?: TaskLifecycleRecord;
   checkpoint?: SessionCheckpoint;
   sessionMemory?: SessionRecord["sessionMemory"];
   messages?: SessionRecord["messages"];

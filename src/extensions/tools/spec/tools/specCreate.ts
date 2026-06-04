@@ -5,6 +5,7 @@ import type { RegisteredTool } from "../../../../tools/core/types.js";
 import { changedJsonResult } from "../../../shared.js";
 import { getSpecPaths } from "../../../../spec/layout.js";
 import { SpecStore, summarizeSpec } from "../../../../spec/store.js";
+import { recordSpecLifecycle } from "../lifecycle.js";
 
 export const specCreateTool: RegisteredTool = {
   definition: {
@@ -34,6 +35,7 @@ export const specCreateTool: RegisteredTool = {
       summary: typeof args.summary === "string" ? args.summary : undefined,
       sessionId: context.sessionId,
     });
+    recordSpecLifecycle(context, state, "spec_create");
     const specDir = getSpecPaths(context.projectContext.stateRootDir, state.id).specDir;
     return changedJsonResult({
       ok: true,

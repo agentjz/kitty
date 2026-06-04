@@ -1,108 +1,21 @@
 import { ControlPlaneLedger, type ExecutionRecord, type TeamMemberRecord, type WakeSignalRecord } from "../control/ledger.js";
+import type { TaskLifecycleRecord } from "../control/ledger.js";
 import { getProjectStatePaths } from "../project/statePaths.js";
 import { listRuntimeMemoryAssets } from "./memory/index.js";
+import { getExecutionDeadlineAt, isActiveExecution, summarizeExecutionHealth } from "./executionHealth.js";
 import { SessionStore } from "../session/store.js";
 import { SpecStore } from "../spec/store.js";
 import type { SessionRecord } from "../types.js";
+import type {
+  RuntimeExecutionSummary,
+  RuntimeSessionSummary,
+  RuntimeStatus,
+  RuntimeTaskLifecycleSummary,
+  RuntimeTeamMemberSummary,
+  RuntimeWakeSignalSummary,
+} from "./statusTypes.js";
 
-export interface RuntimeStatus {
-  rootDir: string;
-  stateDir: string;
-  sessions: {
-    total: number;
-    latest?: RuntimeSessionSummary;
-    recent: RuntimeSessionSummary[];
-    skipped: number;
-  };
-  memory: {
-    sessions: RuntimeMemoryAssetSummary[];
-  };
-  executions: {
-    total: number;
-    active: RuntimeExecutionSummary[];
-    recent: RuntimeExecutionSummary[];
-  };
-  team: {
-    members: RuntimeTeamMemberSummary[];
-  };
-  wakeSignals: {
-    recent: RuntimeWakeSignalSummary[];
-  };
-  specs: {
-    total: number;
-    active: RuntimeSpecSummary[];
-    recent: RuntimeSpecSummary[];
-  };
-}
-
-export interface RuntimeSessionSummary {
-  id: string;
-  title?: string;
-  cwd: string;
-  updatedAt: string;
-  messageCount: number;
-  objective?: string;
-  hasMemory: boolean;
-}
-
-export interface RuntimeMemoryAssetSummary {
-  sessionId: string;
-  path: string;
-  updatedAt?: string;
-  size: number;
-}
-
-export interface RuntimeExecutionSummary {
-  id: string;
-  kind: string;
-  status: string;
-  assignment?: {
-    objective?: string;
-    boundary?: string;
-    expectedOutput?: string;
-  };
-  actorName?: string;
-  actorRole?: string;
-  requestedBy: string;
-  sessionId?: string;
-  pid?: number;
-  cwd: string;
-  waitPolicy?: string;
-  summary?: string;
-  outputPreview?: string;
-  health?: RuntimeExecutionHealth;
-  updatedAt: string;
-}
-
-export interface RuntimeExecutionHealth {
-  state: "running" | "settled" | "no_output" | "stale";
-  message: string;
-}
-
-export interface RuntimeTeamMemberSummary {
-  name: string;
-  role: string;
-  status: string;
-  executionId?: string;
-  sessionId?: string;
-  updatedAt: string;
-}
-
-export interface RuntimeWakeSignalSummary {
-  id: string;
-  executionId: string;
-  reason: string;
-  createdAt: string;
-}
-
-export interface RuntimeSpecSummary {
-  id: string;
-  title: string;
-  stage: string;
-  status: string;
-  updatedAt: string;
-  workspace?: string;
-}
+export type { RuntimeStatus } from "./statusTypes.js";
 
 const DEFAULT_RECENT_LIMIT = 10;
 
@@ -120,6 +33,7 @@ export async function buildRuntimeStatus(rootDir: string): Promise<RuntimeStatus
   ]);
 
   const sessions = sessionRead.sessions.map(summarizeSession);
+  const taskLifecycle = sessions[0] ? readTaskLifecycleStatus(paths.rootDir, sessions[0].id) : undefined;
 
   return {
     rootDir: paths.rootDir,
@@ -133,6 +47,7 @@ export async function buildRuntimeStatus(rootDir: string): Promise<RuntimeStatus
     memory: {
       sessions: memoryAssets,
     },
+    taskLifecycle,
     executions: control.executions,
     team: control.team,
     wakeSignals: control.wakeSignals,
@@ -181,6 +96,33 @@ function readControlPlaneStatus(rootDir: string): {
   } finally {
     ledger.close();
   }
+}
+
+function readTaskLifecycleStatus(rootDir: string, sessionId: string): RuntimeTaskLifecycleSummary | undefined {
+  const ledger = new ControlPlaneLedger(rootDir);
+  try {
+    const lifecycle = ledger.taskLifecycle.loadCurrent(sessionId);
+    return lifecycle ? summarizeTaskLifecycle(lifecycle) : undefined;
+  } finally {
+    ledger.close();
+  }
+}
+
+function summarizeTaskLifecycle(lifecycle: TaskLifecycleRecord): RuntimeTaskLifecycleSummary {
+  return {
+    id: lifecycle.id,
+    sessionId: lifecycle.sessionId,
+    stage: lifecycle.stage,
+    objective: lifecycle.objective,
+    reason: lifecycle.reason,
+    activeExecutionIds: lifecycle.activeExecutionIds,
+    activeSpecId: lifecycle.activeSpecId,
+    activeTodoIds: lifecycle.activeTodoIds,
+    verificationFacts: lifecycle.verificationFacts,
+    completionFacts: lifecycle.completionFacts,
+    updatedAt: lifecycle.updatedAt,
+    completedAt: lifecycle.completedAt,
+  };
 }
 
 function reconcileTeamMembers(
@@ -237,6 +179,12 @@ function summarizeExecution(execution: ExecutionRecord): RuntimeExecutionSummary
     summary: execution.summary,
     outputPreview: execution.output ? truncateExecutionOutput(execution.output) : undefined,
     health: summarizeExecutionHealth(execution),
+    deadlineAt: getExecutionDeadlineAt(execution),
+    lastOutputAt: execution.lastOutputAt,
+    closeReason: execution.closeReason,
+    terminatedBy: execution.terminatedBy,
+    changedPaths: execution.changedPaths,
+    error: execution.error,
     updatedAt: execution.updatedAt,
   };
 }
@@ -258,35 +206,6 @@ function summarizeWakeSignal(signal: WakeSignalRecord): RuntimeWakeSignalSummary
     executionId: signal.executionId,
     reason: signal.reason,
     createdAt: signal.createdAt,
-  };
-}
-
-function isActiveExecution(execution: ExecutionRecord): boolean {
-  return execution.status === "created" || execution.status === "running" || execution.status === "paused";
-}
-
-function summarizeExecutionHealth(execution: ExecutionRecord): RuntimeExecutionHealth {
-  if (execution.status === "stale") {
-    return {
-      state: "stale",
-      message: "Execution process disappeared before a normal closeout.",
-    };
-  }
-  if (!isActiveExecution(execution)) {
-    return {
-      state: "settled",
-      message: `Execution finished with status ${execution.status}.`,
-    };
-  }
-  if (execution.kind === "background" && execution.status === "running" && !execution.output && !execution.summary) {
-    return {
-      state: "no_output",
-      message: "Background execution is running but has not published output yet.",
-    };
-  }
-  return {
-    state: "running",
-    message: `Execution is ${execution.status}.`,
   };
 }
 
