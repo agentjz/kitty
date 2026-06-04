@@ -1,4 +1,5 @@
 import type { Command } from "commander";
+import path from "node:path";
 
 import type { CliOverrides, RuntimeConfig } from "../../types.js";
 import { ui } from "../../utils/console.js";
@@ -26,9 +27,10 @@ export function registerProjectCommands(
     .command("init")
     .description("Create local .kitty/.env and .kitty/.kittyignore files in the current project.")
     .action(async () => {
-      const runtime = await options.resolveRuntime(options.getCliOverrides());
+      const overrides = options.getCliOverrides();
+      const cwd = overrides.cwd ? path.resolve(overrides.cwd) : process.cwd();
       const { initializeProjectFiles } = await import("../../config/init.js");
-      const result = await initializeProjectFiles(runtime.cwd);
+      const result = await initializeProjectFiles(cwd);
 
       if (result.created.length > 0) {
         ui.success(`Created ${result.created.length} file(s).`);

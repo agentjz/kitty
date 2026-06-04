@@ -4,6 +4,7 @@ import path from "node:path";
 
 import packageJson from "../package.json";
 import { getErrorMessage } from "./agent/errors.js";
+import { formatCliSetupError } from "./cli/userFacingErrors.js";
 import type { CliProgramDependencies } from "./cli/program.js";
 import {
   PROJECT_STATE_DIR_NAME,
@@ -46,8 +47,23 @@ function maybeHandleEntryFastPath(argv: string[]): boolean {
 if (typeof require !== "undefined" && typeof module !== "undefined" && require.main === module) {
   if (!maybeHandleEntryFastPath(process.argv)) {
     void runCli().catch((error: unknown) => {
-      writeStderrLine(getErrorMessage(error));
+      writeStderrLine(formatCliSetupError(error, readCliCwd(process.argv)) ?? getErrorMessage(error));
       process.exitCode = 1;
     });
   }
+}
+
+function readCliCwd(argv: string[]): string {
+  const args = argv.slice(2);
+  for (let index = 0; index < args.length; index += 1) {
+    const value = args[index];
+    if (value === "-C" || value === "--cwd") {
+      const next = args[index + 1];
+      return next ? path.resolve(next) : process.cwd();
+    }
+    if (value?.startsWith("--cwd=")) {
+      return path.resolve(value.slice("--cwd=".length));
+    }
+  }
+  return process.cwd();
 }

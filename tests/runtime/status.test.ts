@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { ControlPlaneLedger } from "../../src/control/ledger.js";
+import { formatRuntimeStatusText } from "../../src/cli/commands/runtimeStatusPresenter.js";
 import { buildRuntimeStatus } from "../../src/runtime/status.js";
 import { SessionStore } from "../../src/session/store.js";
 import { SpecStore } from "../../src/spec/store.js";
@@ -80,6 +81,12 @@ test("runtime status projects the current project runtime facts", async (t) => {
   assert.equal(status.wakeSignals.recent.length, 1);
   assert.equal(status.specs.total, 1);
   assert.equal(status.specs.active[0]?.id, spec.id);
+
+  const text = formatRuntimeStatusText(status);
+  assert.match(text, /Now:/);
+  assert.match(text, /Objective: Inspect runtime visibility/);
+  assert.match(text, /Executions: 1 active \/ 1 total/);
+  assert.match(text, /Task lifecycle:/);
 });
 
 test("runtime status presents stale working team members as idle when execution is terminal", async (t) => {
