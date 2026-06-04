@@ -32,7 +32,7 @@
 | --- | --- |
 | 🧭 Agent 循环 | 模型、工具、session、收尾都在同一个主循环里推进 |
 | 🧠 Context | 项目上下文、运行时上下文、工作记忆、长上下文压缩 |
-| 💾 Session | 会话记录、checkpoint、todo、恢复现场、可审阅 memory 文件 |
+| 💾 Session | 会话记录、checkpoint、todo、恢复现场、结构化可审阅 memory 文件 |
 | 🔌 Provider | OpenAI-compatible provider、请求恢复、连接诊断 |
 | 🛠️ Core tools | `read`、`edit`、`write`、`bash` |
 | 🧩 Extensions | `todo`、`worktree`、`network`、`background`、`subagent`、`team`、`skills`、`spec` |
@@ -120,6 +120,8 @@ Extension 是可启用、可禁用、独立存在的工具集合：
 默认 agent 会启用 `todo`、`worktree`、`network`、`background`、`subagent`、`team`、`skills`。`spec` 不随默认 agent 自动启用；需要 spec 工作流时使用 `kitty spec`。
 
 Runtime skills 放在项目 `SKILL.md`、`.skills/**/SKILL.md` 或 `skills/**/SKILL.md`。默认上下文只显示 skill 名称、说明和路径；完整正文必须由模型明确调用 `skill_load` 后进入当前轮。Skill 包内的 `references/`、`scripts/`、`examples/` 和 `assets/` 会作为资源索引出现，需要时用 `skill_read_resource` 读取资源，或用 `skill_run_script` 运行已声明的 `scripts/` 资源。Skill frontmatter 可用 `requires` 声明命令依赖，运行时用 `skill_check` 检查。`.codex/skills/**` 是 Codex 维护本仓库用的开发规范，不属于小猫运行时 skill。
+
+Session memory 由模型在 turn 收口时按固定 Markdown 区块写出：`Current Objective`、`User Constraints`、`Decisions`、`Open Threads`、`Verification Facts`、`Reusable Lessons`。机器只维护格式和保存边界，不替模型判断事实重要性。
 
 Memory 资产可以用 `kitty memory <sessionId> --append-to-spec <specId>` 追加到 spec `notes.md`，也可以用 `kitty memory <sessionId> --append-to-skill <skillName>` 写入该 skill 的 `references/`。这两条路径只沉淀已保存事实，不替模型判断哪些经验值得复用。
 

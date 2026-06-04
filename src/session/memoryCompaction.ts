@@ -1,6 +1,7 @@
 import type { ProviderMessage } from "../provider/contract.js";
 import type { AssistantResponse } from "../agent/types.js";
 import type { SessionDiffChange, SessionRecord, StoredMessage, ToolCallRecord } from "../types.js";
+import { formatSessionMemorySectionList, formatSessionMemorySectionTemplate } from "./memory.js";
 import { sliceCurrentUserInputFrame } from "./turnFrame.js";
 
 const MAX_MEMORY_INPUT_CHARS = 24_000;
@@ -32,11 +33,15 @@ export function buildSessionMemoryCompactionMessages(
       role: "system",
       content: [
         "Update same-session memory from the supplied facts.",
-        "Write only the memory text.",
+        "Write only the memory text using the exact Markdown sections below.",
         "Keep stable user constraints only when they affect future action.",
         "Keep active task continuity, important decisions, and unresolved next steps.",
         "Write compact operational memory, not a transcript or review narrative.",
         "Base every statement on supplied facts.",
+        "Use supplied facts only. Drop stale objectives unless they still affect the next turn.",
+        "",
+        "Required sections:",
+        formatSessionMemorySectionList(),
       ].join("\n"),
     },
     {
@@ -49,6 +54,7 @@ export function buildSessionMemoryCompactionMessages(
         toolEvidence ? `Tool evidence:\n${toolEvidence}` : "Tool evidence: none",
         checkpointEvidence ? `Checkpoint facts:\n${checkpointEvidence}` : "Checkpoint facts: none",
         sessionDiffEvidence ? `Session diff facts:\n${sessionDiffEvidence}` : "Session diff facts: none",
+        `Memory output template:\n${formatSessionMemorySectionTemplate()}`,
       ].join("\n\n"), MAX_MEMORY_INPUT_CHARS),
     },
   ];

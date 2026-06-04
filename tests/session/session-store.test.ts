@@ -30,7 +30,25 @@ test("session store projects model-written session memory into a readable asset"
     ...session,
     sessionMemory: {
       version: 1,
-      summary: "用户要求本 session 用 txt 纯文本回答。",
+      summary: [
+        "## Current Objective",
+        "None",
+        "",
+        "## User Constraints",
+        "用户要求本 session 用 txt 纯文本回答。",
+        "",
+        "## Decisions",
+        "None",
+        "",
+        "## Open Threads",
+        "None",
+        "",
+        "## Verification Facts",
+        "None",
+        "",
+        "## Reusable Lessons",
+        "None",
+      ].join("\n"),
       updatedAt: "2026-05-22T00:00:00.000Z",
     },
   });
@@ -38,5 +56,8 @@ test("session store projects model-written session memory into a readable asset"
   const asset = await fs.readFile(path.join(paths.sessionMemoryDir, `${session.id}.md`), "utf8");
   assert.match(asset, /^# Session Memory/);
   assert.match(asset, /Session:/);
+  assert.match(asset, /Kind: model-written same-session continuity memory/);
+  assert.match(asset, /## Current Objective/);
+  assert.match(asset, /## User Constraints/);
   assert.match(asset, /txt 纯文本回答/);
 });

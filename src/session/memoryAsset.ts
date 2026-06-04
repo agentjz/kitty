@@ -34,6 +34,7 @@ function renderSessionMemoryAsset(session: SessionRecord): string {
     "",
     `Session: ${session.id}`,
     `Updated: ${memory.updatedAt}`,
+    "Kind: model-written same-session continuity memory",
     "",
     memory.summary.trim(),
     "",

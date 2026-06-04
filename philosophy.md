@@ -69,12 +69,12 @@ Spec 不是普通文档目录。它负责把模糊目标变成可审阅的计划
 
 小猫智能体把记忆分成运行连续性和长期资产：
 
-- session memory 由模型在 turn 收口时根据事实写出。
+- session memory 由模型在 turn 收口时根据事实写出，并采用固定 Markdown 区块。
 - working memory 保存当前目标的执行事实。
 - `.kitty/memory/sessions/*.md` 是可审阅的 memory asset。
 - memory asset 可以被用户读取、搜索、删除，也可以沉淀到 spec `notes.md` 或 runtime skill `references/`。
 
-机器保存记忆文本和文件位置。模型判断哪些经验值得复用，哪些历史只适合取证。
+固定区块包括当前目标、用户约束、决策、未结事项、验证事实和可复用经验。机器维护格式、保存文本和文件位置。模型判断哪些经验值得复用，哪些历史只适合取证。
 
 ## 🧾 运行现场
 

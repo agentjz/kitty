@@ -40,7 +40,25 @@ test("agent turn writes same-session memory as a fixed lifecycle behavior", asyn
     fetchSessionMemoryResponse: async (request): Promise<AssistantResponse> => {
       memoryRequests.push(request);
       return {
-        content: "用户要求本 session 用 txt 纯文本回答；当前任务是比较 agentjz/777f 和 agentjz/ohmyflight。",
+        content: [
+          "## Current Objective",
+          "比较 agentjz/777f 和 agentjz/ohmyflight。",
+          "",
+          "## User Constraints",
+          "用户要求本 session 用 txt 纯文本回答。",
+          "",
+          "## Decisions",
+          "None",
+          "",
+          "## Open Threads",
+          "继续围绕两个仓库对比。",
+          "",
+          "## Verification Facts",
+          "None",
+          "",
+          "## Reusable Lessons",
+          "None",
+        ].join("\n"),
         toolCalls: [],
       };
     },
@@ -50,7 +68,12 @@ test("agent turn writes same-session memory as a fixed lifecycle behavior", asyn
   assert.equal(memoryRequests.length, 1);
   assert.equal(memoryRequests[0]?.tools.length, 0);
   assert.match(String(memoryRequests[0]?.messages[0]?.content ?? ""), /Update same-session memory/);
+  assert.match(String(memoryRequests[0]?.messages[0]?.content ?? ""), /Required sections/);
+  assert.match(String(memoryRequests[0]?.messages[1]?.content ?? ""), /Memory output template/);
+  assert.match(String(memoryRequests[0]?.messages[1]?.content ?? ""), /## Current Objective/);
   assert.match(String(memoryRequests[0]?.messages[1]?.content ?? ""), /Current user input/);
+  assert.match(result.session.sessionMemory?.summary ?? "", /## Current Objective/);
+  assert.match(result.session.sessionMemory?.summary ?? "", /## User Constraints/);
   assert.match(result.session.sessionMemory?.summary ?? "", /txt 纯文本回答/);
   assert.match(result.session.sessionMemory?.summary ?? "", /agentjz\/777f/);
   assert.match(result.session.sessionMemory?.summary ?? "", /agentjz\/ohmyflight/);
@@ -86,7 +109,25 @@ test("next turn injects model-written session memory while raw provider messages
     ],
     sessionMemory: {
       version: 1,
-      summary: "用户要求本 session 用 txt 纯文本回答；当前任务是比较 agentjz/777f 和 agentjz/ohmyflight。",
+      summary: [
+        "## Current Objective",
+        "比较 agentjz/777f 和 agentjz/ohmyflight。",
+        "",
+        "## User Constraints",
+        "用户要求本 session 用 txt 纯文本回答。",
+        "",
+        "## Decisions",
+        "None",
+        "",
+        "## Open Threads",
+        "None",
+        "",
+        "## Verification Facts",
+        "None",
+        "",
+        "## Reusable Lessons",
+        "None",
+      ].join("\n"),
       updatedAt: "2026-05-21T20:00:02.000Z",
     },
   });
@@ -168,7 +209,25 @@ test("session memory lifecycle receives tool evidence and session diff facts", a
     fetchSessionMemoryResponse: async (request): Promise<AssistantResponse> => {
       memoryRequests.push(request);
       return {
-        content: "当前任务写入了 status.txt，并确认状态文件已经写入。",
+        content: [
+          "## Current Objective",
+          "写入状态文件并告知结果。",
+          "",
+          "## User Constraints",
+          "None",
+          "",
+          "## Decisions",
+          "None",
+          "",
+          "## Open Threads",
+          "None",
+          "",
+          "## Verification Facts",
+          "write_status 写入了 status.txt；assistant 确认状态文件已经写入。",
+          "",
+          "## Reusable Lessons",
+          "None",
+        ].join("\n"),
         toolCalls: [],
       };
     },
@@ -183,6 +242,64 @@ test("session memory lifecycle receives tool evidence and session diff facts", a
   assert.match(memoryFacts, /changedPaths=status\.txt/);
   assert.match(memoryFacts, /Checkpoint facts:/);
   assert.match(memoryFacts, /recentToolBatch=.*write_status/);
+});
+
+test("legacy unstructured session memory is passed to the model for structured rewrite", async (t) => {
+  const root = await createTempWorkspace("session-memory-legacy-rewrite", t);
+  const config = createTestRuntimeConfig(root);
+  const sessionStore = new InProcessSessionStore();
+  const session = await sessionStore.save({
+    ...(await sessionStore.create(root)),
+    sessionMemory: {
+      version: 1,
+      summary: "用户要求用 txt 回答；当前任务是整理 memory。",
+      updatedAt: "2026-05-22T00:00:00.000Z",
+    },
+  });
+  const memoryRequests: ModelRequestInput[] = [];
+
+  const result = await runAgentTurn({
+    input: "继续整理 memory。",
+    cwd: root,
+    config,
+    session,
+    sessionStore,
+    toolRegistry: createToolRegistry({ onlyNames: [] }),
+    fetchAssistantResponse: async (): Promise<AssistantResponse> => ({
+      content: "继续整理 memory。",
+      toolCalls: [],
+    }),
+    fetchSessionMemoryResponse: async (request): Promise<AssistantResponse> => {
+      memoryRequests.push(request);
+      return {
+        content: [
+          "## Current Objective",
+          "继续整理 memory。",
+          "",
+          "## User Constraints",
+          "用户要求用 txt 回答。",
+          "",
+          "## Decisions",
+          "None",
+          "",
+          "## Open Threads",
+          "None",
+          "",
+          "## Verification Facts",
+          "None",
+          "",
+          "## Reusable Lessons",
+          "None",
+        ].join("\n"),
+        toolCalls: [],
+      };
+    },
+  });
+
+  const requestFacts = String(memoryRequests[0]?.messages[1]?.content ?? "");
+  assert.match(requestFacts, /Previous session memory:\n用户要求用 txt 回答/);
+  assert.match(result.session.sessionMemory?.summary ?? "", /## Current Objective/);
+  assert.match(result.session.sessionMemory?.summary ?? "", /## User Constraints/);
 });
 
 test("session memory lifecycle records failed memory updates without failing the turn", async (t) => {
