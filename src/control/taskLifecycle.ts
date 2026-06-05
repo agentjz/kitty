@@ -7,7 +7,6 @@ interface TaskLifecycleRow {
   id: string;
   session_id: string;
   stage: string;
-  objective: string | null;
   scope: string | null;
   boundary: string | null;
   reason: string | null;
@@ -37,7 +36,6 @@ export class TaskLifecycleLedgerRepo {
 
   startTurn(input: {
     sessionId: string;
-    objective?: string;
     reason?: string;
   }): TaskLifecycleRecord {
     const existing = this.loadCurrent(input.sessionId);
@@ -46,7 +44,6 @@ export class TaskLifecycleLedgerRepo {
       id: existing?.stage === "completed" || !existing ? createControlPlaneId("task") : existing.id,
       sessionId: input.sessionId,
       stage: existing?.stage === "completed" || !existing ? "normal_work" : existing.stage,
-      objective: normalizeText(input.objective) ?? existing?.objective,
       scope: existing?.scope,
       boundary: existing?.boundary,
       reason: normalizeText(input.reason) ?? existing?.reason ?? "turn_started",
@@ -75,7 +72,6 @@ export class TaskLifecycleLedgerRepo {
   update(input: {
     sessionId: string;
     stage?: TaskLifecycleStage;
-    objective?: string;
     scope?: string;
     boundary?: string;
     reason?: string;
@@ -87,14 +83,12 @@ export class TaskLifecycleLedgerRepo {
   }): TaskLifecycleRecord {
     const current = this.loadCurrent(input.sessionId) ?? this.startTurn({
       sessionId: input.sessionId,
-      objective: input.objective,
       reason: input.reason,
     });
     const now = new Date().toISOString();
     return this.save({
       ...current,
       stage: input.stage ?? current.stage,
-      objective: normalizeText(input.objective) ?? current.objective,
       scope: normalizeText(input.scope) ?? current.scope,
       boundary: normalizeText(input.boundary) ?? current.boundary,
       reason: normalizeText(input.reason) ?? current.reason,
@@ -144,12 +138,12 @@ export class TaskLifecycleLedgerRepo {
   private insert(record: TaskLifecycleRecord): TaskLifecycleRecord {
     this.db.prepare(`
       INSERT INTO task_lifecycle (
-        id, session_id, stage, objective, scope, boundary, reason,
+        id, session_id, stage, scope, boundary, reason,
         active_execution_ids_json, active_spec_id, active_todo_ids_json,
         verification_facts_json, completion_facts_json,
         created_at, updated_at, completed_at
       ) VALUES (
-        @id, @sessionId, @stage, @objective, @scope, @boundary, @reason,
+        @id, @sessionId, @stage, @scope, @boundary, @reason,
         @activeExecutionIdsJson, @activeSpecId, @activeTodoIdsJson,
         @verificationFactsJson, @completionFactsJson,
         @createdAt, @updatedAt, @completedAt
@@ -163,7 +157,6 @@ export class TaskLifecycleLedgerRepo {
       UPDATE task_lifecycle SET
         session_id=@sessionId,
         stage=@stage,
-        objective=@objective,
         scope=@scope,
         boundary=@boundary,
         reason=@reason,
@@ -186,7 +179,6 @@ function toTaskLifecycleRow(record: TaskLifecycleRecord): Record<string, unknown
     id: record.id,
     sessionId: record.sessionId,
     stage: record.stage,
-    objective: record.objective,
     scope: record.scope,
     boundary: record.boundary,
     reason: record.reason,
@@ -209,7 +201,6 @@ function fromTaskLifecycleRow(row: TaskLifecycleRow): TaskLifecycleRecord {
     id: row.id,
     sessionId: row.session_id,
     stage,
-    objective: row.objective ?? undefined,
     scope: row.scope ?? undefined,
     boundary: row.boundary ?? undefined,
     reason: row.reason ?? undefined,

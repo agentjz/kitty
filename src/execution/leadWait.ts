@@ -113,7 +113,7 @@ export function buildLeadWakeFacts(executions: readonly ExecutionRecord[]): {
     "Internal wake signal: delegated executions settled.",
     "Execution results:",
     ...lines,
-    "Continue from the current objective. Use the execution facts as evidence.",
+    "Continue the lead turn. Use the execution facts as evidence.",
   ].join("\n");
 
   return {

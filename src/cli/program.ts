@@ -6,6 +6,7 @@ import type { CliProgramDependencies } from "./dependencies.js";
 import { resolveCliRuntime } from "./runtime.js";
 import { registerConfigCommands } from "./commands/config.js";
 import { registerDoctorCommand } from "./commands/doctor.js";
+import { registerEvaluationCommand } from "./commands/evaluation.js";
 import { registerProjectCommands } from "./commands/project.js";
 import { registerAgentCommand } from "./commands/agent.js";
 import { registerSpecCommand } from "./commands/spec.js";
@@ -73,6 +74,7 @@ export function buildCliProgram(dependencies: CliProgramDependencies = {}): Comm
     getCliOverrides,
     resolveRuntime,
   });
+  registerEvaluationCommand(program);
   registerTelegramCommands(program, {
     getCliOverrides,
     resolveRuntime,

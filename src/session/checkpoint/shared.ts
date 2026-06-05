@@ -13,8 +13,8 @@ export const MAX_BATCH_TOOLS = 6;
 export const MAX_BATCH_PATHS = 6;
 export const MAX_SUMMARY_CHARS = 220;
 
-export function fingerprintObjective(objective: string): string {
-  return crypto.createHash("sha1").update(objective.trim().toLowerCase()).digest("hex");
+export function fingerprintFocus(focus: string): string {
+  return crypto.createHash("sha1").update(focus.trim().toLowerCase()).digest("hex");
 }
 
 export function normalizeText(value: unknown): string {

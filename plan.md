@@ -1,90 +1,126 @@
-# Memory 成熟体验计划
-
-## 判断
-
-Kitty 的 memory 主干方向是对的：模型写记忆，机器保存事实、投影资产、下一轮注入。问题不在“有没有 memory”，而在 memory 还是一段混合 summary，审阅性、更新边界和长期沉淀都不够硬。
-
-成熟 agent 的共同原则：
-
-- Codex：thread/session 保持连续，但压缩和恢复是生命周期事实，不伪装成用户输入。
-- LangGraph：短期状态、checkpoint、长程持久化分层。
-- Letta：memory 应该是可审阅的块，而不是聊天残渣。
-- Goose：可复用能力和会话现场都应该是资产，而不是散落提示词。
-- Aider/opencode：配置、状态和错误服务用户下一步，主干事实只维护一处。
-
-Kitty 不复制外部架构。Kitty 的主线是：session memory 负责同 session 连续体验；working memory 负责当前目标执行；checkpoint/execution/event 留证据；memory asset 供用户审阅和沉淀。
+# Codex 骨架重构计划
 
 ## 目标
 
-把 session memory 从“单段摘要”升级为“模型写出的固定结构记忆资产”。
+把 Kitty 的当前轮运行骨架收束成 Codex 式 harness：
 
-机器只做格式边界、长度边界、保存、读取、搜索、删除、沉淀。机器不判断哪句话重要，不做关键词/正则语义分类。
+- Session 保存对话状态。
+- Turn 表示一次模型执行。
+- 当前用户输入只是当前输入，不由机器升级成目标。
+- Working memory 承接模型沉淀的当前工作焦点。
+- Control plane 只记录运行事实、工具执行、等待、恢复和完成。
+- UI 展示回答、工具、状态、结果和 reasoning 调试流。
 
-模型负责把事实写进固定区块。
+本轮不做腾讯长期记忆迁移。长期记忆只作为后续方向，不进入当前代码、测试和文档主干。
 
-## Memory 结构
+## 已修复问题
 
-session memory 正文采用固定 Markdown 区块：
+普通用户输入不再由机器升级成目标事实。
 
-```md
-## Current Objective
-...
+当前用户输入只属于当前 turn。模型如果认为后续需要保留工作焦点，会在 session memory 的 `Current Focus` 区块写出；机器只读取这个固定区块并保存为 `taskState.focus`。
 
-## User Constraints
-...
+简单问候、疑问符、确认句不会自动进入 task lifecycle，也不会自动生成 working memory focus。
 
-## Decisions
-...
+## 设计
 
-## Open Threads
-...
+### Session
 
-## Verification Facts
-...
+Session 只保存：
 
-## Reusable Lessons
-...
+- messages
+- session memory
+- todo
+- task state
+- checkpoint
+- session diff
+
+`TaskState` 使用 `focus` 表示模型沉淀出的当前工作焦点。没有模型沉淀时，focus 为空。
+
+### Turn
+
+每一轮用户输入是 `Current turn input`。
+
+机器只保存这轮输入，不判断它是不是目标。内部 wake 仍不是用户输入。
+
+### Working Memory
+
+Working memory 读取 `taskState.focus`、todo、checkpoint、recent tool batch。
+
+它不从用户原话生成目标。
+
+### Control Plane
+
+Task lifecycle 记录：
+
+- stage
+- reason
+- active executions
+- active spec
+- active todos
+- verification facts
+- completion facts
+
+它不记录普通 turn 的目标。
+
+Execution assignment 可以继续有 objective，因为 background/subagent 是模型显式派工，那里 objective 是派工契约，不是机器猜测。
+
+### Prompt
+
+Prompt 中：
+
+- 当前输入来自 provider message frame。
+- session memory 是模型写出的连续性。
+- working memory 是模型沉淀的工作焦点。
+- task lifecycle 是运行状态。
+
+不再出现机器生成的目标事实。
+
+### Status / UI
+
+`kitty status` 展示：
+
+- current focus
+- latest session
+- memory assets
+- project map
+- task lifecycle stage
+- executions
+- wake
+- specs
+
+没有 focus 时显示 `none`。
+
+raw reasoning 默认可见，便于观察模型路线；需要安静输出时可通过 `.kitty/.env` 关闭。
+
+## 执行清单
+
+- [x] 删除普通 turn 自动写入 task lifecycle 目标。
+- [x] 让 `TaskState` 使用 `focus` 承载模型写出的当前工作焦点。
+- [x] checkpoint 从 focus 派生，不从用户输入派生。
+- [x] working memory prompt 使用 `Focus`，不使用 `Objective/User input`。
+- [x] runtime status 使用 focus，不显示机器猜测目标。
+- [x] task lifecycle prompt 不输出普通 turn 目标。
+- [x] 保留 execution assignment objective。
+- [x] 保持 `KITTY_SHOW_REASONING` 默认开启。
+- [x] 同步 README、philosophy、spec。
+- [x] 更新测试，覆盖简单输入不会成为目标或 focus。
+- [x] 运行 typecheck 和完整验证。
+- [x] 扫描残留，确认不存在自动目标主干。
+
+## 完成标准
+
+- 用户说“你好”“？？？”只会作为当前 turn 输入，不会进入 task lifecycle 目标。
+- 没有模型沉淀时，status focus 为 `none`。
+- background/subagent 的 objective 仍作为模型显式派工契约存在。
+- 文档、代码、测试讲同一个当前事实。
+- `npm.cmd run verify` 通过。
+
+## 验证结果
+
+已运行：
+
+```bash
+npm.cmd run verify
 ```
 
-区块含义：
-
-- `Current Objective`：当前仍然影响下一轮行动的目标。
-- `User Constraints`：稳定用户约束和偏好，只保留会影响未来行动的内容。
-- `Decisions`：已经形成、会影响后续执行的决定。
-- `Open Threads`：未解决事项、下一步、阻塞。
-- `Verification Facts`：工具、测试、文件变化等可验证事实。
-- `Reusable Lessons`：可以沉淀到 skill/spec 的经验，不写临时聊天废料。
-
-空区块写 `None`。旧 memory 如果不是这个格式，作为 previous memory 交给模型，由模型在下一次生命周期更新中改写成固定结构。
-
-## 本轮交付清单
-
-1. [x] `plan.md` 改为 memory 专项计划。
-2. [x] `src/session/memory.ts` 集中维护 memory 区块定义、格式说明、边界规范和机械归一化。
-3. [x] `src/session/memoryCompaction.ts` 使用同一份 memory 区块定义生成模型更新请求。
-4. [x] `src/session/memoryAsset.ts` 投影为可审阅资产，元数据和 memory 正文边界清楚。
-5. [x] `src/context/runtime/sessionBrief/build.ts` 注入结构化 memory，但仍不回灌 raw history，不把内部 wake 当用户意图。
-6. [x] `src/runtime/memory/*` 保持资产读取、搜索、删除、沉淀为事实操作，不增加机器语义判断。
-7. [x] 测试覆盖：固定结构提示、模型写出的结构化 memory 被保存、旧 memory 可进入下一次更新、asset 可审阅、search/delete/sink 行为不退化、internal wake 不写 memory。
-8. [x] spec/README/philosophy 如有当前事实偏差，同步为“结构化 session memory asset”。
-9. [x] 运行 `npm.cmd run typecheck`。
-10. [x] 运行 `npm.cmd run verify`。
-
-## 非目标
-
-- 不引入向量库。
-- 不做机器语义分类。
-- 不把 memory 做成工具。
-- 不恢复 raw transcript 回灌。
-- 不把 checkpoint、execution、observability 混进 session memory 的存储主干。
-- 不为了结构化而增加空壳数据库或兼容层。
-
-## 验收标准
-
-- 新 turn 结束后，session memory 是固定 Markdown 区块。
-- 下一轮上下文能看到结构化 session memory，但 raw provider messages 仍只包含当前用户输入帧。
-- `.kitty/memory/sessions/*.md` 是用户可审阅资产。
-- `kitty memory` 的 list/read/search/delete/sink 继续正常。
-- internal wake 不更新 memory。
-- 文档、代码、测试讲同一个 memory 当前事实。
-- 完整验证通过。
+结果：126/126 通过。

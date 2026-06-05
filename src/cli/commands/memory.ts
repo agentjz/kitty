@@ -26,15 +26,15 @@ export function registerMemoryCommand(
 ): void {
   program
     .command("memory")
-    .description("List readable session memory assets.")
-    .argument("[sessionId]", "Optional session memory id to read.")
-    .option("--delete", "Delete the selected session memory asset.")
+    .description("List readable runtime memory assets.")
+    .argument("[memoryId]", "Optional runtime memory asset id to read.")
+    .option("--delete", "Delete the selected runtime memory asset.")
     .option("--append-to-spec <specId>", "Append the selected memory asset to a spec notes.md document.")
     .option("--append-to-skill <skillName>", "Append the selected memory asset to a runtime skill references/ file.")
     .option("--file <fileName>", "Target file name for --append-to-skill.")
-    .option("-q, --query <query>", "Search session memory assets.")
+    .option("-q, --query <query>", "Search runtime memory assets.")
     .option("--json", "Print structured JSON.")
-    .action(async (sessionId: string | undefined, commandOptions: {
+    .action(async (memoryId: string | undefined, commandOptions: {
       appendToSkill?: string;
       appendToSpec?: string;
       delete?: boolean;
@@ -43,8 +43,8 @@ export function registerMemoryCommand(
       query?: string;
     }) => {
       const runtime = await options.resolveRuntime(options.getCliOverrides());
-      if (sessionId) {
-        await handleSelectedMemory(runtime.cwd, sessionId, commandOptions);
+      if (memoryId) {
+        await handleSelectedMemory(runtime.cwd, memoryId, commandOptions);
         return;
       }
 
@@ -59,7 +59,7 @@ export function registerMemoryCommand(
 
 async function handleSelectedMemory(
   cwd: string,
-  sessionId: string,
+  memoryId: string,
   options: { appendToSkill?: string; appendToSpec?: string; delete?: boolean; file?: string; json?: boolean },
 ): Promise<void> {
   if (options.appendToSkill && options.appendToSpec) {
@@ -69,7 +69,7 @@ async function handleSelectedMemory(
   if (options.appendToSkill) {
     const appended = await appendRuntimeMemoryAssetToSkillReference({
       rootDir: cwd,
-      sessionId,
+      memoryId,
       skillName: options.appendToSkill,
       fileName: options.file,
     });
@@ -77,7 +77,7 @@ async function handleSelectedMemory(
       writeStdoutLine(JSON.stringify({ appended }, null, 2));
       return;
     }
-    ui.success(`Appended memory asset ${sessionId} to skill ${options.appendToSkill}`);
+    ui.success(`Appended memory asset ${memoryId} to skill ${options.appendToSkill}`);
     writeStdoutLine(appended.path);
     return;
   }
@@ -85,30 +85,30 @@ async function handleSelectedMemory(
   if (options.appendToSpec) {
     const appended = await appendRuntimeMemoryAssetToSpecNotes({
       rootDir: cwd,
-      sessionId,
+      memoryId,
       specId: options.appendToSpec,
     });
     if (options.json) {
       writeStdoutLine(JSON.stringify({ appended }, null, 2));
       return;
     }
-    ui.success(`Appended memory asset ${sessionId} to spec ${options.appendToSpec}`);
+    ui.success(`Appended memory asset ${memoryId} to spec ${options.appendToSpec}`);
     writeStdoutLine(appended.path);
     return;
   }
 
   if (options.delete) {
-    const deleted = await deleteRuntimeMemoryAsset(cwd, sessionId);
+    const deleted = await deleteRuntimeMemoryAsset(cwd, memoryId);
     if (options.json) {
       writeStdoutLine(JSON.stringify({ deleted }, null, 2));
       return;
     }
-    ui.success(`Deleted memory asset ${deleted.sessionId}`);
+    ui.success(`Deleted memory asset ${deleted.id}`);
     writeStdoutLine(deleted.path);
     return;
   }
 
-  const memory = await readRuntimeMemoryAsset(cwd, sessionId);
+  const memory = await readRuntimeMemoryAsset(cwd, memoryId);
   if (options.json) {
     writeStdoutLine(JSON.stringify(memory, null, 2));
     return;
@@ -123,11 +123,11 @@ async function handleMemorySearch(cwd: string, query: string, json: boolean): Pr
     return;
   }
   if (results.length === 0) {
-    ui.info("No matching session memory assets.");
+    ui.info("No matching runtime memory assets.");
     return;
   }
   for (const result of results) {
-    writeStdoutLine(`${result.sessionId}  ${result.path}`);
+    writeStdoutLine(`${result.id}  ${result.path}`);
     for (const match of result.matches) {
       writeStdoutLine(`  ${match}`);
     }
@@ -142,17 +142,19 @@ async function handleMemoryList(cwd: string, json: boolean): Promise<void> {
     return;
   }
 
-  if (status.memory.sessions.length === 0) {
-    ui.info("No session memory assets yet.");
+  if (status.memory.assets.length === 0) {
+    ui.info("No runtime memory assets yet.");
     return;
   }
 
-  for (const memory of status.memory.sessions) {
+  for (const memory of status.memory.assets) {
     writeStdoutLine([
-      memory.sessionId,
+      memory.id,
+      memory.kind,
       memory.updatedAt ?? "",
       `bytes=${memory.size}`,
+      memory.evidenceRefs.length > 0 ? `evidence=${memory.evidenceRefs.join(",")}` : undefined,
       memory.path,
-    ].join("  "));
+    ].filter(Boolean).join("  "));
   }
 }

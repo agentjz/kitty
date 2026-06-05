@@ -6,14 +6,14 @@ import type {
   SessionRecord,
 } from "../../types.js";
 import { deriveCompletedSteps } from "./derivation.js";
-import { resolveCurrentObjectiveCheckpoint } from "./state.js";
+import { resolveCurrentFocusCheckpoint } from "./state.js";
 
 export function noteCheckpointTransition(
   session: SessionRecord,
   transition: RuntimeTransition,
   timestamp = new Date().toISOString(),
 ): SessionRecord {
-  const checkpoint = resolveCurrentObjectiveCheckpoint(session, timestamp);
+  const checkpoint = resolveCurrentFocusCheckpoint(session, timestamp);
 
   return {
     ...session,
@@ -36,7 +36,7 @@ export function noteCheckpointRecovery(
   transition: RuntimeRecoverTransition,
   timestamp = new Date().toISOString(),
 ): SessionRecord {
-  const checkpoint = resolveCurrentObjectiveCheckpoint(session, timestamp);
+  const checkpoint = resolveCurrentFocusCheckpoint(session, timestamp);
 
   if (checkpoint.status === "completed") {
     return {
@@ -66,7 +66,7 @@ export function noteCheckpointCompleted(
   transition: RuntimeFinalizeTransition | undefined,
   timestamp = new Date().toISOString(),
 ): SessionRecord {
-  const checkpoint = resolveCurrentObjectiveCheckpoint(session, timestamp);
+  const checkpoint = resolveCurrentFocusCheckpoint(session, timestamp);
 
   return {
     ...session,

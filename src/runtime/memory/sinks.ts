@@ -8,7 +8,7 @@ import type { RuntimeMemoryAsset } from "./types.js";
 
 export async function appendRuntimeMemoryAssetToSpecNotes(input: {
   rootDir: string;
-  sessionId: string;
+  memoryId: string;
   specId: string;
   heading?: string;
 }): Promise<{
@@ -17,11 +17,11 @@ export async function appendRuntimeMemoryAssetToSpecNotes(input: {
   path: string;
 }> {
   const { SpecStore } = await import("../../spec/store.js");
-  const memory = await readRuntimeMemoryAsset(input.rootDir, input.sessionId);
+  const memory = await readRuntimeMemoryAsset(input.rootDir, input.memoryId);
   const result = await new SpecStore(input.rootDir, {
     rootDir: input.rootDir,
   }).appendNote(input.specId, {
-    heading: input.heading ?? `Session memory ${input.sessionId}`,
+    heading: input.heading ?? `Runtime memory ${input.memoryId}`,
     content: [
       `Source memory asset: ${memory.path}`,
       "",
@@ -37,7 +37,7 @@ export async function appendRuntimeMemoryAssetToSpecNotes(input: {
 
 export async function appendRuntimeMemoryAssetToSkillReference(input: {
   rootDir: string;
-  sessionId: string;
+  memoryId: string;
   skillName: string;
   fileName?: string;
 }): Promise<{
@@ -48,7 +48,7 @@ export async function appendRuntimeMemoryAssetToSkillReference(input: {
   };
   path: string;
 }> {
-  const memory = await readRuntimeMemoryAsset(input.rootDir, input.sessionId);
+  const memory = await readRuntimeMemoryAsset(input.rootDir, input.memoryId);
   const ignoreRules = await loadProjectIgnoreRules(input.rootDir, input.rootDir);
   const skill = (await discoverSkills(input.rootDir, input.rootDir, ignoreRules))
     .find((item) => item.name === input.skillName);
@@ -58,11 +58,11 @@ export async function appendRuntimeMemoryAssetToSkillReference(input: {
 
   const skillDir = path.dirname(skill.absolutePath);
   const referencesDir = path.join(skillDir, "references");
-  const fileName = input.fileName?.trim() || `session-memory-${sanitizeMemoryFileName(input.sessionId)}.md`;
+  const fileName = input.fileName?.trim() || `runtime-memory-${sanitizeMemoryFileName(input.memoryId)}.md`;
   const targetPath = path.join(referencesDir, fileName);
   await fs.mkdir(referencesDir, { recursive: true });
   await fs.writeFile(targetPath, [
-    `# Session memory ${input.sessionId}`,
+    `# Runtime memory ${input.memoryId}`,
     "",
     `Source memory asset: ${memory.path}`,
     "",

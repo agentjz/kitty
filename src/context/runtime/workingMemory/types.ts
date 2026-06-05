@@ -13,8 +13,8 @@ export interface WorkingMemoryTodo {
 
 export interface AgentWorkingMemory {
   version: 1;
-  objective?: string;
-  objectiveFingerprint?: string;
+  focus?: string;
+  focusFingerprint?: string;
   activeFiles: string[];
   plannedActions: string[];
   completedActions: string[];

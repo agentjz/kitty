@@ -5,8 +5,8 @@ const MAX_TODO_ITEMS = 20;
 const MAX_TODO_TEXT_CHARS = 240;
 
 export function deriveTodoItems(messages: StoredMessage[], previous: TodoItem[] = []): TodoItem[] {
-  const objectiveBoundaryIndex = findLatestObjectiveBoundaryIndex(messages);
-  const stopIndex = objectiveBoundaryIndex >= 0 ? objectiveBoundaryIndex : -1;
+  const turnBoundaryIndex = findLatestUserInputBoundaryIndex(messages);
+  const stopIndex = turnBoundaryIndex >= 0 ? turnBoundaryIndex : -1;
 
   for (let index = messages.length - 1; index > stopIndex; index -= 1) {
     const message = messages[index];
@@ -116,7 +116,7 @@ export function normalizeSessionTodos(session: SessionRecord): SessionRecord {
   };
 }
 
-function findLatestObjectiveBoundaryIndex(messages: StoredMessage[]): number {
+function findLatestUserInputBoundaryIndex(messages: StoredMessage[]): number {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
     if (message?.role === "user" && readUserInput(message.content)) {

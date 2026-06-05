@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
@@ -41,7 +41,7 @@ test("agent turn writes same-session memory as a fixed lifecycle behavior", asyn
       memoryRequests.push(request);
       return {
         content: [
-          "## Current Objective",
+          "## Current Focus",
           "比较 agentjz/777f 和 agentjz/ohmyflight。",
           "",
           "## User Constraints",
@@ -70,9 +70,9 @@ test("agent turn writes same-session memory as a fixed lifecycle behavior", asyn
   assert.match(String(memoryRequests[0]?.messages[0]?.content ?? ""), /Update same-session memory/);
   assert.match(String(memoryRequests[0]?.messages[0]?.content ?? ""), /Required sections/);
   assert.match(String(memoryRequests[0]?.messages[1]?.content ?? ""), /Memory output template/);
-  assert.match(String(memoryRequests[0]?.messages[1]?.content ?? ""), /## Current Objective/);
+  assert.match(String(memoryRequests[0]?.messages[1]?.content ?? ""), /## Current Focus/);
   assert.match(String(memoryRequests[0]?.messages[1]?.content ?? ""), /Current user input/);
-  assert.match(result.session.sessionMemory?.summary ?? "", /## Current Objective/);
+  assert.match(result.session.sessionMemory?.summary ?? "", /## Current Focus/);
   assert.match(result.session.sessionMemory?.summary ?? "", /## User Constraints/);
   assert.match(result.session.sessionMemory?.summary ?? "", /txt 纯文本回答/);
   assert.match(result.session.sessionMemory?.summary ?? "", /agentjz\/777f/);
@@ -81,7 +81,101 @@ test("agent turn writes same-session memory as a fixed lifecycle behavior", asyn
   const lifecycle = ledger.taskLifecycle.loadCurrent(result.session.id);
   ledger.close();
   assert.equal(lifecycle?.stage, "completed");
-  assert.equal(lifecycle?.objective, "请以后用 txt 纯文本回答，并记住现在要比较 agentjz/777f 和 agentjz/ohmyflight。");
+  assert.equal(result.session.taskState?.focus, "比较 agentjz/777f 和 agentjz/ohmyflight。");
+});
+
+test("plain turn input does not become machine-written focus", async (t) => {
+  const root = await createTempWorkspace("plain-turn-input-no-focus", t);
+  const config = createTestRuntimeConfig(root);
+  const sessionStore = new InProcessSessionStore();
+  const session = await sessionStore.create(root);
+
+  const result = await runAgentTurn({
+    input: "你好",
+    cwd: root,
+    config,
+    session,
+    sessionStore,
+    toolRegistry: createToolRegistry({ onlyNames: [] }),
+    fetchAssistantResponse: async (): Promise<AssistantResponse> => ({
+      content: "你好。",
+      toolCalls: [],
+    }),
+    fetchSessionMemoryResponse: async (): Promise<AssistantResponse> => ({
+      content: [
+        "## Current Focus",
+        "None",
+        "",
+        "## User Constraints",
+        "None",
+        "",
+        "## Decisions",
+        "None",
+        "",
+        "## Open Threads",
+        "None",
+        "",
+        "## Verification Facts",
+        "None",
+        "",
+        "## Reusable Lessons",
+        "None",
+      ].join("\n"),
+      toolCalls: [],
+    }),
+  });
+
+  const ledger = new ControlPlaneLedger(root);
+  const lifecycle = ledger.taskLifecycle.loadCurrent(result.session.id);
+  ledger.close();
+
+  assert.equal(result.session.taskState?.focus, undefined);
+  assert.equal(result.session.checkpoint?.focus, undefined);
+  assert.equal(lifecycle?.stage, "completed");
+});
+
+test("model-written session memory focus becomes working memory focus", async (t) => {
+  const root = await createTempWorkspace("session-memory-focus", t);
+  const config = createTestRuntimeConfig(root);
+  const sessionStore = new InProcessSessionStore();
+  const session = await sessionStore.create(root);
+
+  const result = await runAgentTurn({
+    input: "继续比较两个仓库。",
+    cwd: root,
+    config,
+    session,
+    sessionStore,
+    toolRegistry: createToolRegistry({ onlyNames: [] }),
+    fetchAssistantResponse: async (): Promise<AssistantResponse> => ({
+      content: "继续比较。",
+      toolCalls: [],
+    }),
+    fetchSessionMemoryResponse: async (): Promise<AssistantResponse> => ({
+      content: [
+        "## Current Focus",
+        "比较 agentjz/777f 和 agentjz/ohmyflight。",
+        "",
+        "## User Constraints",
+        "None",
+        "",
+        "## Decisions",
+        "None",
+        "",
+        "## Open Threads",
+        "None",
+        "",
+        "## Verification Facts",
+        "None",
+        "",
+        "## Reusable Lessons",
+        "None",
+      ].join("\n"),
+      toolCalls: [],
+    }),
+  });
+
+  assert.equal(result.session.taskState?.focus, "比较 agentjz/777f 和 agentjz/ohmyflight。");
 });
 
 test("next turn injects model-written session memory while raw provider messages keep only current user frame", async (t) => {
@@ -110,7 +204,7 @@ test("next turn injects model-written session memory while raw provider messages
     sessionMemory: {
       version: 1,
       summary: [
-        "## Current Objective",
+        "## Current Focus",
         "比较 agentjz/777f 和 agentjz/ohmyflight。",
         "",
         "## User Constraints",
@@ -210,7 +304,7 @@ test("session memory lifecycle receives tool evidence and session diff facts", a
       memoryRequests.push(request);
       return {
         content: [
-          "## Current Objective",
+          "## Current Focus",
           "写入状态文件并告知结果。",
           "",
           "## User Constraints",
@@ -244,8 +338,8 @@ test("session memory lifecycle receives tool evidence and session diff facts", a
   assert.match(memoryFacts, /recentToolBatch=.*write_status/);
 });
 
-test("legacy unstructured session memory is passed to the model for structured rewrite", async (t) => {
-  const root = await createTempWorkspace("session-memory-legacy-rewrite", t);
+test("previous session memory is passed to the model for structured rewrite", async (t) => {
+  const root = await createTempWorkspace("session-memory-structured-rewrite", t);
   const config = createTestRuntimeConfig(root);
   const sessionStore = new InProcessSessionStore();
   const session = await sessionStore.save({
@@ -273,7 +367,7 @@ test("legacy unstructured session memory is passed to the model for structured r
       memoryRequests.push(request);
       return {
         content: [
-          "## Current Objective",
+          "## Current Focus",
           "继续整理 memory。",
           "",
           "## User Constraints",
@@ -298,7 +392,7 @@ test("legacy unstructured session memory is passed to the model for structured r
 
   const requestFacts = String(memoryRequests[0]?.messages[1]?.content ?? "");
   assert.match(requestFacts, /Previous session memory:\n用户要求用 txt 回答/);
-  assert.match(result.session.sessionMemory?.summary ?? "", /## Current Objective/);
+  assert.match(result.session.sessionMemory?.summary ?? "", /## Current Focus/);
   assert.match(result.session.sessionMemory?.summary ?? "", /## User Constraints/);
 });
 
@@ -359,7 +453,7 @@ test("internal wake turns do not rewrite same-session memory as user intent", as
     sessionStore,
     toolRegistry: createToolRegistry({ onlyNames: [] }),
     fetchAssistantResponse: async (): Promise<AssistantResponse> => ({
-      content: "继续当前目标。",
+      content: "继续当前工作。",
       toolCalls: [],
     }),
     fetchSessionMemoryResponse: async (): Promise<AssistantResponse> => {

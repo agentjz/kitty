@@ -31,7 +31,6 @@ test("runtime status projects the current project runtime facts", async (t) => {
   try {
     ledger.taskLifecycle.startTurn({
       sessionId: session.id,
-      objective: "Inspect runtime visibility",
       reason: "turn_started",
     });
     const execution = ledger.executions.create({
@@ -62,10 +61,10 @@ test("runtime status projects the current project runtime facts", async (t) => {
   assert.equal(status.rootDir, root);
   assert.equal(status.sessions.total, 1);
   assert.equal(status.sessions.latest?.id, session.id);
-  assert.equal(status.memory.sessions.length, 1);
-  assert.equal(status.memory.sessions[0]?.sessionId, session.id);
+  assert.equal(status.memory.assets.length, 1);
+  assert.equal(status.memory.assets[0]?.id, session.id);
   assert.equal(status.taskLifecycle?.stage, "normal_work");
-  assert.equal(status.taskLifecycle?.objective, "Inspect runtime visibility");
+  assert.equal(status.sessions.latest?.focus, undefined);
   assert.equal(status.executions.total, 1);
   assert.equal(status.executions.active.length, 1);
   assert.equal(status.executions.active[0]?.assignment?.objective, "Inspect runtime visibility");
@@ -76,7 +75,7 @@ test("runtime status projects the current project runtime facts", async (t) => {
 
   const text = formatRuntimeStatusText(status);
   assert.match(text, /Now:/);
-  assert.match(text, /Objective: Inspect runtime visibility/);
+  assert.match(text, /Focus: none/);
   assert.match(text, /Executions: 1 active \/ 1 total/);
   assert.match(text, /Task lifecycle:/);
 });

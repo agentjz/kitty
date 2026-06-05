@@ -43,7 +43,7 @@ export async function handleCompletedAssistantResponse(
       params.options.sessionStore,
       transition,
     );
-    params.options.callbacks?.onStatus?.("Assistant returned no visible result. Continuing the same objective.");
+    params.options.callbacks?.onStatus?.("Assistant returned no visible result. Continuing the same turn.");
     return {
       kind: "continue",
       session,

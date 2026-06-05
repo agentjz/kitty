@@ -1,6 +1,6 @@
 import type { SessionRecord, StoredMessage, TaskState } from "../types.js";
-import { collectActiveFiles, collectBlockers, collectCompletedActions, collectPlannedActions, truncate } from "./taskStateHistory.js";
-import { createInternalReminder, isInternalMessage, oneLine, readUserInput } from "./turnFrame.js";
+import { collectActiveFiles, collectBlockers, collectCompletedActions, collectPlannedActions } from "./taskStateHistory.js";
+import { createInternalReminder, isInternalMessage, readUserInput } from "./turnFrame.js";
 
 const MAX_ACTIVE_FILES = 12;
 const MAX_PLANNED_ACTIONS = 8;
@@ -20,26 +20,10 @@ export function createEmptyTaskState(timestamp = new Date().toISOString()): Task
 export function deriveTaskState(messages: StoredMessage[], previous?: TaskState): TaskState {
   const now = new Date().toISOString();
   const currentTurn = findCurrentTurn(messages);
-  const objective = currentTurn?.objective ?? previous?.objective;
   const frameMessages = currentTurn ? messages.slice(currentTurn.startIndex) : messages;
-  const objectiveChanged =
-    typeof previous?.objective === "string" &&
-    typeof objective === "string" &&
-    oneLine(previous.objective).toLowerCase() !== oneLine(objective).toLowerCase();
-
-  if (objectiveChanged) {
-    return {
-      objective,
-      activeFiles: [],
-      plannedActions: [],
-      completedActions: [],
-      blockers: [],
-      lastUpdatedAt: now,
-    };
-  }
 
   return {
-    objective,
+    focus: previous?.focus,
     activeFiles: takeLastUnique(collectActiveFiles(frameMessages), MAX_ACTIVE_FILES),
     plannedActions: takeLastUnique(collectPlannedActions(frameMessages), MAX_PLANNED_ACTIONS),
     completedActions: takeLastUnique(collectCompletedActions(frameMessages), MAX_COMPLETED_ACTIONS),
@@ -54,7 +38,7 @@ export function normalizeTaskState(taskState: TaskState | undefined): TaskState 
   }
 
   return {
-    objective: typeof taskState.objective === "string" ? taskState.objective : undefined,
+    focus: typeof taskState.focus === "string" ? taskState.focus : undefined,
     activeFiles: takeLastUnique(taskState.activeFiles ?? [], MAX_ACTIVE_FILES),
     plannedActions: takeLastUnique(taskState.plannedActions ?? [], MAX_PLANNED_ACTIONS),
     completedActions: takeLastUnique(taskState.completedActions ?? [], MAX_COMPLETED_ACTIONS),
@@ -72,7 +56,7 @@ export function formatTaskStateBlock(taskState: TaskState | undefined): string {
   }
 
   const parts = [
-    taskState.objective ? `- Latest user input: ${taskState.objective}` : "- Latest user input: none",
+    taskState.focus ? `- Focus: ${taskState.focus}` : "- Focus: none",
     `- Planned actions: ${formatList(taskState.plannedActions)}`,
     `- Blockers: ${formatList(taskState.blockers)}`,
     `- Updated at: ${taskState.lastUpdatedAt}`,
@@ -105,11 +89,10 @@ export function applyCurrentTurnFrame(
     };
   }
 
-  const objective = truncate(userInput, 240);
   return {
     ...session,
     taskState: {
-      objective,
+      focus: session.taskState?.focus,
       activeFiles: [],
       plannedActions: [],
       completedActions: [],
@@ -119,9 +102,9 @@ export function applyCurrentTurnFrame(
   };
 }
 
-function findCurrentTurn(messages: StoredMessage[]): (Pick<TaskState, "objective"> & {
+function findCurrentTurn(messages: StoredMessage[]): {
   startIndex: number;
-}) | undefined {
+} | undefined {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
     if (message?.role !== "user") {
@@ -131,7 +114,6 @@ function findCurrentTurn(messages: StoredMessage[]): (Pick<TaskState, "objective
     const normalized = readUserInput(message.content);
     if (normalized) {
       return {
-        objective: truncate(normalized, 240),
         startIndex: index,
       };
     }

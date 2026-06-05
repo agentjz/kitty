@@ -3,7 +3,7 @@ import type { AgentWorkingMemory } from "./types.js";
 
 export interface WorkingMemoryPromptOptions {
   currentTitle?: string;
-  currentObjectiveLabel?: string;
+  currentFocusLabel?: string;
   memoryTitle?: string;
   includeBoundary?: boolean;
 }
@@ -24,10 +24,10 @@ export function buildCurrentWorksetBlock(
   options: WorkingMemoryPromptOptions = {},
 ): string | undefined {
   const fields: PromptField[] = [];
-  if (memory.objective) {
+  if (memory.focus) {
     fields.push({
-      label: options.currentObjectiveLabel ?? "User input",
-      value: memory.objective,
+      label: options.currentFocusLabel ?? "Focus",
+      value: memory.focus,
     });
   }
   const inProgressTodo = memory.todos.find((todo) => todo.status === "in_progress");
@@ -44,7 +44,7 @@ export function buildCurrentWorksetBlock(
     fields.push({ label: "Blockers", value: formatLimitedList(memory.blockers, 5) });
   }
 
-  return buildFieldBlock(options.currentTitle ?? "Current workset", fields);
+  return buildFieldBlock(options.currentTitle ?? "Current focus", fields);
 }
 
 export function buildSessionWorkingMemoryBlock(
@@ -76,7 +76,7 @@ export function buildSessionWorkingMemoryBlock(
 }
 
 function buildHistoryBoundaryBlock(memory: AgentWorkingMemory): string | undefined {
-  if (!memory.objective) {
+  if (!memory.focus) {
     return undefined;
   }
 

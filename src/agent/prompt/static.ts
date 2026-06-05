@@ -38,7 +38,7 @@ function buildIdentityBlock(
 
 function buildWorkLoopBlock(): string {
   return [
-    "Keep the current user objective at the center of the turn.",
+    "Keep the current user request at the center of the turn.",
     "For code work: inspect relevant evidence, make precise changes with the available tools, then run useful commands.",
     "When evidence is missing, inspect it before deciding.",
     "When a tool or path fails, use the error facts to choose the next step.",
@@ -58,6 +58,7 @@ function buildToolBlock(): string {
 
 function buildCommunicationBlock(): string {
   return [
+    "Always reply in Simplified Chinese.",
     "Provide concise progress updates during multi-step work.",
     "Claim changed files, passed commands, and successful tools only when tool evidence supports them.",
     "Keep final responses outcome-first and mention checks run or unresolved blockers.",

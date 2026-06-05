@@ -1,9 +1,13 @@
+export type RuntimeMemoryAssetKind = "evidence" | "project" | "session" | "user";
+
 export interface RuntimeMemoryAsset {
-  sessionId: string;
+  id: string;
+  kind: RuntimeMemoryAssetKind;
   path: string;
   absolutePath: string;
   updatedAt?: string;
   size: number;
+  evidenceRefs: string[];
 }
 
 export interface RuntimeMemoryAssetContent extends RuntimeMemoryAsset {

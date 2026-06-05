@@ -49,7 +49,6 @@ export function initializeControlPlaneSchema(db: Database.Database): void {
       id TEXT PRIMARY KEY,
       session_id TEXT NOT NULL,
       stage TEXT NOT NULL,
-      objective TEXT,
       scope TEXT,
       boundary TEXT,
       reason TEXT,

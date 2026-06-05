@@ -31,7 +31,7 @@ test("session store projects model-written session memory into a readable asset"
     sessionMemory: {
       version: 1,
       summary: [
-        "## Current Objective",
+        "## Current Focus",
         "None",
         "",
         "## User Constraints",
@@ -57,7 +57,7 @@ test("session store projects model-written session memory into a readable asset"
   assert.match(asset, /^# Session Memory/);
   assert.match(asset, /Session:/);
   assert.match(asset, /Kind: model-written same-session continuity memory/);
-  assert.match(asset, /## Current Objective/);
+  assert.match(asset, /## Current Focus/);
   assert.match(asset, /## User Constraints/);
   assert.match(asset, /txt 纯文本回答/);
 });

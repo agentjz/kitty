@@ -5,13 +5,13 @@ import {
   normalizeCheckpointFlow,
 } from "../../agent/runtimeTransition.js";
 import type { SessionCheckpoint, SessionRecord, StoredMessage } from "../../types.js";
-import { createCheckpointForObjective, createEmptyCheckpoint, deriveCheckpointFromSession } from "./base.js";
+import { createCheckpointForFocus, createEmptyCheckpoint, deriveCheckpointFromSession } from "./base.js";
 import {
   buildToolBatch,
   deriveCompletedSteps,
 } from "./derivation.js";
 import {
-  fingerprintObjective,
+  fingerprintFocus,
   normalizeText,
   normalizeTimestamp,
   normalizeToolBatch,
@@ -34,14 +34,14 @@ export function normalizeCheckpoint(
     return undefined;
   }
 
-  const objective = normalizeText(checkpoint.objective) || undefined;
+  const focus = normalizeText(checkpoint.focus) || undefined;
   const status = checkpoint.status === "completed" ? "completed" : "active";
 
   return {
     version: 1,
-    objective,
-    objectiveFingerprint:
-      normalizeText(checkpoint.objectiveFingerprint) || (objective ? fingerprintObjective(objective) : undefined),
+    focus,
+    focusFingerprint:
+      normalizeText(checkpoint.focusFingerprint) || (focus ? fingerprintFocus(focus) : undefined),
     status,
     completedSteps: takeLastUnique(checkpoint.completedSteps ?? [], 8),
     recentToolBatch: normalizeToolBatch(checkpoint.recentToolBatch),
@@ -101,23 +101,23 @@ export function noteCheckpointTurnInput(
   };
 }
 
-export function resolveCurrentObjectiveCheckpoint(
+export function resolveCurrentFocusCheckpoint(
   session: SessionRecord,
   timestamp = new Date().toISOString(),
 ): SessionCheckpoint {
-  const objective = normalizeText(session.taskState?.objective) || undefined;
-  const fingerprint = objective ? fingerprintObjective(objective) : undefined;
+  const focus = normalizeText(session.taskState?.focus) || undefined;
+  const fingerprint = focus ? fingerprintFocus(focus) : undefined;
   const checkpoint = normalizeCheckpoint(session.checkpoint, timestamp) ?? createEmptyCheckpoint(timestamp);
 
-  if (!objective) {
+  if (!focus) {
     return checkpoint;
   }
 
-  if (checkpoint.objectiveFingerprint === fingerprint) {
+  if (checkpoint.focusFingerprint === fingerprint) {
     return checkpoint;
   }
 
-  return createCheckpointForObjective(objective, timestamp);
+  return createCheckpointForFocus(focus, timestamp);
 }
 
 export function noteCheckpointToolBatch(
@@ -125,7 +125,7 @@ export function noteCheckpointToolBatch(
   input: ToolBatchUpdateInput,
   timestamp = new Date().toISOString(),
 ): SessionRecord {
-  const checkpoint = resolveCurrentObjectiveCheckpoint(session, timestamp);
+  const checkpoint = resolveCurrentFocusCheckpoint(session, timestamp);
   const recentToolBatch = buildToolBatch(input.toolNames, input.toolMessages, input.changedPaths, timestamp);
   const phase = checkpoint.flow.phase === "recovery" ? "active" : checkpoint.flow.phase;
   const transition = createToolBatchTransition({

@@ -22,7 +22,6 @@ import { ChangeStore } from "../changes/store.js";
 import { ControlPlaneLedger } from "../../control/ledger.js";
 import { loadProjectContext } from "../../context/projectContext.js";
 import { createDefaultAgentToolRegistry } from "../../tools/registry.js";
-import { readUserInput } from "../../session/turnFrame.js";
 import { throwIfAborted } from "../../utils/abort.js";
 
 export type { AgentCallbacks, RunTurnOptions } from "../types.js";
@@ -42,7 +41,6 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
   try {
     controlLedger.taskLifecycle.startTurn({
       sessionId: session.id,
-      objective: readUserInput(options.input),
       reason: "turn_started",
     });
   } finally {

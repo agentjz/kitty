@@ -15,6 +15,10 @@ description: 维护小猫智能体 Kitty 源码时使用。适用于修改这个
 
 ## 工作标准
 
+- 最高原则：只写当前事实主干。历史提交、旧数据、旧入口、旧能力只能作为 research 证据，不能进入当前源码主干。
+- 不做旧兼容，不做假历史，不做“旧东西怎么处理”的特殊分支。当前没有的能力，不在源码、测试、文档、plan、status、prompt、CLI 输出里出现。
+- 例子：如果当前已经没有 `team` 能力，就不要写 `team(legacy)`，不要写“旧 team 会被清理”，不要写“team 无法创建”的测试，也不要在文档里解释 team 已废弃。当前协作事实只写当前存在的能力，例如 `subagent`。
+- 历史可以进入人的判断，不能进入当前产品主干。删除旧东西的结果是它不再参与设计，而不是被包装成 legacy、migration、cleanup 或兼容路径。
 - 铁律：每次改动前必须先做全局核心语义调查。
 - 全局核心语义调查不是随便扫一眼。必须从整体到部分，检查 agent、context、session、provider、config、tools、extensions、host、interaction、observability、spec、tests 的事实关系。
 - 审查门槛必须是真实调查，不是计时表演。要求长时间审查时，用命令、阅读、对比、记录和验证填满时间，禁止用 sleep 或空等凑数。

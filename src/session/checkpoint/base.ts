@@ -3,7 +3,7 @@ import {
   deriveCompletedSteps,
   deriveRecentToolBatchFromMessages,
 } from "./derivation.js";
-import { fingerprintObjective, normalizeText } from "./shared.js";
+import { fingerprintFocus, normalizeText } from "./shared.js";
 
 export function createEmptyCheckpoint(timestamp = new Date().toISOString()): SessionCheckpoint {
   return {
@@ -24,14 +24,14 @@ export function createEmptyCheckpoint(timestamp = new Date().toISOString()): Ses
   };
 }
 
-export function createCheckpointForObjective(
-  objective: string | undefined,
+export function createCheckpointForFocus(
+  focus: string | undefined,
   timestamp: string,
 ): SessionCheckpoint {
   return {
     ...createEmptyCheckpoint(timestamp),
-    objective,
-    objectiveFingerprint: objective ? fingerprintObjective(objective) : undefined,
+    focus,
+    focusFingerprint: focus ? fingerprintFocus(focus) : undefined,
   };
 }
 
@@ -42,7 +42,7 @@ export function deriveCheckpointFromSession(
   const recentToolBatch = deriveRecentToolBatchFromMessages(session.messages, timestamp);
 
   return {
-    ...createCheckpointForObjective(normalizeText(session.taskState?.objective) || undefined, timestamp),
+    ...createCheckpointForFocus(normalizeText(session.taskState?.focus) || undefined, timestamp),
     completedSteps: deriveCompletedSteps(session),
     recentToolBatch,
   };

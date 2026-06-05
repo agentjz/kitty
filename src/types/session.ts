@@ -91,8 +91,8 @@ export interface SessionCheckpointFlow {
 
 export interface SessionCheckpoint {
   version: 1;
-  objective?: string;
-  objectiveFingerprint?: string;
+  focus?: string;
+  focusFingerprint?: string;
   status: SessionCheckpointStatus;
   completedSteps: string[];
   recentToolBatch?: SessionCheckpointToolBatch;
@@ -109,7 +109,7 @@ export interface TodoItem {
 }
 
 export interface TaskState {
-  objective?: string;
+  focus?: string;
   activeFiles: string[];
   plannedActions: string[];
   completedActions: string[];

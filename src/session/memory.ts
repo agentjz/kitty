@@ -4,8 +4,8 @@ const MAX_SESSION_MEMORY_CHARS = 12_000;
 
 export const SESSION_MEMORY_SECTIONS = [
   {
-    title: "Current Objective",
-    description: "Current objective that still affects the next turn.",
+    title: "Current Focus",
+    description: "Model-written current work focus that still affects the next turn.",
   },
   {
     title: "User Constraints",
@@ -52,9 +52,22 @@ export function updateSessionMemory(
   summary: string,
   timestamp = new Date().toISOString(),
 ): SessionRecord {
+  const memory = createSessionMemoryState(summary, timestamp);
+  const focus = readSessionMemoryCurrentFocus(memory.summary);
   return {
     ...session,
-    sessionMemory: createSessionMemoryState(summary, timestamp),
+    sessionMemory: memory,
+    taskState: {
+      ...(session.taskState ?? {
+        activeFiles: [],
+        plannedActions: [],
+        completedActions: [],
+        blockers: [],
+        lastUpdatedAt: timestamp,
+      }),
+      focus,
+      lastUpdatedAt: timestamp,
+    },
   };
 }
 
@@ -82,4 +95,27 @@ function normalizeSummary(value: string): string {
     .replace(/\r\n/g, "\n")
     .trim()
     .slice(0, MAX_SESSION_MEMORY_CHARS);
+}
+
+function readSessionMemoryCurrentFocus(summary: string): string | undefined {
+  const lines = summary.split("\n");
+  let inFocusSection = false;
+  const values: string[] = [];
+
+  for (const line of lines) {
+    if (line.startsWith("## ")) {
+      if (inFocusSection) {
+        break;
+      }
+      inFocusSection = line.slice(3).trim() === "Current Focus";
+      continue;
+    }
+
+    if (inFocusSection) {
+      values.push(line);
+    }
+  }
+
+  const focus = values.join("\n").trim();
+  return focus && focus.toLowerCase() !== "none" ? focus : undefined;
 }

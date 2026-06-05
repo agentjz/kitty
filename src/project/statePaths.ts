@@ -18,7 +18,10 @@ export interface ProjectStatePaths {
   changesDir: string;
   extensionsDir: string;
   memoryDir: string;
+  evidenceMemoryDir: string;
+  projectMemoryDir: string;
   sessionMemoryDir: string;
+  userMemoryDir: string;
   controlPlaneLedgerFile: string;
   observabilityDir: string;
   observabilityEventsDir: string;
@@ -39,7 +42,10 @@ export function getProjectStatePaths(rootDir: string): ProjectStatePaths {
     changesDir: path.join(kittyDir, "changes"),
     extensionsDir,
     memoryDir,
+    evidenceMemoryDir: path.join(memoryDir, "evidence"),
+    projectMemoryDir: path.join(memoryDir, "project"),
     sessionMemoryDir: path.join(memoryDir, "sessions"),
+    userMemoryDir: path.join(memoryDir, "user"),
     controlPlaneLedgerFile: path.join(kittyDir, "control-plane.sqlite"),
     observabilityDir,
     observabilityEventsDir: path.join(observabilityDir, "events"),
@@ -53,7 +59,10 @@ export async function ensureProjectStateDirectories(rootDir: string): Promise<Pr
   await fs.mkdir(paths.cacheDir, { recursive: true });
   await fs.mkdir(paths.sessionsDir, { recursive: true });
   await fs.mkdir(paths.changesDir, { recursive: true });
+  await fs.mkdir(paths.evidenceMemoryDir, { recursive: true });
+  await fs.mkdir(paths.projectMemoryDir, { recursive: true });
   await fs.mkdir(paths.sessionMemoryDir, { recursive: true });
+  await fs.mkdir(paths.userMemoryDir, { recursive: true });
   await fs.mkdir(paths.observabilityEventsDir, { recursive: true });
   await fs.mkdir(paths.observabilityCrashesDir, { recursive: true });
   return paths;

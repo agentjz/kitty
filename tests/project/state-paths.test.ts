@@ -18,28 +18,37 @@ test("project state paths centralize extension and observability state", async (
   assert.equal(paths.sessionsDir.startsWith(paths.kittyDir), true);
   assert.equal(paths.changesDir.startsWith(paths.kittyDir), true);
   assert.equal(paths.extensionsDir.startsWith(paths.kittyDir), true);
+  assert.equal(paths.evidenceMemoryDir.startsWith(paths.memoryDir), true);
+  assert.equal(paths.projectMemoryDir.startsWith(paths.memoryDir), true);
   assert.equal(paths.sessionMemoryDir.startsWith(paths.memoryDir), true);
+  assert.equal(paths.userMemoryDir.startsWith(paths.memoryDir), true);
   assert.equal(paths.controlPlaneLedgerFile.startsWith(paths.kittyDir), true);
   assert.equal(paths.observabilityEventsDir.includes("observability"), true);
   assert.deepEqual(Object.keys(paths).sort(), [
     "cacheDir",
     "changesDir",
     "controlPlaneLedgerFile",
+    "evidenceMemoryDir",
     "extensionsDir",
     "kittyDir",
     "memoryDir",
     "observabilityCrashesDir",
     "observabilityDir",
     "observabilityEventsDir",
+    "projectMemoryDir",
     "rootDir",
     "sessionMemoryDir",
     "sessionsDir",
+    "userMemoryDir",
   ]);
 
   await ensureProjectStateDirectories(root);
   assert.equal((await fs.stat(paths.sessionsDir)).isDirectory(), true);
   assert.equal((await fs.stat(paths.changesDir)).isDirectory(), true);
   assert.equal((await fs.stat(paths.extensionsDir)).isDirectory(), true);
+  assert.equal((await fs.stat(paths.evidenceMemoryDir)).isDirectory(), true);
+  assert.equal((await fs.stat(paths.projectMemoryDir)).isDirectory(), true);
   assert.equal((await fs.stat(paths.sessionMemoryDir)).isDirectory(), true);
+  assert.equal((await fs.stat(paths.userMemoryDir)).isDirectory(), true);
   assert.equal((await fs.stat(paths.observabilityEventsDir)).isDirectory(), true);
 });

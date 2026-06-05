@@ -1,6 +1,7 @@
 import { ControlPlaneLedger, type ExecutionRecord, type WakeSignalRecord } from "../control/ledger.js";
 import type { TaskLifecycleRecord } from "../control/ledger.js";
 import { getProjectStatePaths } from "../project/statePaths.js";
+import { buildProjectMap } from "../project/map.js";
 import { listRuntimeMemoryAssets } from "./memory/index.js";
 import { getExecutionDeadlineAt, isActiveExecution, summarizeExecutionHealth } from "./executionHealth.js";
 import { SessionStore } from "../session/store.js";
@@ -8,6 +9,7 @@ import { SpecStore } from "../spec/store.js";
 import type { SessionRecord } from "../types.js";
 import type {
   RuntimeExecutionSummary,
+  RuntimeProjectMapSummary,
   RuntimeSessionSummary,
   RuntimeStatus,
   RuntimeTaskLifecycleSummary,
@@ -24,11 +26,12 @@ export async function buildRuntimeStatus(rootDir: string): Promise<RuntimeStatus
     memorySessionsDir: paths.sessionMemoryDir,
   });
 
-  const [sessionRead, memoryAssets, control, specs] = await Promise.all([
+  const [sessionRead, memoryAssets, control, specs, projectMap] = await Promise.all([
     sessionStore.listReadable?.(DEFAULT_RECENT_LIMIT) ?? sessionStore.list(DEFAULT_RECENT_LIMIT).then((sessions) => ({ sessions, skipped: [] })),
     listRuntimeMemoryAssets(paths.rootDir),
     readControlPlaneStatus(paths.rootDir),
     readSpecStatus(paths.rootDir),
+    buildProjectMap(paths.rootDir),
   ]);
 
   const sessions = sessionRead.sessions.map(summarizeSession);
@@ -44,12 +47,26 @@ export async function buildRuntimeStatus(rootDir: string): Promise<RuntimeStatus
       skipped: sessionRead.skipped.length,
     },
     memory: {
-      sessions: memoryAssets,
+      assets: memoryAssets,
     },
+    projectMap: summarizeProjectMap(projectMap),
     taskLifecycle,
     executions: control.executions,
     wakeSignals: control.wakeSignals,
     specs,
+  };
+}
+
+function summarizeProjectMap(projectMap: Awaited<ReturnType<typeof buildProjectMap>>): RuntimeProjectMapSummary {
+  return {
+    rootDir: projectMap.rootDir,
+    topLevelDirectories: projectMap.topLevelDirectories,
+    entryFiles: projectMap.entryFiles,
+    testDirectories: projectMap.testDirectories,
+    packageScripts: projectMap.packageScripts,
+    specDocuments: projectMap.specDocuments,
+    git: projectMap.git,
+    updatedAt: projectMap.updatedAt,
   };
 }
 
@@ -60,7 +77,7 @@ function summarizeSession(session: SessionRecord): RuntimeSessionSummary {
     cwd: session.cwd,
     updatedAt: session.updatedAt,
     messageCount: session.messageCount,
-    objective: session.taskState?.objective ?? session.checkpoint?.objective,
+    focus: session.taskState?.focus ?? session.checkpoint?.focus,
     hasMemory: Boolean(session.sessionMemory?.summary.trim()),
   };
 }
@@ -106,7 +123,6 @@ function summarizeTaskLifecycle(lifecycle: TaskLifecycleRecord): RuntimeTaskLife
     id: lifecycle.id,
     sessionId: lifecycle.sessionId,
     stage: lifecycle.stage,
-    objective: lifecycle.objective,
     reason: lifecycle.reason,
     activeExecutionIds: lifecycle.activeExecutionIds,
     activeSpecId: lifecycle.activeSpecId,

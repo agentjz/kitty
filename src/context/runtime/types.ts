@@ -4,6 +4,7 @@ import type { SessionConversationBrief } from "./sessionBrief/types.js";
 import type { AgentWorkingMemory } from "./workingMemory/types.js";
 import type { TaskLifecycleRecord } from "../../control/ledger.js";
 import type {
+  ProjectMap,
   ProjectContext,
   RuntimeConfig,
   SessionCheckpoint,
@@ -14,6 +15,7 @@ import type {
 export interface ContextRuntimeSnapshot {
   sessionBrief?: SessionConversationBrief;
   taskLifecycle?: TaskLifecycleRecord;
+  projectMap?: ProjectMap;
   workingMemory: AgentWorkingMemory;
   historyBoundary: {
     rawHistoryPolicy: "evidence_lookup_only";
@@ -22,6 +24,7 @@ export interface ContextRuntimeSnapshot {
 }
 
 export interface BuildContextRuntimeSnapshotInput {
+  projectMap?: ProjectMap;
   session: Pick<
     SessionRecord,
     "messages" | "sessionMemory" | "todoItems" | "taskState" | "checkpoint"

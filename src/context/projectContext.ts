@@ -4,6 +4,7 @@ import path from "node:path";
 import fg from "fast-glob";
 
 import { resolveProjectRoots } from "./repoRoots.js";
+import { buildProjectMap } from "../project/map.js";
 import { discoverSkills } from "../skills/discovery.js";
 import type { LoadedInstructionFile, ProjectContext } from "../types.js";
 import { isPathIgnored, loadProjectIgnoreRules } from "../utils/ignore.js";
@@ -15,7 +16,10 @@ export async function loadProjectContext(cwd: string, input: {
   const instructions = await getInstructionFiles(roots.rootDir, cwd);
   const { content, truncated } = concatInstructionFiles(instructions, input.projectDocMaxBytes);
   const ignoreRules = await loadProjectIgnoreRules(roots.rootDir, cwd);
-  const skills = await discoverSkills(roots.rootDir, cwd, ignoreRules);
+  const [skills, projectMap] = await Promise.all([
+    discoverSkills(roots.rootDir, cwd, ignoreRules),
+    buildProjectMap(roots.rootDir, cwd),
+  ]);
 
   return {
     rootDir: roots.rootDir,
@@ -26,6 +30,7 @@ export async function loadProjectContext(cwd: string, input: {
     instructionTruncated: truncated,
     ignoreRules,
     skills,
+    projectMap,
   };
 }
 

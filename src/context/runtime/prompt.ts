@@ -8,6 +8,7 @@ import type { AgentProfile } from "../../agent/profiles/types.js";
 import type { BuildContextRuntimePromptLayersInput } from "./types.js";
 import { buildContextRuntimeSnapshot } from "./snapshot.js";
 import type { TaskLifecycleRecord } from "../../control/ledger.js";
+import type { ProjectMap } from "../../types.js";
 
 export function buildContextRuntimePromptLayers(
   input: BuildContextRuntimePromptLayersInput & { profile?: AgentProfile },
@@ -22,9 +23,11 @@ export function buildContextRuntimePromptLayers(
       checkpoint: input.checkpoint,
     },
     taskLifecycle: input.taskLifecycle,
+    projectMap: input.projectContext.projectMap,
   });
   const sessionBriefBlock = buildSessionConversationBriefBlock(snapshot.sessionBrief);
   const taskLifecycleBlock = buildTaskLifecyclePromptBlock(snapshot.taskLifecycle);
+  const projectMapBlock = buildProjectMapPromptBlock(snapshot.projectMap);
   const skillIndexBlock = input.config.extensions.skills
     ? buildSkillIndexPromptBlock(input.projectContext.skills)
     : undefined;
@@ -47,8 +50,8 @@ export function buildContextRuntimePromptLayers(
     }),
     profilePersonaBlocks: buildProfilePersonaPromptBlocks(resolvedProfile),
     runtimeFactBlocks: sessionBriefBlock
-      ? [sessionBriefBlock, ...(taskLifecycleBlock ? [taskLifecycleBlock] : []), ...(skillIndexBlock ? [skillIndexBlock] : []), ...(input.runtimeState?.internalFactBlocks ?? []), ...runtimeFactBlocks]
-      : [...(taskLifecycleBlock ? [taskLifecycleBlock] : []), ...(skillIndexBlock ? [skillIndexBlock] : []), ...(input.runtimeState?.internalFactBlocks ?? []), ...runtimeFactBlocks],
+      ? [sessionBriefBlock, ...(taskLifecycleBlock ? [taskLifecycleBlock] : []), ...(projectMapBlock ? [projectMapBlock] : []), ...(skillIndexBlock ? [skillIndexBlock] : []), ...(input.runtimeState?.internalFactBlocks ?? []), ...runtimeFactBlocks]
+      : [...(taskLifecycleBlock ? [taskLifecycleBlock] : []), ...(projectMapBlock ? [projectMapBlock] : []), ...(skillIndexBlock ? [skillIndexBlock] : []), ...(input.runtimeState?.internalFactBlocks ?? []), ...runtimeFactBlocks],
   };
 }
 
@@ -58,7 +61,6 @@ function buildTaskLifecyclePromptBlock(lifecycle: TaskLifecycleRecord | undefine
   }
   const fields: Array<PromptField | undefined> = [
     { label: "Stage", value: lifecycle.stage },
-    lifecycle.objective ? { label: "Objective", value: lifecycle.objective } : undefined,
     lifecycle.scope ? { label: "Scope", value: lifecycle.scope } : undefined,
     lifecycle.boundary ? { label: "Boundary", value: lifecycle.boundary } : undefined,
     lifecycle.reason ? { label: "Reason", value: lifecycle.reason } : undefined,
@@ -78,4 +80,30 @@ function buildTaskLifecyclePromptBlock(lifecycle: TaskLifecycleRecord | undefine
     { label: "Updated", value: lifecycle.updatedAt },
   ];
   return buildFieldBlock("Task lifecycle", fields.filter((field): field is PromptField => Boolean(field)));
+}
+
+function buildProjectMapPromptBlock(projectMap: ProjectMap | undefined): string | undefined {
+  if (!projectMap) {
+    return undefined;
+  }
+  const fields: Array<PromptField | undefined> = [
+    { label: "Purpose", value: "Machine facts for orientation. Use as evidence, not as a route command." },
+    { label: "Root", value: projectMap.rootDir },
+    { label: "Top-level dirs", value: formatLimitedList(projectMap.topLevelDirectories, 10) },
+    { label: "Entries", value: formatLimitedList(projectMap.entryFiles, 8) },
+    { label: "Tests", value: formatLimitedList(projectMap.testDirectories, 6) },
+    { label: "Scripts", value: formatLimitedList(projectMap.packageScripts, 10) },
+    { label: "Specs", value: formatLimitedList(projectMap.specDocuments, 6) },
+    {
+      label: "Git",
+      value: projectMap.git.available
+        ? (projectMap.git.hasChanges ? "available, changed" : "available, clean")
+        : "unavailable",
+    },
+    projectMap.git.recentChanges.length > 0
+      ? { label: "Recent changes", value: formatLimitedList(projectMap.git.recentChanges, 6) }
+      : undefined,
+    { label: "Updated", value: projectMap.updatedAt },
+  ];
+  return buildFieldBlock("Project map", fields.filter((field): field is PromptField => Boolean(field)));
 }

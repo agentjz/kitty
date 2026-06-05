@@ -12,13 +12,14 @@
 
 - 同一个 session 的对话脉络由模型写出的 session memory 进入当前轮，负责用户连续体验。
 - 当前任务工作记忆自动进入当前轮，负责执行连续性。
+- 项目地图把目录、入口、脚本、测试、spec 和 git 状态作为机器事实进入当前轮，负责快速定向。
 - checkpoint、工具产物、运行事件和文件变更记录留在证据里，只在需要取证或恢复时使用。
-- 当前上下文是模型当下工作的桌面，只放当前用户输入、同 session 对话脉络、当前任务工作记忆和必要工作集。
+- 当前上下文是模型当下工作的桌面，只放当前用户输入、同 session 对话脉络、当前任务工作记忆、项目地图和必要工作集。
 - 长期原则写进可审阅的 spec、测试和源码。
 
 模型写记忆负责续命，历史负责取证，上下文负责当下推理。
 
-这条边界同时保护两件事：用户的任务有连续性，模型的当前目标有清晰边界。
+这条边界同时保护两件事：用户的任务有连续性，模型的当前工作焦点有清晰边界。
 
 ## 📌 用户与事实
 
@@ -26,7 +27,7 @@ Agent 应该更忠于用户，还是更忠于事实？
 
 用户友好可以降低摩擦，也可能让用户更舒服地停留在自己的旧习惯、旧偏好和旧盲区里。
 
-小猫智能体理解用户，尊重偏好，也把事实证据放在边界上。用户的上下文可以被接住，用户的历史可以被查询，当前判断仍然落在当前目标和当前证据上。
+小猫智能体理解用户，尊重偏好，也把事实证据放在边界上。用户的上下文可以被接住，用户的历史可以被查询，当前判断仍然落在当前请求和当前证据上。
 
 ## 🛠️ 核心与扩展
 
@@ -42,7 +43,7 @@ Agent 应该更忠于用户，还是更忠于事实？
 
 扩展是工具集合。核心保持清楚，扩展保持独立。
 
-Skills 也是 extension，不是第三套工具体系。它把可复用方法、资料、脚本、示例和素材组织成 runtime 能力包。默认上下文只出现 skill 索引和资源索引；是否加载正文、读取资源、运行脚本，由模型根据当前目标决定。机器只负责发现、读取、执行和记录事实。
+Skills 也是 extension，不是第三套工具体系。它把可复用方法、资料、脚本、示例和素材组织成 runtime 能力包。默认上下文只出现 skill 索引和资源索引；是否加载正文、读取资源、运行脚本，由模型根据当前请求和工作焦点决定。机器只负责发现、读取、执行和记录事实。
 
 ## 📐 Spec
 
@@ -70,11 +71,14 @@ Spec 不是普通文档目录。它负责把模糊目标变成可审阅的计划
 小猫智能体把记忆分成运行连续性和长期资产：
 
 - session memory 由模型在 turn 收口时根据事实写出，并采用固定 Markdown 区块。
-- working memory 保存当前目标的执行事实。
-- `.kitty/memory/sessions/*.md` 是可审阅的 memory asset。
-- memory asset 可以被用户读取、搜索、删除，也可以沉淀到 spec `notes.md` 或 runtime skill `references/`。
+- working memory 保存模型写出的当前工作焦点、todo、近期工具批次和执行连续性事实。
+- `.kitty/memory/sessions/*.md` 保存同 session 连续记忆。
+- `.kitty/memory/project/*.md` 保存项目经验。
+- `.kitty/memory/user/*.md` 保存用户画像。
+- `.kitty/memory/evidence/*.md` 保存可审阅证据资产。
+- memory asset 暴露 kind、id、路径和 evidence references，可以被用户读取、搜索、删除，也可以沉淀到 spec `notes.md` 或 runtime skill `references/`。
 
-固定区块包括当前目标、用户约束、决策、未结事项、验证事实和可复用经验。机器维护格式、保存文本和文件位置。模型判断哪些经验值得复用，哪些历史只适合取证。
+固定区块包括当前工作焦点、用户约束、决策、未结事项、验证事实和可复用经验。机器维护格式、保存文本和文件位置。模型判断哪些经验值得复用，哪些历史只适合取证。
 
 ## 🧾 运行现场
 
@@ -84,7 +88,7 @@ Spec 不是普通文档目录。它负责把模糊目标变成可审阅的计划
 
 小猫智能体用 control plane 保存这些死事实：background、subagent execution、派工边界、pid、状态、退出码、输出摘要、wait policy 和 wake signal。
 
-`kitty status` 让用户看到运行现场：session、memory、execution、wake、spec。它只呈现事实，不替模型做判断。
+`kitty status` 让用户看到运行现场：session、memory、project map、execution、wake、spec。它只呈现事实，不替模型做判断。
 
 Background 是长任务现场。它记录运行输出摘要，能检查、终止、reconcile，也能在完成后把事实暴露给 lead。
 
@@ -100,16 +104,24 @@ Subagent 是隔离上下文协作现场。lead 派出有边界的任务后让出
 
 Runtime 提供运行边界。Control plane 保存执行账本。Observability 记录事实。Checkpoint 保存可恢复现场。工具执行明确的机器操作。
 
-Task Lifecycle 保存当前任务阶段和运行事实：目标、阶段、原因、active execution、spec、todo、验证事实和完成事实。它是 control plane 里的事实账本，不是机器语义分类器。
+Task Lifecycle 保存当前任务阶段和运行事实：阶段、原因、active execution、spec、todo、验证事实和完成事实。它是 control plane 里的事实账本，不是机器语义分类器，不把用户原话升级成目标。
 
 Agent turn 生命周期负责把当前输入、工具批次、provider 恢复、checkpoint、session diff 和记忆更新串成可恢复的现场。生命周期只保存和暴露事实，不决定路线。
 
 Lead wait 必须有边界。阻塞型 subagent execution 会让 lead 让出当前轮；execution 完成或等待 deadline 到达后，host 用 internal wake facts 恢复 lead。wake 是运行事实，不是用户新要求。
 
-## 🧱 删除与重建
+## 🧪 评测
 
-错误结构需要清晰处理。
+Agent 不能只靠单元测试证明成熟。
 
-假兼容、旧入口、空壳目录、残留 route、残留 prompt、残留 alias 会让系统看起来稳，实际越来越难判断。
+小猫智能体用 evaluation harness 暴露真实体验场景：简单问题不疯狂工作、长会话不失忆、旧目标不回灌、项目地图帮助定向、memory 可审阅可追溯、background 可恢复可终止、subagent 能唤醒 lead、spec 工作流能闭环。
 
-小猫智能体的原则是：错的旧结构直接物理删除。需要的能力按当前现实重新建立。Spec、代码和测试同步描述同一个事实。
+`kitty eval` 只列出验收场景和机器事实，不替模型打分，也不把口号写成测试。
+
+## 🧱 当前事实主干
+
+当前产品面只承认当前实现真实存在的能力。
+
+源码、测试、spec、README、CLI 输出和运行状态必须讲同一个当前事实。没有当前入口、当前工具、当前状态或当前测试支撑的能力，不进入产品语言。
+
+历史用于研究和判断，不进入当前产品主干。需要的能力按当前现实建立；不需要的能力不写说明、不写分支、不写测试。

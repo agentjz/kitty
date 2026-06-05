@@ -61,7 +61,6 @@ export interface TaskLifecycleRecord {
   id: string;
   sessionId: string;
   stage: TaskLifecycleStage;
-  objective?: string;
   scope?: string;
   boundary?: string;
   reason?: string;

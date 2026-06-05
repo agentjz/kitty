@@ -1,5 +1,5 @@
 import { normalizeCheckpoint } from "../../../session/checkpoint.js";
-import { fingerprintObjective, normalizeText, takeLastUnique } from "../../../session/checkpoint/shared.js";
+import { fingerprintFocus, normalizeText, takeLastUnique } from "../../../session/checkpoint/shared.js";
 import { normalizeTodoItems } from "../../../session/todos.js";
 import type { SessionCheckpoint, TaskState, TodoItem } from "../../../types.js";
 import type { AgentWorkingMemory } from "./types.js";
@@ -19,13 +19,13 @@ export interface BuildWorkingMemoryInput {
 
 export function buildAgentWorkingMemory(input: BuildWorkingMemoryInput): AgentWorkingMemory {
   const timestamp = input.timestamp ?? new Date().toISOString();
-  const objective = normalizeText(input.taskState?.objective) || undefined;
-  const checkpoint = normalizeCurrentObjectiveCheckpoint(input.checkpoint, objective, timestamp);
+  const focus = normalizeText(input.taskState?.focus) || undefined;
+  const checkpoint = normalizeCurrentFocusCheckpoint(input.checkpoint, focus, timestamp);
 
   return {
     version: 1,
-    objective,
-    objectiveFingerprint: objective ? fingerprintObjective(objective) : undefined,
+    focus,
+    focusFingerprint: focus ? fingerprintFocus(focus) : undefined,
     activeFiles: takeLastUnique(input.taskState?.activeFiles ?? [], MAX_ACTIVE_FILES),
     plannedActions: takeLastUnique(input.taskState?.plannedActions ?? [], MAX_PLANNED_ACTIONS),
     completedActions: takeLastUnique(
@@ -54,20 +54,20 @@ export function buildAgentWorkingMemory(input: BuildWorkingMemoryInput): AgentWo
   };
 }
 
-function normalizeCurrentObjectiveCheckpoint(
+function normalizeCurrentFocusCheckpoint(
   checkpoint: SessionCheckpoint | undefined,
-  objective: string | undefined,
+  focus: string | undefined,
   timestamp: string,
 ): SessionCheckpoint | undefined {
   const normalized = normalizeCheckpoint(checkpoint, timestamp);
   if (!normalized || normalized.status === "completed") {
     return undefined;
   }
-  if (!objective) {
-    return normalized.objective ? undefined : normalized;
+  if (!focus) {
+    return normalized.focus ? undefined : normalized;
   }
 
-  return normalized.objectiveFingerprint === fingerprintObjective(objective)
+  return normalized.focusFingerprint === fingerprintFocus(focus)
     ? normalized
     : undefined;
 }

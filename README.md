@@ -1,4 +1,4 @@
-# 小猫智能体 Kitty
+﻿# 小猫智能体 Kitty
 
 <p align="center">
   <strong>🐾 一个本地 agent 编程工作台：搜得到，看得懂，改得准，跑得通，记得住，能继续。</strong>
@@ -31,8 +31,9 @@
 | 能力 | 当前事实 |
 | --- | --- |
 | 🧭 Agent 循环 | 模型、工具、session、收尾都在同一个主循环里推进 |
-| 🧠 Context | 项目上下文、运行时上下文、工作记忆、长上下文压缩 |
-| 💾 Session | 会话记录、checkpoint、todo、恢复现场、结构化可审阅 memory 文件 |
+| 🧠 Context | 项目上下文、项目地图、运行时上下文、工作记忆、长上下文压缩 |
+| 💾 Session | 会话记录、checkpoint、todo、恢复现场、结构化可审阅 memory assets |
+| 🗺️ Project Map | 目录、入口、脚本、测试、spec 和 git 事实进入短项目地图 |
 | 🔌 Provider | OpenAI-compatible provider、请求恢复、连接诊断 |
 | 🛠️ Core tools | `read`、`edit`、`write`、`bash` |
 | 🧩 Extensions | `todo`、`worktree`、`network`、`background`、`subagent`、`skills`、`spec` |
@@ -40,6 +41,7 @@
 | 📐 Spec 模式 | `requirements.md`、`design.md`、`tasks.md`、`notes.md` 和隔离 worktree |
 | 💬 产品面 | CLI、交互终端、Telegram 私聊服务 |
 | 📎 证据记录 | 事件、终端日志、崩溃记录、文件变更记录 |
+| 🧪 Evaluation | `kitty eval` 暴露真实 agent 体验验收场景 |
 
 ## ⚡ 快速开始
 
@@ -85,12 +87,13 @@ kitty spec
 | `kitty sessions` | 查看最近会话 |
 | `kitty config show` | 查看从 `.kitty/.env` 解析出的当前运行配置 |
 | `kitty config path` | 查看当前项目 `.kitty/.env` 路径 |
-| `kitty status` | 查看当前项目 runtime 现场：session、task lifecycle、memory、execution、deadline、wake、spec |
-| `kitty memory` | 查看、读取、搜索、删除，或把 session memory 沉淀到 spec notes / skill references |
+| `kitty status` | 查看当前项目 runtime 现场：session、task lifecycle、memory、project map、execution、deadline、wake、spec |
+| `kitty memory` | 查看、读取、搜索、删除 runtime memory assets，或把 memory 沉淀到 spec notes / skill references |
 | `kitty changes` | 查看记录的文件变更 |
 | `kitty undo [changeId]` | 撤销最近一次或指定变更 |
 | `kitty diff [path]` | 查看当前 git diff |
 | `kitty doctor` | 检查运行环境 |
+| `kitty eval` | 查看真实 agent 体验验收场景 |
 | `kitty telegram serve` | 启动 Telegram 私聊服务 |
 
 ## 🛠️ 工具体系
@@ -120,9 +123,9 @@ Extension 是可启用、可禁用、独立存在的工具集合：
 
 Runtime skills 放在项目 `SKILL.md`、`.skills/**/SKILL.md` 或 `skills/**/SKILL.md`。默认上下文只显示 skill 名称、说明和路径；完整正文必须由模型明确调用 `skill_load` 后进入当前轮。Skill 包内的 `references/`、`scripts/`、`examples/` 和 `assets/` 会作为资源索引出现，需要时用 `skill_read_resource` 读取资源，或用 `skill_run_script` 运行已声明的 `scripts/` 资源。Skill frontmatter 可用 `requires` 声明命令依赖，运行时用 `skill_check` 检查。`.codex/skills/**` 是 Codex 维护本仓库用的开发规范，不属于小猫运行时 skill。
 
-Session memory 由模型在 turn 收口时按固定 Markdown 区块写出：`Current Objective`、`User Constraints`、`Decisions`、`Open Threads`、`Verification Facts`、`Reusable Lessons`。机器只维护格式和保存边界，不替模型判断事实重要性。
+Session memory 由模型在 turn 收口时按固定 Markdown 区块写出：`Current Focus`、`User Constraints`、`Decisions`、`Open Threads`、`Verification Facts`、`Reusable Lessons`。机器只维护格式和保存边界，不替模型判断事实重要性。
 
-Memory 资产可以用 `kitty memory <sessionId> --append-to-spec <specId>` 追加到 spec `notes.md`，也可以用 `kitty memory <sessionId> --append-to-skill <skillName>` 写入该 skill 的 `references/`。这两条路径只沉淀已保存事实，不替模型判断哪些经验值得复用。
+Memory assets 分为 `session`、`project`、`user` 和 `evidence`。每条 asset 暴露 kind、id、路径和 evidence references。Session memory 由模型写，project/user/evidence assets 是可审阅事实资产。`kitty memory <memoryId> --append-to-spec <specId>` 可以追加到 spec `notes.md`，`kitty memory <memoryId> --append-to-skill <skillName>` 可以写入该 skill 的 `references/`。这两条路径只沉淀已保存事实，不替模型判断哪些经验值得复用。
 
 查看配置：
 
@@ -163,13 +166,15 @@ kitty config show
 | Core tools | `src/tools/` |
 | Extensions | `src/extensions/` |
 | Runtime skills | `src/skills/`, `skills/` |
-| Memory assets | `.kitty/memory/sessions/` |
+| Project map | `src/project/map.ts` |
+| Memory assets | `.kitty/memory/sessions/`, `.kitty/memory/project/`, `.kitty/memory/user/`, `.kitty/memory/evidence/` |
 | Control plane | `src/control/`, `src/execution/` |
 | Spec runtime | `src/spec/` |
 | Host 边界 | `src/host/` |
 | CLI / Shell / Telegram | `src/cli/`, `src/shell/`, `src/telegram/` |
 | Runtime UI | `src/runtime-ui/` |
 | Observability | `src/observability/` |
+| Evaluation | `src/evaluation/`, `tests/evaluation/` |
 | Specs | `spec/` |
 | Tests | `tests/` |
 

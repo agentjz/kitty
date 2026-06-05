@@ -8,8 +8,9 @@ export interface RuntimeStatus {
     skipped: number;
   };
   memory: {
-    sessions: RuntimeMemoryAssetSummary[];
+    assets: RuntimeMemoryAssetSummary[];
   };
+  projectMap?: RuntimeProjectMapSummary;
   taskLifecycle?: RuntimeTaskLifecycleSummary;
   executions: {
     total: number;
@@ -26,28 +27,44 @@ export interface RuntimeStatus {
   };
 }
 
+export interface RuntimeProjectMapSummary {
+  rootDir: string;
+  topLevelDirectories: string[];
+  entryFiles: string[];
+  testDirectories: string[];
+  packageScripts: string[];
+  specDocuments: string[];
+  git: {
+    available: boolean;
+    hasChanges: boolean;
+    recentChanges: string[];
+  };
+  updatedAt: string;
+}
+
 export interface RuntimeSessionSummary {
   id: string;
   title?: string;
   cwd: string;
   updatedAt: string;
   messageCount: number;
-  objective?: string;
+  focus?: string;
   hasMemory: boolean;
 }
 
 export interface RuntimeMemoryAssetSummary {
-  sessionId: string;
+  id: string;
+  kind: string;
   path: string;
   updatedAt?: string;
   size: number;
+  evidenceRefs: string[];
 }
 
 export interface RuntimeTaskLifecycleSummary {
   id: string;
   sessionId: string;
   stage: string;
-  objective?: string;
   reason?: string;
   activeExecutionIds: string[];
   activeSpecId?: string;

@@ -11,6 +11,7 @@ export function buildContextRuntimeSnapshot(
       sessionMemory: input.session.sessionMemory,
     }),
     taskLifecycle: input.taskLifecycle,
+    projectMap: input.projectMap,
     workingMemory: buildAgentWorkingMemory({
       taskState: input.session.taskState,
       todoItems: input.session.todoItems,
@@ -20,7 +21,7 @@ export function buildContextRuntimeSnapshot(
       rawHistoryPolicy: "evidence_lookup_only",
       automaticSurfaces: [
         "internal continuity state",
-        "current-objective working memory",
+        "current-focus working memory",
       ],
     },
   };

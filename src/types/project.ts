@@ -26,4 +26,22 @@ export interface ProjectContext {
   instructionTruncated: boolean;
   ignoreRules: ProjectIgnoreRule[];
   skills: LoadedSkill[];
+  projectMap?: ProjectMap;
+}
+
+export interface ProjectMap {
+  rootDir: string;
+  cwd: string;
+  topLevelDirectories: string[];
+  entryFiles: string[];
+  testDirectories: string[];
+  packageScripts: string[];
+  specDocuments: string[];
+  git: {
+    available: boolean;
+    hasChanges: boolean;
+    recentChanges: string[];
+  };
+  summary: string;
+  updatedAt: string;
 }

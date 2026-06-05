@@ -35,10 +35,10 @@ export function buildSessionMemoryCompactionMessages(
         "Update same-session memory from the supplied facts.",
         "Write only the memory text using the exact Markdown sections below.",
         "Keep stable user constraints only when they affect future action.",
-        "Keep active task continuity, important decisions, and unresolved next steps.",
+        "Keep active work focus, important decisions, and unresolved next steps.",
         "Write compact operational memory, not a transcript or review narrative.",
         "Base every statement on supplied facts.",
-        "Use supplied facts only. Drop stale objectives unless they still affect the next turn.",
+        "Use supplied facts only. Drop stale focus unless it still affects the next turn.",
         "",
         "Required sections:",
         formatSessionMemorySectionList(),
@@ -94,7 +94,7 @@ function formatCheckpointEvidence(session: SessionRecord): string | undefined {
   }
 
   const facts = [
-    checkpoint.objective ? `objective=${checkpoint.objective}` : undefined,
+    checkpoint.focus ? `focus=${checkpoint.focus}` : undefined,
     `status=${checkpoint.status}`,
     `phase=${checkpoint.flow.phase}`,
     checkpoint.flow.reason ? `reason=${checkpoint.flow.reason}` : undefined,

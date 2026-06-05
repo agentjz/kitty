@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
@@ -23,7 +23,7 @@ test("runtime memory assets can be listed, read, and searched", async (t) => {
     sessionMemory: {
       version: 1,
       summary: [
-        "## Current Objective",
+        "## Current Focus",
         "Review runtime memory assets.",
         "",
         "## User Constraints",
@@ -47,23 +47,77 @@ test("runtime memory assets can be listed, read, and searched", async (t) => {
 
   const assets = await listRuntimeMemoryAssets(root);
   assert.equal(assets.length, 1);
-  assert.equal(assets[0]?.sessionId, session.id);
+  assert.equal(assets[0]?.id, session.id);
 
   const read = await readRuntimeMemoryAsset(root, session.id);
   assert.match(read.content, /Runtime memory should be searchable/);
+  assert.equal(read.kind, "session");
+  assert.deepEqual(read.evidenceRefs, [`session:${session.id}`]);
 
   const search = await searchRuntimeMemoryAssets(root, "reusable");
   assert.equal(search.length, 1);
-  assert.equal(search[0]?.sessionId, session.id);
+  assert.equal(search[0]?.id, session.id);
   assert.match(search[0]?.matches.join("\n") ?? "", /reusable/);
 
   const splitPhraseSearch = await searchRuntimeMemoryAssets(root, "Runtime reusable");
   assert.equal(splitPhraseSearch.length, 0);
 
   const deleted = await deleteRuntimeMemoryAsset(root, session.id);
-  assert.equal(deleted.sessionId, session.id);
+  assert.equal(deleted.id, session.id);
   assert.equal((await listRuntimeMemoryAssets(root)).length, 0);
   assert.equal((await sessionStore.load(session.id)).sessionMemory, undefined);
+});
+
+test("runtime memory assets expose asset kinds and evidence references", async (t) => {
+  const root = await createTempWorkspace("runtime-memory-kinds", t);
+  const sessionStore = new SessionStore(`${root}/.kitty/sessions`);
+  const session = await sessionStore.save({
+    ...(await sessionStore.create(root)),
+    sessionMemory: {
+      version: 1,
+      summary: [
+        "## Current Focus",
+        "Keep memory assets traceable.",
+        "",
+        "## User Constraints",
+        "None",
+        "",
+        "## Decisions",
+        "None",
+        "",
+        "## Open Threads",
+        "None",
+        "",
+        "## Verification Facts",
+        "Session memory is backed by the session snapshot.",
+        "",
+        "## Reusable Lessons",
+        "None",
+      ].join("\n"),
+      updatedAt: "2026-05-22T00:00:00.000Z",
+    },
+  });
+  await writeFile(root, ".kitty/memory/project/repo.md", [
+    "# Project Experience",
+    "",
+    "Evidence: session:manual-project-note",
+    "",
+    "Keep project map concise.",
+  ].join("\n"));
+  await writeFile(root, ".kitty/memory/user/preferences.md", [
+    "# User Profile",
+    "",
+    "Evidence: session:manual-user-note",
+    "",
+    "User prefers concise answers.",
+  ].join("\n"));
+
+  const assets = await listRuntimeMemoryAssets(root);
+
+  assert.deepEqual(assets.map((asset) => asset.kind).sort(), ["project", "session", "user"]);
+  assert.equal(assets.find((asset) => asset.id === session.id)?.evidenceRefs[0], `session:${session.id}`);
+  assert.equal(assets.find((asset) => asset.kind === "project")?.id, "project/repo");
+  assert.equal(assets.find((asset) => asset.kind === "user")?.id, "user/preferences");
 });
 
 test("runtime memory assets can be appended to spec notes as evidence", async (t) => {
@@ -75,7 +129,7 @@ test("runtime memory assets can be appended to spec notes as evidence", async (t
     sessionMemory: {
       version: 1,
       summary: [
-        "## Current Objective",
+        "## Current Focus",
         "None",
         "",
         "## User Constraints",
@@ -104,7 +158,7 @@ test("runtime memory assets can be appended to spec notes as evidence", async (t
 
   const appended = await appendRuntimeMemoryAssetToSpecNotes({
     rootDir: root,
-    sessionId: session.id,
+    memoryId: session.id,
     specId: spec.id,
   });
   const notes = await specStore.readDocument(spec.id, "notes");
@@ -130,7 +184,7 @@ test("runtime memory assets can be appended to runtime skill references", async 
     sessionMemory: {
       version: 1,
       summary: [
-        "## Current Objective",
+        "## Current Focus",
         "None",
         "",
         "## User Constraints",
@@ -154,7 +208,7 @@ test("runtime memory assets can be appended to runtime skill references", async 
 
   const appended = await appendRuntimeMemoryAssetToSkillReference({
     rootDir: root,
-    sessionId: session.id,
+    memoryId: session.id,
     skillName: "review",
   });
   const content = await fs.readFile(`${root}/${appended.path}`, "utf8");

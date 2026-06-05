@@ -17,6 +17,7 @@ export type {
 } from "./types/diagnostics.js";
 export type {
   LoadedInstructionFile,
+  ProjectMap,
   ProjectContext,
   ProjectIgnoreRule,
 } from "./types/project.js";

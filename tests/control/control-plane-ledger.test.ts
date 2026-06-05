@@ -102,7 +102,6 @@ test("control plane ledger persists task lifecycle facts", async (t) => {
 
   const started = ledger.taskLifecycle.startTurn({
     sessionId: "session-1",
-    objective: "Inspect lifecycle",
     reason: "turn_started",
   });
   const waiting = ledger.taskLifecycle.appendExecutionWait({
@@ -124,7 +123,6 @@ test("control plane ledger persists task lifecycle facts", async (t) => {
   assert.equal(waiting.stage, "delegated_wait");
   assert.equal(completed.stage, "completed");
   assert.equal(reloaded?.id, started.id);
-  assert.equal(reloaded?.objective, "Inspect lifecycle");
   assert.deepEqual(reloaded?.activeExecutionIds, []);
   assert.deepEqual(reloaded?.verificationFacts, ["npm test passed"]);
   assert.deepEqual(reloaded?.completionFacts, ["Lifecycle persisted"]);

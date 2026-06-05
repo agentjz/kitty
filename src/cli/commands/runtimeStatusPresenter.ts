@@ -8,9 +8,10 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
   lines.push(`State: ${status.stateDir}`);
   lines.push("");
   lines.push("Now:");
-  lines.push(`- Objective: ${readObjective(status)}`);
+  lines.push(`- Focus: ${readFocus(status)}`);
   lines.push(`- Session: ${readSessionLine(status)}`);
-  lines.push(`- Memory: ${status.memory.sessions.length > 0 ? `${status.memory.sessions.length} asset(s)` : "none"}`);
+  lines.push(`- Memory: ${status.memory.assets.length > 0 ? `${status.memory.assets.length} asset(s)` : "none"}`);
+  lines.push(`- Project map: ${status.projectMap ? "ready" : "missing"}`);
   lines.push(`- Executions: ${status.executions.active.length} active / ${status.executions.total} total`);
   lines.push(`- Specs: ${status.specs.active.length} active / ${status.specs.total} total`);
   lines.push(`- Wake signals: ${status.wakeSignals.recent.length}`);
@@ -33,6 +34,19 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
       status.sessions.latest.title ?? "(untitled)",
       `messages=${status.sessions.latest.messageCount}`,
       status.sessions.latest.hasMemory ? "memory=yes" : "memory=no",
+    ].join("  "));
+  }
+
+  if (status.projectMap) {
+    lines.push("");
+    lines.push("Project map:");
+    lines.push([
+      `dirs=${status.projectMap.topLevelDirectories.slice(0, 6).join(", ") || "none"}`,
+      `scripts=${status.projectMap.packageScripts.slice(0, 6).join(", ") || "none"}`,
+      `tests=${status.projectMap.testDirectories.slice(0, 4).join(", ") || "none"}`,
+      status.projectMap.git.available
+        ? `git=${status.projectMap.git.hasChanges ? "changed" : "clean"}`
+        : "git=unavailable",
     ].join("  "));
   }
 
@@ -68,15 +82,17 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
     }
   }
 
-  if (status.memory.sessions.length > 0) {
+  if (status.memory.assets.length > 0) {
     lines.push("");
     lines.push("Memory:");
-    for (const memory of status.memory.sessions.slice(0, 5)) {
+    for (const memory of status.memory.assets.slice(0, 5)) {
       lines.push([
-        memory.sessionId,
+        memory.id,
+        memory.kind,
         `bytes=${memory.size}`,
+        memory.evidenceRefs.length > 0 ? `evidence=${memory.evidenceRefs.join(",")}` : undefined,
         memory.path,
-      ].join("  "));
+      ].filter(Boolean).join("  "));
     }
   }
 
@@ -91,9 +107,9 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
   return `${lines.join("\n")}\n`;
 }
 
-function readObjective(status: RuntimeStatus): string {
-  const objective = status.taskLifecycle?.objective ?? status.sessions.latest?.objective;
-  return objective ? truncateCliValue(objective, 100) : "none";
+function readFocus(status: RuntimeStatus): string {
+  const focus = status.sessions.latest?.focus;
+  return focus ? truncateCliValue(focus, 100) : "none";
 }
 
 function readSessionLine(status: RuntimeStatus): string {

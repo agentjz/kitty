@@ -8,7 +8,7 @@ export const INTP_ARCHITECTURE_BLOCK_TITLE = "Structural compression";
 const INTP_RUNTIME_FACTS_PROFILE: AgentRuntimeFactsProfile = {
   id: INTP_PROFILE_ID,
   name: "INTP runtime facts",
-  summary: "Structured runtime facts for objective-first, evidence-first, compressed architecture work.",
+  summary: "Structured runtime facts for request-first, evidence-first, compressed architecture work.",
   buildBlocks: buildIntpRuntimeFactBlocks,
 };
 
