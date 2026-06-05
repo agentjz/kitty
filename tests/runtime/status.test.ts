@@ -49,13 +49,6 @@ test("runtime status projects the current project runtime facts", async (t) => {
       actorRole: "explorer",
       sessionId: session.id,
     });
-    ledger.team.upsertMember({
-      name: "alpha",
-      role: "explorer",
-      status: "working",
-      executionId: execution.id,
-      sessionId: session.id,
-    });
     ledger.wakeSignals.publish({
       executionId: execution.id,
       reason: "completed",
@@ -77,7 +70,6 @@ test("runtime status projects the current project runtime facts", async (t) => {
   assert.equal(status.executions.active.length, 1);
   assert.equal(status.executions.active[0]?.assignment?.objective, "Inspect runtime visibility");
   assert.equal(status.executions.active[0]?.health?.state, "running");
-  assert.equal(status.team.members[0]?.name, "alpha");
   assert.equal(status.wakeSignals.recent.length, 1);
   assert.equal(status.specs.total, 1);
   assert.equal(status.specs.active[0]?.id, spec.id);
@@ -87,39 +79,6 @@ test("runtime status projects the current project runtime facts", async (t) => {
   assert.match(text, /Objective: Inspect runtime visibility/);
   assert.match(text, /Executions: 1 active \/ 1 total/);
   assert.match(text, /Task lifecycle:/);
-});
-
-test("runtime status presents stale working team members as idle when execution is terminal", async (t) => {
-  const root = await createTempWorkspace("runtime-status-team-reconcile", t);
-  const ledger = new ControlPlaneLedger(root);
-  try {
-    const execution = ledger.executions.create({
-      kind: "team",
-      status: "running",
-      prompt: "Review runtime state.",
-      cwd: root,
-      requestedBy: "lead",
-      actorName: "reviewer",
-      actorRole: "reviewer",
-    });
-    ledger.team.upsertMember({
-      name: "reviewer",
-      role: "reviewer",
-      status: "working",
-      executionId: execution.id,
-    });
-    ledger.executions.close(execution.id, {
-      status: "completed",
-      summary: "done",
-    });
-  } finally {
-    ledger.close();
-  }
-
-  const status = await buildRuntimeStatus(root);
-
-  assert.equal(status.team.members[0]?.name, "reviewer");
-  assert.equal(status.team.members[0]?.status, "idle");
 });
 
 test("runtime status exposes background executions that are running without output", async (t) => {

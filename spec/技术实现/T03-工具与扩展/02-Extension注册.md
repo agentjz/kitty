@@ -19,7 +19,6 @@ Extension 真相源：
 - `network`
 - `background`
 - `subagent`
-- `team`
 - `skills`
 - `spec`
 
@@ -30,7 +29,6 @@ Extension 真相源：
 - `network`: 开
 - `background`: 开
 - `subagent`: 开
-- `team`: 开
 - `skills`: 开
 - `spec`: 关
 

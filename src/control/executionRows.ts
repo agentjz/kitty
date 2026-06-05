@@ -139,7 +139,7 @@ export function normalizeExecutionWaitPolicy(kind: ExecutionKind, value?: LeadWa
     return normalizeLeadWaitPolicy(value);
   }
 
-  return kind === "subagent" || kind === "team"
+  return kind === "subagent"
     ? createLeadWaitPolicy({
         lead: "while_execution_active",
         wake: "required",

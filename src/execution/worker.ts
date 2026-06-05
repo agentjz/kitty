@@ -1,7 +1,6 @@
 import { createSessionStore } from "../cli/commands/sessionHelpers.js";
 import { runHostTurn } from "../host/turn.js";
 import { createHostSession } from "../host/session.js";
-import { TeamStore } from "../team/store.js";
 import type { RuntimeConfig } from "../types.js";
 import { isAgentWorkerExecutionKind, toAgentWorkerIdentityKind } from "./kinds.js";
 import { ExecutionStore } from "./store.js";
@@ -58,16 +57,6 @@ export async function runExecutionWorker(input: {
     error: outcome.status === "failed" ? outcome.errorMessage : undefined,
   });
 
-  if (closed.kind === "team" && closed.actorName && closed.actorRole) {
-    new TeamStore(input.rootDir).upsertMember({
-      name: closed.actorName,
-      role: closed.actorRole,
-      status: "idle",
-      executionId: closed.id,
-      sessionId: closed.sessionId,
-      pid: closed.pid,
-    });
-  }
 }
 
 function readLastAssistantText(session: { messages: Array<{ role: string; content: string | null }> }): string | undefined {

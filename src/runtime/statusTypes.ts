@@ -16,9 +16,6 @@ export interface RuntimeStatus {
     active: RuntimeExecutionSummary[];
     recent: RuntimeExecutionSummary[];
   };
-  team: {
-    members: RuntimeTeamMemberSummary[];
-  };
   wakeSignals: {
     recent: RuntimeWakeSignalSummary[];
   };
@@ -92,15 +89,6 @@ export interface RuntimeExecutionSummary {
 export interface RuntimeExecutionHealth {
   state: "running" | "settled" | "no_output" | "stale" | "deadline_passed";
   message: string;
-}
-
-export interface RuntimeTeamMemberSummary {
-  name: string;
-  role: string;
-  status: string;
-  executionId?: string;
-  sessionId?: string;
-  updatedAt: string;
 }
 
 export interface RuntimeWakeSignalSummary {

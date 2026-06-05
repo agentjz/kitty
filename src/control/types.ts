@@ -47,24 +47,6 @@ export interface WakeSignalRecord {
   createdAt: string;
 }
 
-export interface TeamMemberRecord {
-  name: string;
-  role: string;
-  status: "working" | "idle" | "shutdown";
-  executionId?: string;
-  sessionId?: string;
-  pid?: number;
-  updatedAt: string;
-}
-
-export interface TeamMessageRecord {
-  id: string;
-  from: string;
-  to: string;
-  message: string;
-  createdAt: string;
-}
-
 export type TaskLifecycleStage =
   | "light_response"
   | "normal_work"

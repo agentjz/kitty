@@ -6,7 +6,7 @@ import type { ProviderMessage } from "../provider/contract.js";
 import type { PromptRuntimeState } from "./prompt/types.js";
 
 export interface AgentIdentity {
-  kind: "lead" | "subagent" | "teammate";
+  kind: "lead" | "subagent";
   name: string;
   role?: string;
 }

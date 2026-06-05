@@ -52,22 +52,13 @@ test("exit guard collects and terminates agent worker executions from the same l
     requestedBy: "lead",
     actorName: "explorer",
   });
-  const teammate = store.create({
-    kind: "team",
-    prompt: "implement change",
-    cwd: root,
-    requestedBy: "lead",
-    actorName: "alpha",
-  });
   store.markRunning(subagent.id, { pid: process.pid });
-  store.markRunning(teammate.id, { pid: process.pid });
 
   const running = await collectRunningProcesses(root);
   const result = await terminateProcesses(running, root);
 
-  assert.deepEqual(running.map((item) => item.kind).sort(), ["subagent", "team"]);
+  assert.deepEqual(running.map((item) => item.kind), ["subagent"]);
   assert.deepEqual(result.failedPids, []);
-  assert.deepEqual(result.terminatedPids, [process.pid, process.pid]);
+  assert.deepEqual(result.terminatedPids, [process.pid]);
   assert.equal(store.load(subagent.id)?.status, "aborted");
-  assert.equal(store.load(teammate.id)?.status, "aborted");
 });

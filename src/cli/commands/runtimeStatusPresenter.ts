@@ -12,7 +12,6 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
   lines.push(`- Session: ${readSessionLine(status)}`);
   lines.push(`- Memory: ${status.memory.sessions.length > 0 ? `${status.memory.sessions.length} asset(s)` : "none"}`);
   lines.push(`- Executions: ${status.executions.active.length} active / ${status.executions.total} total`);
-  lines.push(`- Team: ${status.team.members.length} member(s)`);
   lines.push(`- Specs: ${status.specs.active.length} active / ${status.specs.total} total`);
   lines.push(`- Wake signals: ${status.wakeSignals.recent.length}`);
 
@@ -78,19 +77,6 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
         `bytes=${memory.size}`,
         memory.path,
       ].join("  "));
-    }
-  }
-
-  if (status.team.members.length > 0) {
-    lines.push("");
-    lines.push("Team:");
-    for (const member of status.team.members) {
-      lines.push([
-        member.name,
-        member.role,
-        member.status,
-        member.executionId ? `execution=${member.executionId}` : undefined,
-      ].filter(Boolean).join("  "));
     }
   }
 

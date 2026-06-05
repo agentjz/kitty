@@ -35,7 +35,7 @@
 | 💾 Session | 会话记录、checkpoint、todo、恢复现场、结构化可审阅 memory 文件 |
 | 🔌 Provider | OpenAI-compatible provider、请求恢复、连接诊断 |
 | 🛠️ Core tools | `read`、`edit`、`write`、`bash` |
-| 🧩 Extensions | `todo`、`worktree`、`network`、`background`、`subagent`、`team`、`skills`、`spec` |
+| 🧩 Extensions | `todo`、`worktree`、`network`、`background`、`subagent`、`skills`、`spec` |
 | 🧾 Control plane | SQLite 账本记录 task lifecycle、execution、deadline、输出健康、wait policy、pid、状态和 wake 事实；host 负责等待和恢复 lead |
 | 📐 Spec 模式 | `requirements.md`、`design.md`、`tasks.md`、`notes.md` 和隔离 worktree |
 | 💬 产品面 | CLI、交互终端、Telegram 私聊服务 |
@@ -85,7 +85,7 @@ kitty spec
 | `kitty sessions` | 查看最近会话 |
 | `kitty config show` | 查看从 `.kitty/.env` 解析出的当前运行配置 |
 | `kitty config path` | 查看当前项目 `.kitty/.env` 路径 |
-| `kitty status` | 查看当前项目 runtime 现场：session、task lifecycle、memory、execution、deadline、team、wake、spec |
+| `kitty status` | 查看当前项目 runtime 现场：session、task lifecycle、memory、execution、deadline、wake、spec |
 | `kitty memory` | 查看、读取、搜索、删除，或把 session memory 沉淀到 spec notes / skill references |
 | `kitty changes` | 查看记录的文件变更 |
 | `kitty undo [changeId]` | 撤销最近一次或指定变更 |
@@ -113,11 +113,10 @@ Extension 是可启用、可禁用、独立存在的工具集合：
 | `network` | HTTP session、请求、探测、下载、trace、OpenAPI 检查 |
 | `background` | 后台命令执行、运行输出摘要、deadline、last output、检查、终止和生命周期记录 |
 | `subagent` | 聚焦子执行启动、派工边界、deadline、状态检查、worker 结论回传、wait policy、lead 挂起与 wake 恢复 |
-| `team` | teammate 注册、派工边界、deadline、执行、消息、inbox、worker 结论回传、wait policy、lead 挂起与成员状态收束 |
 | `skills` | 项目运行时 skill 包索引、正文加载、资源读取和脚本运行；使用事实进入 observability 和 task lifecycle |
 | `spec` | durable spec 文档、状态、任务、checkpoint、隔离 worktree，并把 spec stage 接入 task lifecycle |
 
-默认 agent 会启用 `todo`、`worktree`、`network`、`background`、`subagent`、`team`、`skills`。`spec` 不随默认 agent 自动启用；需要 spec 工作流时使用 `kitty spec`。
+默认 agent 会启用 `todo`、`worktree`、`network`、`background`、`subagent`、`skills`。`spec` 不随默认 agent 自动启用；需要 spec 工作流时使用 `kitty spec`。
 
 Runtime skills 放在项目 `SKILL.md`、`.skills/**/SKILL.md` 或 `skills/**/SKILL.md`。默认上下文只显示 skill 名称、说明和路径；完整正文必须由模型明确调用 `skill_load` 后进入当前轮。Skill 包内的 `references/`、`scripts/`、`examples/` 和 `assets/` 会作为资源索引出现，需要时用 `skill_read_resource` 读取资源，或用 `skill_run_script` 运行已声明的 `scripts/` 资源。Skill frontmatter 可用 `requires` 声明命令依赖，运行时用 `skill_check` 检查。`.codex/skills/**` 是 Codex 维护本仓库用的开发规范，不属于小猫运行时 skill。
 

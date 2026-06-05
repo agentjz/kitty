@@ -36,9 +36,9 @@ Agent 应该更忠于用户，还是更忠于事实？
 
 小猫智能体的核心固定为 `read / edit / write / bash`。这四个工具负责基础编程闭环。
 
-复杂能力通过 extension 独立存在。当前 extension 是 `todo`、`worktree`、`network`、`background`、`subagent`、`team`、`skills`、`spec`。它们可启用、可禁用，打开后进入同一个 agent 工具面，关闭后从工具面移除。
+复杂能力通过 extension 独立存在。当前 extension 是 `todo`、`worktree`、`network`、`background`、`subagent`、`skills`、`spec`。它们可启用、可禁用，打开后进入同一个 agent 工具面，关闭后从工具面移除。
 
-默认 agent 打开 `todo`、`worktree`、`network`、`background`、`subagent`、`team`、`skills`。`spec` 不默认混进普通 agent；需要计划工作流时，通过 `kitty spec` 进入隔离的 spec 模式。
+默认 agent 打开 `todo`、`worktree`、`network`、`background`、`subagent`、`skills`。`spec` 不默认混进普通 agent；需要计划工作流时，通过 `kitty spec` 进入隔离的 spec 模式。
 
 扩展是工具集合。核心保持清楚，扩展保持独立。
 
@@ -80,15 +80,15 @@ Spec 不是普通文档目录。它负责把模糊目标变成可审阅的计划
 
 长任务应该靠模型记住，还是靠本地现场接住？
 
-模型可以理解任务，但不能可靠地替代运行账本。长任务、后台进程、子执行、team 协作和唤醒事实需要一个本地事实层。
+模型可以理解任务，但不能可靠地替代运行账本。长任务、后台进程、子执行和唤醒事实需要一个本地事实层。
 
-小猫智能体用 control plane 保存这些死事实：background、subagent、team execution、派工边界、team 成员、team 消息、pid、状态、退出码、输出摘要、wait policy 和 wake signal。
+小猫智能体用 control plane 保存这些死事实：background、subagent execution、派工边界、pid、状态、退出码、输出摘要、wait policy 和 wake signal。
 
-`kitty status` 让用户看到运行现场：session、memory、execution、team、wake、spec。它只呈现事实，不替模型做判断。
+`kitty status` 让用户看到运行现场：session、memory、execution、wake、spec。它只呈现事实，不替模型做判断。
 
 Background 是长任务现场。它记录运行输出摘要，能检查、终止、reconcile，也能在完成后把事实暴露给 lead。
 
-Subagent 和 team 是协作现场。lead 派出有边界的任务后让出当前轮；worker 完成后把 summary/output 写回 execution；host 用内部 wake facts 恢复 lead。wake 是内部事实，不是用户新要求。
+Subagent 是隔离上下文协作现场。lead 派出有边界的任务后让出当前轮；worker 完成后把 summary/output 写回 execution；host 用内部 wake facts 恢复 lead。wake 是内部事实，不是用户新要求。
 
 ## ⚙️ 模型与机器
 
@@ -104,7 +104,7 @@ Task Lifecycle 保存当前任务阶段和运行事实：目标、阶段、原�
 
 Agent turn 生命周期负责把当前输入、工具批次、provider 恢复、checkpoint、session diff 和记忆更新串成可恢复的现场。生命周期只保存和暴露事实，不决定路线。
 
-Lead wait 必须有边界。阻塞型 subagent/team execution 会让 lead 让出当前轮；execution 完成或等待 deadline 到达后，host 用 internal wake facts 恢复 lead。wake 是运行事实，不是用户新要求。
+Lead wait 必须有边界。阻塞型 subagent execution 会让 lead 让出当前轮；execution 完成或等待 deadline 到达后，host 用 internal wake facts 恢复 lead。wake 是运行事实，不是用户新要求。
 
 ## 🧱 删除与重建
 

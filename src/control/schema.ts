@@ -45,26 +45,6 @@ export function initializeControlPlaneSchema(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_wake_signals_execution ON wake_signals(execution_id);
 
-    CREATE TABLE IF NOT EXISTS team_members (
-      name TEXT PRIMARY KEY,
-      role TEXT NOT NULL,
-      status TEXT NOT NULL,
-      execution_id TEXT,
-      session_id TEXT,
-      pid INTEGER,
-      updated_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS team_messages (
-      id TEXT PRIMARY KEY,
-      sender TEXT NOT NULL,
-      recipient TEXT NOT NULL,
-      message TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_team_messages_recipient ON team_messages(recipient);
-
     CREATE TABLE IF NOT EXISTS task_lifecycle (
       id TEXT PRIMARY KEY,
       session_id TEXT NOT NULL,

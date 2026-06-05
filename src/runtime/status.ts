@@ -1,4 +1,4 @@
-import { ControlPlaneLedger, type ExecutionRecord, type TeamMemberRecord, type WakeSignalRecord } from "../control/ledger.js";
+import { ControlPlaneLedger, type ExecutionRecord, type WakeSignalRecord } from "../control/ledger.js";
 import type { TaskLifecycleRecord } from "../control/ledger.js";
 import { getProjectStatePaths } from "../project/statePaths.js";
 import { listRuntimeMemoryAssets } from "./memory/index.js";
@@ -11,7 +11,6 @@ import type {
   RuntimeSessionSummary,
   RuntimeStatus,
   RuntimeTaskLifecycleSummary,
-  RuntimeTeamMemberSummary,
   RuntimeWakeSignalSummary,
 } from "./statusTypes.js";
 
@@ -49,7 +48,6 @@ export async function buildRuntimeStatus(rootDir: string): Promise<RuntimeStatus
     },
     taskLifecycle,
     executions: control.executions,
-    team: control.team,
     wakeSignals: control.wakeSignals,
     specs,
   };
@@ -69,13 +67,11 @@ function summarizeSession(session: SessionRecord): RuntimeSessionSummary {
 
 function readControlPlaneStatus(rootDir: string): {
   executions: RuntimeStatus["executions"];
-  team: RuntimeStatus["team"];
   wakeSignals: RuntimeStatus["wakeSignals"];
 } {
   const ledger = new ControlPlaneLedger(rootDir);
   try {
     const executions = ledger.executions.list();
-    const reconciledMembers = reconcileTeamMembers(ledger.team.listMembers(), executions);
     const recent = executions
       .map(summarizeExecution)
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
@@ -85,9 +81,6 @@ function readControlPlaneStatus(rootDir: string): {
         total: executions.length,
         active: executions.filter(isActiveExecution).map(summarizeExecution),
         recent,
-      },
-      team: {
-        members: reconciledMembers.map(summarizeTeamMember),
       },
       wakeSignals: {
         recent: ledger.wakeSignals.list().map(summarizeWakeSignal).slice(0, DEFAULT_RECENT_LIMIT),
@@ -123,27 +116,6 @@ function summarizeTaskLifecycle(lifecycle: TaskLifecycleRecord): RuntimeTaskLife
     updatedAt: lifecycle.updatedAt,
     completedAt: lifecycle.completedAt,
   };
-}
-
-function reconcileTeamMembers(
-  members: TeamMemberRecord[],
-  executions: ExecutionRecord[],
-): TeamMemberRecord[] {
-  const executionById = new Map(executions.map((execution) => [execution.id, execution]));
-  return members.map((member) => {
-    if (!member.executionId || member.status !== "working") {
-      return member;
-    }
-    const execution = executionById.get(member.executionId);
-    if (!execution || isActiveExecution(execution)) {
-      return member;
-    }
-    return {
-      ...member,
-      status: "idle",
-      updatedAt: execution.updatedAt,
-    };
-  });
 }
 
 async function readSpecStatus(rootDir: string): Promise<RuntimeStatus["specs"]> {
@@ -186,17 +158,6 @@ function summarizeExecution(execution: ExecutionRecord): RuntimeExecutionSummary
     changedPaths: execution.changedPaths,
     error: execution.error,
     updatedAt: execution.updatedAt,
-  };
-}
-
-function summarizeTeamMember(member: TeamMemberRecord): RuntimeTeamMemberSummary {
-  return {
-    name: member.name,
-    role: member.role,
-    status: member.status,
-    executionId: member.executionId,
-    sessionId: member.sessionId,
-    updatedAt: member.updatedAt,
   };
 }
 

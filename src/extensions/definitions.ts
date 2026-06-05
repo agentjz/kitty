@@ -5,7 +5,6 @@ import { createNetworkTools } from "./tools/network/index.js";
 import { createSpecTools } from "./tools/spec/index.js";
 import { createSkillTools } from "./tools/skills/index.js";
 import { createSubagentTools } from "./tools/subagent/index.js";
-import { createTeamTools } from "./tools/team/index.js";
 import { createTodoTools } from "./tools/todo/index.js";
 import { createWorktreeTools } from "./tools/worktree/index.js";
 
@@ -95,21 +94,6 @@ export const EXTENSION_DEFINITIONS = [
       bestFor: [
         "delegating bounded investigation or implementation work",
         "checking subagent execution state",
-      ],
-      cost: "medium",
-    },
-  },
-  {
-    id: "team",
-    envKey: "KITTY_EXTENSION_TEAM",
-    defaultEnabled: true,
-    summary: "Teammate execution, registry, inbox, and message tools.",
-    createTools: createTeamTools,
-    capability: {
-      description: "Teammate execution registry and explicit message passing.",
-      bestFor: [
-        "spawning named teammate executions",
-        "sending and reading teammate inbox messages",
       ],
       cost: "medium",
     },
