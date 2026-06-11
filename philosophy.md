@@ -76,7 +76,9 @@ Spec 不是普通文档目录。它负责把模糊目标变成可审阅的计划
 - `.kitty/memory/project/*.md` 保存项目经验。
 - `.kitty/memory/user/*.md` 保存用户画像。
 - `.kitty/memory/evidence/*.md` 保存可审阅证据资产。
-- memory asset 暴露 kind、id、路径和 evidence references，可以被用户读取、搜索、删除，也可以沉淀到 spec `notes.md` 或 runtime skill `references/`。
+- memory asset 暴露 kind、id、title、scope、tags、路径和 evidence references，可以被用户创建、读取、搜索、删除，也可以沉淀到 spec `notes.md` 或 runtime skill `references/`。
+
+Memory 搜索是候选召回，不是语义裁判。机器按文本 token、路径、标签和证据引用暴露命中行；是否采用这些记忆，由模型结合当前请求判断。
 
 固定区块包括当前工作焦点、用户约束、决策、未结事项、验证事实和可复用经验。机器维护格式、保存文本和文件位置。模型判断哪些经验值得复用，哪些历史只适合取证。
 

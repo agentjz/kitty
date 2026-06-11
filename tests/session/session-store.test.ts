@@ -55,8 +55,10 @@ test("session store projects model-written session memory into a readable asset"
 
   const asset = await fs.readFile(path.join(paths.sessionMemoryDir, `${session.id}.md`), "utf8");
   assert.match(asset, /^# Session Memory/);
-  assert.match(asset, /Session:/);
-  assert.match(asset, /Kind: model-written same-session continuity memory/);
+  assert.match(asset, /Kind: session/);
+  assert.match(asset, new RegExp(`Evidence: session:${session.id}`));
+  assert.match(asset, new RegExp(`Scope: ${session.id}`));
+  assert.match(asset, /Tags: same-session, continuity/);
   assert.match(asset, /## Current Focus/);
   assert.match(asset, /## User Constraints/);
   assert.match(asset, /txt 纯文本回答/);

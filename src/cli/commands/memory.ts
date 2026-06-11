@@ -3,11 +3,13 @@ import type { Command } from "commander";
 import { buildRuntimeStatus } from "../../runtime/status.js";
 import {
   appendRuntimeMemoryAssetToSkillReference,
+  createRuntimeMemoryAsset,
   deleteRuntimeMemoryAsset,
   readRuntimeMemoryAsset,
   appendRuntimeMemoryAssetToSpecNotes,
   searchRuntimeMemoryAssets,
 } from "../../runtime/memory/index.js";
+import type { WritableRuntimeMemoryAssetKind } from "../../runtime/memory/index.js";
 import type { CliOverrides, RuntimeConfig } from "../../types.js";
 import { ui } from "../../utils/console.js";
 import { writeStdoutLine } from "../../utils/stdio.js";
@@ -31,18 +33,35 @@ export function registerMemoryCommand(
     .option("--delete", "Delete the selected runtime memory asset.")
     .option("--append-to-spec <specId>", "Append the selected memory asset to a spec notes.md document.")
     .option("--append-to-skill <skillName>", "Append the selected memory asset to a runtime skill references/ file.")
+    .option("--create <kind>", "Create a project, user, or evidence memory asset.")
+    .option("--title <title>", "Title for --create.")
+    .option("--content <content>", "Content for --create.")
+    .option("--evidence <refs>", "Comma-separated evidence refs for --create.")
+    .option("--scope <scope>", "Scope metadata for --create.")
+    .option("--tags <tags>", "Comma-separated tags for --create.")
     .option("--file <fileName>", "Target file name for --append-to-skill.")
     .option("-q, --query <query>", "Search runtime memory assets.")
     .option("--json", "Print structured JSON.")
     .action(async (memoryId: string | undefined, commandOptions: {
       appendToSkill?: string;
       appendToSpec?: string;
+      content?: string;
+      create?: string;
       delete?: boolean;
+      evidence?: string;
       file?: string;
       json?: boolean;
       query?: string;
+      scope?: string;
+      tags?: string;
+      title?: string;
     }) => {
       const runtime = await options.resolveRuntime(options.getCliOverrides());
+      if (commandOptions.create) {
+        await handleMemoryCreate(runtime.cwd, commandOptions);
+        return;
+      }
+
       if (memoryId) {
         await handleSelectedMemory(runtime.cwd, memoryId, commandOptions);
         return;
@@ -55,6 +74,46 @@ export function registerMemoryCommand(
 
       await handleMemoryList(runtime.cwd, commandOptions.json === true);
     });
+}
+
+async function handleMemoryCreate(
+  cwd: string,
+  options: {
+    content?: string;
+    create?: string;
+    evidence?: string;
+    file?: string;
+    json?: boolean;
+    scope?: string;
+    tags?: string;
+    title?: string;
+  },
+): Promise<void> {
+  const kind = parseWritableMemoryKind(options.create);
+  if (!options.title?.trim()) {
+    throw new Error("--title is required when creating a memory asset.");
+  }
+  if (!options.content?.trim()) {
+    throw new Error("--content is required when creating a memory asset.");
+  }
+
+  const created = await createRuntimeMemoryAsset({
+    rootDir: cwd,
+    kind,
+    title: options.title,
+    content: options.content,
+    evidenceRefs: parseCsvOption(options.evidence),
+    scope: options.scope,
+    tags: parseCsvOption(options.tags),
+    fileName: options.file,
+  });
+
+  if (options.json) {
+    writeStdoutLine(JSON.stringify({ created }, null, 2));
+    return;
+  }
+  ui.success(`Created memory asset ${created.id}`);
+  writeStdoutLine(created.path);
 }
 
 async function handleSelectedMemory(
@@ -127,11 +186,25 @@ async function handleMemorySearch(cwd: string, query: string, json: boolean): Pr
     return;
   }
   for (const result of results) {
-    writeStdoutLine(`${result.id}  ${result.path}`);
+    writeStdoutLine(`${result.id}  score=${result.score}  ${result.path}`);
     for (const match of result.matches) {
       writeStdoutLine(`  ${match}`);
     }
   }
+}
+
+function parseWritableMemoryKind(value: string | undefined): WritableRuntimeMemoryAssetKind {
+  if (value === "project" || value === "user" || value === "evidence") {
+    return value;
+  }
+  throw new Error("--create must be one of: project, user, evidence.");
+}
+
+function parseCsvOption(value: string | undefined): string[] {
+  return (value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 async function handleMemoryList(cwd: string, json: boolean): Promise<void> {

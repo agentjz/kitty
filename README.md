@@ -88,7 +88,7 @@ kitty spec
 | `kitty config show` | 查看从 `.kitty/.env` 解析出的当前运行配置 |
 | `kitty config path` | 查看当前项目 `.kitty/.env` 路径 |
 | `kitty status` | 查看当前项目 runtime 现场：session、task lifecycle、memory、project map、execution、deadline、wake、spec |
-| `kitty memory` | 查看、读取、搜索、删除 runtime memory assets，或把 memory 沉淀到 spec notes / skill references |
+| `kitty memory` | 创建、查看、读取、搜索、删除 runtime memory assets，或把 memory 沉淀到 spec notes / skill references |
 | `kitty changes` | 查看记录的文件变更 |
 | `kitty undo [changeId]` | 撤销最近一次或指定变更 |
 | `kitty diff [path]` | 查看当前 git diff |
@@ -125,7 +125,7 @@ Runtime skills 放在项目 `SKILL.md`、`.skills/**/SKILL.md` 或 `skills/**/SK
 
 Session memory 由模型在 turn 收口时按固定 Markdown 区块写出：`Current Focus`、`User Constraints`、`Decisions`、`Open Threads`、`Verification Facts`、`Reusable Lessons`。机器只维护格式和保存边界，不替模型判断事实重要性。
 
-Memory assets 分为 `session`、`project`、`user` 和 `evidence`。每条 asset 暴露 kind、id、路径和 evidence references。Session memory 由模型写，project/user/evidence assets 是可审阅事实资产。`kitty memory <memoryId> --append-to-spec <specId>` 可以追加到 spec `notes.md`，`kitty memory <memoryId> --append-to-skill <skillName>` 可以写入该 skill 的 `references/`。这两条路径只沉淀已保存事实，不替模型判断哪些经验值得复用。
+Memory assets 分为 `session`、`project`、`user` 和 `evidence`。每条 asset 暴露 kind、id、title、scope、tags、路径和 evidence references。Session memory 由模型写，project/user/evidence assets 通过 `kitty memory --create <kind> --title <title> --content <content>` 创建成可审阅 Markdown 资产。`kitty memory -q <query>` 做多词候选召回，只返回命中的资产和证据行，不替模型判断语义重要性。`kitty memory <memoryId> --append-to-spec <specId>` 可以追加到 spec `notes.md`，`kitty memory <memoryId> --append-to-skill <skillName>` 可以写入该 skill 的 `references/`。这两条路径只沉淀已保存事实，不替模型判断哪些经验值得复用。
 
 查看配置：
 

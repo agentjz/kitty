@@ -1,126 +1,126 @@
-# Codex 骨架重构计划
+# Memory 主干重构计划
 
 ## 目标
 
-把 Kitty 的当前轮运行骨架收束成 Codex 式 harness：
+把 Kitty 的记忆系统做成可继续演进的本地 agent memory 主干：
 
-- Session 保存对话状态。
-- Turn 表示一次模型执行。
-- 当前用户输入只是当前输入，不由机器升级成目标。
-- Working memory 承接模型沉淀的当前工作焦点。
-- Control plane 只记录运行事实、工具执行、等待、恢复和完成。
-- UI 展示回答、工具、状态、结果和 reasoning 调试流。
+- 当前 session 不失忆。
+- 长任务有任务现场。
+- 历史证据可追溯。
+- 长期资产可审阅。
+- 召回只暴露候选事实，最终取舍交给模型。
 
-本轮不做腾讯长期记忆迁移。长期记忆只作为后续方向，不进入当前代码、测试和文档主干。
+## 判断
 
-## 已修复问题
+成熟记忆不是把历史整段塞回上下文，也不是把所有内容扔进一个向量库。
 
-普通用户输入不再由机器升级成目标事实。
+Kitty 当前已有正确骨架：
 
-当前用户输入只属于当前 turn。模型如果认为后续需要保留工作焦点，会在 session memory 的 `Current Focus` 区块写出；机器只读取这个固定区块并保存为 `taskState.focus`。
+- session memory 由模型在 turn 收口时写出。
+- working memory 承接当前工作焦点、todo、checkpoint 和近期工具批次。
+- `.kitty/memory/**` 暴露可审阅文件资产。
+- `kitty memory` 能 list/read/search/delete，并把资产沉淀到 spec notes 或 skill references。
 
-简单问候、疑问符、确认句不会自动进入 task lifecycle，也不会自动生成 working memory focus。
+本轮修复点：
+
+- project/user/evidence memory 没有统一元数据契约。
+- memory asset 的证据引用只靠散落的 `Evidence:` 行。
+- 搜索已从整句包含改为多词候选召回，并返回命中分数。
+- 没有标准写入入口，长期资产容易变成随手写文件。
+- 测试还没覆盖“证据引用、分词召回、长期资产写入、删除边界”这些真实行为。
 
 ## 设计
 
-### Session
+### 证据
 
-Session 只保存：
+证据是底座。
 
-- messages
-- session memory
-- todo
-- task state
-- checkpoint
-- session diff
+每条 memory asset 都可以带：
 
-`TaskState` 使用 `focus` 表示模型沉淀出的当前工作焦点。没有模型沉淀时，focus 为空。
+- `Kind`
+- `Title`
+- `Updated`
+- `Evidence`
+- `Scope`
+- `Tags`
 
-### Turn
+机器只解析这些死事实，不替模型判断含义。
 
-每一轮用户输入是 `Current turn input`。
+### 会话记忆
 
-机器只保存这轮输入，不判断它是不是目标。内部 wake 仍不是用户输入。
+session memory 保持当前设计：
 
-### Working Memory
+- 模型写内容。
+- 机器维护固定区块和长度边界。
+- session record 是运行时入口。
+- `.kitty/memory/sessions/*.md` 是同一次保存生成的可审阅资产。
 
-Working memory 读取 `taskState.focus`、todo、checkpoint、recent tool batch。
+### 长期资产
 
-它不从用户原话生成目标。
+project/user/evidence memory 统一通过 runtime memory 写入入口创建。
 
-### Control Plane
+资产文件使用稳定 Markdown：
 
-Task lifecycle 记录：
+```md
+# <title>
 
-- stage
-- reason
-- active executions
-- active spec
-- active todos
-- verification facts
-- completion facts
+Kind: project
+Updated: <iso time>
+Evidence: session:<id>
+Scope: <scope>
+Tags: tag-a, tag-b
 
-它不记录普通 turn 的目标。
+<content>
+```
 
-Execution assignment 可以继续有 objective，因为 background/subagent 是模型显式派工，那里 objective 是派工契约，不是机器猜测。
+没有证据引用也可以写，但 CLI/status/search 必须显式暴露 `evidenceRefs: []`，不伪造来源。
 
-### Prompt
+### 召回
 
-Prompt 中：
+`kitty memory --query` 是机器召回候选，不是语义判断。
 
-- 当前输入来自 provider message frame。
-- session memory 是模型写出的连续性。
-- working memory 是模型沉淀的工作焦点。
-- task lifecycle 是运行状态。
+召回规则：
 
-不再出现机器生成的目标事实。
+- 标准化文本。
+- 查询切成 token。
+- 每个 token 都必须命中同一个 asset。
+- 返回命中的证据行和命中分数。
+- 不把搜索结果自动注入模型上下文。
 
-### Status / UI
+### 沉淀
 
-`kitty status` 展示：
+已有沉淀路径保留：
 
-- current focus
-- latest session
-- memory assets
-- project map
-- task lifecycle stage
-- executions
-- wake
-- specs
+- memory asset -> spec notes
+- memory asset -> skill references
 
-没有 focus 时显示 `none`。
+新增写入入口后，后续可以让模型把 session memory 中的稳定经验沉淀为 project/user/evidence asset。
 
-raw reasoning 默认可见，便于观察模型路线；需要安静输出时可通过 `.kitty/.env` 关闭。
+本轮不做：
+
+- 图数据库。
+- 向量数据库。
+- 大规模长期画像自动生成。
+- 腾讯整套 memory pipeline 迁移。
+
+这些可以作为未来方向，但不进入当前实现主干。
 
 ## 执行清单
 
-- [x] 删除普通 turn 自动写入 task lifecycle 目标。
-- [x] 让 `TaskState` 使用 `focus` 承载模型写出的当前工作焦点。
-- [x] checkpoint 从 focus 派生，不从用户输入派生。
-- [x] working memory prompt 使用 `Focus`，不使用 `Objective/User input`。
-- [x] runtime status 使用 focus，不显示机器猜测目标。
-- [x] task lifecycle prompt 不输出普通 turn 目标。
-- [x] 保留 execution assignment objective。
-- [x] 保持 `KITTY_SHOW_REASONING` 默认开启。
+- [x] 增加 memory asset 元数据解析。
+- [x] 增加统一的 runtime memory asset 写入入口。
+- [x] session memory asset 使用统一元数据头。
+- [x] search 改成 token 候选召回，并返回 score。
+- [x] CLI 支持创建 project/user/evidence memory asset。
+- [x] status/list 展示统一证据引用。
+- [x] 测试覆盖 session asset 元数据、长期资产写入、搜索召回、删除边界、sink 路径。
 - [x] 同步 README、philosophy、spec。
-- [x] 更新测试，覆盖简单输入不会成为目标或 focus。
-- [x] 运行 typecheck 和完整验证。
-- [x] 扫描残留，确认不存在自动目标主干。
+- [x] 运行完整验证。
 
 ## 完成标准
 
-- 用户说“你好”“？？？”只会作为当前 turn 输入，不会进入 task lifecycle 目标。
-- 没有模型沉淀时，status focus 为 `none`。
-- background/subagent 的 objective 仍作为模型显式派工契约存在。
-- 文档、代码、测试讲同一个当前事实。
+- `kitty memory --create project ...` 能生成可审阅 asset。
+- 每条 asset 的 kind、scope、tags、evidenceRefs 由同一套解析逻辑得到。
+- 搜索能按多个词召回同一 asset 的候选事实。
+- session memory、project memory、user memory、evidence memory 在代码、测试、文档中讲同一个事实。
 - `npm.cmd run verify` 通过。
-
-## 验证结果
-
-已运行：
-
-```bash
-npm.cmd run verify
-```
-
-结果：126/126 通过。

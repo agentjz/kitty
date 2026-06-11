@@ -55,10 +55,13 @@ export interface RuntimeSessionSummary {
 export interface RuntimeMemoryAssetSummary {
   id: string;
   kind: string;
+  title?: string;
   path: string;
   updatedAt?: string;
   size: number;
   evidenceRefs: string[];
+  scope?: string;
+  tags: string[];
 }
 
 export interface RuntimeTaskLifecycleSummary {

@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
+import { renderRuntimeMemoryAssetDocument } from "../runtime/memory/metadata.js";
 import type { SessionRecord } from "../types.js";
 
 export function getSessionMemoryAssetPath(memorySessionsDir: string, sessionId: string): string {
@@ -29,17 +30,15 @@ function renderSessionMemoryAsset(session: SessionRecord): string {
     return "";
   }
 
-  return [
-    "# Session Memory",
-    "",
-    `Session: ${session.id}`,
-    `Updated: ${memory.updatedAt}`,
-    "Kind: model-written same-session continuity memory",
-    `Evidence: session:${session.id}`,
-    "",
-    memory.summary.trim(),
-    "",
-  ].join("\n");
+  return renderRuntimeMemoryAssetDocument({
+    kind: "session",
+    title: "Session Memory",
+    timestamp: memory.updatedAt,
+    evidenceRefs: [`session:${session.id}`],
+    scope: session.id,
+    tags: ["same-session", "continuity"],
+    content: memory.summary,
+  });
 }
 
 function sanitizeSessionId(value: string): string {

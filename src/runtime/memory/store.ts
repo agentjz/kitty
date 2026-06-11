@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { getProjectStatePaths } from "../../project/statePaths.js";
 import { SessionStore } from "../../session/store.js";
+import { parseRuntimeMemoryAssetMetadata } from "./metadata.js";
 import type { RuntimeMemoryAsset, RuntimeMemoryAssetContent, RuntimeMemoryAssetKind } from "./types.js";
 
 export async function listRuntimeMemoryAssets(rootDir: string): Promise<RuntimeMemoryAsset[]> {
@@ -71,31 +72,20 @@ async function listMemoryAssetsInDirectory(
       const body = await fs.readFile(absolutePath, "utf8").catch(() => "");
       const basename = entry.name.slice(0, -".md".length);
       const id = kind === "session" ? basename : `${kind}/${basename}`;
+      const metadata = parseRuntimeMemoryAssetMetadata(body, { kind, basename });
       return {
         id,
-        kind,
+        kind: metadata.kind ?? kind,
+        title: metadata.title,
         path: path.relative(rootDir, absolutePath),
         absolutePath,
-        updatedAt: stat.mtime.toISOString(),
+        updatedAt: metadata.updatedAt ?? stat.mtime.toISOString(),
         size: stat.size,
-        evidenceRefs: readEvidenceRefs(body, kind, basename),
+        evidenceRefs: metadata.evidenceRefs,
+        scope: metadata.scope,
+        tags: metadata.tags,
       };
     }));
 
   return assets;
-}
-
-function readEvidenceRefs(body: string, kind: RuntimeMemoryAssetKind, basename: string): string[] {
-  const refs = body
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.toLowerCase().startsWith("evidence:"))
-    .flatMap((line) => line.slice("Evidence:".length).split(","))
-    .map((value) => value.trim())
-    .filter(Boolean);
-
-  if (refs.length > 0) {
-    return [...new Set(refs)];
-  }
-  return kind === "session" ? [`session:${basename}`] : [];
 }

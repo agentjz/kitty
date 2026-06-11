@@ -6,6 +6,7 @@ import test from "node:test";
 import {
   appendRuntimeMemoryAssetToSkillReference,
   appendRuntimeMemoryAssetToSpecNotes,
+  createRuntimeMemoryAsset,
   deleteRuntimeMemoryAsset,
   listRuntimeMemoryAssets,
   readRuntimeMemoryAsset,
@@ -48,24 +49,75 @@ test("runtime memory assets can be listed, read, and searched", async (t) => {
   const assets = await listRuntimeMemoryAssets(root);
   assert.equal(assets.length, 1);
   assert.equal(assets[0]?.id, session.id);
+  assert.equal(assets[0]?.title, "Session Memory");
+  assert.equal(assets[0]?.scope, session.id);
+  assert.deepEqual(assets[0]?.tags, ["same-session", "continuity"]);
 
   const read = await readRuntimeMemoryAsset(root, session.id);
   assert.match(read.content, /Runtime memory should be searchable/);
   assert.equal(read.kind, "session");
   assert.deepEqual(read.evidenceRefs, [`session:${session.id}`]);
+  assert.match(read.content, /Kind: session/);
+  assert.match(read.content, /Scope:/);
 
   const search = await searchRuntimeMemoryAssets(root, "reusable");
   assert.equal(search.length, 1);
   assert.equal(search[0]?.id, session.id);
+  assert.ok((search[0]?.score ?? 0) >= 1);
   assert.match(search[0]?.matches.join("\n") ?? "", /reusable/);
 
   const splitPhraseSearch = await searchRuntimeMemoryAssets(root, "Runtime reusable");
-  assert.equal(splitPhraseSearch.length, 0);
+  assert.equal(splitPhraseSearch.length, 1);
+  assert.equal(splitPhraseSearch[0]?.id, session.id);
 
   const deleted = await deleteRuntimeMemoryAsset(root, session.id);
   assert.equal(deleted.id, session.id);
   assert.equal((await listRuntimeMemoryAssets(root)).length, 0);
   assert.equal((await sessionStore.load(session.id)).sessionMemory, undefined);
+});
+
+test("runtime memory assets can be created with metadata and evidence refs", async (t) => {
+  const root = await createTempWorkspace("runtime-memory-create", t);
+
+  const created = await createRuntimeMemoryAsset({
+    rootDir: root,
+    kind: "project",
+    title: "Memory architecture",
+    content: "Keep lower evidence intact and put high-level summaries in reviewable assets.",
+    evidenceRefs: ["session:abc", "execution:def"],
+    scope: "kitty",
+    tags: ["memory", "architecture"],
+    timestamp: "2026-06-11T00:00:00.000Z",
+  });
+
+  assert.equal(created.id, "project/Memory-architecture");
+  assert.equal(created.kind, "project");
+  assert.equal(created.title, "Memory architecture");
+  assert.equal(created.updatedAt, "2026-06-11T00:00:00.000Z");
+  assert.equal(created.scope, "kitty");
+  assert.deepEqual(created.tags, ["memory", "architecture"]);
+  assert.deepEqual(created.evidenceRefs, ["session:abc", "execution:def"]);
+
+  const read = await readRuntimeMemoryAsset(root, created.id);
+  assert.match(read.content, /Kind: project/);
+  assert.match(read.content, /Evidence: session:abc, execution:def/);
+  assert.match(read.content, /Scope: kitty/);
+  assert.match(read.content, /Tags: memory, architecture/);
+
+  const byTags = await searchRuntimeMemoryAssets(root, "architecture session:abc");
+  assert.equal(byTags.length, 1);
+  assert.equal(byTags[0]?.id, created.id);
+  assert.ok((byTags[0]?.score ?? 0) >= 2);
+
+  await assert.rejects(
+    () => createRuntimeMemoryAsset({
+      rootDir: root,
+      kind: "project",
+      title: "Memory architecture",
+      content: "This should not overwrite the existing asset.",
+    }),
+    /EEXIST/,
+  );
 });
 
 test("runtime memory assets expose asset kinds and evidence references", async (t) => {
