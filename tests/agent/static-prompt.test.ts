@@ -35,6 +35,8 @@ test("agent static prompt names the lead loop without hardcoding the tool surfac
   assert.match(text, /exposed tool definitions as the active capability boundary/);
   assert.match(text, /extra blocks define the active workflow/);
   assert.match(text, /Always reply in Simplified Chinese/);
+  assert.match(text, /Make every sentence carry decision, execution, evidence, or understanding/);
+  assert.match(text, /Use safe summaries or focused excerpts for large raw content/);
   assert.doesNotMatch(text, /read, edit, write, and bash/);
   assert.doesNotMatch(text, /active tool surface is read, edit, write, and bash/);
 });
