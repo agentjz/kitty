@@ -88,6 +88,7 @@ function summarizeSession(session: SessionRecord): RuntimeSessionSummary {
       compressed: session.contextBudget.compressed,
       compressionMode: session.contextBudget.compressionMode,
       compressionReason: session.contextBudget.compressionReason,
+      sources: session.contextBudget.sources,
       promptHotspots: session.contextBudget.promptHotspots,
     } : undefined,
   };

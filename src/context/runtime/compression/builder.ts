@@ -1,11 +1,13 @@
 import { expandStartToToolBoundary, shouldIncludeStoredAssistantReasoning } from "../../../session/messages.js";
 import { renderPromptLayers } from "../../../agent/prompt/format.js";
 import { measurePromptLayers } from "../../../agent/prompt/metrics.js";
-import { findLatestUserInputIndex, isInternalMessage, sliceCurrentUserInputFrame } from "../../../session/turnFrame.js";
+import { isInternalMessage } from "../../../session/turnFrame.js";
+import { buildVisibleConversationWindow } from "../conversationWindow.js";
 import { buildContextBudgetReport } from "../budget.js";
 import type { ProviderMessage } from "../../../provider/contract.js";
 import type { PromptLayerMetrics, PromptLayers } from "../../../agent/prompt/types.js";
 import type { RuntimeConfig, StoredMessage } from "../../../types.js";
+import type { ContextBudgetReport } from "../../../types/contextBudget.js";
 import type { ContextRuntimeRequest } from "../types.js";
 
 const MIN_TAIL_MESSAGES = 8;
@@ -19,10 +21,12 @@ export function buildCompressedContextRequest(
   config: Pick<RuntimeConfig, "contextWindowMessages" | "model" | "maxContextChars" | "contextSummaryChars">,
 ): ContextRuntimeRequest {
   const safeMaxChars = Math.max(8_000, config.maxContextChars);
-  const frameMessages = sliceCurrentUserInputFrame(messages);
-  const fullMessages = composeChatMessages(systemPrompt, frameMessages, config.model);
-  const initialEstimatedChars = estimateChatMessagesChars(composeChatMessages(systemPrompt, frameMessages, config.model));
+  const conversation = buildVisibleConversationWindow(messages);
+  const conversationMessages = conversation.messages;
+  const fullMessages = composeChatMessages(systemPrompt, conversationMessages, config.model);
+  const initialEstimatedChars = estimateChatMessagesChars(fullMessages);
   const initialPromptMetrics = measureSystemPrompt(systemPrompt);
+  const initialSources = buildBudgetSources(systemPrompt, conversationMessages);
 
   if (initialEstimatedChars <= safeMaxChars) {
     return {
@@ -33,17 +37,18 @@ export function buildCompressedContextRequest(
         limitChars: safeMaxChars,
         estimatedChars: initialEstimatedChars,
         compressed: false,
+        sources: initialSources,
         promptHotspots: initialPromptMetrics?.hotspots,
       }),
       promptMetrics: initialPromptMetrics,
     };
   }
 
-  let tailCount = Math.max(1, Math.min(frameMessages.length, config.contextWindowMessages));
+  let tailCount = Math.max(1, Math.min(conversationMessages.length, config.contextWindowMessages));
 
   while (true) {
-    const tailMessages = sliceTailMessages(frameMessages, tailCount);
-    const compressedFrameHead = frameMessages.slice(0, Math.max(0, frameMessages.length - tailMessages.length));
+    const tailMessages = sliceTailMessages(conversationMessages, tailCount);
+    const compressedFrameHead = conversationMessages.slice(0, Math.max(0, conversationMessages.length - tailMessages.length));
     const summary =
       compressedFrameHead.length > 0
         ? summarizeConversation(compressedFrameHead, config.contextSummaryChars)
@@ -65,6 +70,7 @@ export function buildCompressedContextRequest(
           estimatedChars,
           compressed: Boolean(summary),
           summary,
+          sources: buildBudgetSources(systemPrompt, workingTail, summary),
           promptHotspots: promptMetrics?.hotspots,
           compressionMode: summary ? "normal" : "none",
         }),
@@ -88,6 +94,7 @@ export function buildCompressedContextRequest(
           estimatedChars,
           compressed: true,
           summary,
+          sources: buildBudgetSources(systemPrompt, workingTail, summary),
           promptHotspots: promptMetrics?.hotspots,
           compressionMode: "aggressive",
         }),
@@ -105,10 +112,11 @@ export function buildCompressedContextRequest(
     const hardPrompt = appendSummary(systemPrompt, hardSummary);
 
     for (const hardTailCount of HARD_TAIL_COUNTS) {
-      const hardTail = sliceTailMessages(frameMessages, Math.min(hardTailCount, frameMessages.length));
+      const hardTail = sliceTailMessages(conversationMessages, Math.min(hardTailCount, conversationMessages.length));
+      const compactedHardTail = compactTailMessages(hardTail, "hard");
       const hardMessages = composeChatMessages(
         hardPrompt,
-        compactTailMessages(hardTail, "hard"),
+        compactedHardTail,
         config.model,
       );
       const hardEstimatedChars = estimateChatMessagesChars(hardMessages);
@@ -122,6 +130,7 @@ export function buildCompressedContextRequest(
             estimatedChars: hardEstimatedChars,
             compressed: true,
             summary: hardSummary,
+            sources: buildBudgetSources(systemPrompt, compactedHardTail, hardSummary),
             promptHotspots: measureSystemPrompt(hardPrompt)?.hotspots,
             compressionMode: "hard",
           }),
@@ -227,16 +236,14 @@ function summarizeConversation(messages: StoredMessage[], maxChars: number): str
   }
 
   if (summaryLines.length === 0) {
-    return "No current turn context summary was available.";
+    return "No earlier conversation summary was available.";
   }
 
   return summaryLines.join("\n");
 }
 
 function pickSummaryCandidates(messages: StoredMessage[]): StoredMessage[] {
-  const currentFrameStart = findLatestUserInputIndex(messages);
-  const frameMessages = currentFrameStart >= 0 ? messages.slice(currentFrameStart) : messages;
-  const recent = frameMessages
+  const recent = messages
     .filter((message) => !(message.role === "user" && isInternalMessage(message.content)))
     .slice(-MAX_SUMMARY_MESSAGE_COUNT);
 
@@ -277,14 +284,14 @@ function appendSummary(systemPrompt: string | PromptLayers, summary: string | un
   }
 
   if (typeof systemPrompt === "string") {
-    return `${systemPrompt}\n\nCurrent turn compressed context:\n${summary}`;
+    return `${systemPrompt}\n\nEarlier conversation summary:\n${summary}`;
   }
 
   return {
     ...systemPrompt,
     runtimeFactBlocks: [
       ...systemPrompt.runtimeFactBlocks,
-      `Current turn compressed context:\n${summary}`,
+      `Earlier conversation summary:\n${summary}`,
     ],
   };
 }
@@ -301,6 +308,36 @@ function measureSystemPrompt(systemPrompt: string | PromptLayers): PromptLayerMe
         runtimeFactBlocks: [],
       })
     : measurePromptLayers(systemPrompt);
+}
+
+function buildBudgetSources(
+  systemPrompt: string | PromptLayers,
+  messages: StoredMessage[],
+  summary?: string,
+): ContextBudgetReport["sources"] {
+  const systemChars = renderSystemPrompt(systemPrompt).length;
+  const conversationChars = estimateStoredMessagesChars(messages);
+  return [
+    {
+      name: "systemPrompt",
+      chars: systemChars,
+    },
+    ...(summary
+      ? [{
+          name: "conversationSummary" as const,
+          chars: summary.length,
+        }]
+      : []),
+    {
+      name: summary ? "compactedConversation" : "nearFieldConversation",
+      chars: conversationChars,
+      messages: messages.length,
+    },
+  ];
+}
+
+function estimateStoredMessagesChars(messages: StoredMessage[]): number {
+  return messages.reduce((total, message) => total + JSON.stringify(message).length, 0);
 }
 
 function oneLine(value: string): string {

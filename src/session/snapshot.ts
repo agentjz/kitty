@@ -154,8 +154,33 @@ function readContextBudget(value: unknown, sessionPath: string): SessionRecord["
     compressed: readRequiredBoolean(record, "compressed", sessionPath, "contextBudget"),
     compressionMode,
     compressionReason: readRequiredString(record, "compressionReason", sessionPath, "contextBudget"),
+    sources: readContextBudgetSources(record.sources, sessionPath),
     promptHotspots: readContextBudgetHotspots(record.promptHotspots, sessionPath),
   };
+}
+
+function readContextBudgetSources(value: unknown, sessionPath: string): NonNullable<SessionRecord["contextBudget"]>["sources"] {
+  if (value === undefined) {
+    return [];
+  }
+  if (!Array.isArray(value)) {
+    throw createSessionCorruptError(sessionPath, "contextBudget.sources must be an array");
+  }
+  return value.map((entry, index) => {
+    const record = expectRecord(entry, sessionPath, `contextBudget.sources[${index}]`);
+    const name = readRequiredString(record, "name", sessionPath, `contextBudget.sources[${index}]`);
+    if (name !== "systemPrompt" && name !== "nearFieldConversation" && name !== "conversationSummary" && name !== "compactedConversation") {
+      throw createSessionCorruptError(sessionPath, `contextBudget.sources[${index}].name is invalid`);
+    }
+    const messages = record.messages === undefined
+      ? undefined
+      : readRequiredNumber(record, "messages", sessionPath, `contextBudget.sources[${index}]`);
+    return {
+      name,
+      chars: readRequiredNumber(record, "chars", sessionPath, `contextBudget.sources[${index}]`),
+      messages,
+    };
+  });
 }
 
 function readContextBudgetHotspots(value: unknown, sessionPath: string): NonNullable<SessionRecord["contextBudget"]>["promptHotspots"] {

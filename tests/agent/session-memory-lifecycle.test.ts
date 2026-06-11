@@ -178,7 +178,7 @@ test("model-written session memory focus becomes working memory focus", async (t
   assert.equal(result.session.taskState?.focus, "比较 agentjz/777f 和 agentjz/ohmyflight。");
 });
 
-test("next turn injects model-written session memory while raw provider messages keep only current user frame", async (t) => {
+test("next turn injects model-written session memory while raw provider messages keep visible conversation", async (t) => {
   const root = await createTempWorkspace("session-memory-prompt", t);
   const config = createTestRuntimeConfig(root);
   const sessionStore = new InProcessSessionStore();
@@ -254,7 +254,9 @@ test("next turn injects model-written session memory while raw provider messages
   assert.match(prompt, /txt 纯文本回答/);
   assert.match(prompt, /agentjz\/777f/);
   assert.match(prompt, /agentjz\/ohmyflight/);
-  assert.equal(rawMessages, "你还记得刚刚的要求吗？");
+  assert.match(rawMessages, /请以后用 txt 纯文本回答/);
+  assert.match(rawMessages, /我会按这个方向继续/);
+  assert.match(rawMessages, /你还记得刚刚的要求吗/);
 });
 
 test("session memory lifecycle receives tool evidence and session diff facts", async (t) => {

@@ -64,6 +64,18 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
     }
   }
 
+  if (status.sessions.latest?.contextBudget?.sources.length) {
+    lines.push("");
+    lines.push("Context budget sources:");
+    for (const source of status.sessions.latest.contextBudget.sources) {
+      lines.push([
+        source.name,
+        `chars=${source.chars}`,
+        source.messages === undefined ? undefined : `messages=${source.messages}`,
+      ].filter(Boolean).join("  "));
+    }
+  }
+
   if (status.executions.active.length > 0) {
     lines.push("");
     lines.push("Active executions:");

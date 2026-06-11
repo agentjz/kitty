@@ -29,6 +29,10 @@ test("runtime status projects the current project runtime facts", async (t) => {
       compressed: false,
       compressionMode: "none",
       compressionReason: "within_budget",
+      sources: [
+        { name: "systemPrompt", chars: 20_000 },
+        { name: "nearFieldConversation", chars: 25_000, messages: 3 },
+      ],
       promptHotspots: [{
         layer: "runtimeFacts",
         title: "Project context",
@@ -96,6 +100,8 @@ test("runtime status projects the current project runtime facts", async (t) => {
   assert.match(text, /Executions: 1 active \/ 1 total/);
   assert.match(text, /Context budget: 45000\/900000 chars/);
   assert.match(text, /Context budget hotspots:/);
+  assert.match(text, /Context budget sources:/);
+  assert.match(text, /nearFieldConversation  chars=25000  messages=3/);
   assert.match(text, /Task lifecycle:/);
   assert.match(text, /next=confirm_requirements/);
 });

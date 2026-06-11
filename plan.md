@@ -1,114 +1,77 @@
-# 四条主线成熟化计划
+# 记忆与自然上下文重构计划
 
 ## 目标
 
-把当前 Kitty 从“能跑”推进到“用户能看懂、能恢复、能持续使用”的运行体验。
+把 Kitty 的会话体验从“从账本拼回上下文”改成“自然延续当前对话”。
 
-本轮只处理当前存在的四条主线：
+当前只处理存在的主干能力：session messages、session memory、working memory、runtime facts、tool evidence、context budget、status、测试和文档。不写旧兼容，不解释不存在的能力。
 
-- 上下文预算管理。
-- Background / subagent 真实体验。
-- Spec / plan 工作流。
-- Doctor / init / 配置体验。
+## 源码依据
 
-不做旧兼容，不写不存在的能力，不把历史残留包装成当前事实。
+- Codex：`ref/repos/codex/codex-rs/core/src/compact.rs` 和 `session/rollout_reconstruction.rs` 表明主线是 thread / rollout history；compaction 是替换历史的 checkpoint，不是把运行事实伪装成用户记忆。
+- Aider：`ref/repos/aider/aider/history.py` 和 `/tokens` 实现表明 chat history 是一等上下文；repo map、文件、系统提示、历史分别计量，超预算时摘要旧历史并保留新 tail。
+- LangMem：`ref/repos/langmem/src/langmem/short_term/summarization.py` 表明摘要只在 token 阈值后触发；running summary 记录已经摘要过的消息，新近消息保持原样。
+- OpenCode：`ref/repos/opencode/packages/opencode/test/v2/session-message-updater.test.ts` 表明 compaction / tool / assistant event 应还原为清晰会话消息；事件是构造消息的证据，不是替代消息本身。
 
-## 判断
+结论：真实近场对话必须先进入模型；session memory 是长任务连续性；runtime facts 是证据层。三者不能互相冒充。
 
-当前主干已有可用骨架：
+## 当前缺口
 
-- context 已经只把当前用户帧作为 raw messages，并有压缩链路。
-- execution 已经有后台任务、subagent、lead wait、wake signal 和健康状态。
-- spec 已经有 requirements -> design -> tasks -> implement -> validate -> archive。
-- init 已经能生成 `.kitty/.env`、`.kitty/.env.example`、`.kitty/.kittyignore`。
-
-缺口不在“再造一套系统”，而在四个事实没有被稳定暴露：
-
-- 上下文预算没有成为清楚的运行事实。
-- 后台和 subagent 的状态输出偏原始，用户不容易判断发生了什么。
-- spec 阶段门存在，但当前阶段、下一步和工具面不够清楚。
-- doctor 在配置解析失败前缺少本地预检，init 也没有给出模板状态事实。
+- `buildCompressedContextRequest` 只取当前用户帧，短 session 也看不到第一轮到当前轮的自然对话。
+- session memory 和 completion facts 被迫承担“刚刚聊了什么”的职责，体验像读记录。
+- `继续` 这种短输入本应由模型根据近场对话理解，但当前上下文容易让模型转向项目状态检查。
+- context budget 只有总量和 prompt hotspot，看不出压力来自真实对话、session memory、runtime facts 还是项目上下文。
 
 ## 设计
 
-### 上下文预算
+### 1. 近场对话是 provider 主轨
 
-预算结果由 context request 生成，同一份事实进入 runtime status 和测试：
+Provider request 使用当前 session 的可见对话窗口：
 
-- `limitChars`
-- `estimatedChars`
-- `remainingChars`
-- `usageRatio`
-- `compressed`
-- `compressionReason`
-- `promptMetrics.hotspots`
+- 保留用户与 assistant 的自然消息。
+- 保留必要 tool boundary，避免孤立 tool output。
+- 排除 internal wake 和内部控制输入。
+- 预算足够时保留完整可见对话。
+- 超预算时摘要旧对话，保留最近 tail。
 
-机器只暴露数字、边界和压缩事实；模型负责判断是否需要继续读文件、沉淀记忆或缩小范围。
+### 2. Session memory 是连续性资产
 
-### Background / Subagent
+Session memory 继续由模型在 turn 收口时写入。它负责长任务焦点、约束、决策、未完成事项和验证事实，不替代短会话近场对话。
 
-execution ledger 是唯一事实源。
+### 3. Runtime facts 是证据层
 
-新增统一 execution 摘要：
+Task lifecycle、execution、wake、completion facts、checkpoint、session diff 只作为事实证据进入 prompt。它们不描述“用户刚刚说过什么”，也不压过近场对话。
 
-- active / recent 分组。
-- status、health、deadlineAt、lastOutputAt、outputPreview。
-- assignment objective / boundary / expectedOutput。
-- closeReason、error、changedPaths。
+### 4. Budget 按来源暴露
 
-`background_check`、`subagent_check`、`kitty status` 只呈现这份摘要，不各自发明状态语言。
+Context budget 增加来源分桶：
 
-### Spec / Plan 工作流
+- system prompt。
+- near-field conversation。
+- summarized conversation。
+- compacted tail。
 
-spec 保持当前 spec mode，不改名，不恢复旧模式。
-
-新增 workflow summary：
-
-- active spec。
-- current stage。
-- confirmed gates。
-- next gate。
-- document state。
-- writable tool surface。
-- isolated workspace。
-
-prompt、status、spec 工具输出引用同一份 summary。提示词保持通用，不用硬编码用户话术。
-
-### Doctor / Init / 配置
-
-本地配置体验分成两层：
-
-- preflight：不依赖完整 runtime，检查 `.kitty` 文件、env key、provider preset、extension switches。
-- runtime probe：runtime 能加载且有 API key 时，再探测 provider。
-
-init 负责创建模板并暴露 created / skipped / expected files，不强行覆盖用户本地密钥。
-
-doctor 先输出本地 preflight，再输出 runtime 和 provider 连接事实。
+status 和测试使用同一个 budget 事实，不另造统计逻辑。
 
 ## 执行清单
 
-- [ ] 增加 context budget report，并接入 context request。
-- [ ] 在 runtime status 中暴露最近一次 session 的 context budget。
-- [ ] 测试 budget report 的 limit、usage、compressionReason、hotspots。
-- [ ] 增加 execution summary helper，统一 background/subagent/status 输出。
-- [ ] 改造 `background_check` 输出为 active/recent/stale/summary。
-- [ ] 改造 `subagent_check` 输出为 active/recent/summary。
-- [ ] 测试 background/subagent check 的用户可见状态。
-- [ ] 增加 spec workflow summary helper。
-- [ ] 在 spec prompt、runtime status、spec open/create 输出中暴露 workflow summary。
-- [ ] 测试 spec 阶段门、next gate、工具面和文档状态。
-- [ ] 增加 config preflight helper。
-- [ ] doctor 先运行 preflight，再加载 runtime，再 provider probe。
-- [ ] init 输出模板状态，并保持不加载 runtime。
-- [ ] 测试 doctor 在缺 `.env`、缺 key、模板完整时的输出。
-- [ ] 同步 README / philosophy / spec 中与四条主线有关的当前事实。
-- [ ] 运行 `npm.cmd run verify`。
+- [x] 新增可见对话窗口构建器，统一过滤 internal 输入和保护 tool boundary。
+- [x] 主 provider request 从当前用户帧改为近场可见对话。
+- [x] 压缩逻辑改为摘要旧可见对话、保留近场 tail。
+- [x] context budget 增加来源分桶。
+- [x] 保留 session memory 生命周期，但不让它替代短会话原始对话。
+- [x] 更新“当前用户帧”相关测试为“近场对话”行为。
+- [x] 增加 internal wake 不进入近场对话测试。
+- [x] 增加短 session 从第一轮回溯的行为测试。
+- [x] 增加 budget 分桶测试。
+- [x] 同步 philosophy / spec 中的当前记忆设计。
+- [x] 运行 `npm.cmd run verify`。
 
 ## 完成标准
 
-- `kitty status` 能看清上下文预算、execution 健康、active spec 阶段门和配置状态。
-- `background_check` 和 `subagent_check` 输出用户可理解的执行事实，不再只倒原始账本。
-- spec 模式能清楚显示当前阶段、下一步、确认门和工具面。
-- `kitty init` 是稳定模板创建体验，`kitty doctor` 是稳定本地诊断体验。
-- 代码、测试、README、philosophy、spec 讲同一个当前事实。
+- 短 session 里，模型请求包含可见近场对话，而不是只包含当前用户输入。
+- 长 session 超预算时，旧对话被摘要，新近对话保持原样。
+- internal wake 不进入用户对话主轨。
+- budget 能说明上下文压力来源。
+- 代码、测试、文档讲同一个当前事实。
 - `npm.cmd run verify` 通过。

@@ -61,6 +61,11 @@ export interface RuntimeContextBudgetSummary {
   compressed: boolean;
   compressionMode: string;
   compressionReason: string;
+  sources: Array<{
+    name: string;
+    chars: number;
+    messages?: number;
+  }>;
   promptHotspots: Array<{
     layer: string;
     title: string;

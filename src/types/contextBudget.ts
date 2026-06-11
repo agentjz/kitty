@@ -7,7 +7,14 @@ export interface ContextBudgetReport {
   compressed: boolean;
   compressionMode: "none" | "normal" | "aggressive" | "hard";
   compressionReason: string;
+  sources: ContextBudgetSource[];
   promptHotspots: ContextBudgetHotspot[];
+}
+
+export interface ContextBudgetSource {
+  name: "systemPrompt" | "nearFieldConversation" | "conversationSummary" | "compactedConversation";
+  chars: number;
+  messages?: number;
 }
 
 export interface ContextBudgetHotspot {

@@ -4,7 +4,7 @@ Session 是任务现场。
 
 它保存消息、任务状态、checkpoint、session diff 和恢复所需事实。
 
-Session 不把所有旧消息直接灌进当前轮。当前轮使用当前用户输入帧；同 session 连续体验由模型写出的 session memory 承接；当前工作焦点和执行连续性由 working memory 承接；checkpoint 和 session diff 用于恢复和取证。
+Session 不把运行账本伪装成对话。当前轮使用同 session 的近场可见对话；预算足够时保留完整可见对话，超预算时摘要旧对话并保留最近对话 tail。同 session 长任务连续体验由模型写出的 session memory 承接；当前工作焦点和执行连续性由 working memory 承接；checkpoint 和 session diff 用于恢复和取证。
 
 Session memory 不是工具。它是每轮完成后的固定生命周期行为：模型负责按固定区块写记忆，机器负责保存、版本化、下一轮注入，并把失败记录到 observability。session record 是运行时状态入口；`.kitty/memory/sessions/*.md` 是同一次保存生成的可审阅记忆文件。
 

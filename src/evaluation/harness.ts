@@ -22,24 +22,25 @@ const EVALUATION_SCENARIOS: readonly EvaluationScenario[] = [
   },
   {
     id: "long-session-keeps-confirmed-facts",
-    userExperience: "A long session keeps confirmed constraints without replaying raw history.",
+    userExperience: "A long session keeps nearby conversation natural and carries older confirmed constraints through memory.",
     machineFacts: [
+      "provider request keeps visible near-field conversation",
       "runtime memory asset exists",
-      "context injects session memory instead of raw transcript",
+      "context injects session memory for older continuity",
       "memory asset can be read by the user",
     ],
     acceptance: [
+      "recent conversation can be recalled naturally",
       "confirmed constraint appears in session memory",
       "old focus is not treated as current focus",
-      "raw history is evidence lookup only",
     ],
   },
   {
     id: "old-goal-stays-history",
     userExperience: "Previous goals stay as evidence and do not hijack the current turn.",
     machineFacts: [
-      "current user frame is distinct",
-      "history boundary is evidence lookup only",
+      "visible near-field conversation is distinct from runtime facts",
+      "internal wake is excluded from visible conversation",
       "working memory carries the active focus",
     ],
     acceptance: [

@@ -83,7 +83,7 @@ test("context compression exposes budget facts when the request is compacted", (
   assert.equal(request.budget.promptHotspots.some((hotspot) => hotspot.layer === "static"), true);
 });
 
-test("context request keeps raw messages scoped to the current user frame", () => {
+test("context request keeps visible near-field conversation under budget", () => {
   const messages: StoredMessage[] = [
     {
       role: "user",
@@ -115,11 +115,14 @@ test("context request keeps raw messages scoped to the current user frame", () =
   const rawMessages = request.messages.slice(1).map((message) => String(message.content ?? "")).join("\n");
 
   assert.equal(request.compressed, false);
-  assert.equal(request.messages.length, 2);
-  assert.equal(rawMessages, "你还记得刚刚让我做什么吗？");
+  assert.equal(request.messages.length, 4);
+  assert.match(rawMessages, /请以后不要 Markdown，用 txt 格式/);
+  assert.match(rawMessages, /我会用 txt 纯文本格式回答/);
+  assert.match(rawMessages, /你还记得刚刚让我做什么吗/);
+  assert.equal(request.budget.sources.some((source) => source.name === "nearFieldConversation" && source.messages === 3), true);
 });
 
-test("runtime prompt carries same-session memory while raw request stays on current frame", () => {
+test("runtime prompt carries same-session memory while raw request keeps near-field conversation", () => {
   const root = process.cwd();
   const config = createTestRuntimeConfig(root);
   const messages: StoredMessage[] = [
@@ -181,5 +184,55 @@ test("runtime prompt carries same-session memory while raw request stays on curr
   assert.match(prompt, /agentjz\/777f/);
   assert.match(prompt, /agentjz\/ohmyflight/);
   assert.doesNotMatch(prompt, /我会用 txt 纯文本格式回答/);
-  assert.equal(rawMessages, "你还记得刚刚让我做什么吗？");
+  assert.match(rawMessages, /请以后不要 Markdown，用 txt 格式/);
+  assert.match(rawMessages, /我会用 txt 纯文本格式回答/);
+  assert.match(rawMessages, /agentjz\/777f/);
+  assert.match(rawMessages, /你还记得刚刚让我做什么吗/);
+});
+
+test("internal wake turn is excluded from visible near-field conversation", () => {
+  const messages: StoredMessage[] = [
+    {
+      role: "user",
+      content: "先聊 DeepSeek。",
+      createdAt: "2026-05-21T19:56:00.000Z",
+    },
+    {
+      role: "assistant",
+      content: "可以，先聊 DeepSeek。",
+      createdAt: "2026-05-21T19:56:03.000Z",
+    },
+    {
+      role: "user",
+      content: "[internal] wake: subagent completed",
+      createdAt: "2026-05-21T19:57:00.000Z",
+    },
+    {
+      role: "assistant",
+      content: "内部唤醒处理完成。",
+      createdAt: "2026-05-21T19:57:01.000Z",
+    },
+    {
+      role: "user",
+      content: "继续。",
+      createdAt: "2026-05-21T19:58:00.000Z",
+    },
+  ];
+
+  const request = buildCompressedContextRequest(
+    "system prompt",
+    messages,
+    {
+      contextWindowMessages: 120,
+      model: "deepseek-v4-flash",
+      maxContextChars: 900_000,
+      contextSummaryChars: 120_000,
+    },
+  );
+  const rawMessages = request.messages.slice(1).map((message) => String(message.content ?? "")).join("\n");
+
+  assert.match(rawMessages, /先聊 DeepSeek/);
+  assert.match(rawMessages, /继续/);
+  assert.doesNotMatch(rawMessages, /wake/);
+  assert.doesNotMatch(rawMessages, /内部唤醒处理完成/);
 });
