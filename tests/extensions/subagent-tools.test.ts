@@ -47,4 +47,11 @@ test("subagent extension launches a recorded agent execution", async (t) => {
     boundary: "Read provider files only.",
     expectedOutput: "Return config path summary.",
   });
+
+  const check = tools.find((tool) => tool.definition.function.name === "subagent_check");
+  assert.ok(check);
+  const checked = parseToolJson((await check.execute("{}", context)).output);
+  assert.equal(checked.total, 1);
+  assert.equal((checked.active as Array<Record<string, unknown>>)[0]?.id, payload.id);
+  assert.equal(((checked.active as Array<Record<string, unknown>>)[0]?.health as Record<string, unknown>).state, "running");
 });

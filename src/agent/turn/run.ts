@@ -88,6 +88,10 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
         session,
         config: requestConfig,
       });
+      session = await options.sessionStore.save({
+        ...session,
+        contextBudget: requestContext.budget,
+      });
       const turnToolDefinitions = toolRegistry.definitions;
       if (requestContext.compressed) {
         options.callbacks?.onStatus?.(`Context compressed automatically at ~${requestContext.estimatedChars} chars to keep the turn running.`);

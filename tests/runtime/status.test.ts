@@ -20,6 +20,22 @@ test("runtime status projects the current project runtime facts", async (t) => {
       summary: "User wants durable runtime visibility.",
       updatedAt: "2026-05-22T00:00:00.000Z",
     },
+    contextBudget: {
+      version: 1,
+      limitChars: 900_000,
+      estimatedChars: 45_000,
+      remainingChars: 855_000,
+      usageRatio: 0.05,
+      compressed: false,
+      compressionMode: "none",
+      compressionReason: "within_budget",
+      promptHotspots: [{
+        layer: "runtimeFacts",
+        title: "Project context",
+        chars: 10_000,
+        lines: 120,
+      }],
+    },
   });
 
   const spec = await new SpecStore(root, { rootDir: root }).create({
@@ -65,6 +81,7 @@ test("runtime status projects the current project runtime facts", async (t) => {
   assert.equal(status.memory.assets[0]?.id, session.id);
   assert.equal(status.taskLifecycle?.stage, "normal_work");
   assert.equal(status.sessions.latest?.focus, undefined);
+  assert.equal(status.sessions.latest?.contextBudget?.compressionReason, "within_budget");
   assert.equal(status.executions.total, 1);
   assert.equal(status.executions.active.length, 1);
   assert.equal(status.executions.active[0]?.assignment?.objective, "Inspect runtime visibility");
@@ -77,7 +94,10 @@ test("runtime status projects the current project runtime facts", async (t) => {
   assert.match(text, /Now:/);
   assert.match(text, /Focus: none/);
   assert.match(text, /Executions: 1 active \/ 1 total/);
+  assert.match(text, /Context budget: 45000\/900000 chars/);
+  assert.match(text, /Context budget hotspots:/);
   assert.match(text, /Task lifecycle:/);
+  assert.match(text, /next=confirm_requirements/);
 });
 
 test("runtime status exposes background executions that are running without output", async (t) => {

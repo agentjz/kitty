@@ -10,6 +10,7 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
   lines.push("Now:");
   lines.push(`- Focus: ${readFocus(status)}`);
   lines.push(`- Session: ${readSessionLine(status)}`);
+  lines.push(`- Context budget: ${readContextBudgetLine(status)}`);
   lines.push(`- Memory: ${status.memory.assets.length > 0 ? `${status.memory.assets.length} asset(s)` : "none"}`);
   lines.push(`- Project map: ${status.projectMap ? "ready" : "missing"}`);
   lines.push(`- Executions: ${status.executions.active.length} active / ${status.executions.total} total`);
@@ -48,6 +49,19 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
         ? `git=${status.projectMap.git.hasChanges ? "changed" : "clean"}`
         : "git=unavailable",
     ].join("  "));
+  }
+
+  if (status.sessions.latest?.contextBudget?.promptHotspots.length) {
+    lines.push("");
+    lines.push("Context budget hotspots:");
+    for (const hotspot of status.sessions.latest.contextBudget.promptHotspots.slice(0, 3)) {
+      lines.push([
+        hotspot.layer,
+        hotspot.title,
+        `chars=${hotspot.chars}`,
+        `lines=${hotspot.lines}`,
+      ].join("  "));
+    }
   }
 
   if (status.executions.active.length > 0) {
@@ -100,7 +114,13 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
     lines.push("");
     lines.push("Active specs:");
     for (const spec of status.specs.active) {
-      lines.push([spec.id, spec.stage, spec.title].join("  "));
+      lines.push([
+        spec.id,
+        spec.stage,
+        spec.workflow ? `next=${spec.workflow.nextGate}` : undefined,
+        spec.workflow ? `tools=${spec.workflow.writableTools}` : undefined,
+        spec.title,
+      ].filter(Boolean).join("  "));
     }
   }
 
@@ -117,4 +137,18 @@ function readSessionLine(status: RuntimeStatus): string {
     return "none";
   }
   return `${status.sessions.latest.id} (${status.sessions.latest.messageCount} message(s))`;
+}
+
+function readContextBudgetLine(status: RuntimeStatus): string {
+  const budget = status.sessions.latest?.contextBudget;
+  if (!budget) {
+    return "none";
+  }
+  const percent = Math.round(budget.usageRatio * 100);
+  return [
+    `${budget.estimatedChars}/${budget.limitChars} chars`,
+    `${percent}%`,
+    budget.compressed ? `compressed=${budget.compressionMode}` : "compressed=no",
+    `reason=${budget.compressionReason}`,
+  ].join("  ");
 }

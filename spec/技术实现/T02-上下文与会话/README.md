@@ -4,6 +4,8 @@ Context 和 Session 共同保证任务连续性。
 
 Provider raw messages 由 `src/context/runtime/compression/` 从当前用户输入帧构建。
 
+`src/context/runtime/budget.ts` 生成 context budget report，记录 limit、estimated、remaining、usage ratio、压缩模式、压缩原因和 prompt hotspots。Agent turn 把最近一次 budget 保存到 session，`kitty status` 从 session 投影这份机器测量事实。
+
 同 session 对话连续性由两层组成：
 
 - `src/session/memory.ts` 集中维护 session memory 的固定 Markdown 区块和长度边界。

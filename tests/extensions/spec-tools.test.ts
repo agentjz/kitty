@@ -27,6 +27,7 @@ test("spec extension persists durable documents, state, tasks, notes, and checkp
   const createdPayload = parseToolJson(created.output);
   const specId = (createdPayload.spec as Record<string, unknown>).id as string;
   const workspacePath = (createdPayload.workspace as Record<string, unknown>).path as string;
+  assert.equal((createdPayload.workflow as Record<string, unknown>).nextGate, "confirm_requirements");
 
   const requirements = "# Requirements\n\n- 扩展是工具集合，不是运行模式。\n";
   const written = await registry.execute("spec_write_document", JSON.stringify({
@@ -126,6 +127,7 @@ test("spec extension lists, searches, opens, and reads durable specs by explicit
 
   const opened = parseToolJson((await registry.execute("spec_open", JSON.stringify({ specId }), context)).output);
   assert.equal((opened.spec as Record<string, unknown>).id, specId);
+  assert.equal((opened.workflow as Record<string, unknown>).nextGate, "confirm_requirements");
   const openedDesign = (opened.documents as Record<string, string>).design;
   assert.equal(typeof openedDesign, "string");
   assert.match(openedDesign as string, /browser-control-console/);

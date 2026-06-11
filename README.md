@@ -31,14 +31,14 @@
 | 能力 | 当前事实 |
 | --- | --- |
 | 🧭 Agent 循环 | 模型、工具、session、收尾都在同一个主循环里推进 |
-| 🧠 Context | 项目上下文、项目地图、运行时上下文、工作记忆、长上下文压缩 |
+| 🧠 Context | 项目上下文、项目地图、运行时上下文、工作记忆、长上下文压缩和预算报告 |
 | 💾 Session | 会话记录、checkpoint、todo、恢复现场、结构化可审阅 memory assets |
 | 🗺️ Project Map | 目录、入口、脚本、测试、spec 和 git 事实进入短项目地图 |
 | 🔌 Provider | OpenAI-compatible provider、请求恢复、连接诊断 |
 | 🛠️ Core tools | `read`、`edit`、`write`、`bash` |
 | 🧩 Extensions | `todo`、`worktree`、`network`、`background`、`subagent`、`skills`、`spec` |
 | 🧾 Control plane | SQLite 账本记录 task lifecycle、execution、deadline、输出健康、wait policy、pid、状态和 wake 事实；host 负责等待和恢复 lead |
-| 📐 Spec 模式 | `requirements.md`、`design.md`、`tasks.md`、`notes.md` 和隔离 worktree |
+| 📐 Spec 模式 | `requirements.md`、`design.md`、`tasks.md`、`notes.md`、workflow summary 和隔离 worktree |
 | 💬 产品面 | CLI、交互终端、Telegram 私聊服务 |
 | 📎 证据记录 | 事件、终端日志、崩溃记录、文件变更记录 |
 | 🧪 Evaluation | `kitty eval` 暴露真实 agent 体验验收场景 |
@@ -87,12 +87,12 @@ kitty spec
 | `kitty sessions` | 查看最近会话 |
 | `kitty config show` | 查看从 `.kitty/.env` 解析出的当前运行配置 |
 | `kitty config path` | 查看当前项目 `.kitty/.env` 路径 |
-| `kitty status` | 查看当前项目 runtime 现场：session、task lifecycle、memory、project map、execution、deadline、wake、spec |
+| `kitty status` | 查看当前项目 runtime 现场：session、context budget、task lifecycle、memory、project map、execution、deadline、wake、spec |
 | `kitty memory` | 创建、查看、读取、搜索、删除 runtime memory assets，或把 memory 沉淀到 spec notes / skill references |
 | `kitty changes` | 查看记录的文件变更 |
 | `kitty undo [changeId]` | 撤销最近一次或指定变更 |
 | `kitty diff [path]` | 查看当前 git diff |
-| `kitty doctor` | 检查运行环境 |
+| `kitty doctor` | 检查 `.kitty` 文件、env contract、provider preset、runtime 和 provider 连接 |
 | `kitty eval` | 查看真实 agent 体验验收场景 |
 | `kitty telegram serve` | 启动 Telegram 私聊服务 |
 
@@ -138,6 +138,8 @@ kitty config show
 ## ⚙️ 配置
 
 项目运行配置只从 `.kitty/.env` 读取。初始化后按 `.kitty/.env` 填写当前启用的 provider、模型、API key 和 profile。
+
+`kitty init` 创建 `.kitty/.env`、`.kitty/.env.example` 和 `.kitty/.kittyignore`，并输出本地配置 preflight。`kitty doctor` 先检查这些本地事实，再加载 runtime，最后在 API key 存在时探测 provider 连接。
 
 `.kitty/.env` 放当前启用的 provider 和 API key，同时保留 YLS、TTAPI、DeepSeek 三组 provider preset 注释块，方便直接切换。Telegram、扩展开关和运行时配置也在 `.kitty/.env` 与 `.kitty/.env.example` 中保持同一结构。
 

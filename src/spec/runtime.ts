@@ -3,6 +3,7 @@ import { createSpecTools } from "../extensions/tools/spec/index.js";
 import type { RegisteredTool, ToolFilter } from "../tools/core/types.js";
 import { buildSpecModePromptBlock } from "./prompt.js";
 import { SpecStore } from "./store.js";
+import { buildSpecWorkflowSummary, type SpecWorkflowSummary } from "./workflowSummary.js";
 import type { SpecState } from "./types.js";
 
 export interface SpecRuntime {
@@ -12,6 +13,7 @@ export interface SpecRuntime {
   promptBlock: string;
   tools: readonly RegisteredTool[];
   builtinToolFilter: ToolFilter;
+  workflow: SpecWorkflowSummary;
 }
 
 export async function loadSpecRuntime(input: {
@@ -27,13 +29,16 @@ export async function loadSpecRuntime(input: {
   });
   const binding = await store.loadSessionBinding(input.sessionId);
   const activeSpec = binding ? await store.load(binding.specId).catch(() => null) : null;
+  const documents = activeSpec ? await store.readAllDocuments(activeSpec.id).catch(() => undefined) : undefined;
+  const workflow = buildSpecWorkflowSummary({ spec: activeSpec, documents });
   return {
     activeSpec,
     cwd: activeSpec?.workspace?.path ?? input.cwd,
     stateRootDir: projectContext.stateRootDir,
-    promptBlock: buildSpecModePromptBlock(activeSpec),
+    promptBlock: buildSpecModePromptBlock(activeSpec, workflow),
     tools: createSpecTools(),
     builtinToolFilter: createSpecBuiltinToolFilter(activeSpec),
+    workflow,
   };
 }
 

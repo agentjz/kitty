@@ -15,6 +15,7 @@
 - 项目地图把目录、入口、脚本、测试、spec 和 git 状态作为机器事实进入当前轮，负责快速定向。
 - checkpoint、工具产物、运行事件和文件变更记录留在证据里，只在需要取证或恢复时使用。
 - 当前上下文是模型当下工作的桌面，只放当前用户输入、同 session 对话脉络、当前任务工作记忆、项目地图和必要工作集。
+- 上下文预算是机器测量事实：limit、estimated、remaining、usage ratio、压缩模式和 prompt hotspots 会进入 session 和 status，帮助用户看到当前上下文压力。
 - 长期原则写进可审阅的 spec、测试和源码。
 
 模型写记忆负责续命，历史负责取证，上下文负责当下推理。
@@ -56,7 +57,7 @@ Skills 也是 extension，不是第三套工具体系。它把可复用方法、
 - `tasks.md`
 - `notes.md`
 
-Spec 的主流程是 requirements、design、tasks 三阶段；implement、validate、archive 是执行和收口状态。
+Spec 的主流程是 requirements、design、tasks 三阶段；implement、validate、archive 是执行和收口状态。Workflow summary 会暴露 active spec、当前阶段、确认门、下一 gate、四个文档状态、工具面和隔离 workspace。
 
 任务拆解进入 `tasks.md`，事实笔记和审阅痕迹进入 `notes.md`。checkpoint 保存 spec 状态、四个文档和隔离 worktree 的代码位置。
 
@@ -90,7 +91,7 @@ Memory 搜索是候选召回，不是语义裁判。机器按文本 token、路�
 
 小猫智能体用 control plane 保存这些死事实：background、subagent execution、派工边界、pid、状态、退出码、输出摘要、wait policy 和 wake signal。
 
-`kitty status` 让用户看到运行现场：session、memory、project map、execution、wake、spec。它只呈现事实，不替模型做判断。
+`kitty status` 让用户看到运行现场：session、context budget、memory、project map、execution、wake、spec。它只呈现事实，不替模型做判断。
 
 Background 是长任务现场。它记录运行输出摘要，能检查、终止、reconcile，也能在完成后把事实暴露给 lead。
 

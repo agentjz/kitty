@@ -1,4 +1,5 @@
 import { ExecutionStore } from "../../../../execution/store.js";
+import { summarizeExecutionSet } from "../../../../runtime/executionSummary.js";
 import { okResult, parseArgs } from "../../../../tools/core/shared.js";
 import type { RegisteredTool } from "../../../../tools/core/types.js";
 
@@ -18,6 +19,11 @@ export const subagentCheckTool: RegisteredTool = {
   async execute(rawArgs, context) {
     parseArgs(rawArgs || "{}");
     const executions = new ExecutionStore(context.projectContext.stateRootDir).list({ kind: "subagent" });
-    return okResult(JSON.stringify({ executions }, null, 2));
+    const summary = summarizeExecutionSet(executions);
+    return okResult(JSON.stringify({
+      total: summary.total,
+      active: summary.active,
+      recent: summary.recent,
+    }, null, 2));
   },
 };

@@ -3,9 +3,10 @@ import type { TaskLifecycleRecord } from "../control/ledger.js";
 import { getProjectStatePaths } from "../project/statePaths.js";
 import { buildProjectMap } from "../project/map.js";
 import { listRuntimeMemoryAssets } from "./memory/index.js";
-import { getExecutionDeadlineAt, isActiveExecution, summarizeExecutionHealth } from "./executionHealth.js";
+import { summarizeExecution, summarizeExecutionSet } from "./executionSummary.js";
 import { SessionStore } from "../session/store.js";
 import { SpecStore } from "../spec/store.js";
+import { buildSpecWorkflowSummary } from "../spec/workflowSummary.js";
 import type { SessionRecord } from "../types.js";
 import type {
   RuntimeExecutionSummary,
@@ -79,6 +80,16 @@ function summarizeSession(session: SessionRecord): RuntimeSessionSummary {
     messageCount: session.messageCount,
     focus: session.taskState?.focus ?? session.checkpoint?.focus,
     hasMemory: Boolean(session.sessionMemory?.summary.trim()),
+    contextBudget: session.contextBudget ? {
+      limitChars: session.contextBudget.limitChars,
+      estimatedChars: session.contextBudget.estimatedChars,
+      remainingChars: session.contextBudget.remainingChars,
+      usageRatio: session.contextBudget.usageRatio,
+      compressed: session.contextBudget.compressed,
+      compressionMode: session.contextBudget.compressionMode,
+      compressionReason: session.contextBudget.compressionReason,
+      promptHotspots: session.contextBudget.promptHotspots,
+    } : undefined,
   };
 }
 
@@ -89,16 +100,8 @@ function readControlPlaneStatus(rootDir: string): {
   const ledger = new ControlPlaneLedger(rootDir);
   try {
     const executions = ledger.executions.list();
-    const recent = executions
-      .map(summarizeExecution)
-      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
-      .slice(0, DEFAULT_RECENT_LIMIT);
     return {
-      executions: {
-        total: executions.length,
-        active: executions.filter(isActiveExecution).map(summarizeExecution),
-        recent,
-      },
+      executions: summarizeExecutionSet(executions, { recentLimit: DEFAULT_RECENT_LIMIT }),
       wakeSignals: {
         recent: ledger.wakeSignals.list().map(summarizeWakeSignal).slice(0, DEFAULT_RECENT_LIMIT),
       },
@@ -135,45 +138,31 @@ function summarizeTaskLifecycle(lifecycle: TaskLifecycleRecord): RuntimeTaskLife
 }
 
 async function readSpecStatus(rootDir: string): Promise<RuntimeStatus["specs"]> {
-  const specs = await new SpecStore(rootDir, { rootDir }).list(DEFAULT_RECENT_LIMIT).catch(() => []);
-  const summaries = specs.map((spec) => ({
+  const store = new SpecStore(rootDir, { rootDir });
+  const specs = await store.list(DEFAULT_RECENT_LIMIT).catch(() => []);
+  const summaries = await Promise.all(specs.map(async (spec) => {
+    const state = await store.load(spec.id).catch(() => null);
+    const documents = state ? await store.readAllDocuments(state.id).catch(() => undefined) : undefined;
+    const workflow = buildSpecWorkflowSummary({ spec: state, documents });
+    return {
     id: spec.id,
     title: spec.title,
     stage: spec.stage,
     status: spec.status,
     updatedAt: spec.updatedAt,
     workspace: spec.workspace?.path,
+    workflow: {
+      nextGate: workflow.nextGate,
+      writableTools: workflow.writableTools,
+      confirmed: workflow.confirmed,
+      documents: workflow.documents,
+    },
+  };
   }));
   return {
     total: summaries.length,
     active: summaries.filter((spec) => spec.status === "active"),
     recent: summaries,
-  };
-}
-
-function summarizeExecution(execution: ExecutionRecord): RuntimeExecutionSummary {
-  return {
-    id: execution.id,
-    kind: execution.kind,
-    status: execution.status,
-    assignment: execution.assignment,
-    actorName: execution.actorName,
-    actorRole: execution.actorRole,
-    requestedBy: execution.requestedBy,
-    sessionId: execution.sessionId,
-    pid: execution.pid,
-    cwd: execution.cwd,
-    waitPolicy: execution.waitPolicy?.lead,
-    summary: execution.summary,
-    outputPreview: execution.output ? truncateExecutionOutput(execution.output) : undefined,
-    health: summarizeExecutionHealth(execution),
-    deadlineAt: getExecutionDeadlineAt(execution),
-    lastOutputAt: execution.lastOutputAt,
-    closeReason: execution.closeReason,
-    terminatedBy: execution.terminatedBy,
-    changedPaths: execution.changedPaths,
-    error: execution.error,
-    updatedAt: execution.updatedAt,
   };
 }
 
@@ -184,9 +173,4 @@ function summarizeWakeSignal(signal: WakeSignalRecord): RuntimeWakeSignalSummary
     reason: signal.reason,
     createdAt: signal.createdAt,
   };
-}
-
-function truncateExecutionOutput(value: string): string {
-  const normalized = value.trim();
-  return normalized.length <= 240 ? normalized : `${normalized.slice(0, 240)}...`;
 }

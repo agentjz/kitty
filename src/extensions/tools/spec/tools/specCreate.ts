@@ -5,6 +5,7 @@ import type { RegisteredTool } from "../../../../tools/core/types.js";
 import { changedJsonResult } from "../../../shared.js";
 import { getSpecPaths } from "../../../../spec/layout.js";
 import { SpecStore, summarizeSpec } from "../../../../spec/store.js";
+import { buildSpecWorkflowSummary } from "../../../../spec/workflowSummary.js";
 import { recordSpecLifecycle } from "../lifecycle.js";
 
 export const specCreateTool: RegisteredTool = {
@@ -37,9 +38,11 @@ export const specCreateTool: RegisteredTool = {
     });
     recordSpecLifecycle(context, state, "spec_create");
     const specDir = getSpecPaths(context.projectContext.stateRootDir, state.id).specDir;
+    const documents = await store.readAllDocuments(state.id);
     return changedJsonResult({
       ok: true,
       spec: summarizeSpec(state),
+      workflow: buildSpecWorkflowSummary({ spec: state, documents }),
       directory: path.relative(context.projectContext.rootDir, specDir),
       workspace: state.workspace,
     }, [specDir, state.workspace?.path].filter((item): item is string => Boolean(item)));

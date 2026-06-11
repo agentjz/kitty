@@ -37,6 +37,50 @@ test("context compression keeps full current turn while under budget", () => {
   assert.equal(request.compressed, false);
   assert.equal(request.summary, undefined);
   assert.equal(request.messages.length, 1 + messages.length);
+  assert.equal(request.budget.compressed, false);
+  assert.equal(request.budget.limitChars, 900_000);
+  assert.equal(request.budget.compressionReason, "within_budget");
+  assert.ok(request.budget.remainingChars > 0);
+  assert.equal(request.budget.promptHotspots[0]?.title, "static_1");
+});
+
+test("context compression exposes budget facts when the request is compacted", () => {
+  const messages: StoredMessage[] = [
+    {
+      role: "user",
+      content: `start ${"u".repeat(600)}`,
+      createdAt: "2026-05-20T00:00:00.000Z",
+    },
+    ...Array.from({ length: 20 }, (_, index): StoredMessage => ({
+      role: index % 2 === 0 ? "assistant" : "tool",
+      name: index % 2 === 0 ? undefined : "read",
+      content: `message ${index} ${"x".repeat(800)}`,
+      createdAt: `2026-05-20T00:00:${String(index + 1).padStart(2, "0")}.000Z`,
+    })),
+  ];
+
+  const request = buildCompressedContextRequest(
+    {
+      staticBlocks: [`static ${"s".repeat(3_000)}`],
+      profilePersonaBlocks: ["profile"],
+      runtimeFactBlocks: ["runtime"],
+    },
+    messages,
+    {
+      contextWindowMessages: 10,
+      model: "deepseek-v4-flash",
+      maxContextChars: 8_000,
+      contextSummaryChars: 1_200,
+    },
+  );
+
+  assert.equal(request.compressed, true);
+  assert.equal(request.budget.compressed, true);
+  assert.equal(request.budget.limitChars, 8_000);
+  assert.ok(request.budget.estimatedChars > 0);
+  assert.ok(request.budget.usageRatio > 0);
+  assert.match(request.budget.compressionReason, /compaction/);
+  assert.equal(request.budget.promptHotspots.some((hotspot) => hotspot.layer === "static"), true);
 });
 
 test("context request keeps raw messages scoped to the current user frame", () => {

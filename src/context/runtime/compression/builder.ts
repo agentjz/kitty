@@ -2,6 +2,7 @@ import { expandStartToToolBoundary, shouldIncludeStoredAssistantReasoning } from
 import { renderPromptLayers } from "../../../agent/prompt/format.js";
 import { measurePromptLayers } from "../../../agent/prompt/metrics.js";
 import { findLatestUserInputIndex, isInternalMessage, sliceCurrentUserInputFrame } from "../../../session/turnFrame.js";
+import { buildContextBudgetReport } from "../budget.js";
 import type { ProviderMessage } from "../../../provider/contract.js";
 import type { PromptLayerMetrics, PromptLayers } from "../../../agent/prompt/types.js";
 import type { RuntimeConfig, StoredMessage } from "../../../types.js";
@@ -21,13 +22,20 @@ export function buildCompressedContextRequest(
   const frameMessages = sliceCurrentUserInputFrame(messages);
   const fullMessages = composeChatMessages(systemPrompt, frameMessages, config.model);
   const initialEstimatedChars = estimateChatMessagesChars(composeChatMessages(systemPrompt, frameMessages, config.model));
+  const initialPromptMetrics = measureSystemPrompt(systemPrompt);
 
   if (initialEstimatedChars <= safeMaxChars) {
     return {
       messages: fullMessages,
       compressed: false,
       estimatedChars: initialEstimatedChars,
-      promptMetrics: measureSystemPrompt(systemPrompt),
+      budget: buildContextBudgetReport({
+        limitChars: safeMaxChars,
+        estimatedChars: initialEstimatedChars,
+        compressed: false,
+        promptHotspots: initialPromptMetrics?.hotspots,
+      }),
+      promptMetrics: initialPromptMetrics,
     };
   }
 
@@ -52,6 +60,14 @@ export function buildCompressedContextRequest(
         messages: requestMessages,
         compressed: Boolean(summary),
         estimatedChars,
+        budget: buildContextBudgetReport({
+          limitChars: safeMaxChars,
+          estimatedChars,
+          compressed: Boolean(summary),
+          summary,
+          promptHotspots: promptMetrics?.hotspots,
+          compressionMode: summary ? "normal" : "none",
+        }),
         summary,
         promptMetrics,
       };
@@ -67,6 +83,14 @@ export function buildCompressedContextRequest(
         messages: requestMessages,
         compressed: true,
         estimatedChars,
+        budget: buildContextBudgetReport({
+          limitChars: safeMaxChars,
+          estimatedChars,
+          compressed: true,
+          summary,
+          promptHotspots: promptMetrics?.hotspots,
+          compressionMode: "aggressive",
+        }),
         summary,
         promptMetrics,
       };
@@ -93,6 +117,14 @@ export function buildCompressedContextRequest(
           messages: hardMessages,
           compressed: true,
           estimatedChars: hardEstimatedChars,
+          budget: buildContextBudgetReport({
+            limitChars: safeMaxChars,
+            estimatedChars: hardEstimatedChars,
+            compressed: true,
+            summary: hardSummary,
+            promptHotspots: measureSystemPrompt(hardPrompt)?.hotspots,
+            compressionMode: "hard",
+          }),
           summary: hardSummary,
           promptMetrics: measureSystemPrompt(hardPrompt),
         };

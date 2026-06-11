@@ -30,6 +30,7 @@ const SESSION_SNAPSHOT_KEYS = new Set([
   "taskState",
   "checkpoint",
   "sessionDiff",
+  "contextBudget",
 ]);
 
 type SessionSnapshotCandidate = Partial<SessionRecord> & {
@@ -74,6 +75,7 @@ export function parseSessionSnapshot(raw: string, sessionPath: string): SessionR
     taskState: readOptionalObject(record.taskState, "taskState", sessionPath) as SessionRecord["taskState"],
     checkpoint: readOptionalObject(record.checkpoint, "checkpoint", sessionPath) as SessionRecord["checkpoint"],
     sessionDiff: readOptionalObject(record.sessionDiff, "sessionDiff", sessionPath) as SessionRecord["sessionDiff"],
+    contextBudget: readContextBudget(record.contextBudget, sessionPath),
   };
 
   return normalizeLoadedSessionRecord(candidate as SessionRecord);
@@ -128,6 +130,51 @@ function readTodoItems(value: unknown, sessionPath: string): SessionRecord["todo
   } catch (error) {
     throw createSessionCorruptError(sessionPath, error instanceof Error ? error.message : String(error));
   }
+}
+
+function readContextBudget(value: unknown, sessionPath: string): SessionRecord["contextBudget"] {
+  if (value === undefined) {
+    return undefined;
+  }
+  const record = expectRecord(value, sessionPath, "contextBudget");
+  const version = record.version;
+  if (version !== 1) {
+    throw createSessionCorruptError(sessionPath, "contextBudget.version must be 1");
+  }
+  const compressionMode = readRequiredString(record, "compressionMode", sessionPath, "contextBudget");
+  if (compressionMode !== "none" && compressionMode !== "normal" && compressionMode !== "aggressive" && compressionMode !== "hard") {
+    throw createSessionCorruptError(sessionPath, "contextBudget.compressionMode must be one of none|normal|aggressive|hard");
+  }
+  return {
+    version,
+    limitChars: readRequiredNumber(record, "limitChars", sessionPath, "contextBudget"),
+    estimatedChars: readRequiredNumber(record, "estimatedChars", sessionPath, "contextBudget"),
+    remainingChars: readRequiredNumber(record, "remainingChars", sessionPath, "contextBudget"),
+    usageRatio: readRequiredNumber(record, "usageRatio", sessionPath, "contextBudget"),
+    compressed: readRequiredBoolean(record, "compressed", sessionPath, "contextBudget"),
+    compressionMode,
+    compressionReason: readRequiredString(record, "compressionReason", sessionPath, "contextBudget"),
+    promptHotspots: readContextBudgetHotspots(record.promptHotspots, sessionPath),
+  };
+}
+
+function readContextBudgetHotspots(value: unknown, sessionPath: string): NonNullable<SessionRecord["contextBudget"]>["promptHotspots"] {
+  if (!Array.isArray(value)) {
+    throw createSessionCorruptError(sessionPath, "contextBudget.promptHotspots must be an array");
+  }
+  return value.map((entry, index) => {
+    const record = expectRecord(entry, sessionPath, `contextBudget.promptHotspots[${index}]`);
+    const layer = readRequiredString(record, "layer", sessionPath, `contextBudget.promptHotspots[${index}]`);
+    if (layer !== "static" && layer !== "profile" && layer !== "runtimeFacts") {
+      throw createSessionCorruptError(sessionPath, `contextBudget.promptHotspots[${index}].layer must be one of static|profile|runtimeFacts`);
+    }
+    return {
+      layer,
+      title: readRequiredString(record, "title", sessionPath, `contextBudget.promptHotspots[${index}]`),
+      chars: readRequiredNumber(record, "chars", sessionPath, `contextBudget.promptHotspots[${index}]`),
+      lines: readRequiredNumber(record, "lines", sessionPath, `contextBudget.promptHotspots[${index}]`),
+    };
+  });
 }
 
 function readMessage(value: unknown, index: number, sessionPath: string): StoredMessage {
@@ -227,6 +274,32 @@ function readRequiredString(
   const value = readOptionalString(record[key], key, sessionPath, scope);
   if (!value) {
     throw createSessionCorruptError(sessionPath, `${scope ? `${scope}.` : ""}${key} is required`);
+  }
+  return value;
+}
+
+function readRequiredNumber(
+  record: Record<string, unknown>,
+  key: string,
+  sessionPath: string,
+  scope?: string,
+): number {
+  const value = record[key];
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw createSessionCorruptError(sessionPath, `${scope ? `${scope}.` : ""}${key} must be a finite number`);
+  }
+  return value;
+}
+
+function readRequiredBoolean(
+  record: Record<string, unknown>,
+  key: string,
+  sessionPath: string,
+  scope?: string,
+): boolean {
+  const value = record[key];
+  if (typeof value !== "boolean") {
+    throw createSessionCorruptError(sessionPath, `${scope ? `${scope}.` : ""}${key} must be a boolean`);
   }
   return value;
 }

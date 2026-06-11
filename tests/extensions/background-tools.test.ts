@@ -50,8 +50,11 @@ test("background run preserves streamed output after process close", async (t) =
   await waitForRegisteredBackgroundProcess(String(payload.id), 20_000);
 
   const checked = parseToolJson((await check.execute("{}", context)).output);
-  const job = (checked.jobs as Array<Record<string, unknown>>).find((item) => item.id === payload.id);
+  const job = (checked.recent as Array<Record<string, unknown>>).find((item) => item.id === payload.id);
+  assert.equal(checked.total, 1);
+  assert.equal(Array.isArray(checked.active), true);
   assert.equal(job?.status, "completed");
-  assert.match(String(job?.output), /background-smoke/);
+  assert.equal((job?.health as Record<string, unknown> | undefined)?.state, "settled");
+  assert.match(String(job?.outputPreview), /background-smoke/);
   assert.match(String(job?.summary), /background-smoke/);
 });

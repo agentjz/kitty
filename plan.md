@@ -1,126 +1,114 @@
-# Memory 主干重构计划
+# 四条主线成熟化计划
 
 ## 目标
 
-把 Kitty 的记忆系统做成可继续演进的本地 agent memory 主干：
+把当前 Kitty 从“能跑”推进到“用户能看懂、能恢复、能持续使用”的运行体验。
 
-- 当前 session 不失忆。
-- 长任务有任务现场。
-- 历史证据可追溯。
-- 长期资产可审阅。
-- 召回只暴露候选事实，最终取舍交给模型。
+本轮只处理当前存在的四条主线：
+
+- 上下文预算管理。
+- Background / subagent 真实体验。
+- Spec / plan 工作流。
+- Doctor / init / 配置体验。
+
+不做旧兼容，不写不存在的能力，不把历史残留包装成当前事实。
 
 ## 判断
 
-成熟记忆不是把历史整段塞回上下文，也不是把所有内容扔进一个向量库。
+当前主干已有可用骨架：
 
-Kitty 当前已有正确骨架：
+- context 已经只把当前用户帧作为 raw messages，并有压缩链路。
+- execution 已经有后台任务、subagent、lead wait、wake signal 和健康状态。
+- spec 已经有 requirements -> design -> tasks -> implement -> validate -> archive。
+- init 已经能生成 `.kitty/.env`、`.kitty/.env.example`、`.kitty/.kittyignore`。
 
-- session memory 由模型在 turn 收口时写出。
-- working memory 承接当前工作焦点、todo、checkpoint 和近期工具批次。
-- `.kitty/memory/**` 暴露可审阅文件资产。
-- `kitty memory` 能 list/read/search/delete，并把资产沉淀到 spec notes 或 skill references。
+缺口不在“再造一套系统”，而在四个事实没有被稳定暴露：
 
-本轮修复点：
-
-- project/user/evidence memory 没有统一元数据契约。
-- memory asset 的证据引用只靠散落的 `Evidence:` 行。
-- 搜索已从整句包含改为多词候选召回，并返回命中分数。
-- 没有标准写入入口，长期资产容易变成随手写文件。
-- 测试还没覆盖“证据引用、分词召回、长期资产写入、删除边界”这些真实行为。
+- 上下文预算没有成为清楚的运行事实。
+- 后台和 subagent 的状态输出偏原始，用户不容易判断发生了什么。
+- spec 阶段门存在，但当前阶段、下一步和工具面不够清楚。
+- doctor 在配置解析失败前缺少本地预检，init 也没有给出模板状态事实。
 
 ## 设计
 
-### 证据
+### 上下文预算
 
-证据是底座。
+预算结果由 context request 生成，同一份事实进入 runtime status 和测试：
 
-每条 memory asset 都可以带：
+- `limitChars`
+- `estimatedChars`
+- `remainingChars`
+- `usageRatio`
+- `compressed`
+- `compressionReason`
+- `promptMetrics.hotspots`
 
-- `Kind`
-- `Title`
-- `Updated`
-- `Evidence`
-- `Scope`
-- `Tags`
+机器只暴露数字、边界和压缩事实；模型负责判断是否需要继续读文件、沉淀记忆或缩小范围。
 
-机器只解析这些死事实，不替模型判断含义。
+### Background / Subagent
 
-### 会话记忆
+execution ledger 是唯一事实源。
 
-session memory 保持当前设计：
+新增统一 execution 摘要：
 
-- 模型写内容。
-- 机器维护固定区块和长度边界。
-- session record 是运行时入口。
-- `.kitty/memory/sessions/*.md` 是同一次保存生成的可审阅资产。
+- active / recent 分组。
+- status、health、deadlineAt、lastOutputAt、outputPreview。
+- assignment objective / boundary / expectedOutput。
+- closeReason、error、changedPaths。
 
-### 长期资产
+`background_check`、`subagent_check`、`kitty status` 只呈现这份摘要，不各自发明状态语言。
 
-project/user/evidence memory 统一通过 runtime memory 写入入口创建。
+### Spec / Plan 工作流
 
-资产文件使用稳定 Markdown：
+spec 保持当前 spec mode，不改名，不恢复旧模式。
 
-```md
-# <title>
+新增 workflow summary：
 
-Kind: project
-Updated: <iso time>
-Evidence: session:<id>
-Scope: <scope>
-Tags: tag-a, tag-b
+- active spec。
+- current stage。
+- confirmed gates。
+- next gate。
+- document state。
+- writable tool surface。
+- isolated workspace。
 
-<content>
-```
+prompt、status、spec 工具输出引用同一份 summary。提示词保持通用，不用硬编码用户话术。
 
-没有证据引用也可以写，但 CLI/status/search 必须显式暴露 `evidenceRefs: []`，不伪造来源。
+### Doctor / Init / 配置
 
-### 召回
+本地配置体验分成两层：
 
-`kitty memory --query` 是机器召回候选，不是语义判断。
+- preflight：不依赖完整 runtime，检查 `.kitty` 文件、env key、provider preset、extension switches。
+- runtime probe：runtime 能加载且有 API key 时，再探测 provider。
 
-召回规则：
+init 负责创建模板并暴露 created / skipped / expected files，不强行覆盖用户本地密钥。
 
-- 标准化文本。
-- 查询切成 token。
-- 每个 token 都必须命中同一个 asset。
-- 返回命中的证据行和命中分数。
-- 不把搜索结果自动注入模型上下文。
-
-### 沉淀
-
-已有沉淀路径保留：
-
-- memory asset -> spec notes
-- memory asset -> skill references
-
-新增写入入口后，后续可以让模型把 session memory 中的稳定经验沉淀为 project/user/evidence asset。
-
-本轮不做：
-
-- 图数据库。
-- 向量数据库。
-- 大规模长期画像自动生成。
-- 腾讯整套 memory pipeline 迁移。
-
-这些可以作为未来方向，但不进入当前实现主干。
+doctor 先输出本地 preflight，再输出 runtime 和 provider 连接事实。
 
 ## 执行清单
 
-- [x] 增加 memory asset 元数据解析。
-- [x] 增加统一的 runtime memory asset 写入入口。
-- [x] session memory asset 使用统一元数据头。
-- [x] search 改成 token 候选召回，并返回 score。
-- [x] CLI 支持创建 project/user/evidence memory asset。
-- [x] status/list 展示统一证据引用。
-- [x] 测试覆盖 session asset 元数据、长期资产写入、搜索召回、删除边界、sink 路径。
-- [x] 同步 README、philosophy、spec。
-- [x] 运行完整验证。
+- [ ] 增加 context budget report，并接入 context request。
+- [ ] 在 runtime status 中暴露最近一次 session 的 context budget。
+- [ ] 测试 budget report 的 limit、usage、compressionReason、hotspots。
+- [ ] 增加 execution summary helper，统一 background/subagent/status 输出。
+- [ ] 改造 `background_check` 输出为 active/recent/stale/summary。
+- [ ] 改造 `subagent_check` 输出为 active/recent/summary。
+- [ ] 测试 background/subagent check 的用户可见状态。
+- [ ] 增加 spec workflow summary helper。
+- [ ] 在 spec prompt、runtime status、spec open/create 输出中暴露 workflow summary。
+- [ ] 测试 spec 阶段门、next gate、工具面和文档状态。
+- [ ] 增加 config preflight helper。
+- [ ] doctor 先运行 preflight，再加载 runtime，再 provider probe。
+- [ ] init 输出模板状态，并保持不加载 runtime。
+- [ ] 测试 doctor 在缺 `.env`、缺 key、模板完整时的输出。
+- [ ] 同步 README / philosophy / spec 中与四条主线有关的当前事实。
+- [ ] 运行 `npm.cmd run verify`。
 
 ## 完成标准
 
-- `kitty memory --create project ...` 能生成可审阅 asset。
-- 每条 asset 的 kind、scope、tags、evidenceRefs 由同一套解析逻辑得到。
-- 搜索能按多个词召回同一 asset 的候选事实。
-- session memory、project memory、user memory、evidence memory 在代码、测试、文档中讲同一个事实。
+- `kitty status` 能看清上下文预算、execution 健康、active spec 阶段门和配置状态。
+- `background_check` 和 `subagent_check` 输出用户可理解的执行事实，不再只倒原始账本。
+- spec 模式能清楚显示当前阶段、下一步、确认门和工具面。
+- `kitty init` 是稳定模板创建体验，`kitty doctor` 是稳定本地诊断体验。
+- 代码、测试、README、philosophy、spec 讲同一个当前事实。
 - `npm.cmd run verify` 通过。

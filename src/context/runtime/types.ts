@@ -3,6 +3,7 @@ import type { PromptLayerMetrics, PromptLayers, PromptRuntimeState } from "../..
 import type { SessionConversationBrief } from "./sessionBrief/types.js";
 import type { AgentWorkingMemory } from "./workingMemory/types.js";
 import type { TaskLifecycleRecord } from "../../control/ledger.js";
+import type { ContextBudgetReport } from "../../types/contextBudget.js";
 import type {
   ProjectMap,
   ProjectContext,
@@ -55,6 +56,7 @@ export interface ContextRuntimeRequest {
   messages: ProviderMessage[];
   compressed: boolean;
   estimatedChars: number;
+  budget: ContextBudgetReport;
   summary?: string;
   promptMetrics?: PromptLayerMetrics;
 }

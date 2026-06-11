@@ -25,6 +25,9 @@ test("spec runtime exposes spec prompt, tools, and isolated workspace", async (t
   const toolNames = runtime.tools.map((tool) => tool.definition.function.name);
 
   assert.equal(runtime.activeSpec?.id, spec.id);
+  assert.equal(runtime.workflow.nextGate, "confirm_requirements");
+  assert.equal(runtime.workflow.writableTools, "planning");
+  assert.equal(runtime.workflow.documents.requirements.present, true);
   assert.equal(runtime.cwd, spec.workspace?.path);
   assert.deepEqual(readBuiltinToolNames(runtime.builtinToolFilter), ["read", "bash"]);
   assert.match(runtime.promptBlock, /Kitty spec mode/);
@@ -34,6 +37,8 @@ test("spec runtime exposes spec prompt, tools, and isolated workspace", async (t
   assert.match(runtime.promptBlock, /recent conversation text/);
   assert.match(runtime.promptBlock, /Clean up conflicting or stale notes before writing design\.md or tasks\.md/);
   assert.match(runtime.promptBlock, /confirmed implementation work expands the writable code tool surface/);
+  assert.match(runtime.promptBlock, /Workflow summary:/);
+  assert.match(runtime.promptBlock, /Next gate: confirm_requirements/);
   assert.equal(toolNames.includes("spec_create"), true);
   assert.equal(toolNames.includes("spec_checkpoint_restore"), true);
 });
@@ -49,6 +54,7 @@ test("spec runtime tells new feature sessions to create a spec and persist notes
   });
 
   assert.equal(runtime.activeSpec, null);
+  assert.equal(runtime.workflow.nextGate, "create_spec");
   assert.deepEqual(readBuiltinToolNames(runtime.builtinToolFilter), ["read", "bash"]);
   assert.match(runtime.promptBlock, /Active spec: none bound to this session/);
   assert.match(runtime.promptBlock, /call spec_create first/);
@@ -82,6 +88,8 @@ test("spec builtin tool surface expands only for confirmed implementation work",
 
   assert.deepEqual(readBuiltinToolNames(createSpecBuiltinToolFilter(ready)), ["read", "write", "edit", "bash"]);
   assert.deepEqual(readBuiltinToolNames(runtime.builtinToolFilter), ["read", "write", "edit", "bash"]);
+  assert.equal(runtime.workflow.nextGate, "implement_tasks");
+  assert.equal(runtime.workflow.writableTools, "implementation");
 });
 
 function readBuiltinToolNames(filter: (tool: ReturnType<typeof getBuiltinTools>[number]) => boolean): string[] {

@@ -11,6 +11,10 @@ export type {
   RuntimeConfig,
 } from "./types/config.js";
 export type {
+  ContextBudgetHotspot,
+  ContextBudgetReport,
+} from "./types/contextBudget.js";
+export type {
   ToolDiagnosticFileReport,
   ToolDiagnosticItem,
   ToolDiagnosticsReport,

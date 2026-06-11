@@ -9,10 +9,12 @@ import {
   PROJECT_STATE_ENV_FILE_NAME,
   PROJECT_STATE_IGNORE_FILE_NAME,
 } from "../project/statePaths.js";
+import { inspectConfigPreflight, type ConfigPreflightReport } from "./preflight.js";
 
 export interface InitProjectResult {
   created: string[];
   skipped: string[];
+  preflight: ConfigPreflightReport;
 }
 
 export async function initializeProjectFiles(cwd: string): Promise<InitProjectResult> {
@@ -52,6 +54,7 @@ export async function initializeProjectFiles(cwd: string): Promise<InitProjectRe
   return {
     created,
     skipped,
+    preflight: await inspectConfigPreflight(cwd),
   };
 }
 

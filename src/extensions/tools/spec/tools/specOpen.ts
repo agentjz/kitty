@@ -2,6 +2,7 @@ import { parseArgs, readString } from "../../../../tools/core/shared.js";
 import type { RegisteredTool } from "../../../../tools/core/types.js";
 import { getSpecSessionBindingFile } from "../../../../spec/layout.js";
 import { SpecStore, summarizeSpec } from "../../../../spec/store.js";
+import { buildSpecWorkflowSummary } from "../../../../spec/workflowSummary.js";
 import { changedJsonResult } from "../../../shared.js";
 import { recordSpecLifecycle } from "../lifecycle.js";
 
@@ -31,11 +32,13 @@ export const specOpenTool: RegisteredTool = {
     const state = await store.load(specId);
     await store.bindSession(context.sessionId, specId);
     recordSpecLifecycle(context, state, "spec_open");
+    const documents = await store.readAllDocuments(specId);
     return changedJsonResult({
       ok: true,
       spec: summarizeSpec(state),
+      workflow: buildSpecWorkflowSummary({ spec: state, documents }),
       workspace: state.workspace,
-      documents: await store.readAllDocuments(specId),
+      documents,
     }, [getSpecSessionBindingFile(context.projectContext.stateRootDir, context.sessionId)]);
   },
 };

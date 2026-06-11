@@ -50,6 +50,23 @@ export interface RuntimeSessionSummary {
   messageCount: number;
   focus?: string;
   hasMemory: boolean;
+  contextBudget?: RuntimeContextBudgetSummary;
+}
+
+export interface RuntimeContextBudgetSummary {
+  limitChars: number;
+  estimatedChars: number;
+  remainingChars: number;
+  usageRatio: number;
+  compressed: boolean;
+  compressionMode: string;
+  compressionReason: string;
+  promptHotspots: Array<{
+    layer: string;
+    title: string;
+    chars: number;
+    lines: number;
+  }>;
 }
 
 export interface RuntimeMemoryAssetSummary {
@@ -92,6 +109,7 @@ export interface RuntimeExecutionSummary {
   requestedBy: string;
   sessionId?: string;
   pid?: number;
+  command?: string;
   cwd: string;
   waitPolicy?: string;
   summary?: string;
@@ -125,4 +143,18 @@ export interface RuntimeSpecSummary {
   status: string;
   updatedAt: string;
   workspace?: string;
+  workflow?: {
+    nextGate: string;
+    writableTools: string;
+    confirmed: {
+      requirements: boolean;
+      design: boolean;
+      tasks: boolean;
+    };
+    documents: Record<string, {
+      present: boolean;
+      bytes: number;
+      initial: boolean;
+    }>;
+  };
 }

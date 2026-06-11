@@ -1,8 +1,11 @@
 import type { Command } from "commander";
+import path from "node:path";
 
 import { probeProviderConnection } from "../../provider/connection.js";
+import { formatConfigPreflightReport, inspectConfigPreflight } from "../../config/preflight.js";
 import type { CliOverrides, RuntimeConfig } from "../../types.js";
 import { ui } from "../../utils/console.js";
+import { writeStdoutLine } from "../../utils/stdio.js";
 
 export function registerDoctorCommand(
   program: Command,
@@ -20,9 +23,18 @@ export function registerDoctorCommand(
     .command("doctor")
     .description("Check local setup and validate the API connection.")
     .action(async () => {
-      const runtime = await options.resolveRuntime(options.getCliOverrides());
+      const overrides = options.getCliOverrides();
+      const cwd = overrides.cwd ? path.resolve(overrides.cwd) : process.cwd();
+      const preflight = await inspectConfigPreflight(cwd);
 
       ui.heading("kitty doctor");
+      for (const line of formatConfigPreflightReport(preflight)) {
+        writeStdoutLine(line);
+      }
+
+      const runtime = await options.resolveRuntime(overrides);
+
+      ui.heading("runtime");
       ui.info(`env: ${runtime.paths.configDir}`);
       ui.info(`provider: ${runtime.config.provider}`);
       ui.info(`model: ${runtime.config.model}`);

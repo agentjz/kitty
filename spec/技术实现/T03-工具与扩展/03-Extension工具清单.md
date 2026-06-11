@@ -27,13 +27,13 @@
 ## background
 
 - `background_run`：启动后台命令，写入 control-plane execution 账本，持续记录运行输出预览、摘要、last output 和 deadline，返回 execution id、pid、deadline 和状态。
-- `background_check`：读取后台 execution 事实，并 reconcile 已丢失的 running pid。
+- `background_check`：读取后台 execution 摘要，并 reconcile 已丢失的 running pid；输出 total、active、recent、health、deadline、last output 和 output preview。
 - `background_terminate`：终止一个后台 execution，等待当前宿主进程内的后台 handle 释放，并把生命周期关闭为 aborted。
 
 ## subagent
 
 - `subagent_launch`：启动聚焦 subagent execution，写入 objective、boundary、expected output、timeout/deadline 等派工事实，返回 execution id、actor、deadline 和状态。execution 默认带阻塞型 `waitPolicy`；lead 调用后会让出当前轮，由 host 等 execution 结束后唤醒 lead。worker 最终可见回答写入 execution summary/output/changed paths。
-- `subagent_check`：列出 subagent execution 事实。
+- `subagent_check`：列出 subagent execution 摘要；输出 total、active、recent、health、派工边界、deadline 和 worker summary/output preview。
 
 ## skills
 
@@ -47,8 +47,8 @@
 
 - `spec_list`：列出 `.kitty/specs/changes` 下的 durable spec。
 - `spec_search`：按 title、summary 和四个文档内容搜索 spec。
-- `spec_create`：创建 spec、初始化带骨架的四个文档、绑定当前 session、创建隔离 git worktree，并把 Task Lifecycle 切到 `spec_work`。
-- `spec_open`：按 `specId` 打开 spec，绑定当前 session，返回四个文档，并记录 active spec。
+- `spec_create`：创建 spec、初始化带骨架的四个文档、绑定当前 session、创建隔离 git worktree，并把 Task Lifecycle 切到 `spec_work`；返回 workflow summary。
+- `spec_open`：按 `specId` 打开 spec，绑定当前 session，返回四个文档和 workflow summary，并记录 active spec。
 - `spec_update_state`：更新 title、summary、stage、status 和确认标记，并同步 Task Lifecycle 的 active spec/stage 事实。
 - `spec_append_note`：追加事实笔记到 `notes.md`。
 - `spec_write_document`：写入 `requirements`、`design`、`tasks` 或 `notes` 文档。

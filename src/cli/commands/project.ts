@@ -30,6 +30,7 @@ export function registerProjectCommands(
       const overrides = options.getCliOverrides();
       const cwd = overrides.cwd ? path.resolve(overrides.cwd) : process.cwd();
       const { initializeProjectFiles } = await import("../../config/init.js");
+      const { formatConfigPreflightReport } = await import("../../config/preflight.js");
       const result = await initializeProjectFiles(cwd);
 
       if (result.created.length > 0) {
@@ -44,6 +45,11 @@ export function registerProjectCommands(
         for (const filePath of result.skipped) {
           writeStdoutLine(filePath);
         }
+      }
+
+      ui.heading("config preflight");
+      for (const line of formatConfigPreflightReport(result.preflight)) {
+        writeStdoutLine(line);
       }
     });
 

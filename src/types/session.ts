@@ -1,5 +1,6 @@
 import type { RuntimeTransition } from "./runtimeTransitions.js";
 import type { ToolDiagnosticsReport } from "./diagnostics.js";
+import type { ContextBudgetReport } from "./contextBudget.js";
 
 export interface ToolCallRecord {
   id: string;
@@ -33,6 +34,7 @@ export interface SessionRecord {
   taskState?: TaskState;
   checkpoint?: SessionCheckpoint;
   sessionDiff?: SessionDiffState;
+  contextBudget?: ContextBudgetReport;
 }
 
 export interface SessionMemoryState {

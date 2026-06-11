@@ -1,7 +1,8 @@
 import { formatPromptBlock } from "../agent/prompt/format.js";
+import { formatSpecWorkflowSummary, type SpecWorkflowSummary } from "./workflowSummary.js";
 import type { SpecState } from "./types.js";
 
-export function buildSpecModePromptBlock(activeSpec: SpecState | null): string {
+export function buildSpecModePromptBlock(activeSpec: SpecState | null, workflow?: SpecWorkflowSummary): string {
   const lines = [
     "You are running in Kitty spec mode, the isolated SDD surface for new projects and substantial features.",
     "The user chose spec mode at process startup. Remain in spec mode for this session; explicit exit or unrelated maintenance requests return to agent-mode behavior.",
@@ -59,6 +60,14 @@ export function buildSpecModePromptBlock(activeSpec: SpecState | null): string {
       "Active spec: none bound to this session.",
       "For a new feature or project idea, call spec_create first, then record clarified facts in notes.md before implementation.",
       "For an existing feature, search and open the requested spec explicitly.",
+    );
+  }
+
+  if (workflow) {
+    lines.push(
+      "",
+      "Workflow summary:",
+      formatSpecWorkflowSummary(workflow),
     );
   }
 

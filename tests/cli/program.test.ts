@@ -37,6 +37,25 @@ test("init bootstraps project templates without loading runtime config", async (
   assert.equal(fs.existsSync(path.join(root, PROJECT_STATE_DIR_NAME, PROJECT_STATE_IGNORE_FILE_NAME)), true);
 });
 
+test("doctor prints preflight facts before runtime loading", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "kitty-doctor-preflight-"));
+  let runtimeLoaded = false;
+  const program = buildCliProgram({
+    resolveRuntime: async () => {
+      runtimeLoaded = true;
+      throw new Error("runtime unavailable");
+    },
+  });
+
+  program.exitOverride();
+  await assert.rejects(
+    () => program.parseAsync(["-C", root, "doctor"], { from: "user" }),
+    /runtime unavailable/,
+  );
+
+  assert.equal(runtimeLoaded, true);
+});
+
 test("cli setup errors explain the bootstrap path", () => {
   const root = path.join(os.tmpdir(), "kitty-missing-env");
   const message = formatCliSetupError(
