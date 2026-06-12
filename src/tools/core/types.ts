@@ -78,4 +78,7 @@ export interface ToolContext {
     changeId?: string;
     reason?: string;
   }) => Promise<void>;
+
+  /** Optional host callback to enqueue a file for delivery (e.g. Telegram document upload). */
+  enqueueFile?: (filePath: string, fileName?: string, caption?: string) => Promise<string | undefined>;
 }

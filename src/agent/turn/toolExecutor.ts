@@ -32,6 +32,7 @@ export async function executeToolCallWithRecovery(
       projectContext,
       changeStore,
       createToolRegistry,
+      enqueueFile: options.callbacks?.enqueueFile,
       recordWorksetFile: async (input) => {
         const nextSession = recordSessionWorksetFile(session, {
           cwd: options.cwd,

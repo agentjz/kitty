@@ -36,6 +36,7 @@ export async function runTelegramTurn(options: {
   attachmentStore: TelegramAttachmentStoreLike;
   deliveryQueue: {
     flushDue(): Promise<void>;
+    enqueueFile(input: { chatId: number; filePath: string; fileName?: string; caption?: string }): Promise<{ id: string }>;
   };
   logger: TelegramLogger;
   message: TelegramPrivateMessage | TelegramPrivateFileMessage;
@@ -94,12 +95,26 @@ export async function runTelegramTurn(options: {
       enqueueVisibleMessage: async (target, text) => options.enqueueReply(target.chatId, text),
       typingIntervalMs: options.config.telegram.typingIntervalMs,
     });
-    const callbacks = createLoggedTelegramCallbacks(display, options.logger, {
-      peerKey: options.message.peerKey,
-      userId: options.message.userId,
-      chatId: options.message.chatId,
-      sessionId: session.id,
-    });
+    const enqueueFile = async (filePath: string, fileName?: string, caption?: string) => {
+      const entry = await options.deliveryQueue.enqueueFile({
+        chatId: options.message.chatId,
+        filePath,
+        fileName,
+        caption,
+      });
+      return entry.id;
+    };
+    const callbacks = createLoggedTelegramCallbacks(
+      display,
+      options.logger,
+      {
+        peerKey: options.message.peerKey,
+        userId: options.message.userId,
+        chatId: options.message.chatId,
+        sessionId: session.id,
+      },
+      enqueueFile,
+    );
     options.logger.info("starting turn", {
       peerKey: options.message.peerKey,
       userId: options.message.userId,

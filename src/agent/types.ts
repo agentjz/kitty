@@ -24,6 +24,9 @@ export interface AgentCallbacks {
   onToolCall?: (name: string, args: string) => void;
   onToolResult?: (name: string, output: string) => void;
   onToolError?: (name: string, error: string) => void;
+
+  /** Optional host callback to send a file back to the conversation (e.g. Telegram sendDocument). */
+  enqueueFile?: (filePath: string, fileName?: string, caption?: string) => Promise<string | undefined>;
 }
 
 export interface RunTurnOptions {

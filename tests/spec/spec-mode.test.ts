@@ -86,8 +86,8 @@ test("spec builtin tool surface expands only for confirmed implementation work",
     projectDocMaxBytes: PROJECT_DOC_MAX_BYTES,
   });
 
-  assert.deepEqual(readBuiltinToolNames(createSpecBuiltinToolFilter(ready)), ["read", "write", "edit", "bash"]);
-  assert.deepEqual(readBuiltinToolNames(runtime.builtinToolFilter), ["read", "write", "edit", "bash"]);
+  assert.deepEqual(readBuiltinToolNames(createSpecBuiltinToolFilter(ready)), ["read", "write", "edit", "bash", "send_file"]);
+  assert.deepEqual(readBuiltinToolNames(runtime.builtinToolFilter), ["read", "write", "edit", "bash", "send_file"]);
   assert.equal(runtime.workflow.nextGate, "implement_tasks");
   assert.equal(runtime.workflow.writableTools, "implementation");
 });

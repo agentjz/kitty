@@ -11,9 +11,11 @@ export function createLoggedTelegramCallbacks(
     chatId: number;
     sessionId: string;
   },
+  enqueueFile?: (filePath: string, fileName?: string, caption?: string) => Promise<string | undefined>,
 ): RunTurnOptions["callbacks"] {
   return {
     ...display.callbacks,
+    enqueueFile,
     onStatus: (text) => {
       logger.info("phase", {
         ...context,

@@ -1,11 +1,12 @@
 import type { RegisteredTool } from "../tools/core/types.js";
-import { bashToolDefinition, editToolDefinition, readToolDefinition, writeToolDefinition } from "./index.js";
+import { bashToolDefinition, editToolDefinition, readToolDefinition, sendFileToolDefinition, writeToolDefinition } from "./index.js";
 
 export const agentCoreToolCatalog: readonly RegisteredTool[] = [
   withChangeSignal(readToolDefinition, "none"),
   withChangeSignal(writeToolDefinition, "required"),
   withChangeSignal(editToolDefinition, "required"),
   withChangeSignal(bashToolDefinition, "none"),
+  withChangeSignal(sendFileToolDefinition, "none"),
 ];
 
 export function getBuiltinTools(): readonly RegisteredTool[] {
