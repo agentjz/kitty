@@ -74,6 +74,13 @@ export const writeToolDefinition: RegisteredTool = {
       diff: truncateText(preview, 6_000),
       diagnostics,
     });
+    await context.recordWorksetFile?.({
+      path: resolved,
+      toolName: "write",
+      changed: true,
+      changeId: changeRecord.change?.id,
+      reason: existed ? "rewritten" : "created",
+    });
 
     return okResult(
       JSON.stringify(

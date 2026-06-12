@@ -17,6 +17,7 @@ test("project state paths centralize extension and observability state", async (
   assert.equal(path.basename(paths.kittyDir), PROJECT_STATE_DIR_NAME);
   assert.equal(paths.sessionsDir.startsWith(paths.kittyDir), true);
   assert.equal(paths.changesDir.startsWith(paths.kittyDir), true);
+  assert.equal(paths.eventsDir.startsWith(paths.kittyDir), true);
   assert.equal(paths.extensionsDir.startsWith(paths.kittyDir), true);
   assert.equal(paths.evidenceMemoryDir.startsWith(paths.memoryDir), true);
   assert.equal(paths.projectMemoryDir.startsWith(paths.memoryDir), true);
@@ -28,6 +29,7 @@ test("project state paths centralize extension and observability state", async (
     "cacheDir",
     "changesDir",
     "controlPlaneLedgerFile",
+    "eventsDir",
     "evidenceMemoryDir",
     "extensionsDir",
     "kittyDir",
@@ -45,6 +47,7 @@ test("project state paths centralize extension and observability state", async (
   await ensureProjectStateDirectories(root);
   assert.equal((await fs.stat(paths.sessionsDir)).isDirectory(), true);
   assert.equal((await fs.stat(paths.changesDir)).isDirectory(), true);
+  assert.equal((await fs.stat(paths.eventsDir)).isDirectory(), true);
   assert.equal((await fs.stat(paths.extensionsDir)).isDirectory(), true);
   assert.equal((await fs.stat(paths.evidenceMemoryDir)).isDirectory(), true);
   assert.equal((await fs.stat(paths.projectMemoryDir)).isDirectory(), true);

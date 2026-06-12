@@ -84,6 +84,8 @@ Memory 搜索是候选召回，不是语义裁判。机器按文本 token、路�
 
 固定区块包括当前工作焦点、用户约束、决策、未结事项、验证事实和可复用经验。机器维护格式、保存文本和文件位置。模型判断哪些经验值得复用，哪些历史只适合取证。
 
+工作集是当前 session 的现场索引。文件被 `read` 成功读取时进入工作集，被 `edit` / `write` 成功变更时记录变更次数和 change id。工作集回答“这轮任务实际碰过哪些文件”，不回答“哪些文件最重要”。
+
 ## 🧾 运行现场
 
 长任务应该靠模型记住，还是靠本地现场接住？
@@ -114,13 +116,15 @@ Agent turn 生命周期负责把当前输入、工具批次、provider 恢复、
 
 Lead wait 必须有边界。阻塞型 subagent execution 会让 lead 让出当前轮；execution 完成或等待 deadline 到达后，host 用 internal wake facts 恢复 lead。wake 是运行事实，不是用户新要求。
 
+Session events 是宿主和未来入口共享的事件边界。它记录 session 创建、turn 开始、完成、失败和中断。事件是机器事实，不进入自然对话主轨，也不写成用户意图。
+
 ## 🧪 评测
 
 Agent 不能只靠单元测试证明成熟。
 
 小猫智能体用 evaluation harness 暴露真实体验场景：简单问题不疯狂工作、长会话不失忆、旧目标不回灌、项目地图帮助定向、memory 可审阅可追溯、background 可恢复可终止、subagent 能唤醒 lead、spec 工作流能闭环。
 
-`kitty eval` 列出验收场景和机器事实。`kitty eval --run` 运行本地可验证检查，输出 pass/fail/skip。它不替模型打分，也不把口号写成测试。
+`kitty eval` 列出验收场景和机器事实。`kitty eval --run` 运行本地可验证检查，也会用假 provider 跑真实 host turn golden 场景，检查工具、session、workset 和 events 的闭环。它不替模型打分，也不把口号写成测试。
 
 ## 🧱 当前事实主干
 

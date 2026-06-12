@@ -71,4 +71,11 @@ export interface ToolContext {
   projectContext: ProjectContext;
   changeStore: ChangeStore;
   createToolRegistry: ToolRegistryFactory;
+  recordWorksetFile?: (input: {
+    path: string;
+    toolName: string;
+    changed: boolean;
+    changeId?: string;
+    reason?: string;
+  }) => Promise<void>;
 }

@@ -1,4 +1,5 @@
 import type { ChangeStore } from "../changes/store.js";
+import { recordSessionWorksetFile } from "../../session/workset.js";
 import { ToolExecutionError } from "../../tools/core/errors.js";
 import { createToolRegistry } from "../../tools/index.js";
 import type { ProjectContext, SessionRecord, ToolCallRecord, ToolExecutionResult } from "../../types.js";
@@ -12,6 +13,7 @@ export async function executeToolCallWithRecovery(
   session: SessionRecord,
   projectContext: ProjectContext,
   changeStore: ChangeStore,
+  updateSession?: (session: SessionRecord) => Promise<void>,
 ): Promise<ToolExecutionResult> {
   try {
     return await toolRegistry.execute(toolCall.function.name, toolCall.function.arguments, {
@@ -30,6 +32,18 @@ export async function executeToolCallWithRecovery(
       projectContext,
       changeStore,
       createToolRegistry,
+      recordWorksetFile: async (input) => {
+        const nextSession = recordSessionWorksetFile(session, {
+          cwd: options.cwd,
+          path: input.path,
+          toolName: input.toolName,
+          changed: input.changed,
+          changeId: input.changeId,
+          reason: input.reason,
+        });
+        Object.assign(session, nextSession);
+        await updateSession?.(session);
+      },
     });
   } catch (error) {
     return buildToolExecutionFailureResult(toolCall, error);

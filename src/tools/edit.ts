@@ -120,6 +120,13 @@ export const editToolDefinition: RegisteredTool = {
         diff: truncateText(diff, 6_000),
         diagnostics,
       });
+      await context.recordWorksetFile?.({
+        path: resolved,
+        toolName: "edit",
+        changed: true,
+        changeId: changeRecord.change?.id,
+        reason: "edited",
+      });
 
       return okResult(
         JSON.stringify(

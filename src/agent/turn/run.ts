@@ -55,7 +55,6 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
   try {
     for (;;) {
       throwIfAborted(options.abortSignal, "Turn aborted by user.");
-      throwIfAborted(options.abortSignal, "Turn aborted by user.");
       const turnRuntimeState = {
         ...(options.runtimePromptState ?? {}),
         identity,
@@ -75,6 +74,7 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
         taskState: session.taskState,
         todoItems: session.todoItems,
         sessionMemory: session.sessionMemory,
+        workset: session.workset,
         runtimeState: turnRuntimeState,
         checkpoint: session.checkpoint,
         profile,

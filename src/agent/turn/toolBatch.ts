@@ -42,6 +42,9 @@ export async function executeToolBatch(
       params.session,
       params.projectContext,
       params.changeStore,
+      async (session) => {
+        params.session = await params.options.sessionStore.save(session);
+      },
     );
     items.push({
       toolCall,

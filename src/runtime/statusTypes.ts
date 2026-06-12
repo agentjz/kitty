@@ -56,6 +56,17 @@ export interface RuntimeSessionSummary {
   focus?: string;
   hasMemory: boolean;
   contextBudget?: RuntimeContextBudgetSummary;
+  workset?: {
+    total: number;
+    files: Array<{
+      path: string;
+      readCount: number;
+      changedCount: number;
+      lastTool: string;
+      lastChangeId?: string;
+      reason?: string;
+    }>;
+  };
 }
 
 export interface RuntimeContextBudgetSummary {

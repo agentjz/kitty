@@ -1,7 +1,7 @@
 import { normalizeCheckpoint } from "../../../session/checkpoint.js";
 import { fingerprintFocus, normalizeText, takeLastUnique } from "../../../session/checkpoint/shared.js";
 import { normalizeTodoItems } from "../../../session/todos.js";
-import type { SessionCheckpoint, TaskState, TodoItem } from "../../../types.js";
+import type { SessionCheckpoint, SessionWorksetState, TaskState, TodoItem } from "../../../types.js";
 import type { AgentWorkingMemory } from "./types.js";
 
 const MAX_ACTIVE_FILES = 10;
@@ -14,6 +14,7 @@ export interface BuildWorkingMemoryInput {
   taskState?: TaskState;
   todoItems?: TodoItem[];
   checkpoint?: SessionCheckpoint;
+  workset?: SessionWorksetState;
   timestamp?: string;
 }
 
@@ -33,6 +34,14 @@ export function buildAgentWorkingMemory(input: BuildWorkingMemoryInput): AgentWo
       MAX_COMPLETED_ACTIONS,
     ),
     blockers: takeLastUnique(input.taskState?.blockers ?? [], MAX_BLOCKERS),
+    files: (input.workset?.files ?? []).slice(-MAX_ACTIVE_FILES).map((file) => ({
+      path: file.path,
+      readCount: file.readCount,
+      changedCount: file.changedCount,
+      lastTool: file.lastTool,
+      lastChangeId: file.lastChangeId,
+      reason: file.reason,
+    })),
     todos: normalizeTodoItems(input.todoItems).slice(0, MAX_TODOS),
     recentToolBatch: checkpoint?.recentToolBatch
       ? {
@@ -48,6 +57,7 @@ export function buildAgentWorkingMemory(input: BuildWorkingMemoryInput): AgentWo
     checkpointStatus: checkpoint?.status,
     updatedAt: latestTimestamp([
       input.taskState?.lastUpdatedAt,
+      input.workset?.updatedAt,
       checkpoint?.updatedAt,
       timestamp,
     ]),

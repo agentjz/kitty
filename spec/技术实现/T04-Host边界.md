@@ -8,6 +8,7 @@ Host 负责把产品入口接到 agent turn。
 - CLI spec
 - interactive shell
 - Telegram
+- local session/event API
 - status
 - eval
 
@@ -25,5 +26,11 @@ Host 工具注册边界：
 
 `kitty status` 使用 `src/runtime/status.ts` 聚合当前现场。CLI presenter 只负责呈现：当前焦点、下一步、阻塞项、session、context budget、memory、skills、project map、execution、wake 和 spec workflow。
 
-`kitty eval` 使用 `src/evaluation/harness.ts`。它列出场景，也可以通过 `--run` 执行本地机器检查。检查结果是 pass/fail/skip 事实，不调用模型评分。
+`src/host/localApi.ts` 提供本地 API：创建 session、发送消息、读取 session events、读取 status。它复用 `runHostTurn`，不绕过 agent 主循环。
+
+`src/session/events.ts` 把 session event 写入 `.kitty/events/*.jsonl`。事件类型包括 session created、turn started、turn completed、turn failed 和 turn aborted。事件是机器事实，不进入用户消息。
+
+`kitty events` 使用 `src/cli/commands/events.ts` 读取 `src/session/events.ts` 的同一份事件事实。默认读取最新 session，也可以按 session id 读取；CLI presenter 只格式化事件，不判断语义。
+
+`kitty eval` 使用 `src/evaluation/`。`harness.ts` 只负责编排；`scenarios.ts` 维护场景事实；`checks.ts` 运行本地机器检查；`golden.ts` 用假 provider 跑真实 `runHostTurn`，验证 session、工具、workset 和 event 边界。检查结果是 pass/fail/skip 事实，不调用模型评分。
 

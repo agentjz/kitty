@@ -21,6 +21,7 @@ export function buildContextRuntimePromptLayers(
       todoItems: input.todoItems,
       taskState: input.taskState,
       checkpoint: input.checkpoint,
+      workset: input.workset,
     },
     taskLifecycle: input.taskLifecycle,
     projectMap: input.projectContext.projectMap,

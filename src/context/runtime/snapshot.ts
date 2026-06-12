@@ -16,6 +16,7 @@ export function buildContextRuntimeSnapshot(
       taskState: input.session.taskState,
       todoItems: input.session.todoItems,
       checkpoint: input.session.checkpoint,
+      workset: input.session.workset,
     }),
     historyBoundary: {
       rawHistoryPolicy: "evidence_lookup_only",

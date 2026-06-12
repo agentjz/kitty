@@ -10,6 +10,7 @@ import type {
   RuntimeConfig,
   SessionCheckpoint,
   SessionRecord,
+  SessionWorksetState,
   TaskState,
 } from "../../types.js";
 
@@ -28,7 +29,7 @@ export interface BuildContextRuntimeSnapshotInput {
   projectMap?: ProjectMap;
   session: Pick<
     SessionRecord,
-    "messages" | "sessionMemory" | "todoItems" | "taskState" | "checkpoint"
+    "messages" | "sessionMemory" | "todoItems" | "taskState" | "checkpoint" | "workset"
   >;
   taskLifecycle?: TaskLifecycleRecord;
 }
@@ -43,6 +44,7 @@ export interface BuildContextRuntimePromptLayersInput {
   taskLifecycle?: TaskLifecycleRecord;
   checkpoint?: SessionCheckpoint;
   sessionMemory?: SessionRecord["sessionMemory"];
+  workset?: SessionWorksetState;
   messages?: SessionRecord["messages"];
 }
 

@@ -100,6 +100,12 @@ export const readToolDefinition: RegisteredTool = {
     const selected = lines.slice(readWindow.start, fittedEndExclusive).join("\n");
     const content = formatFileWithLineNumbers(selected, readWindow.start + 1);
     const hasMore = fittedEndExclusive < lines.length;
+    await context.recordWorksetFile?.({
+      path: resolved,
+      toolName: "read",
+      changed: false,
+      reason: hasMore ? "partial read" : "read",
+    });
 
     return okResult(
       JSON.stringify(

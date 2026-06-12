@@ -38,6 +38,8 @@ export type {
   SessionDiffChange,
   SessionDiffState,
   SessionMemoryState,
+  SessionWorksetEntry,
+  SessionWorksetState,
   SessionRecord,
   SessionRunState,
   SessionRunStateSource,

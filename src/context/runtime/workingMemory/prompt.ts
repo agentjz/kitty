@@ -40,6 +40,19 @@ export function buildCurrentWorksetBlock(
   if (memory.activeFiles.length > 0) {
     fields.push({ label: "Active files", value: formatLimitedList(memory.activeFiles, 6) });
   }
+  if (memory.files.length > 0) {
+    fields.push({
+      label: "Workset files",
+      value: formatLimitedList(memory.files.map((file) =>
+        [
+          file.path,
+          `read=${file.readCount}`,
+          `changed=${file.changedCount}`,
+          `last=${file.lastTool}`,
+        ].join(" "),
+      ), 6),
+    });
+  }
   if (memory.blockers.length > 0) {
     fields.push({ label: "Blockers", value: formatLimitedList(memory.blockers, 5) });
   }

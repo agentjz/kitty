@@ -12,5 +12,6 @@ export function getAppPaths(rootDir = process.cwd()): AppPaths {
     memoryDir: statePaths.memoryDir,
     sessionMemoryDir: statePaths.sessionMemoryDir,
     changesDir: statePaths.changesDir,
+    eventsDir: statePaths.eventsDir,
   };
 }

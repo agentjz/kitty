@@ -4,6 +4,7 @@ import { resolveProjectRoots } from "../context/repoRoots.js";
 import { buildLeadWakeFacts, waitForLeadWaitExecutions } from "../execution/leadWait.js";
 import { enterCrashContext } from "../observability/crashRecorder.js";
 import { recordHostTurnFinished, recordHostTurnStarted } from "../observability/hostEvents.js";
+import { SessionEventStore } from "../session/events.js";
 import { isAbortError } from "../utils/abort.js";
 import { createHostToolRegistry } from "./toolRegistry.js";
 import type { HostTurnDependencies, HostTurnOptions, HostTurnOutcome } from "./types.js";
@@ -26,6 +27,7 @@ export async function runHostTurn(
   });
   const createToolRegistry = dependencies.createToolRegistry ?? createHostToolRegistry;
   const runTurn = dependencies.runTurn ?? runAgentTurn;
+  const sessionEvents = new SessionEventStore(options.config.paths.eventsDir);
   let toolRegistry: Awaited<ReturnType<typeof createToolRegistry>> | null = null;
 
   await recordHostTurnStarted(stateRootDir, {
@@ -34,6 +36,13 @@ export async function runHostTurn(
     identityKind: (options.identity ?? DEFAULT_IDENTITY).kind,
     identityName: (options.identity ?? DEFAULT_IDENTITY).name,
     cwd: options.cwd,
+  });
+  await sessionEvents.append({
+    type: "turn.started",
+    sessionId: options.session.id,
+    cwd: options.cwd,
+    host,
+    message: options.input,
   });
 
   try {
@@ -47,6 +56,7 @@ export async function runHostTurn(
         durationMs: Date.now() - startedAt,
         cwd: options.cwd,
       });
+      await appendTurnAbortedEvent(sessionEvents, options.session.id, options.cwd, host);
       return {
         status: "aborted",
         session: options.session,
@@ -69,6 +79,7 @@ export async function runHostTurn(
         durationMs: Date.now() - startedAt,
         cwd: options.cwd,
       });
+      await appendTurnAbortedEvent(sessionEvents, options.session.id, options.cwd, host);
       return {
         status: "aborted",
         session: options.session,
@@ -132,6 +143,15 @@ export async function runHostTurn(
         changedPathCount: result.changedPaths.length,
       },
     });
+    await sessionEvents.append({
+      type: "turn.completed",
+      sessionId: result.session.id,
+      cwd: options.cwd,
+      host,
+      details: {
+        changedPathCount: result.changedPaths.length,
+      },
+    });
 
     return {
       status: "completed",
@@ -151,6 +171,7 @@ export async function runHostTurn(
         cwd: options.cwd,
         error,
       });
+      await appendTurnAbortedEvent(sessionEvents, session.id, options.cwd, host);
       return {
         status: "aborted",
         session,
@@ -168,6 +189,13 @@ export async function runHostTurn(
       durationMs: Date.now() - startedAt,
       cwd: options.cwd,
       error,
+    });
+    await sessionEvents.append({
+      type: "turn.failed",
+      sessionId: session.id,
+      cwd: options.cwd,
+      host,
+      message: getErrorMessage(error),
     });
     return {
       status: "failed",
@@ -187,4 +215,19 @@ async function readStateRootDir(cwd: string): Promise<string> {
   } catch {
     return cwd;
   }
+}
+
+async function appendTurnAbortedEvent(
+  events: SessionEventStore,
+  sessionId: string,
+  cwd: string,
+  host: string,
+): Promise<void> {
+  await events.append({
+    type: "turn.aborted",
+    sessionId,
+    cwd,
+    host,
+    message: "Turn interrupted.",
+  });
 }

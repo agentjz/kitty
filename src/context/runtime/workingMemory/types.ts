@@ -11,6 +11,15 @@ export interface WorkingMemoryTodo {
   status: "pending" | "in_progress" | "completed";
 }
 
+export interface WorkingMemoryFile {
+  path: string;
+  readCount: number;
+  changedCount: number;
+  lastTool: string;
+  lastChangeId?: string;
+  reason?: string;
+}
+
 export interface AgentWorkingMemory {
   version: 1;
   focus?: string;
@@ -19,6 +28,7 @@ export interface AgentWorkingMemory {
   plannedActions: string[];
   completedActions: string[];
   blockers: string[];
+  files: WorkingMemoryFile[];
   todos: WorkingMemoryTodo[];
   recentToolBatch?: WorkingMemoryRecentToolBatch;
   checkpointPhase?: string;

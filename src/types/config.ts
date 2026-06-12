@@ -12,6 +12,7 @@ export interface AppPaths {
   memoryDir: string;
   sessionMemoryDir: string;
   changesDir: string;
+  eventsDir: string;
 }
 
 export interface AppConfig {

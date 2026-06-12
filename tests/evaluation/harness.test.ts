@@ -32,4 +32,8 @@ test("evaluation harness runs local machine-verifiable checks", async (t) => {
   assert.ok(results.some((result) =>
     result.checks.some((check) => check.id === "runtime-status-builds" && check.status === "passed"),
   ));
+  assert.ok(results.some((result) =>
+    result.checks.some((check) => String(check.id).startsWith("golden:") && check.status === "passed"),
+  ));
+  assert.ok(results.some((result) => result.sessionId));
 });

@@ -40,6 +40,20 @@ test("runtime status projects the current project runtime facts", async (t) => {
         lines: 120,
       }],
     },
+    workset: {
+      version: 1,
+      updatedAt: "2026-05-22T00:00:00.000Z",
+      files: [{
+        path: "src/runtime/status.ts",
+        firstSeenAt: "2026-05-22T00:00:00.000Z",
+        lastSeenAt: "2026-05-22T00:00:00.000Z",
+        readCount: 1,
+        changedCount: 1,
+        lastTool: "edit",
+        lastChangeId: "change-1",
+        reason: "edited",
+      }],
+    },
   });
 
   const spec = await new SpecStore(root, { rootDir: root }).create({
@@ -87,6 +101,7 @@ test("runtime status projects the current project runtime facts", async (t) => {
   assert.equal(status.taskLifecycle?.stage, "normal_work");
   assert.equal(status.sessions.latest?.focus, undefined);
   assert.equal(status.sessions.latest?.contextBudget?.compressionReason, "within_budget");
+  assert.equal(status.sessions.latest?.workset?.files[0]?.path, "src/runtime/status.ts");
   assert.equal(status.executions.total, 1);
   assert.equal(status.executions.active.length, 1);
   assert.equal(status.executions.active[0]?.assignment?.objective, "Inspect runtime visibility");
@@ -103,6 +118,8 @@ test("runtime status projects the current project runtime facts", async (t) => {
   assert.match(text, /Skills: 0\/0 ready/);
   assert.match(text, /Executions: 1 active \/ 1 total/);
   assert.match(text, /Context budget: 45000\/900000 chars/);
+  assert.match(text, /Workset: 1 file\(s\)/);
+  assert.match(text, /src\/runtime\/status\.ts  read=1  changed=1  last=edit/);
   assert.match(text, /Context budget hotspots:/);
   assert.match(text, /Context budget sources:/);
   assert.match(text, /nearFieldConversation  chars=25000  messages=3/);

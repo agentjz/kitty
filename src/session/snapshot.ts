@@ -6,6 +6,7 @@ import type {
 import { normalizeSessionCheckpoint } from "./checkpoint.js";
 import { normalizeSessionMemory } from "./memory.js";
 import { normalizeSessionDiffState } from "./sessionDiff.js";
+import { normalizeSessionWorkset } from "./workset.js";
 import {
   createInvalidSessionJsonError,
   createSessionCorruptError,
@@ -31,6 +32,7 @@ const SESSION_SNAPSHOT_KEYS = new Set([
   "checkpoint",
   "sessionDiff",
   "contextBudget",
+  "workset",
 ]);
 
 type SessionSnapshotCandidate = Partial<SessionRecord> & {
@@ -76,6 +78,7 @@ export function parseSessionSnapshot(raw: string, sessionPath: string): SessionR
     checkpoint: readOptionalObject(record.checkpoint, "checkpoint", sessionPath) as SessionRecord["checkpoint"],
     sessionDiff: readOptionalObject(record.sessionDiff, "sessionDiff", sessionPath) as SessionRecord["sessionDiff"],
     contextBudget: readContextBudget(record.contextBudget, sessionPath),
+    workset: normalizeSessionWorkset(record.workset),
   };
 
   return normalizeLoadedSessionRecord(candidate as SessionRecord);
@@ -96,6 +99,7 @@ export function prepareSessionRecordForSave(session: SessionRecord): SessionReco
 
   return normalizeSessionDiffState(normalizeSessionCheckpoint({
     ...prepared,
+    workset: normalizeSessionWorkset(prepared.workset),
   }));
 }
 

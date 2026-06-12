@@ -18,6 +18,8 @@ Provider raw messages 由 `src/context/runtime/conversationWindow.ts` 先构建�
 
 Runtime memory asset 由 `src/runtime/memory/metadata.ts` 统一解析 kind、title、scope、tags、updated 和 evidence refs；`src/runtime/memory/writer.ts` 统一创建 project/user/evidence asset；`src/runtime/memory/search.ts` 做多词候选召回，返回 score 和命中行，不把结果自动注入上下文。
 
+Session workset 由 `src/session/workset.ts` 维护，随 session snapshot 保存。`read`、`edit`、`write` 成功后通过工具上下文记录文件读取和变更事实。`src/context/runtime/workingMemory/` 和 `src/runtime/status.ts` 只投影这份 workset，不另建第二套事实。
+
 当前工作焦点和执行连续性由 `src/context/runtime/workingMemory/` 承接。
 
 关键代码：
@@ -29,6 +31,7 @@ Runtime memory asset 由 `src/runtime/memory/metadata.ts` 统一解析 kind、ti
 - `src/context/runtime/sessionBrief/`
 - `src/context/runtime/compression/`
 - `src/session/`
+- `src/session/workset.ts`
 - `src/session/memoryAsset.ts`
 - `src/session/checkpoint/`
 

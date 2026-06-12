@@ -94,6 +94,17 @@ function summarizeSession(session: SessionRecord): RuntimeSessionSummary {
       sources: session.contextBudget.sources,
       promptHotspots: session.contextBudget.promptHotspots,
     } : undefined,
+    workset: session.workset ? {
+      total: session.workset.files.length,
+      files: session.workset.files.slice(-10).map((file) => ({
+        path: file.path,
+        readCount: file.readCount,
+        changedCount: file.changedCount,
+        lastTool: file.lastTool,
+        lastChangeId: file.lastChangeId,
+        reason: file.reason,
+      })),
+    } : undefined,
   };
 }
 

@@ -35,6 +35,24 @@ export interface SessionRecord {
   checkpoint?: SessionCheckpoint;
   sessionDiff?: SessionDiffState;
   contextBudget?: ContextBudgetReport;
+  workset?: SessionWorksetState;
+}
+
+export interface SessionWorksetEntry {
+  path: string;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  readCount: number;
+  changedCount: number;
+  lastTool: string;
+  lastChangeId?: string;
+  reason?: string;
+}
+
+export interface SessionWorksetState {
+  version: 1;
+  files: SessionWorksetEntry[];
+  updatedAt: string;
 }
 
 export interface SessionMemoryState {

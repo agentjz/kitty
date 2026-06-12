@@ -13,10 +13,32 @@ test("working memory keeps current focus facts compact", () => {
       blockers: [],
       lastUpdatedAt: "2026-01-01T00:00:00.000Z",
     },
+    workset: {
+      version: 1,
+      updatedAt: "2026-01-01T00:00:02.000Z",
+      files: [{
+        path: "src/app.ts",
+        firstSeenAt: "2026-01-01T00:00:00.000Z",
+        lastSeenAt: "2026-01-01T00:00:02.000Z",
+        readCount: 2,
+        changedCount: 1,
+        lastTool: "edit",
+        lastChangeId: "change-1",
+        reason: "edited",
+      }],
+    },
     timestamp: "2026-01-01T00:00:01.000Z",
   });
 
   assert.equal(memory.focus, "重建扩展工具");
   assert.deepEqual(memory.activeFiles, ["b.ts", "a.ts"]);
+  assert.deepEqual(memory.files, [{
+    path: "src/app.ts",
+    readCount: 2,
+    changedCount: 1,
+    lastTool: "edit",
+    lastChangeId: "change-1",
+    reason: "edited",
+  }]);
   assert.deepEqual(memory.plannedActions, ["写 spec", "写测试"]);
 });

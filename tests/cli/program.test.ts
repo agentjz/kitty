@@ -5,14 +5,18 @@ import path from "node:path";
 import test from "node:test";
 
 import { buildCliProgram } from "../../src/cli/program.js";
+import { readSessionEventsForCli } from "../../src/cli/commands/events.js";
 import { formatCliSetupError } from "../../src/cli/userFacingErrors.js";
+import { getAppPaths } from "../../src/config/paths.js";
 import { PROJECT_STATE_DIR_NAME, PROJECT_STATE_ENV_EXAMPLE_FILE_NAME, PROJECT_STATE_ENV_FILE_NAME, PROJECT_STATE_IGNORE_FILE_NAME } from "../../src/project/statePaths.js";
+import { SessionEventStore } from "../../src/session/events.js";
+import { SessionStore } from "../../src/session/store.js";
 
 test("cli program exposes current top-level commands", () => {
   const program = buildCliProgram();
   const commands = program.commands.map((command) => command.name());
 
-  for (const name of ["agent", "spec", "resume", "sessions", "config", "init", "status", "memory", "changes", "undo", "diff", "doctor", "eval", "telegram", "version", "__worker__"]) {
+  for (const name of ["agent", "spec", "resume", "sessions", "events", "config", "init", "status", "memory", "changes", "undo", "diff", "doctor", "eval", "telegram", "version", "__worker__"]) {
     assert.equal(commands.includes(name), true, `${name} command should exist`);
   }
   assert.equal(program.helpInformation().includes("__worker__"), false);
@@ -64,6 +68,31 @@ test("eval command can run local checks", async () => {
 
   program.exitOverride();
   await program.parseAsync(["-C", root, "eval", "--run"], { from: "user" });
+});
+
+test("events command reads latest session event facts", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "kitty-events-"));
+  const paths = getAppPaths(root);
+  const sessionStore = new SessionStore(paths.sessionsDir);
+  const session = await sessionStore.save(await sessionStore.create(root));
+  await new SessionEventStore(paths.eventsDir).append({
+    type: "turn.completed",
+    sessionId: session.id,
+    cwd: root,
+    host: "test",
+    details: {
+      changedPathCount: 0,
+    },
+  });
+  const result = await readSessionEventsForCli({
+    cwd: root,
+    paths,
+    limit: 20,
+  });
+
+  assert.equal(result.sessionId, session.id);
+  assert.equal(result.events[0]?.type, "turn.completed");
+  assert.equal(result.events[0]?.host, "test");
 });
 
 test("cli setup errors explain the bootstrap path", () => {

@@ -13,6 +13,7 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
   lines.push(`- Next: ${readNextStep(status)}`);
   lines.push(`- Blocked: ${readBlockedLine(status)}`);
   lines.push(`- Context budget: ${readContextBudgetLine(status)}`);
+  lines.push(`- Workset: ${status.sessions.latest?.workset ? `${status.sessions.latest.workset.total} file(s)` : "none"}`);
   lines.push(`- Memory: ${status.memory.assets.length > 0 ? `${status.memory.assets.length} asset(s)` : "none"}`);
   lines.push(`- Skills: ${status.skills.ready}/${status.skills.total} ready`);
   lines.push(`- Project map: ${status.projectMap ? "ready" : "missing"}`);
@@ -52,6 +53,21 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
         ? `git=${status.projectMap.git.hasChanges ? "changed" : "clean"}`
         : "git=unavailable",
     ].join("  "));
+  }
+
+  if (status.sessions.latest?.workset?.files.length) {
+    lines.push("");
+    lines.push("Workset:");
+    for (const file of status.sessions.latest.workset.files) {
+      lines.push([
+        file.path,
+        `read=${file.readCount}`,
+        `changed=${file.changedCount}`,
+        `last=${file.lastTool}`,
+        file.lastChangeId ? `change=${file.lastChangeId}` : undefined,
+        file.reason ? `reason=${file.reason}` : undefined,
+      ].filter(Boolean).join("  "));
+    }
   }
 
   if (status.sessions.latest?.contextBudget?.promptHotspots.length) {

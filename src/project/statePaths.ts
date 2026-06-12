@@ -16,6 +16,7 @@ export interface ProjectStatePaths {
   cacheDir: string;
   sessionsDir: string;
   changesDir: string;
+  eventsDir: string;
   extensionsDir: string;
   memoryDir: string;
   evidenceMemoryDir: string;
@@ -40,6 +41,7 @@ export function getProjectStatePaths(rootDir: string): ProjectStatePaths {
     cacheDir: path.join(kittyDir, "cache"),
     sessionsDir: path.join(kittyDir, "sessions"),
     changesDir: path.join(kittyDir, "changes"),
+    eventsDir: path.join(kittyDir, "events"),
     extensionsDir,
     memoryDir,
     evidenceMemoryDir: path.join(memoryDir, "evidence"),
@@ -59,6 +61,7 @@ export async function ensureProjectStateDirectories(rootDir: string): Promise<Pr
   await fs.mkdir(paths.cacheDir, { recursive: true });
   await fs.mkdir(paths.sessionsDir, { recursive: true });
   await fs.mkdir(paths.changesDir, { recursive: true });
+  await fs.mkdir(paths.eventsDir, { recursive: true });
   await fs.mkdir(paths.evidenceMemoryDir, { recursive: true });
   await fs.mkdir(paths.projectMemoryDir, { recursive: true });
   await fs.mkdir(paths.sessionMemoryDir, { recursive: true });
