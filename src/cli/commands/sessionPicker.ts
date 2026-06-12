@@ -42,7 +42,7 @@ export async function selectCliSession(options: {
   });
 
   while (true) {
-    const answer = await io.readChoice("选择会话 [1，0 新建]: ");
+    const answer = await io.readChoice("选择会话（输入编号，0 新建）: ");
     if (answer === null) {
       return null;
     }
