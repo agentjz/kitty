@@ -81,7 +81,7 @@ export function renderSessionPicker(options: {
   options.io.writeLine("0. 新建会话");
   options.sessions.forEach((session, index) => {
     options.io.writeLine(
-      `${index + 1}. ${formatSessionPickerTitle(session)}  ${formatRelativeSessionTime(session.updatedAt, options.now)}  messages=${session.messageCount}`,
+      `${index + 1}. ${formatSessionPickerTitle(session)}  ${formatRelativeSessionTime(session.updatedAt, options.now)}`,
     );
   });
   options.io.writeLine();
