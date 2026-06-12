@@ -25,6 +25,7 @@ export interface ConfigPreflightReport {
     apiKeyPresent: boolean;
   };
   ready: boolean;
+  nextSteps: string[];
 }
 
 export interface ConfigPreflightFile {
@@ -51,6 +52,7 @@ export async function inspectConfigPreflight(rootDir: string): Promise<ConfigPre
   const baseUrl = parsedEnv[KITTY_ENV.baseUrl] ?? "";
   const providerPreset = readProviderPresetLabel({ provider, model, baseUrl });
 
+  const ready = files.every((file) => file.exists) && missingKeys.length === 0;
   return {
     rootDir: normalizedRoot,
     kittyDir,
@@ -64,7 +66,13 @@ export async function inspectConfigPreflight(rootDir: string): Promise<ConfigPre
       baseUrl,
       apiKeyPresent: Boolean(parsedEnv[KITTY_ENV.apiKey]?.trim()),
     },
-    ready: files.every((file) => file.exists) && missingKeys.length === 0,
+    ready,
+    nextSteps: buildPreflightNextSteps({
+      filesReady: files.every((file) => file.exists),
+      missingKeys,
+      apiKeyPresent: Boolean(parsedEnv[KITTY_ENV.apiKey]?.trim()),
+      ready,
+    }),
   };
 }
 
@@ -81,7 +89,30 @@ export function formatConfigPreflightReport(report: ConfigPreflightReport): stri
     `provider preset: ${formatProviderPresetFact(report)}`,
     `api key: ${report.env.apiKeyPresent ? "present" : "missing"}`,
     `preflight: ${report.ready ? "ready" : "not_ready"}`,
+    "next:",
+    ...report.nextSteps.map((step) => `- ${step}`),
   ];
+}
+
+function buildPreflightNextSteps(input: {
+  filesReady: boolean;
+  missingKeys: readonly string[];
+  apiKeyPresent: boolean;
+  ready: boolean;
+}): string[] {
+  if (!input.filesReady) {
+    return ["run `kitty init` to create the local .kitty files"];
+  }
+  if (input.missingKeys.length > 0) {
+    return ["open `.kitty/.env` and fill the missing keys", "rerun `kitty doctor`"];
+  }
+  if (!input.apiKeyPresent) {
+    return ["set `KITTY_API_KEY` in `.kitty/.env`", "rerun `kitty doctor`"];
+  }
+  if (input.ready) {
+    return ["run `kitty doctor` to verify provider connectivity", "start Kitty with `kitty`"];
+  }
+  return ["review `.kitty/.env`", "rerun `kitty doctor`"];
 }
 
 function readExpectedEnvKeys(): string[] {

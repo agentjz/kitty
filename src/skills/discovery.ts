@@ -44,6 +44,7 @@ export async function discoverSkills(
       rootDir,
     });
     skill.resources = await listSkillResources(skill.absolutePath, rootDir, ignoreRules);
+    skill.health = buildSkillPackageHealth(skill);
     const existingPath = seenNames.get(skill.name);
     if (existingPath && existingPath !== skill.absolutePath) {
       throw new Error(`Duplicate skill name "${skill.name}" found in ${existingPath} and ${skill.absolutePath}.`);
@@ -78,9 +79,54 @@ async function listSkillResources(
     resources.push({
       path: path.relative(rootDir, file),
       size: stat.size,
+      kind: readSkillResourceKind(path.relative(skillDir, file)),
     });
   }
   return resources;
+}
+
+function readSkillResourceKind(relativePath: string): LoadedSkill["resources"][number]["kind"] {
+  const firstSegment = relativePath.split(/[\\/]/)[0]?.toLowerCase();
+  if (firstSegment === "references" || firstSegment === "reference") {
+    return "references";
+  }
+  if (firstSegment === "scripts") {
+    return "scripts";
+  }
+  if (firstSegment === "examples") {
+    return "examples";
+  }
+  if (firstSegment === "assets") {
+    return "assets";
+  }
+  return "other";
+}
+
+function buildSkillPackageHealth(skill: LoadedSkill): LoadedSkill["health"] {
+  const resourceGroups = {
+    references: 0,
+    scripts: 0,
+    examples: 0,
+    assets: 0,
+    other: 0,
+  };
+  for (const resource of skill.resources) {
+    resourceGroups[resource.kind] += 1;
+  }
+
+  const bodyPresent = skill.body.trim().length > 0;
+  const issues = [
+    bodyPresent ? undefined : "SKILL.md body is empty",
+  ].filter((item): item is string => Boolean(item));
+
+  return {
+    status: issues.length === 0 ? "ready" : "needs_content",
+    bodyPresent,
+    resourceCount: skill.resources.length,
+    dependencyCount: skill.dependencies.length,
+    resourceGroups,
+    issues,
+  };
 }
 
 async function findSkillFiles(rootDir: string, cwd: string): Promise<string[]> {

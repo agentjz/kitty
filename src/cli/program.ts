@@ -74,7 +74,12 @@ export function buildCliProgram(dependencies: CliProgramDependencies = {}): Comm
     getCliOverrides,
     resolveRuntime,
   });
-  registerEvaluationCommand(program);
+  registerEvaluationCommand(program, {
+    getCwd: () => {
+      const overrides = getCliOverrides();
+      return overrides.cwd ?? process.cwd();
+    },
+  });
   registerTelegramCommands(program, {
     getCliOverrides,
     resolveRuntime,

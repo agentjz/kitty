@@ -27,7 +27,19 @@ test("spec extension persists durable documents, state, tasks, notes, and checkp
   const createdPayload = parseToolJson(created.output);
   const specId = (createdPayload.spec as Record<string, unknown>).id as string;
   const workspacePath = (createdPayload.workspace as Record<string, unknown>).path as string;
-  assert.equal((createdPayload.workflow as Record<string, unknown>).nextGate, "confirm_requirements");
+  const createdWorkflow = createdPayload.workflow as Record<string, unknown>;
+  assert.equal(createdWorkflow.nextGate, "confirm_requirements");
+  assert.equal(createdWorkflow.nextAction, "Finish requirements.md and ask the user to confirm requirements.");
+  assert.deepEqual(createdWorkflow.waitingFor, [
+    "requirements confirmation",
+    "design confirmation",
+    "tasks confirmation",
+  ]);
+  assert.deepEqual(createdWorkflow.documentProgress, {
+    ready: 0,
+    total: 4,
+    summary: "0/4 documents ready",
+  });
 
   const requirements = "# Requirements\n\n- 扩展是工具集合，不是运行模式。\n";
   const written = await registry.execute("spec_write_document", JSON.stringify({

@@ -24,6 +24,9 @@ test("project skills are discovered from runtime skill roots but not .codex skil
   assert.deepEqual(context.skills[0]?.resources.map((resource) => resource.path), [
     path.join("skills", "skepticism", "references", "checklist.md"),
   ]);
+  assert.equal(context.skills[0]?.resources[0]?.kind, "references");
+  assert.equal(context.skills[0]?.health.status, "ready");
+  assert.equal(context.skills[0]?.health.resourceGroups.references, 1);
 });
 
 test("runtime prompt shows the skill index without loading full skill bodies", async (t) => {
@@ -90,6 +93,7 @@ test("skills extension lists summaries and explicitly loads full skill content",
   assert.deepEqual(((list.skills as Array<Record<string, unknown>>)[0]?.resources as Array<Record<string, unknown>>).map((resource) => resource.path), [
     path.join("skills", "skepticism", "references", "checklist.md"),
   ]);
+  assert.equal(((list.skills as Array<Record<string, unknown>>)[0]?.health as Record<string, unknown>).status, "ready");
 
   const loaded = parseToolJson((await registry.execute("skill_load", JSON.stringify({ name: "skepticism" }), context)).output);
   assert.equal(loaded.ok, true);
@@ -163,6 +167,7 @@ test("skills extension exposes examples and checks declared command dependencies
 
   const check = parseToolJson((await registry.execute("skill_check", JSON.stringify({ name: "runner" }), context)).output);
   assert.equal(check.ok, false);
+  assert.equal((check.health as Record<string, unknown>).status, "ready");
   const dependencies = check.dependencies as Array<Record<string, unknown>>;
   assert.equal(dependencies.find((item) => item.command === "node")?.available, true);
   assert.equal(dependencies.find((item) => item.command === "definitely_missing_kitty_command")?.available, false);

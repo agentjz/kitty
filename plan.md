@@ -1,77 +1,101 @@
-# 记忆与自然上下文重构计划
+# 产品体验闭环重构计划
 
 ## 目标
 
-把 Kitty 的会话体验从“从账本拼回上下文”改成“自然延续当前对话”。
+把当前已经存在的主干能力打磨成可验证、可理解、可继续的成熟体验：
 
-当前只处理存在的主干能力：session messages、session memory、working memory、runtime facts、tool evidence、context budget、status、测试和文档。不写旧兼容，不解释不存在的能力。
+- `kitty eval` 从场景清单升级为可运行的本地验收。
+- `kitty spec` 和 `kitty status` 从状态字段升级为清楚的当前现场。
+- `skills` 从“能发现和加载”升级为可审查的能力包体验。
+- `kitty init` / `kitty doctor` 从配置检查升级为首次成功路径。
 
-## 源码依据
+只处理当前真实存在的能力。不写旧兼容，不写不存在的入口，不把历史残留包装成产品说明。
 
-- Codex：`ref/repos/codex/codex-rs/core/src/compact.rs` 和 `session/rollout_reconstruction.rs` 表明主线是 thread / rollout history；compaction 是替换历史的 checkpoint，不是把运行事实伪装成用户记忆。
-- Aider：`ref/repos/aider/aider/history.py` 和 `/tokens` 实现表明 chat history 是一等上下文；repo map、文件、系统提示、历史分别计量，超预算时摘要旧历史并保留新 tail。
-- LangMem：`ref/repos/langmem/src/langmem/short_term/summarization.py` 表明摘要只在 token 阈值后触发；running summary 记录已经摘要过的消息，新近消息保持原样。
-- OpenCode：`ref/repos/opencode/packages/opencode/test/v2/session-message-updater.test.ts` 表明 compaction / tool / assistant event 应还原为清晰会话消息；事件是构造消息的证据，不是替代消息本身。
+## 参考依据
 
-结论：真实近场对话必须先进入模型；session memory 是长任务连续性；runtime facts 是证据层。三者不能互相冒充。
+- Codex：会话、工具、状态、恢复和输出是稳定主链路；内部事实不能伪装成用户输入。
+- OpenCode：上下文和状态源需要稳定、可组合、可解释；状态变化在安全边界进入下一轮。
+- Aider：首次配置、模型警告、测试命令和用户下一步要具体。
+- Goose：真实 agent 产品需要可运行评测和清楚的运行现场，而不只是文档描述。
 
-## 当前缺口
-
-- `buildCompressedContextRequest` 只取当前用户帧，短 session 也看不到第一轮到当前轮的自然对话。
-- session memory 和 completion facts 被迫承担“刚刚聊了什么”的职责，体验像读记录。
-- `继续` 这种短输入本应由模型根据近场对话理解，但当前上下文容易让模型转向项目状态检查。
-- context budget 只有总量和 prompt hotspot，看不出压力来自真实对话、session memory、runtime facts 还是项目上下文。
+结论：产品成熟度不靠模块数量，而靠每条用户路径是否能自己闭环。
 
 ## 设计
 
-### 1. 近场对话是 provider 主轨
+### 1. Evaluation
 
-Provider request 使用当前 session 的可见对话窗口：
+`kitty eval` 输出场景，也能运行本地机器验收。
 
-- 保留用户与 assistant 的自然消息。
-- 保留必要 tool boundary，避免孤立 tool output。
-- 排除 internal wake 和内部控制输入。
-- 预算足够时保留完整可见对话。
-- 超预算时摘要旧对话，保留最近 tail。
+- 场景仍然描述用户体验、机器事实和验收点。
+- 新增 runner，把可检查事实转成 pass/fail/skip。
+- `--run` 运行本地验收。
+- `--json` 输出同一事实模型。
+- 不让模型打分，不做语义裁判。
 
-### 2. Session memory 是连续性资产
+### 2. Spec 产品现场
 
-Session memory 继续由模型在 turn 收口时写入。它负责长任务焦点、约束、决策、未完成事项和验证事实，不替代短会话近场对话。
+Spec workflow summary 增加产品化字段：
 
-### 3. Runtime facts 是证据层
+- 当前阶段中文说明。
+- 下一步动作。
+- 等待用户确认项。
+- 文档完成度。
+- checkpoint / workspace 现场。
 
-Task lifecycle、execution、wake、completion facts、checkpoint、session diff 只作为事实证据进入 prompt。它们不描述“用户刚刚说过什么”，也不压过近场对话。
+工具返回、status 和 CLI 复用同一 summary，不各自拼一套。
 
-### 4. Budget 按来源暴露
+### 3. Skill 能力包体验
 
-Context budget 增加来源分桶：
+Skill discovery 增加 package health：
 
-- system prompt。
-- near-field conversation。
-- summarized conversation。
-- compacted tail。
+- metadata 是否完整。
+- 是否有正文。
+- 是否有资源。
+- 依赖命令是否声明。
+- references / scripts / examples / assets 资源分组。
 
-status 和测试使用同一个 budget 事实，不另造统计逻辑。
+`skill_list` / `skill_check` / `kitty status` 复用同一事实，不让工具各自判断。
+
+### 4. Init / Doctor 首次成功路径
+
+`kitty init` 和 `kitty doctor` 给出用户能直接执行的下一步：
+
+- 哪些文件已创建或已存在。
+- `.kitty/.env` 是否可用。
+- provider / model / baseUrl / API key 是否齐。
+- 下一步是填 API key、运行 doctor，还是直接启动 kitty。
+
+### 5. Runtime UI
+
+`kitty status` 保留机器事实，但先展示“当前现场”：
+
+- 当前焦点。
+- 下一步。
+- 是否有阻塞。
+- active execution。
+- memory / spec / project map 是否可用。
+- 详细账本放到后面。
 
 ## 执行清单
 
-- [x] 新增可见对话窗口构建器，统一过滤 internal 输入和保护 tool boundary。
-- [x] 主 provider request 从当前用户帧改为近场可见对话。
-- [x] 压缩逻辑改为摘要旧可见对话、保留近场 tail。
-- [x] context budget 增加来源分桶。
-- [x] 保留 session memory 生命周期，但不让它替代短会话原始对话。
-- [x] 更新“当前用户帧”相关测试为“近场对话”行为。
-- [x] 增加 internal wake 不进入近场对话测试。
-- [x] 增加短 session 从第一轮回溯的行为测试。
-- [x] 增加 budget 分桶测试。
-- [x] 同步 philosophy / spec 中的当前记忆设计。
+- [x] 重写 evaluation 数据模型和 runner。
+- [x] 给 `kitty eval` 增加 `--run`。
+- [x] 增加 eval runner 测试。
+- [x] 扩展 spec workflow summary，并让工具/status 复用。
+- [x] 增加 spec 产品现场测试。
+- [x] 增加 skill package health 和资源分组。
+- [x] 增加 skill list/check/status 测试。
+- [x] 改进 init / doctor 输出和 preflight next steps。
+- [x] 增加首次成功路径测试。
+- [x] 改进 runtime status 文案结构。
+- [x] 同步 README、philosophy、spec。
 - [x] 运行 `npm.cmd run verify`。
 
 ## 完成标准
 
-- 短 session 里，模型请求包含可见近场对话，而不是只包含当前用户输入。
-- 长 session 超预算时，旧对话被摘要，新近对话保持原样。
-- internal wake 不进入用户对话主轨。
-- budget 能说明上下文压力来源。
-- 代码、测试、文档讲同一个当前事实。
-- `npm.cmd run verify` 通过。
+- `kitty eval --run` 能输出真实本地验收结果。
+- `kitty spec` / `kitty status` 能让用户看懂当前阶段和下一步。
+- skill 包能显示健康状态和资源结构。
+- `kitty init` 后用户知道下一步该填什么、跑什么。
+- `kitty doctor` 失败时给出明确修复动作，成功时给出可启动事实。
+- README、philosophy、spec、测试和源码讲同一套当前事实。

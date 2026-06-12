@@ -10,6 +10,11 @@ export interface RuntimeStatus {
   memory: {
     assets: RuntimeMemoryAssetSummary[];
   };
+  skills: {
+    total: number;
+    ready: number;
+    needsAttention: RuntimeSkillSummary[];
+  };
   projectMap?: RuntimeProjectMapSummary;
   taskLifecycle?: RuntimeTaskLifecycleSummary;
   executions: {
@@ -86,6 +91,15 @@ export interface RuntimeMemoryAssetSummary {
   tags: string[];
 }
 
+export interface RuntimeSkillSummary {
+  name: string;
+  path: string;
+  status: string;
+  resources: number;
+  dependencies: number;
+  issues: string[];
+}
+
 export interface RuntimeTaskLifecycleSummary {
   id: string;
   sessionId: string;
@@ -150,7 +164,15 @@ export interface RuntimeSpecSummary {
   workspace?: string;
   workflow?: {
     nextGate: string;
+    stageLabel: string;
+    nextAction: string;
+    waitingFor: string[];
     writableTools: string;
+    documentProgress: {
+      ready: number;
+      total: number;
+      summary: string;
+    };
     confirmed: {
       requirements: boolean;
       design: boolean;

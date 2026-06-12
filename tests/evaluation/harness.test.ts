@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { listEvaluationScenarios } from "../../src/evaluation/harness.js";
+import { listEvaluationScenarios, runEvaluationScenarios } from "../../src/evaluation/harness.js";
+import { createTempWorkspace } from "../helpers.js";
 
 test("evaluation harness defines real agent experience scenarios", () => {
   const scenarios = listEvaluationScenarios();
@@ -17,5 +18,18 @@ test("evaluation harness defines real agent experience scenarios", () => {
     assert.ok(scenario.userExperience.trim());
     assert.ok(scenario.machineFacts.length > 0);
     assert.ok(scenario.acceptance.length > 0);
+    assert.ok(scenario.checks.length > 0);
   }
+});
+
+test("evaluation harness runs local machine-verifiable checks", async (t) => {
+  const root = await createTempWorkspace("eval-runner", t);
+
+  const results = await runEvaluationScenarios(root);
+
+  assert.equal(results.length, listEvaluationScenarios().length);
+  assert.equal(results.every((result) => result.status === "passed"), true);
+  assert.ok(results.some((result) =>
+    result.checks.some((check) => check.id === "runtime-status-builds" && check.status === "passed"),
+  ));
 });

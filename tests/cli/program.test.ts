@@ -35,6 +35,8 @@ test("init bootstraps project templates without loading runtime config", async (
   assert.equal(fs.existsSync(path.join(root, PROJECT_STATE_DIR_NAME, PROJECT_STATE_ENV_FILE_NAME)), true);
   assert.equal(fs.existsSync(path.join(root, PROJECT_STATE_DIR_NAME, PROJECT_STATE_ENV_EXAMPLE_FILE_NAME)), true);
   assert.equal(fs.existsSync(path.join(root, PROJECT_STATE_DIR_NAME, PROJECT_STATE_IGNORE_FILE_NAME)), true);
+  const env = fs.readFileSync(path.join(root, PROJECT_STATE_DIR_NAME, PROJECT_STATE_ENV_FILE_NAME), "utf8");
+  assert.match(env, /KITTY_API_KEY/);
 });
 
 test("doctor prints preflight facts before runtime loading", async () => {
@@ -54,6 +56,14 @@ test("doctor prints preflight facts before runtime loading", async () => {
   );
 
   assert.equal(runtimeLoaded, true);
+});
+
+test("eval command can run local checks", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "kitty-eval-run-"));
+  const program = buildCliProgram();
+
+  program.exitOverride();
+  await program.parseAsync(["-C", root, "eval", "--run"], { from: "user" });
 });
 
 test("cli setup errors explain the bootstrap path", () => {

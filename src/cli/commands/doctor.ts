@@ -57,6 +57,7 @@ export function registerDoctorCommand(
         if (diagnosis.resolvedBaseUrl !== runtime.config.baseUrl) {
           ui.info(`resolvedBaseUrl: ${diagnosis.resolvedBaseUrl}`);
         }
+        ui.success("Kitty is ready. Start with `kitty` or run `kitty \"your task\"`.");
         return;
       }
 

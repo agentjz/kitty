@@ -7,11 +7,14 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
   lines.push(`Project: ${status.rootDir}`);
   lines.push(`State: ${status.stateDir}`);
   lines.push("");
-  lines.push("Now:");
+  lines.push("Current workspace:");
   lines.push(`- Focus: ${readFocus(status)}`);
   lines.push(`- Session: ${readSessionLine(status)}`);
+  lines.push(`- Next: ${readNextStep(status)}`);
+  lines.push(`- Blocked: ${readBlockedLine(status)}`);
   lines.push(`- Context budget: ${readContextBudgetLine(status)}`);
   lines.push(`- Memory: ${status.memory.assets.length > 0 ? `${status.memory.assets.length} asset(s)` : "none"}`);
+  lines.push(`- Skills: ${status.skills.ready}/${status.skills.total} ready`);
   lines.push(`- Project map: ${status.projectMap ? "ready" : "missing"}`);
   lines.push(`- Executions: ${status.executions.active.length} active / ${status.executions.total} total`);
   lines.push(`- Specs: ${status.specs.active.length} active / ${status.specs.total} total`);
@@ -124,14 +127,28 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
 
   if (status.specs.active.length > 0) {
     lines.push("");
-    lines.push("Active specs:");
+    lines.push("Spec workspace:");
     for (const spec of status.specs.active) {
+      lines.push(`${spec.id}  ${spec.workflow?.stageLabel ?? spec.stage}  ${spec.title}`);
+      if (spec.workflow) {
+        lines.push(`  next: ${spec.workflow.nextAction}`);
+        lines.push(`  waiting: ${spec.workflow.waitingFor.join(", ") || "none"}`);
+        lines.push(`  documents: ${spec.workflow.documentProgress.summary}`);
+        lines.push(`  tools: ${spec.workflow.writableTools}`);
+      }
+    }
+  }
+
+  if (status.skills.needsAttention.length > 0) {
+    lines.push("");
+    lines.push("Skills needing attention:");
+    for (const skill of status.skills.needsAttention) {
       lines.push([
-        spec.id,
-        spec.stage,
-        spec.workflow ? `next=${spec.workflow.nextGate}` : undefined,
-        spec.workflow ? `tools=${spec.workflow.writableTools}` : undefined,
-        spec.title,
+        skill.name,
+        skill.path,
+        `resources=${skill.resources}`,
+        `dependencies=${skill.dependencies}`,
+        skill.issues.length > 0 ? `issues=${skill.issues.join("; ")}` : undefined,
       ].filter(Boolean).join("  "));
     }
   }
@@ -149,6 +166,34 @@ function readSessionLine(status: RuntimeStatus): string {
     return "none";
   }
   return `${status.sessions.latest.id} (${status.sessions.latest.messageCount} message(s))`;
+}
+
+function readNextStep(status: RuntimeStatus): string {
+  const activeSpec = status.specs.active.find((spec) => spec.workflow);
+  if (activeSpec?.workflow) {
+    return activeSpec.workflow.nextAction;
+  }
+  if (status.executions.active.length > 0) {
+    return "Wait for active execution results or inspect them with status/tools.";
+  }
+  if (!status.sessions.latest) {
+    return "Start a session with `kitty` or run a prompt.";
+  }
+  return "Continue from the current session focus.";
+}
+
+function readBlockedLine(status: RuntimeStatus): string {
+  const waitingFor = status.specs.active.flatMap((spec) => spec.workflow?.waitingFor ?? []);
+  if (waitingFor.length > 0) {
+    return waitingFor.join(", ");
+  }
+  const unhealthy = status.executions.active.find((execution) =>
+    execution.health?.state === "stale" || execution.health?.state === "deadline_passed",
+  );
+  if (unhealthy) {
+    return `${unhealthy.kind} ${unhealthy.id}: ${unhealthy.health?.message}`;
+  }
+  return "no";
 }
 
 function readContextBudgetLine(status: RuntimeStatus): string {

@@ -83,6 +83,7 @@ test("runtime status projects the current project runtime facts", async (t) => {
   assert.equal(status.sessions.latest?.id, session.id);
   assert.equal(status.memory.assets.length, 1);
   assert.equal(status.memory.assets[0]?.id, session.id);
+  assert.equal(status.skills.total, 0);
   assert.equal(status.taskLifecycle?.stage, "normal_work");
   assert.equal(status.sessions.latest?.focus, undefined);
   assert.equal(status.sessions.latest?.contextBudget?.compressionReason, "within_budget");
@@ -95,15 +96,20 @@ test("runtime status projects the current project runtime facts", async (t) => {
   assert.equal(status.specs.active[0]?.id, spec.id);
 
   const text = formatRuntimeStatusText(status);
-  assert.match(text, /Now:/);
+  assert.match(text, /Current workspace:/);
   assert.match(text, /Focus: none/);
+  assert.match(text, /Next: Finish requirements\.md/);
+  assert.match(text, /Blocked: requirements confirmation, design confirmation, tasks confirmation/);
+  assert.match(text, /Skills: 0\/0 ready/);
   assert.match(text, /Executions: 1 active \/ 1 total/);
   assert.match(text, /Context budget: 45000\/900000 chars/);
   assert.match(text, /Context budget hotspots:/);
   assert.match(text, /Context budget sources:/);
   assert.match(text, /nearFieldConversation  chars=25000  messages=3/);
   assert.match(text, /Task lifecycle:/);
-  assert.match(text, /next=confirm_requirements/);
+  assert.match(text, /Spec workspace:/);
+  assert.match(text, /next: Finish requirements\.md/);
+  assert.match(text, /documents: 0\/4 documents ready/);
 });
 
 test("runtime status exposes background executions that are running without output", async (t) => {

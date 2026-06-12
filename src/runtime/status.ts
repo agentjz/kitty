@@ -3,6 +3,7 @@ import type { TaskLifecycleRecord } from "../control/ledger.js";
 import { getProjectStatePaths } from "../project/statePaths.js";
 import { buildProjectMap } from "../project/map.js";
 import { listRuntimeMemoryAssets } from "./memory/index.js";
+import { loadProjectContext } from "../context/projectContext.js";
 import { summarizeExecution, summarizeExecutionSet } from "./executionSummary.js";
 import { SessionStore } from "../session/store.js";
 import { SpecStore } from "../spec/store.js";
@@ -27,12 +28,13 @@ export async function buildRuntimeStatus(rootDir: string): Promise<RuntimeStatus
     memorySessionsDir: paths.sessionMemoryDir,
   });
 
-  const [sessionRead, memoryAssets, control, specs, projectMap] = await Promise.all([
+  const [sessionRead, memoryAssets, control, specs, projectMap, projectContext] = await Promise.all([
     sessionStore.listReadable?.(DEFAULT_RECENT_LIMIT) ?? sessionStore.list(DEFAULT_RECENT_LIMIT).then((sessions) => ({ sessions, skipped: [] })),
     listRuntimeMemoryAssets(paths.rootDir),
     readControlPlaneStatus(paths.rootDir),
     readSpecStatus(paths.rootDir),
     buildProjectMap(paths.rootDir),
+    loadProjectContext(paths.rootDir, { projectDocMaxBytes: 24_576 }),
   ]);
 
   const sessions = sessionRead.sessions.map(summarizeSession);
@@ -50,6 +52,7 @@ export async function buildRuntimeStatus(rootDir: string): Promise<RuntimeStatus
     memory: {
       assets: memoryAssets,
     },
+    skills: summarizeSkills(projectContext.skills),
     projectMap: summarizeProjectMap(projectMap),
     taskLifecycle,
     executions: control.executions,
@@ -91,6 +94,22 @@ function summarizeSession(session: SessionRecord): RuntimeSessionSummary {
       sources: session.contextBudget.sources,
       promptHotspots: session.contextBudget.promptHotspots,
     } : undefined,
+  };
+}
+
+function summarizeSkills(skills: Awaited<ReturnType<typeof loadProjectContext>>["skills"]): RuntimeStatus["skills"] {
+  const summaries = skills.map((skill) => ({
+    name: skill.name,
+    path: skill.path,
+    status: skill.health.status,
+    resources: skill.health.resourceCount,
+    dependencies: skill.health.dependencyCount,
+    issues: skill.health.issues,
+  }));
+  return {
+    total: summaries.length,
+    ready: summaries.filter((skill) => skill.status === "ready").length,
+    needsAttention: summaries.filter((skill) => skill.status !== "ready"),
   };
 }
 
@@ -154,7 +173,11 @@ async function readSpecStatus(rootDir: string): Promise<RuntimeStatus["specs"]> 
     workspace: spec.workspace?.path,
     workflow: {
       nextGate: workflow.nextGate,
+      stageLabel: workflow.stageLabel,
+      nextAction: workflow.nextAction,
+      waitingFor: workflow.waitingFor,
       writableTools: workflow.writableTools,
+      documentProgress: workflow.documentProgress,
       confirmed: workflow.confirmed,
       documents: workflow.documents,
     },

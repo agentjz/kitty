@@ -40,11 +40,12 @@ export const skillCheckTool: RegisteredTool = {
     }));
 
     return jsonResult({
-      ok: dependencies.every((dependency) => dependency.available),
+      ok: skill.health.status === "ready" && dependencies.every((dependency) => dependency.available),
       skill: {
         name: skill.name,
         path: skill.path,
       },
+      health: skill.health,
       dependencies,
     });
   },

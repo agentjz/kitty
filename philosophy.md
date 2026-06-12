@@ -45,7 +45,7 @@ Agent 应该更忠于用户，还是更忠于事实？
 
 扩展是工具集合。核心保持清楚，扩展保持独立。
 
-Skills 也是 extension，不是第三套工具体系。它把可复用方法、资料、脚本、示例和素材组织成 runtime 能力包。默认上下文只出现 skill 索引和资源索引；是否加载正文、读取资源、运行脚本，由模型根据当前请求和工作焦点决定。机器只负责发现、读取、执行和记录事实。
+Skills 也是 extension，不是第三套工具体系。它把可复用方法、资料、脚本、示例和素材组织成 runtime 能力包。默认上下文只出现 skill 索引、健康状态和资源索引；是否加载正文、读取资源、运行脚本，由模型根据当前请求和工作焦点决定。机器只负责发现、分组、读取、执行、检查依赖和记录事实。
 
 ## 📐 Spec
 
@@ -92,7 +92,7 @@ Memory 搜索是候选召回，不是语义裁判。机器按文本 token、路�
 
 小猫智能体用 control plane 保存这些死事实：background、subagent execution、派工边界、pid、状态、退出码、输出摘要、wait policy 和 wake signal。
 
-`kitty status` 让用户看到运行现场：session、context budget、memory、project map、execution、wake、spec。它只呈现事实，不替模型做判断。
+`kitty status` 让用户看到运行现场：当前焦点、下一步、阻塞项、session、context budget、memory、skills、project map、execution、wake、spec。它先呈现用户能理解的当前现场，再呈现机器账本细节；它只呈现事实，不替模型做判断。
 
 Background 是长任务现场。它记录运行输出摘要，能检查、终止、reconcile，也能在完成后把事实暴露给 lead。
 
@@ -120,7 +120,7 @@ Agent 不能只靠单元测试证明成熟。
 
 小猫智能体用 evaluation harness 暴露真实体验场景：简单问题不疯狂工作、长会话不失忆、旧目标不回灌、项目地图帮助定向、memory 可审阅可追溯、background 可恢复可终止、subagent 能唤醒 lead、spec 工作流能闭环。
 
-`kitty eval` 只列出验收场景和机器事实，不替模型打分，也不把口号写成测试。
+`kitty eval` 列出验收场景和机器事实。`kitty eval --run` 运行本地可验证检查，输出 pass/fail/skip。它不替模型打分，也不把口号写成测试。
 
 ## 🧱 当前事实主干
 

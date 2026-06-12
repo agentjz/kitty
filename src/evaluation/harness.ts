@@ -3,6 +3,29 @@ export interface EvaluationScenario {
   userExperience: string;
   machineFacts: string[];
   acceptance: string[];
+  checks: EvaluationCheckId[];
+}
+
+export type EvaluationCheckId =
+  | "runtime-status-builds"
+  | "project-map-builds"
+  | "memory-assets-readable"
+  | "extension-surface-current"
+  | "spec-store-available"
+  | "skill-packages-readable"
+  | "config-preflight-readable";
+
+export interface EvaluationRunResult {
+  scenarioId: string;
+  status: "passed" | "failed" | "skipped";
+  checks: EvaluationCheckResult[];
+}
+
+export interface EvaluationCheckResult {
+  id: EvaluationCheckId;
+  status: "passed" | "failed" | "skipped";
+  fact: string;
+  error?: string;
 }
 
 const EVALUATION_SCENARIOS: readonly EvaluationScenario[] = [
@@ -19,6 +42,7 @@ const EVALUATION_SCENARIOS: readonly EvaluationScenario[] = [
       "no delegated execution is created",
       "no project-wide scan is triggered by default",
     ],
+    checks: ["runtime-status-builds", "extension-surface-current"],
   },
   {
     id: "long-session-keeps-confirmed-facts",
@@ -34,6 +58,7 @@ const EVALUATION_SCENARIOS: readonly EvaluationScenario[] = [
       "confirmed constraint appears in session memory",
       "old focus is not treated as current focus",
     ],
+    checks: ["runtime-status-builds", "memory-assets-readable"],
   },
   {
     id: "old-goal-stays-history",
@@ -48,6 +73,7 @@ const EVALUATION_SCENARIOS: readonly EvaluationScenario[] = [
       "prior goals are not narrated unless asked",
       "internal facts are not presented as user intent",
     ],
+    checks: ["runtime-status-builds"],
   },
   {
     id: "project-map-orients-without-judging",
@@ -62,6 +88,7 @@ const EVALUATION_SCENARIOS: readonly EvaluationScenario[] = [
       "context includes concise project map facts",
       "large directory trees are not dumped into prompt",
     ],
+    checks: ["project-map-builds"],
   },
   {
     id: "memory-can-be-reviewed-and-traced",
@@ -76,6 +103,7 @@ const EVALUATION_SCENARIOS: readonly EvaluationScenario[] = [
       "deleted memory is no longer listed",
       "skill reference records the source memory asset",
     ],
+    checks: ["memory-assets-readable", "skill-packages-readable"],
   },
   {
     id: "background-can-recover-or-terminate",
@@ -90,6 +118,7 @@ const EVALUATION_SCENARIOS: readonly EvaluationScenario[] = [
       "stalled background has a visible health fact",
       "terminated background records close reason",
     ],
+    checks: ["runtime-status-builds"],
   },
   {
     id: "subagent-wakes-lead-with-result",
@@ -104,6 +133,7 @@ const EVALUATION_SCENARIOS: readonly EvaluationScenario[] = [
       "lead resumes after completion or deadline",
       "wake facts do not become user input",
     ],
+    checks: ["runtime-status-builds", "extension-surface-current"],
   },
   {
     id: "spec-workflow-completes",
@@ -118,6 +148,7 @@ const EVALUATION_SCENARIOS: readonly EvaluationScenario[] = [
       "notes preserve interview facts",
       "ordinary agent mode does not auto-enter spec mode",
     ],
+    checks: ["spec-store-available", "extension-surface-current"],
   },
 ];
 
@@ -126,5 +157,94 @@ export function listEvaluationScenarios(): EvaluationScenario[] {
     ...scenario,
     machineFacts: [...scenario.machineFacts],
     acceptance: [...scenario.acceptance],
+    checks: [...scenario.checks],
   }));
+}
+
+export async function runEvaluationScenarios(rootDir: string): Promise<EvaluationRunResult[]> {
+  const scenarios = listEvaluationScenarios();
+  const cache = new Map<EvaluationCheckId, Promise<EvaluationCheckResult>>();
+  return Promise.all(scenarios.map(async (scenario) => {
+    const checks = await Promise.all(scenario.checks.map((check) => {
+      const existing = cache.get(check);
+      if (existing) {
+        return existing;
+      }
+      const pending = runEvaluationCheck(check, rootDir);
+      cache.set(check, pending);
+      return pending;
+    }));
+    return {
+      scenarioId: scenario.id,
+      status: summarizeChecks(checks),
+      checks,
+    };
+  }));
+}
+
+async function runEvaluationCheck(id: EvaluationCheckId, rootDir: string): Promise<EvaluationCheckResult> {
+  try {
+    switch (id) {
+      case "runtime-status-builds": {
+        const { buildRuntimeStatus } = await import("../runtime/status.js");
+        const status = await buildRuntimeStatus(rootDir);
+        return passed(id, `runtime status ready: sessions=${status.sessions.total}, executions=${status.executions.total}`);
+      }
+      case "project-map-builds": {
+        const { buildProjectMap } = await import("../project/map.js");
+        const map = await buildProjectMap(rootDir);
+        return passed(id, `project map ready: dirs=${map.topLevelDirectories.length}, scripts=${map.packageScripts.length}`);
+      }
+      case "memory-assets-readable": {
+        const { listRuntimeMemoryAssets } = await import("../runtime/memory/index.js");
+        const assets = await listRuntimeMemoryAssets(rootDir);
+        return passed(id, `memory assets readable: total=${assets.length}`);
+      }
+      case "extension-surface-current": {
+        const { EXTENSION_DEFINITIONS } = await import("../extensions/definitions.js");
+        const enabled = EXTENSION_DEFINITIONS.filter((extension) => extension.defaultEnabled).map((extension) => extension.id);
+        return passed(id, `extension surface ready: default=${enabled.join(",")}`);
+      }
+      case "spec-store-available": {
+        const { SpecStore } = await import("../spec/store.js");
+        const specs = await new SpecStore(rootDir, { rootDir }).list(5).catch(() => []);
+        return passed(id, `spec store ready: total=${specs.length}`);
+      }
+      case "skill-packages-readable": {
+        const { loadProjectContext } = await import("../context/projectContext.js");
+        const project = await loadProjectContext(rootDir, { projectDocMaxBytes: 24_576 });
+        return passed(id, `skills readable: total=${project.skills.length}`);
+      }
+      case "config-preflight-readable": {
+        const { inspectConfigPreflight } = await import("../config/preflight.js");
+        const preflight = await inspectConfigPreflight(rootDir);
+        return passed(id, `config preflight ready: ready=${preflight.ready}`);
+      }
+    }
+  } catch (error) {
+    return {
+      id,
+      status: "failed",
+      fact: `${id} failed`,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+function passed(id: EvaluationCheckId, fact: string): EvaluationCheckResult {
+  return {
+    id,
+    status: "passed",
+    fact,
+  };
+}
+
+function summarizeChecks(checks: readonly EvaluationCheckResult[]): EvaluationRunResult["status"] {
+  if (checks.some((check) => check.status === "failed")) {
+    return "failed";
+  }
+  if (checks.some((check) => check.status === "skipped")) {
+    return "skipped";
+  }
+  return "passed";
 }

@@ -34,6 +34,20 @@ export function parseSkillSource(
     body,
     dependencies: parseDependencies(metadata.requires),
     resources: [],
+    health: {
+      status: body ? "ready" : "needs_content",
+      bodyPresent: Boolean(body),
+      resourceCount: 0,
+      dependencyCount: 0,
+      resourceGroups: {
+        references: 0,
+        scripts: 0,
+        examples: 0,
+        assets: 0,
+        other: 0,
+      },
+      issues: body ? [] : ["SKILL.md body is empty"],
+    },
   };
 }
 
