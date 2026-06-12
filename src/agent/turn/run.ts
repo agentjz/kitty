@@ -9,7 +9,7 @@ import {
 import { createProviderRecoveryTransition } from "../runtimeTransition.js";
 import { resolveAgentProfile } from "../profiles/registry.js";
 import { emitAssistantFinalOutput, emitAssistantReasoning } from "./finalize.js";
-import { updateSessionMemoryAfterTurn } from "./lifecycle.js";
+import { updateSessionMemoryAfterTurn, updateSessionTitleAfterTurn } from "./lifecycle.js";
 import {
   initializeTurnSession,
   persistRecoveryTurn,
@@ -177,6 +177,16 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
           session = completed.session;
           continue;
         }
+        completed.result.session = await updateSessionTitleAfterTurn({
+          session: completed.result.session,
+          input: options.input,
+          response,
+          options,
+          client,
+          requestModel,
+          identity,
+          rootDir: projectContext.stateRootDir,
+        });
         completed.result.session = await updateSessionMemoryAfterTurn({
           session: completed.result.session,
           input: options.input,

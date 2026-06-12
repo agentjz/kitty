@@ -64,6 +64,8 @@ kitty init
 kitty
 ```
 
+如果已有会话，`kitty` 会先显示最近会话列表：输入 `1` 继续最近会话，输入 `0` 新建会话。没有历史会话时会直接新建。会话标题由模型在第一次真实对话完成后生成，后续保持稳定。
+
 执行一次明确任务：
 
 ```bash
@@ -80,7 +82,7 @@ kitty spec
 
 | 命令 | 用途 |
 | --- | --- |
-| `kitty` | 进入默认 agent 交互，或直接接收一次性 prompt |
+| `kitty` | 进入默认 agent 交互；有历史会话时先选择继续或新建，也可直接接收一次性 prompt |
 | `kitty agent` | 显式进入 agent 模式 |
 | `kitty spec` | 进入 requirements -> design -> tasks -> implement -> validate 工作流 |
 | `kitty resume [sessionId]` | 恢复最近会话或指定会话 |

@@ -26,15 +26,20 @@ export function registerAgentCommand(
       const prompt = promptParts.join(" ").trim();
       const runtime = await options.resolveRuntime(options.getCliOverrides());
       const sessionStore = await createSessionStore(runtime.paths.sessionsDir);
-      const session = await resolveCliSession({
+      const selected = await resolveCliSession({
         sessionStore,
         cwd: runtime.cwd,
+        cwdOverridden: Boolean(runtime.overrides.cwd),
+        interactive: !prompt,
       });
+      if (!selected) {
+        return;
+      }
       await runCliMode(options.dependencies, {
         prompt,
-        cwd: runtime.cwd,
+        cwd: selected.cwd,
         config: runtime.config,
-        session,
+        session: selected.session,
         sessionStore,
         incompleteMessage: "Agent one-shot did not complete.",
         onIncomplete: (message) => {

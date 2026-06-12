@@ -37,6 +37,7 @@ test("agent turn writes same-session memory as a fixed lifecycle behavior", asyn
         toolCalls: [],
       };
     },
+    fetchSessionTitleResponse: async () => titleResponse("仓库比较要求"),
     fetchSessionMemoryResponse: async (request): Promise<AssistantResponse> => {
       memoryRequests.push(request);
       return {
@@ -84,6 +85,100 @@ test("agent turn writes same-session memory as a fixed lifecycle behavior", asyn
   assert.equal(result.session.taskState?.focus, "比较 agentjz/777f 和 agentjz/ohmyflight。");
 });
 
+test("agent turn generates a model-written session title once", async (t) => {
+  const root = await createTempWorkspace("session-title-lifecycle", t);
+  const config = createTestRuntimeConfig(root);
+  const sessionStore = new InProcessSessionStore();
+  const session = await sessionStore.create(root);
+  const titleRequests: ModelRequestInput[] = [];
+
+  const first = await runAgentTurn({
+    input: "帮我设计启动时恢复最近会话的体验。",
+    cwd: root,
+    config,
+    session,
+    sessionStore,
+    toolRegistry: createToolRegistry({ onlyNames: [] }),
+    fetchAssistantResponse: async (): Promise<AssistantResponse> => ({
+      content: "可以。入口先列出最近会话，用户选择继续或新建。",
+      toolCalls: [],
+    }),
+    fetchSessionTitleResponse: async (request): Promise<AssistantResponse> => {
+      titleRequests.push(request);
+      return {
+        content: "启动会话选择",
+        toolCalls: [],
+      };
+    },
+    fetchSessionMemoryResponse: async (): Promise<AssistantResponse> => ({
+      content: [
+        "## Current Focus",
+        "设计启动时恢复最近会话的体验。",
+        "",
+        "## User Constraints",
+        "None",
+        "",
+        "## Decisions",
+        "None",
+        "",
+        "## Open Threads",
+        "None",
+        "",
+        "## Verification Facts",
+        "None",
+        "",
+        "## Reusable Lessons",
+        "None",
+      ].join("\n"),
+      toolCalls: [],
+    }),
+  });
+
+  const second = await runAgentTurn({
+    input: "继续。",
+    cwd: root,
+    config,
+    session: first.session,
+    sessionStore,
+    toolRegistry: createToolRegistry({ onlyNames: [] }),
+    fetchAssistantResponse: async (): Promise<AssistantResponse> => ({
+      content: "继续完善边界。",
+      toolCalls: [],
+    }),
+    fetchSessionTitleResponse: async (): Promise<AssistantResponse> => {
+      throw new Error("title should already exist");
+    },
+    fetchSessionMemoryResponse: async (): Promise<AssistantResponse> => ({
+      content: [
+        "## Current Focus",
+        "继续完善启动会话选择。",
+        "",
+        "## User Constraints",
+        "None",
+        "",
+        "## Decisions",
+        "None",
+        "",
+        "## Open Threads",
+        "None",
+        "",
+        "## Verification Facts",
+        "None",
+        "",
+        "## Reusable Lessons",
+        "None",
+      ].join("\n"),
+      toolCalls: [],
+    }),
+  });
+
+  assert.equal(titleRequests.length, 1);
+  assert.equal(titleRequests[0]?.tools.length, 0);
+  assert.match(String(titleRequests[0]?.messages[0]?.content ?? ""), /Create a concise title/);
+  assert.equal(first.session.title, "启动会话选择");
+  assert.equal(second.session.title, "启动会话选择");
+});
+
 test("plain turn input does not become machine-written focus", async (t) => {
   const root = await createTempWorkspace("plain-turn-input-no-focus", t);
   const config = createTestRuntimeConfig(root);
@@ -101,6 +196,7 @@ test("plain turn input does not become machine-written focus", async (t) => {
       content: "你好。",
       toolCalls: [],
     }),
+    fetchSessionTitleResponse: async () => titleResponse("问候"),
     fetchSessionMemoryResponse: async (): Promise<AssistantResponse> => ({
       content: [
         "## Current Focus",
@@ -151,6 +247,7 @@ test("model-written session memory focus becomes working memory focus", async (t
       content: "继续比较。",
       toolCalls: [],
     }),
+    fetchSessionTitleResponse: async () => titleResponse("仓库比较"),
     fetchSessionMemoryResponse: async (): Promise<AssistantResponse> => ({
       content: [
         "## Current Focus",
@@ -302,6 +399,7 @@ test("session memory lifecycle receives tool evidence and session diff facts", a
         toolCalls: [],
       };
     },
+    fetchSessionTitleResponse: async () => titleResponse("状态文件写入"),
     fetchSessionMemoryResponse: async (request): Promise<AssistantResponse> => {
       memoryRequests.push(request);
       return {
@@ -365,6 +463,7 @@ test("previous session memory is passed to the model for structured rewrite", as
       content: "继续整理 memory。",
       toolCalls: [],
     }),
+    fetchSessionTitleResponse: async () => titleResponse("整理记忆"),
     fetchSessionMemoryResponse: async (request): Promise<AssistantResponse> => {
       memoryRequests.push(request);
       return {
@@ -415,6 +514,7 @@ test("session memory lifecycle records failed memory updates without failing the
       content: "这是正常回答。",
       toolCalls: [],
     }),
+    fetchSessionTitleResponse: async () => titleResponse("正常回答"),
     fetchSessionMemoryResponse: async (): Promise<AssistantResponse> => {
       throw new Error("memory model unavailable");
     },
@@ -458,6 +558,7 @@ test("internal wake turns do not rewrite same-session memory as user intent", as
       content: "继续当前工作。",
       toolCalls: [],
     }),
+    fetchSessionTitleResponse: async () => titleResponse("内部唤醒"),
     fetchSessionMemoryResponse: async (): Promise<AssistantResponse> => {
       memoryRequestCount += 1;
       return {
@@ -503,6 +604,13 @@ function createWriteStatusTool(root: string): RegisteredTool {
         },
       };
     },
+  };
+}
+
+function titleResponse(content: string): AssistantResponse {
+  return {
+    content,
+    toolCalls: [],
   };
 }
 

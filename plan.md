@@ -1,59 +1,55 @@
-# 入口闭环补全计划
+# 启动会话选择体验计划
 
 ## 目标
 
-把已经存在但用户无法完整使用的入口补成当前事实主干。
+`kitty` 或 `node dist/cli.js` 在没有 prompt 时，先让用户选择最近会话；没有历史会话时直接进入新会话。用户能从入口自然继续之前的上下文，而不是每次启动都默认开空白对话。
 
-本轮只处理真实不完整点：session events 已经被 host 记录，也能被 local API 读取，但普通 CLI 没有审阅入口。结果是事件层有地基、有测试，却没有用户可见闭环。
+## 当前事实
 
-不新增新概念。不做旧兼容。不为了统一而重写已经正常工作的 CLI、interactive、Telegram 或 worker 链路。
-
-## 排查结论
-
-- `runHostTurn` 已统一写入 `turn.started`、`turn.completed`、`turn.failed`、`turn.aborted`。
-- `createLocalAgentApi` 能创建 session、发送消息、读取 events、读取 status。
-- `kitty status` 展示当前现场，但不适合展示单 session 事件流。
-- `kitty sessions` 只列 session 摘要，不展示 turn 事件。
-- `src/session/events.ts` 只有 API 和测试在读，用户没有直接入口。
-- `src/evaluation/` 已拆成 `harness/scenarios/checks/golden/types`，不再是本轮主矛盾。
+- 默认入口和 `kitty agent` 都通过 `resolveCliSession()` 创建 session，再进入 `runCliMode()`。
+- `kitty resume [sessionId]` 已经支持明确恢复会话。
+- one-shot prompt 应保持创建新 session，不弹选择器。
+- spec 模式有独立入口，本轮不把默认选择器塞进 spec。
+- `SessionRecord.title` 已存在，应该由模型在第一次真实对话完成后生成。
+- `SessionStore.list()` 已按 `updatedAt` 倒序返回最近会话。
 
 ## 设计
 
-新增当前 CLI 入口：
+- 新增 CLI session picker，职责只做启动前会话选择。
+- 触发条件：交互模式、没有显式 resume、存在历史 session。
+- 选择规则：
+  - `0` 新建会话。
+  - `1..n` 恢复列表中的会话。
+  - 输入为空默认选 `1`。
+  - 无效输入继续提示。
+  - 输入流关闭时取消启动，不创建隐式 session。
+- 显示内容：编号、标题、相对更新时间、消息数。
+- 选中旧会话后：
+  - 未传 `-C` 时使用该 session 的 cwd。
+  - 传了 `-C` 时使用当前 runtime cwd。
+- session 标题由 turn 生命周期触发一次模型生成；已有标题后不再触发。
 
-```bash
-kitty events [sessionId] [-n 20] [--json]
-```
+## 改动清单
 
-行为：
+- [x] 新增 `src/cli/commands/sessionPicker.ts`。
+- [x] 调整 `resolveCliSession()` 返回 session 和 cwd。
+- [x] 默认入口和 `kitty agent` 接入选择器。
+- [x] 保持 `run`、one-shot prompt、`resume`、spec 模式现有边界。
+- [x] 删除 session 保存层的机器派生标题。
+- [x] 增加首轮完成后的模型标题生成生命周期。
+- [x] 补 CLI picker 和 session title 测试。
+- [x] README 同步启动体验。
+- [x] 运行 typecheck、相关测试、完整 verify。
 
-- 不传 `sessionId` 时读取最新 session。
-- 传 `sessionId` 时读取指定 session。
-- `-n/--limit` 控制读取数量。
-- 默认文本输出按时间顺序展示 event type、createdAt、host、message/details。
-- `--json` 输出 `{ sessionId, events }`。
-- 没有 session 时给出清楚提示。
-- 没有 events 时给出清楚提示。
+## 验收
 
-边界：
-
-- events 是机器事实审阅入口，不是对话历史入口。
-- 不把 events 注入模型。
-- 不让 CLI presenter 重新判断语义，只格式化已有事件记录。
-- 不改变 `runHostTurn`、Telegram、interactive 的生命周期主干。
-
-## 执行清单
-
-- [x] 重写 `plan.md`。
-- [x] 新增 CLI `events` 命令。
-- [x] 给 `events` 命令补测试。
-- [x] 同步 README 和 spec 当前入口事实。
-- [x] 运行 `npm.cmd run verify`。
-- [x] 真实运行 `node dist\cli.js events --json`。
-
-## 完成标准
-
-- 用户能直接用 CLI 查看当前 session 的机器事件。
-- `session events` 不再只是 API 内部能力。
-- 文档、代码、测试讲同一个当前事实。
-- 完整验证通过。
+- 没有历史 session：`kitty` 直接进入新会话。
+- 有历史 session：`kitty` 展示编号列表。
+- 输入 `0`：进入新会话。
+- 输入 `1`：恢复最近会话。
+- 输入无效值：继续提示，不误启动。
+- 输入流关闭：退出，不创建 session。
+- one-shot prompt 不弹选择器。
+- `kitty resume` 继续直接恢复。
+- 第一轮真实对话完成后生成标题。
+- 已有标题的 session 后续不再生成标题。

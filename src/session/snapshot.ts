@@ -14,7 +14,6 @@ import {
 } from "./errors.js";
 import { deriveTaskState, normalizeSessionRecord as normalizeTaskStateSessionRecord } from "./taskState.js";
 import { deriveTodoItems, normalizeSessionTodos, normalizeTodoItems } from "./todos.js";
-import { readUserInput } from "./turnFrame.js";
 
 const CURRENT_SESSION_SCHEMA_VERSION = 1;
 const SESSION_SNAPSHOT_KEYS = new Set([
@@ -89,7 +88,7 @@ export function prepareSessionRecordForSave(session: SessionRecord): SessionReco
   const prepared = {
     ...session,
     updatedAt: new Date().toISOString(),
-    title: session.title ?? deriveSessionTitle(normalizedMessages),
+    title: session.title,
     messageCount: normalizedMessages.length,
     messages: normalizedMessages,
     sessionMemory: normalizeSessionMemory(session.sessionMemory),
@@ -348,18 +347,6 @@ function readOptionalString(
   }
 
   return value;
-}
-
-function deriveSessionTitle(messages: StoredMessage[]): string | undefined {
-  const firstUserInput = messages
-    .filter((message) => message.role === "user")
-    .map((message) => readUserInput(message.content))
-    .find((content): content is string => Boolean(content));
-  if (!firstUserInput) {
-    return undefined;
-  }
-
-  return firstUserInput.slice(0, 80);
 }
 
 export { CURRENT_SESSION_SCHEMA_VERSION };

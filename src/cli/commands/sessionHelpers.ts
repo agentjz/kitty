@@ -1,6 +1,7 @@
 import type { CliProgramDependencies } from "../dependencies.js";
 import type { RuntimeConfig, SessionRecord } from "../../types.js";
 import { createHostSession } from "../../host/session.js";
+import { selectCliSession } from "./sessionPicker.js";
 
 export async function createSessionStore(sessionsDir: string) {
   const { SessionStore } = await import("../../session/index.js");
@@ -46,14 +47,34 @@ export async function runOneShot(
 
 export async function resolveCliSession(input: {
   cwd: string;
+  cwdOverridden?: boolean;
   sessionStore: Awaited<ReturnType<typeof createSessionStore>>;
   resume?: string;
-}): Promise<SessionRecord> {
+  interactive?: boolean;
+}): Promise<{
+  session: SessionRecord;
+  cwd: string;
+} | null> {
   if (input.resume) {
-    return input.sessionStore.load(input.resume);
+    const session = await input.sessionStore.load(input.resume);
+    return {
+      session,
+      cwd: input.cwdOverridden ? input.cwd : session.cwd,
+    };
   }
 
-  return createHostSession(input.sessionStore, input.cwd);
+  if (input.interactive) {
+    return selectCliSession({
+      cwd: input.cwd,
+      cwdOverridden: Boolean(input.cwdOverridden),
+      sessionStore: input.sessionStore,
+    });
+  }
+
+  return {
+    session: await createHostSession(input.sessionStore, input.cwd),
+    cwd: input.cwd,
+  };
 }
 
 export async function runCliMode(
