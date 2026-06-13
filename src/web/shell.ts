@@ -16,6 +16,7 @@ export function createWebInteractionShell(wss: WebSocketServer): InteractionShel
     }): InteractionTurnDisplay {
       return createWebTurnDisplay({
         wss,
+        config: options.config,
         abortSignal: options.abortSignal,
       });
     },

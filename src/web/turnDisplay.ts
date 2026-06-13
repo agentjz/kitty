@@ -13,6 +13,7 @@ function broadcast(wss: WebSocketServer, data: object): void {
 
 export function createWebTurnDisplay(options: {
   wss: WebSocketServer;
+  config: { showReasoning?: boolean };
   abortSignal: AbortSignal;
 }): InteractionTurnDisplay {
   const callbacks: AgentCallbacks = {
@@ -21,6 +22,16 @@ export function createWebTurnDisplay(options: {
     },
     onModelWaitStop() {
       broadcast(options.wss, { type: "status", text: "" });
+    },
+    onReasoningDelta(delta: string) {
+      if (options.config.showReasoning) {
+        broadcast(options.wss, { type: "reasoning_delta", text: delta });
+      }
+    },
+    onReasoning(text: string) {
+      if (options.config.showReasoning) {
+        broadcast(options.wss, { type: "reasoning", text });
+      }
     },
     onAssistantDelta(delta: string) {
       broadcast(options.wss, { type: "delta", text: delta });
@@ -36,6 +47,12 @@ export function createWebTurnDisplay(options: {
     },
     onToolCall(name: string, _args: string) {
       broadcast(options.wss, { type: "status", text: `🔧${name}` });
+    },
+    onToolResult(name: string, _output: string) {
+      broadcast(options.wss, { type: "status", text: `✅${name}` });
+    },
+    onToolError(name: string, _error: string) {
+      broadcast(options.wss, { type: "status", text: `❌${name}` });
     },
     onStatus(text: string) {
       broadcast(options.wss, { type: "status", text });

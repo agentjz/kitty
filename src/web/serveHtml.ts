@@ -22,6 +22,10 @@ export function serveHtml(): string {
   .msg-agent .bubble table { display: block; overflow-x: auto; max-width: 100%; }
   .msg-agent .bubble p:last-child { margin-bottom: 0; }
   .status-text { color: #c4a0a8; font-style: italic; font-size: 0.85rem; padding: 0.25rem 0; }
+  details.reasoning-block { margin-bottom: 0.5rem; max-width: 90%; }
+  details.reasoning-block summary { color: #a08088; font-size: 0.8rem; cursor: pointer; user-select: none; padding: 0.25rem 0.5rem; border-radius: 0.5rem; background: #f5ece8; display: inline-block; }
+  details.reasoning-block summary:hover { background: #f0e4e0; }
+  details.reasoning-block .reasoning-content { color: #8a7078; font-size: 0.85rem; font-style: italic; padding: 0.5rem 0.75rem; border-left: 3px solid #f0d6d0; margin-top: 0.25rem; line-height: 1.5; overflow-wrap: break-word; word-break: break-word; }
   #input-area { display: flex; gap: 0.5rem; align-items: center; }
   #input-area textarea { flex: 1; resize: none; background: #fffaf5; color: #4a4045; border: 1px solid #f0d6d0; border-radius: 0.75rem; padding: 0.75rem 1rem; min-height: 3.5rem; max-height: 12rem; }
   #input-area textarea:focus { outline: none; border-color: #f8a5c2; box-shadow: 0 0 0 3px rgba(248,165,194,0.25); }
@@ -63,6 +67,8 @@ export function serveHtml(): string {
   const pauseBtn = document.getElementById('pause-btn');
   let currentAgentBubble = null;
   let currentAgentText = '';
+  let currentReasoningElem = null;
+  let currentReasoningText = '';
 
   function scrollToBottom() {
     chatArea.scrollTop = chatArea.scrollHeight;
@@ -70,6 +76,31 @@ export function serveHtml(): string {
 
   function stripUserPrefix(text) {
     return text.replace(/^>\s*/gm, '');
+  }
+
+  function finalizeReasoning() {
+    currentReasoningElem = null;
+    currentReasoningText = '';
+  }
+
+  function updateReasoningDelta(delta) {
+    if (!currentReasoningElem) {
+      const details = document.createElement('details');
+      details.className = 'reasoning-block';
+      details.open = true;
+      const summary = document.createElement('summary');
+      summary.textContent = '🐶 思考';
+      details.appendChild(summary);
+      const content = document.createElement('div');
+      content.className = 'reasoning-content';
+      details.appendChild(content);
+      messagesDiv.appendChild(details);
+      currentReasoningElem = content;
+      currentReasoningText = '';
+    }
+    currentReasoningText += delta;
+    currentReasoningElem.textContent = currentReasoningText;
+    scrollToBottom();
   }
 
   function addUserMessage(text) {
@@ -82,6 +113,8 @@ export function serveHtml(): string {
     messagesDiv.appendChild(div);
     currentAgentBubble = null;
     currentAgentText = '';
+    currentReasoningElem = null;
+    currentReasoningText = '';
     scrollToBottom();
   }
 
@@ -95,6 +128,7 @@ export function serveHtml(): string {
     messagesDiv.appendChild(div);
     currentAgentBubble = null;
     currentAgentText = '';
+    finalizeReasoning();
     scrollToBottom();
   }
 
@@ -116,6 +150,7 @@ export function serveHtml(): string {
   function finalizeAgentMessage() {
     currentAgentBubble = null;
     currentAgentText = '';
+    finalizeReasoning();
   }
 
   function setStatus(text) {
@@ -136,6 +171,16 @@ export function serveHtml(): string {
     switch (msg.type) {
       case 'user':
         addUserMessage(msg.text);
+        break;
+      case 'reasoning_delta':
+        updateReasoningDelta(msg.text);
+        break;
+      case 'reasoning':
+        if (msg.text) {
+          currentReasoningElem = null;
+          currentReasoningText = '';
+          updateReasoningDelta(msg.text);
+        }
         break;
       case 'delta':
         updateAgentDelta(msg.text);

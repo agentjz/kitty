@@ -16,8 +16,8 @@ export function createWebOutputPort(wss: WebSocketServer): ShellOutputPort {
       // formatSubmittedInput output: display as user message on the right
       broadcast(wss, { type: "user", text });
     },
-    info(_text: string): void {
-      // Not pushed to web — terminal only
+    info(text: string): void {
+      broadcast(wss, { type: "status", text });
     },
     warn(text: string): void {
       broadcast(wss, { type: "status", text });

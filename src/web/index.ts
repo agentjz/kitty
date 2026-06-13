@@ -8,6 +8,7 @@ import { WebSocketServer } from "ws";
 
 import { InteractiveSessionDriver, type InteractiveSessionDriverOptions } from "../interaction/sessionDriver.js";
 
+import { isSessionNotFoundError } from "../session/errors.js";
 import type { SessionStoreLike } from "../session/index.js";
 import type { RuntimeConfig, SessionRecord } from "../types.js";
 import { createWebInteractionShell } from "./shell.js";
@@ -68,18 +69,31 @@ export async function startWebShell(options: StartWebShellOptions): Promise<void
   // WebSocket connection logging + replay history
   wss.on("connection", async (ws) => {
     writeStdoutLine("[web] 客户端已连接");
+    // Try to replay history from persisted session; for a new session not yet
+    // saved to disk, fall back to the in-memory session (which may be empty).
+    let current: SessionRecord;
     try {
-      // Load latest session state to replay history
-      const current = await options.sessionStore.load(session.id);
-      for (const msg of current.messages) {
-        if (msg.role === "user" && msg.content) {
-          ws.send(JSON.stringify({ type: "user", text: msg.content }));
-        } else if (msg.role === "assistant" && msg.content) {
+      current = await options.sessionStore.load(session.id);
+    } catch (err) {
+      if (isSessionNotFoundError(err)) {
+        // New session not yet persisted – use in-memory state
+        current = session;
+      } else {
+        writeStdoutLine(`[web] 加载历史消息失败: ${err}`);
+        current = session;
+      }
+    }
+    for (const msg of current.messages) {
+      if (msg.role === "user" && msg.content) {
+        ws.send(JSON.stringify({ type: "user", text: msg.content }));
+      } else if (msg.role === "assistant") {
+        if (msg.reasoningContent) {
+          ws.send(JSON.stringify({ type: "reasoning", text: msg.reasoningContent }));
+        }
+        if (msg.content) {
           ws.send(JSON.stringify({ type: "message", text: msg.content }));
         }
       }
-    } catch (err) {
-      writeStdoutLine(`[web] 加载历史消息失败: ${err}`);
     }
     ws.on("close", () => {
       writeStdoutLine("[web] 客户端已断开");
