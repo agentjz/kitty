@@ -15,6 +15,7 @@ import { registerSessionCommands } from "./commands/session.js";
 import { registerWorkerCommand } from "./commands/worker.js";
 import { writeStderr, writeStdout, writeStdoutLine } from "../utils/stdio.js";
 import { registerTelegramCommands } from "../telegram/cli.js";
+import { registerWebCommand } from "./commands/web.js";
 
 export { type CliProgramDependencies } from "./dependencies.js";
 
@@ -92,6 +93,10 @@ export function buildCliProgram(dependencies: CliProgramDependencies = {}): Comm
     acquireProcessLock: dependencies.acquireProcessLock,
   });
   registerWorkerCommand(program, {
+    getCliOverrides,
+    resolveRuntime,
+  });
+  registerWebCommand(program, {
     getCliOverrides,
     resolveRuntime,
   });
