@@ -32,5 +32,5 @@ Host 工具注册边界：
 
 `kitty events` 使用 `src/cli/commands/events.ts` 读取 `src/session/events.ts` 的同一份事件事实。默认读取最新 session，也可以按 session id 读取；CLI presenter 只格式化事件，不判断语义。
 
-`kitty eval` 使用 `src/evaluation/`。`harness.ts` 只负责编排；`scenarios.ts` 维护场景事实；`checks.ts` 运行本地机器检查；`golden.ts` 用假 provider 跑真实 `runHostTurn`，验证 session、工具、workset 和 event 边界。检查结果是 pass/fail/skip 事实，不调用模型评分。
+`kitty eval` 使用 `src/evaluation/`。`harness.ts` 只负责编排；`checks.ts` 运行本地机器检查。检查结果是 pass/fail/skip 事实，不调用模型评分，也不保留 scenario / golden 层。
 

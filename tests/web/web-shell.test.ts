@@ -5,7 +5,9 @@ import { once } from "node:events";
 import WebSocket, { WebSocketServer } from "ws";
 
 import { createWebInputPort } from "../../src/web/inputPort.js";
+import { createWebOutputPort } from "../../src/web/outputPort.js";
 import { serveHtml } from "../../src/web/serveHtml.js";
+import { createWebTurnDisplay } from "../../src/web/turnDisplay.js";
 
 test("serveHtml returns a valid HTML page", () => {
   const html = serveHtml();
@@ -106,6 +108,91 @@ test("web input port maps WebSocket interrupt messages to the bound handler", as
     await closeWebSocketServer(wss);
   }
 });
+
+test("web output port emits user, status, and interrupt events", async () => {
+  const wss = new WebSocketServer({ port: 0 });
+  const output = createWebOutputPort(wss);
+  const port = (wss.address() as import("net").AddressInfo).port;
+  const client = new WebSocket(`ws://127.0.0.1:${port}`);
+
+  try {
+    await once(client, "open");
+    const messages = collectClientMessages(client, 3);
+    output.plain("> hello");
+    output.info("connected");
+    output.interrupt("stopped");
+
+    assert.deepEqual(await messages, [
+      { type: "user", text: "> hello" },
+      { type: "status", text: "connected" },
+      { type: "interrupt", text: "stopped" },
+    ]);
+  } finally {
+    client.close();
+    await closeWebSocketServer(wss);
+  }
+});
+
+test("web turn display emits assistant and tool lifecycle events", async () => {
+  const wss = new WebSocketServer({ port: 0 });
+  const display = createWebTurnDisplay({
+    wss,
+    config: { showReasoning: true },
+    abortSignal: new AbortController().signal,
+  });
+  const port = (wss.address() as import("net").AddressInfo).port;
+  const client = new WebSocket(`ws://127.0.0.1:${port}`);
+
+  try {
+    await once(client, "open");
+    const messages = collectClientMessages(client, 5);
+    display.callbacks.onModelWaitStart?.();
+    display.callbacks.onReasoning?.("thinking");
+    display.callbacks.onAssistantDelta?.("hel");
+    display.callbacks.onToolCall?.("read", "{}");
+    display.callbacks.onAssistantDone?.("hello");
+
+    assert.deepEqual(await messages, [
+      { type: "status", text: "🐱 thinking..." },
+      { type: "reasoning", text: "thinking" },
+      { type: "delta", text: "hel" },
+      { type: "status", text: "🔧 read" },
+      { type: "done" },
+    ]);
+  } finally {
+    display.dispose();
+    client.close();
+    await closeWebSocketServer(wss);
+  }
+});
+
+function collectClientMessages(client: WebSocket, count: number): Promise<Array<Record<string, unknown>>> {
+  return new Promise((resolve, reject) => {
+    const messages: Array<Record<string, unknown>> = [];
+    const onMessage = (raw: WebSocket.RawData) => {
+      try {
+        messages.push(JSON.parse(raw.toString()) as Record<string, unknown>);
+        if (messages.length === count) {
+          cleanup();
+          resolve(messages);
+        }
+      } catch (error) {
+        cleanup();
+        reject(error);
+      }
+    };
+    const onError = (error: Error) => {
+      cleanup();
+      reject(error);
+    };
+    const cleanup = () => {
+      client.off("message", onMessage);
+      client.off("error", onError);
+    };
+    client.on("message", onMessage);
+    client.on("error", onError);
+  });
+}
 
 async function closeWebSocketServer(wss: WebSocketServer): Promise<void> {
   for (const client of wss.clients) {

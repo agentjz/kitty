@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 
-import { listEvaluationScenarios, runEvaluationScenarios } from "../../evaluation/harness.js";
+import { listEvaluationChecks, runEvaluationChecks } from "../../evaluation/harness.js";
 import { writeStdoutLine } from "../../utils/stdio.js";
 
 export function registerEvaluationCommand(
@@ -11,32 +11,29 @@ export function registerEvaluationCommand(
 ): void {
   program
     .command("eval")
-    .description("List or run real agent experience evaluation scenarios.")
+    .description("List or run machine-verifiable evaluation checks.")
     .option("--json", "Print structured JSON.")
-    .option("--run", "Run local machine-verifiable evaluation checks.")
+    .option("--run", "Run all local evaluation checks.")
     .action(async (commandOptions: { json?: boolean; run?: boolean }) => {
-      const scenarios = listEvaluationScenarios();
-      const results = commandOptions.run
-        ? await runEvaluationScenarios(options.getCwd?.() ?? process.cwd())
+      const checks = listEvaluationChecks();
+      const result = commandOptions.run
+        ? await runEvaluationChecks(options.getCwd?.() ?? process.cwd())
         : undefined;
 
       if (commandOptions.json) {
-        writeStdoutLine(JSON.stringify({ scenarios, results }, null, 2));
+        writeStdoutLine(JSON.stringify({ checks, result }, null, 2));
         return;
       }
 
-      writeStdoutLine(commandOptions.run ? "Evaluation run:" : "Evaluation scenarios:");
-      for (const scenario of scenarios) {
-        const result = results?.find((item) => item.scenarioId === scenario.id);
+      writeStdoutLine(commandOptions.run ? "Evaluation checks run:" : "Evaluation checks:");
+      for (const check of checks) {
+        writeStdoutLine(`- ${check}`);
+      }
+      if (result) {
         writeStdoutLine("");
-        writeStdoutLine(result ? `${scenario.id}  ${result.status}` : scenario.id);
-        writeStdoutLine(`  User experience: ${scenario.userExperience}`);
-        writeStdoutLine(`  Machine facts: ${scenario.machineFacts.join(" | ")}`);
-        writeStdoutLine(`  Acceptance: ${scenario.acceptance.join(" | ")}`);
-        if (result) {
-          for (const check of result.checks) {
-            writeStdoutLine(`  ${check.status}: ${check.fact}${check.error ? ` (${check.error})` : ""}`);
-          }
+        writeStdoutLine(`Status: ${result.status}`);
+        for (const check of result.checks) {
+          writeStdoutLine(`${check.status} ${check.id}: ${check.fact}${check.error ? ` (${check.error})` : ""}`);
         }
       }
     });

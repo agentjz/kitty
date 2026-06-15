@@ -1,12 +1,3 @@
-export interface EvaluationScenario {
-  id: string;
-  userExperience: string;
-  machineFacts: string[];
-  acceptance: string[];
-  checks: EvaluationCheckId[];
-  golden?: GoldenEvaluationScenarioId;
-}
-
 export type EvaluationCheckId =
   | "runtime-status-builds"
   | "project-map-builds"
@@ -14,31 +5,22 @@ export type EvaluationCheckId =
   | "extension-surface-current"
   | "spec-store-available"
   | "skill-packages-readable"
-  | "config-preflight-readable";
+  | "config-preflight-readable"
+  | "host-turn-boundary-runs"
+  | "remote-entrypoints-available"
+  | "recovery-drills-pass";
 
 export interface EvaluationRunResult {
-  scenarioId: string;
   status: "passed" | "failed" | "skipped";
   checks: EvaluationCheckResult[];
-  sessionId?: string;
 }
 
 export interface EvaluationCheckResult {
-  id: EvaluationCheckId | GoldenEvaluationCheckId;
+  id: EvaluationCheckId;
   status: "passed" | "failed" | "skipped";
   fact: string;
   error?: string;
 }
-
-export type GoldenEvaluationScenarioId =
-  | "simple-question-stays-small"
-  | "tool-read-records-workset"
-  | "edit-records-workset-and-change";
-
-export type GoldenEvaluationCheckId =
-  | `golden:${GoldenEvaluationScenarioId}:turn`
-  | `golden:${GoldenEvaluationScenarioId}:workset`
-  | `golden:${GoldenEvaluationScenarioId}:events`;
 
 export function passed(id: EvaluationCheckResult["id"], fact: string): EvaluationCheckResult {
   return {

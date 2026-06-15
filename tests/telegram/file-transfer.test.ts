@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { TelegramDeliveryQueue } from "../../src/telegram/deliveryQueue.js";
-import { buildFileTurnInput, downloadTelegramAttachment } from "../../src/telegram/inboundFiles.js";
+import { buildFileTurnInput, buildTextTurnInput, downloadTelegramAttachment } from "../../src/telegram/inboundFiles.js";
 import type {
   TelegramBotApiClient,
   TelegramFileDescriptor,
@@ -44,6 +44,12 @@ test("telegram inbound file is downloaded locally and exposed in turn input", as
   assert.match(turnInput, /please inspect this/);
   assert.match(turnInput, /notes\?\.txt ->/);
   assert.match(turnInput, /Telegram context|Recent Telegram attachments/);
+
+  const followupInput = buildTextTurnInput("use the uploaded file", [attachment], root);
+  assert.match(followupInput, /use the uploaded file/);
+  assert.match(followupInput, /Recent attachments from this chat/);
+  assert.match(followupInput, /notes\?\.txt ->/);
+  assert.doesNotMatch(followupInput, /internal wake/i);
 });
 
 test("telegram delivery queue sends queued files with sendDocument", async (t) => {

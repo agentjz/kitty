@@ -1,39 +1,34 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { listEvaluationScenarios, runEvaluationScenarios } from "../../src/evaluation/harness.js";
+import { listEvaluationChecks, runEvaluationChecks } from "../../src/evaluation/harness.js";
 import { createTempWorkspace } from "../helpers.js";
 
-test("evaluation harness defines real agent experience scenarios", () => {
-  const scenarios = listEvaluationScenarios();
-  const ids = scenarios.map((scenario) => scenario.id);
-
-  assert.ok(ids.includes("simple-question-stays-small"));
-  assert.ok(ids.includes("long-session-keeps-confirmed-facts"));
-  assert.ok(ids.includes("background-can-recover-or-terminate"));
-  assert.ok(ids.includes("subagent-wakes-lead-with-result"));
-  assert.ok(ids.includes("spec-workflow-completes"));
-
-  for (const scenario of scenarios) {
-    assert.ok(scenario.userExperience.trim());
-    assert.ok(scenario.machineFacts.length > 0);
-    assert.ok(scenario.acceptance.length > 0);
-    assert.ok(scenario.checks.length > 0);
-  }
+test("evaluation harness defines machine checks only", () => {
+  assert.deepEqual(listEvaluationChecks(), [
+    "runtime-status-builds",
+    "project-map-builds",
+    "memory-assets-readable",
+    "extension-surface-current",
+    "spec-store-available",
+    "skill-packages-readable",
+    "config-preflight-readable",
+    "host-turn-boundary-runs",
+    "remote-entrypoints-available",
+    "recovery-drills-pass",
+  ]);
 });
 
 test("evaluation harness runs local machine-verifiable checks", async (t) => {
   const root = await createTempWorkspace("eval-runner", t);
 
-  const results = await runEvaluationScenarios(root);
+  const result = await runEvaluationChecks(root);
 
-  assert.equal(results.length, listEvaluationScenarios().length);
-  assert.equal(results.every((result) => result.status === "passed"), true);
-  assert.ok(results.some((result) =>
-    result.checks.some((check) => check.id === "runtime-status-builds" && check.status === "passed"),
-  ));
-  assert.ok(results.some((result) =>
-    result.checks.some((check) => String(check.id).startsWith("golden:") && check.status === "passed"),
-  ));
-  assert.ok(results.some((result) => result.sessionId));
+  assert.equal(result.checks.length, listEvaluationChecks().length);
+  assert.equal(result.status, "passed");
+  assert.ok(result.checks.every((check) => check.status === "passed"));
+  assert.ok(result.checks.some((check) => check.id === "runtime-status-builds"));
+  assert.ok(result.checks.some((check) => check.id === "host-turn-boundary-runs"));
+  assert.ok(result.checks.some((check) => check.id === "remote-entrypoints-available"));
+  assert.ok(result.checks.some((check) => check.id === "recovery-drills-pass"));
 });

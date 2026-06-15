@@ -1,0 +1,82 @@
+name: Verify
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test / ${{ matrix.os }} / Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+        node:
+          - 20.x
+          - 22.x
+          - 24.x
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Verify
+        run: npm run verify
+
+  package-smoke:
+    name: Package smoke / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Install packed CLI
+        shell: pwsh
+        run: |
+          $pack = @(npm pack --json | ConvertFrom-Json)
+          $package = Resolve-Path $pack[0].filename
+          $smoke = Join-Path ([System.IO.Path]::GetTempPath()) "kitty-smoke-$([System.Guid]::NewGuid().ToString('N'))"
+          New-Item -ItemType Directory -Path $smoke | Out-Null
+          Set-Content -Path (Join-Path $smoke "package.json") -Value "{}" -Encoding UTF8
+          npm install --no-audit --no-fund $package.FullName --prefix $smoke
+          npm exec --prefix $smoke -- kitty --version

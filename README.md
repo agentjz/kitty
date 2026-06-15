@@ -43,7 +43,7 @@
 | 📐 Spec 模式 | `requirements.md`、`design.md`、`tasks.md`、`notes.md`、workflow summary 和隔离 worktree |
 | 💬 产品面 | CLI、交互终端、Telegram 私聊服务 |
 | 📎 证据记录 | session events、终端日志、崩溃记录、文件变更记录 |
-| 🧪 Evaluation | `kitty eval` 暴露真实 agent 体验验收场景，`--run` 会跑本地 golden turn |
+| 🧪 Evaluation | `kitty eval` 只暴露机器检查，`--run` 会跑本地检查闭环 |
 
 ## ⚡ 快速开始
 
@@ -98,7 +98,7 @@ kitty spec
 | `kitty undo [changeId]` | 撤销最近一次或指定变更 |
 | `kitty diff [path]` | 查看当前 git diff |
 | `kitty doctor` | 检查 `.kitty` 文件、env contract、provider preset、runtime、provider 连接和下一步 |
-| `kitty eval` | 查看真实 agent 体验验收场景；`kitty eval --run` 运行本地机器验收 |
+| `kitty eval` | 查看机器检查；`kitty eval --run` 运行本地机器验收 |
 | `kitty telegram serve` | 启动 Telegram 私聊服务 |
 
 ## 🛠️ 工具体系
@@ -128,7 +128,7 @@ Extension 是可启用、可禁用、独立存在的工具集合：
 
 Runtime skills 放在项目 `SKILL.md`、`.skills/**/SKILL.md` 或 `skills/**/SKILL.md`。默认上下文只显示 skill 名称、说明、路径、健康状态和资源索引；完整正文必须由模型明确调用 `skill_load` 后进入当前轮。Skill 包内的 `references/`、`scripts/`、`examples/` 和 `assets/` 会作为资源分组出现，需要时用 `skill_read_resource` 读取资源，或用 `skill_run_script` 运行已声明的 `scripts/` 资源。Skill frontmatter 可用 `requires` 声明命令依赖，运行时用 `skill_check` 检查包健康和依赖可用性。`.codex/skills/**` 是 Codex 维护本仓库用的开发规范，不属于小猫运行时 skill。
 
-当前仓库内置 `skills/development/` 开发阶段 skill：需求调研、代码调研、实施、验证和端到端开发闭环。
+当前仓库内置四个开发阶段 runtime skill：`research`、`plan`、`development`、`verification`。其中 `plan` 强制把 `plan.md` 写成从目标、当前事实、交付标准、失败测试、实施路线、详细检查单到验证计划的完整执行合同。
 
 Provider 请求优先携带同 session 的近场可见对话。短会话不靠账本拼上下文；长会话超预算时摘要旧对话，保留最近对话 tail。Session memory 由模型在 turn 收口时按固定 Markdown 区块写出：`Current Focus`、`User Constraints`、`Decisions`、`Open Threads`、`Verification Facts`、`Reusable Lessons`。机器只维护格式和保存边界，不替模型判断事实重要性。
 
