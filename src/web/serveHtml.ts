@@ -4,42 +4,50 @@ export function serveHtml(): string {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kitty Web Shell</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<title>小猫智能体</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.13.1/font/bootstrap-icons.min.css" rel="stylesheet">
 <style>
   html, body { height: 100%; margin: 0; }
-  body { display: flex; flex-direction: column; background: #fffaf5; }
-  #chat-area { flex: 1; overflow-y: auto; padding: 1rem; padding-bottom: 0; }
-  #input-bar { position: sticky; bottom: 0; background: #fffaf5; border-top: 1px solid #f0e0d8; padding: 0.75rem 1rem; }
-  .msg-user { text-align: right; margin-bottom: 0.5rem; }
-  .msg-user .bubble { display: inline-block; background: #f8a5c2; color: #4a3036; padding: 0.5rem 1rem; border-radius: 1rem 1rem 0.25rem 1rem; max-width: 80%; text-align: left; overflow-wrap: break-word; word-break: break-word; overflow: hidden; }
-  .msg-agent { margin-bottom: 0.5rem; }
-  .msg-agent .bubble { display: inline-block; background: #fff0f5; color: #4a4045; padding: 0.5rem 1rem; border-radius: 1rem 1rem 1rem 0.25rem; max-width: 90%; text-align: left; border: 1px solid #fde2e8; overflow-wrap: break-word; word-break: break-word; overflow: hidden; }
+  body { display: flex; flex-direction: column; background: #dbe7ef; color: #17212b; }
+  #top-bar { min-height: 3.5rem; background: #ffffff; border-bottom: 1px solid #c7d5df; padding: 0.65rem 1rem; }
+  .shell-title { font-weight: 700; line-height: 1.1; }
+  #chat-area { flex: 1; overflow-y: auto; padding: 1rem; padding-bottom: 0; background: #dbe7ef; }
+  #messages { max-width: 980px; margin: 0 auto; }
+  #input-bar { position: sticky; bottom: 0; background: #ffffff; border-top: 1px solid #c7d5df; padding: 0.7rem 1rem; }
+  #input-area { display: flex; gap: 0.6rem; align-items: flex-end; max-width: 980px; margin: 0 auto; }
+  .msg-user, .msg-agent { display: flex; margin-bottom: 0.55rem; }
+  .msg-user { justify-content: flex-end; }
+  .msg-agent { justify-content: flex-start; }
+  .bubble { display: inline-block; padding: 0.55rem 0.78rem; max-width: min(90%, 820px); text-align: left; overflow-wrap: break-word; word-break: break-word; overflow: hidden; box-shadow: 0 1px 1px rgba(23,33,43,0.08); }
+  .msg-user .bubble { background: #d9fdd3; color: #17212b; border-radius: 1rem 1rem 0.25rem 1rem; }
+  .msg-agent .bubble { width: min(90%, 820px); background: #ffffff; color: #17212b; border-radius: 1rem 1rem 1rem 0.25rem; }
   .msg-agent .bubble pre { white-space: pre-wrap; overflow-x: auto; max-width: 100%; }
   .msg-agent .bubble code { word-break: break-word; }
   .msg-agent .bubble img { max-width: 100%; height: auto; }
   .msg-agent .bubble table { display: block; overflow-x: auto; max-width: 100%; }
   .msg-agent .bubble p:last-child { margin-bottom: 0; }
-  .status-text { color: #c4a0a8; font-style: italic; font-size: 0.85rem; padding: 0.25rem 0; }
-  details.reasoning-block { margin-bottom: 0.5rem; max-width: 90%; }
-  details.reasoning-block summary { color: #a08088; font-size: 0.8rem; cursor: pointer; user-select: none; padding: 0.25rem 0.5rem; border-radius: 0.5rem; background: #f5ece8; display: inline-block; }
-  details.reasoning-block summary:hover { background: #f0e4e0; }
-  details.reasoning-block .reasoning-content { color: #8a7078; font-size: 0.85rem; font-style: italic; padding: 0.5rem 0.75rem; border-left: 3px solid #f0d6d0; margin-top: 0.25rem; line-height: 1.5; overflow-wrap: break-word; word-break: break-word; }
-  #input-area { display: flex; gap: 0.5rem; align-items: center; }
-  #input-area textarea { flex: 1; resize: none; background: #fffaf5; color: #4a4045; border: 1px solid #f0d6d0; border-radius: 0.75rem; padding: 0.75rem 1rem; min-height: 3.5rem; max-height: 12rem; }
-  #input-area textarea:focus { outline: none; border-color: #f8a5c2; box-shadow: 0 0 0 3px rgba(248,165,194,0.25); }
-  #input-area textarea::placeholder { color: #d4b0b8; }
-  .btn-icon { width: 2.6rem; height: 2.6rem; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
-  #pause-btn { background: #f0d0d0; border-color: #f0d0d0; color: #7a6068; }
-  #pause-btn:hover { background: #e8c0c0; border-color: #e8c0c0; }
-  #send-btn { background: #f8a5c2; border-color: #f8a5c2; color: #fff; }
-  #send-btn:hover { background: #f08fb0; border-color: #f08fb0; }
-  #status-bar { min-height: 1.5rem; }
+  .status-text { min-height: 1.5rem; max-width: 980px; margin: 0 auto; color: #5f7280; font-size: 0.85rem; padding: 0.25rem 0.15rem; }
+  details.reasoning-block { width: min(90%, 820px); max-width: 100%; margin: 0 0 0.55rem; overflow: hidden; background: rgba(255,255,255,0.86); border-radius: 1rem 1rem 1rem 0.25rem; box-shadow: 0 1px 1px rgba(23,33,43,0.08); }
+  details.reasoning-block summary { color: #456174; font-size: 0.82rem; cursor: pointer; user-select: none; padding: 0.48rem 0.78rem; background: #eef6fb; display: block; }
+  details.reasoning-block summary:hover { background: #e5f1f8; }
+  details.reasoning-block .reasoning-content { color: #536b7a; font-size: 0.86rem; padding: 0.55rem 0.78rem; line-height: 1.5; overflow-wrap: break-word; word-break: break-word; }
+  #input-area textarea { flex: 1; resize: none; background: #f7f9fb; color: #17212b; border: 1px solid #c7d5df; border-radius: 1.1rem; padding: 0.78rem 1rem; min-height: 3.5rem; max-height: 12rem; }
+  #input-area textarea:focus { outline: none; border-color: #2aabee; box-shadow: 0 0 0 3px rgba(42,171,238,0.18); }
+  #input-area textarea::placeholder { color: #7e909b; }
+  .btn-icon { width: 2.75rem; height: 2.75rem; display: flex; align-items: center; justify-content: center; border-radius: 50%; flex: 0 0 auto; }
+  #send-btn { background: #2aabee; border-color: #2aabee; color: #fff; }
+  #send-btn:hover { background: #229ed9; border-color: #229ed9; }
+  #pause-btn { background: #ffffff; border-color: #e25b5b; color: #e25b5b; }
+  #pause-btn:hover { background: #fff1f1; border-color: #d94b4b; color: #d94b4b; }
+  .btn:disabled { opacity: 0.48; }
   .scroll-anchor { height: 1px; }
 </style>
 </head>
 <body>
+<div id="top-bar" class="d-flex align-items-center gap-2">
+  <div class="shell-title"><span aria-hidden="true">🐱</span> 小猫智能体</div>
+</div>
 <div id="chat-area" class="pb-2">
   <div id="messages"></div>
   <div id="status-bar" class="status-text"></div>
@@ -47,18 +55,17 @@ export function serveHtml(): string {
 </div>
 <div id="input-bar">
   <div id="input-area">
-    <textarea id="msg-input" class="form-control" rows="1" placeholder="输入消息..."></textarea>
-    <button id="send-btn" class="btn btn-icon rounded-circle" title="发送"><i class="bi bi-send-fill"></i></button>
-    <button id="pause-btn" class="btn btn-icon rounded-circle" title="暂停"><i class="bi bi-pause-fill"></i></button>
+    <textarea id="msg-input" class="form-control" rows="1" placeholder="正在连接"></textarea>
+    <button id="send-btn" class="btn btn-icon rounded-circle" title="发送" disabled><i class="bi bi-send-fill"></i></button>
+    <button id="pause-btn" class="btn btn-icon rounded-circle" title="停止" disabled><i class="bi bi-stop-fill"></i></button>
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/15.0.7/marked.min.js"></script>
 <script>
 (function() {
-  const WS_PORT = location.port || '80';
-  const ws = new WebSocket((location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.hostname + ':' + WS_PORT);
+  const ws = new WebSocket((location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host);
   const chatArea = document.getElementById('chat-area');
   const messagesDiv = document.getElementById('messages');
   const statusBar = document.getElementById('status-bar');
@@ -158,7 +165,10 @@ export function serveHtml(): string {
   }
 
   ws.onopen = function() {
-    setStatus('已连接');
+    msgInput.placeholder = '已连接，输入消息';
+    sendBtn.disabled = false;
+    pauseBtn.disabled = false;
+    setStatus('');
   };
 
   ws.onmessage = function(event) {
@@ -203,7 +213,10 @@ export function serveHtml(): string {
   };
 
   ws.onclose = function() {
-    setStatus('连接断开');
+    msgInput.placeholder = '断开连接';
+    sendBtn.disabled = true;
+    pauseBtn.disabled = true;
+    setStatus('');
   };
 
   function sendMessage() {
@@ -211,10 +224,20 @@ export function serveHtml(): string {
     if (!text) return;
     msgInput.value = '';
     msgInput.style.height = 'auto';
+    if (ws.readyState !== WebSocket.OPEN) {
+      msgInput.placeholder = '连接未就绪';
+      setStatus('连接未就绪');
+      return;
+    }
     ws.send(JSON.stringify({ type: 'input', text: text }));
   }
 
   function sendInterrupt() {
+    if (ws.readyState !== WebSocket.OPEN) {
+      msgInput.placeholder = '连接未就绪';
+      setStatus('连接未就绪');
+      return;
+    }
     ws.send(JSON.stringify({ type: 'interrupt' }));
   }
 

@@ -1,16 +1,21 @@
 import assert from "node:assert/strict";
 import http from "node:http";
 import test from "node:test";
+import { once } from "node:events";
+import WebSocket, { WebSocketServer } from "ws";
 
+import { createWebInputPort } from "../../src/web/inputPort.js";
 import { serveHtml } from "../../src/web/serveHtml.js";
 
 test("serveHtml returns a valid HTML page", () => {
   const html = serveHtml();
   assert.match(html, /<!DOCTYPE html>/i);
-  assert.match(html, /Kitty Web Shell/);
+  assert.match(html, /小猫智能体/);
   assert.match(html, /WebSocket/);
   assert.match(html, /marked/);
   assert.match(html, /bootstrap/);
+  assert.doesNotMatch(html, /WebSocket 实时同步/);
+  assert.doesNotMatch(html, /connection-label/);
 });
 
 test("serveHtml page contains send and pause buttons", () => {
@@ -20,20 +25,6 @@ test("serveHtml page contains send and pause buttons", () => {
   assert.match(html, /msg-input/);
 });
 
-test("serveHtml page does not contain emoji in visible text", () => {
-  const html = serveHtml();
-  // Emoji range check for common ones used before
-  const emojiRegex = /[\u{1F300}-\u{1F9FF}]/u;
-  // The HTML may contain Bootstrap icons which are CSS-based, not unicode emoji
-  const bodyContent = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "");
-  // Only check that common emoji characters in visible content are removed
-  const containsThinkingEmoji = bodyContent.includes("🤔");
-  const containsToolEmoji = bodyContent.includes("🔧");
-  assert.equal(containsThinkingEmoji, false, "should not contain thinking emoji");
-  assert.equal(containsToolEmoji, false, "should not contain tool emoji");
-});
-
 test("serveHtml page uses white/light background", () => {
   const html = serveHtml();
   // Should not have dark theme attribute
@@ -41,6 +32,8 @@ test("serveHtml page uses white/light background", () => {
   // Should have light/white background (#fff or white)
   assert.match(html, /#fff/);
   assert.doesNotMatch(html, /#1a1a2e/);
+  assert.match(html, /#d9fdd3/);
+  assert.match(html, /#2aabee/);
 });
 
 test("serveHtml page has circular pause button", () => {
@@ -69,8 +62,62 @@ test("HTTP server returns 200 for root path with correct content type", async ()
     assert.equal(res.status, 200);
     assert.match(res.headers.get("content-type") ?? "", /text\/html/);
     const body = await res.text();
-    assert.match(body, /Kitty Web Shell/);
+    assert.match(body, /小猫智能体/);
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 });
+
+test("web input port receives WebSocket input messages", async () => {
+  const wss = new WebSocketServer({ port: 0 });
+  const input = createWebInputPort(wss);
+  const port = (wss.address() as import("net").AddressInfo).port;
+  const client = new WebSocket(`ws://127.0.0.1:${port}`);
+
+  try {
+    await once(client, "open");
+    const pending = input.readInput("> ");
+    client.send(JSON.stringify({ type: "input", text: "hello from web" }));
+    assert.deepEqual(await pending, {
+      kind: "submit",
+      value: "hello from web",
+    });
+  } finally {
+    client.close();
+    await closeWebSocketServer(wss);
+  }
+});
+
+test("web input port maps WebSocket interrupt messages to the bound handler", async () => {
+  const wss = new WebSocketServer({ port: 0 });
+  const input = createWebInputPort(wss);
+  const port = (wss.address() as import("net").AddressInfo).port;
+  const client = new WebSocket(`ws://127.0.0.1:${port}`);
+  const interrupted = new Promise<void>((resolve) => {
+    input.bindInterrupt(resolve);
+  });
+
+  try {
+    await once(client, "open");
+    client.send(JSON.stringify({ type: "interrupt" }));
+    await interrupted;
+  } finally {
+    client.close();
+    await closeWebSocketServer(wss);
+  }
+});
+
+async function closeWebSocketServer(wss: WebSocketServer): Promise<void> {
+  for (const client of wss.clients) {
+    client.close();
+  }
+  await new Promise<void>((resolve, reject) => {
+    wss.close((error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+  });
+}

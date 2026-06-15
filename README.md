@@ -1,5 +1,7 @@
 ﻿# 小猫智能体 Kitty
 
+官网：https://agentjz.github.io/kitty/
+
 <p align="center">
   <strong>🐾 一个本地 agent 编程工作台：搜得到，看得懂，改得准，跑得通，记得住，能继续。</strong>
 </p>
@@ -126,6 +128,8 @@ Extension 是可启用、可禁用、独立存在的工具集合：
 
 Runtime skills 放在项目 `SKILL.md`、`.skills/**/SKILL.md` 或 `skills/**/SKILL.md`。默认上下文只显示 skill 名称、说明、路径、健康状态和资源索引；完整正文必须由模型明确调用 `skill_load` 后进入当前轮。Skill 包内的 `references/`、`scripts/`、`examples/` 和 `assets/` 会作为资源分组出现，需要时用 `skill_read_resource` 读取资源，或用 `skill_run_script` 运行已声明的 `scripts/` 资源。Skill frontmatter 可用 `requires` 声明命令依赖，运行时用 `skill_check` 检查包健康和依赖可用性。`.codex/skills/**` 是 Codex 维护本仓库用的开发规范，不属于小猫运行时 skill。
 
+当前仓库内置 `skills/development/` 开发阶段 skill：需求调研、代码调研、实施、验证和端到端开发闭环。
+
 Provider 请求优先携带同 session 的近场可见对话。短会话不靠账本拼上下文；长会话超预算时摘要旧对话，保留最近对话 tail。Session memory 由模型在 turn 收口时按固定 Markdown 区块写出：`Current Focus`、`User Constraints`、`Decisions`、`Open Threads`、`Verification Facts`、`Reusable Lessons`。机器只维护格式和保存边界，不替模型判断事实重要性。
 
 Session workset 记录当前会话实际读过和改过的文件。`read` 成功后记录读取事实，`edit` / `write` 成功后记录变更事实和 change id。工作集会进入 session、working memory 和 `kitty status`，让用户看到当前任务真正碰过哪些文件。
@@ -183,6 +187,8 @@ kitty config show
 | Runtime UI | `src/runtime-ui/` |
 | Observability | `src/observability/` |
 | Evaluation | `src/evaluation/`, `tests/evaluation/` |
+| 产品宣传页 | `site/` |
+| GitHub Pages 发布 | `.github/workflows/pages.yml` |
 | Specs | `spec/` |
 | Tests | `tests/` |
 

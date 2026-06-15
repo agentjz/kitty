@@ -18,7 +18,7 @@ export function createWebTurnDisplay(options: {
 }): InteractionTurnDisplay {
   const callbacks: AgentCallbacks = {
     onModelWaitStart() {
-      broadcast(options.wss, { type: "status", text: "🐱thinking..." });
+      broadcast(options.wss, { type: "status", text: "🐱 thinking..." });
     },
     onModelWaitStop() {
       broadcast(options.wss, { type: "status", text: "" });
@@ -46,13 +46,13 @@ export function createWebTurnDisplay(options: {
       broadcast(options.wss, { type: "message", text });
     },
     onToolCall(name: string, _args: string) {
-      broadcast(options.wss, { type: "status", text: `🔧${name}` });
+      broadcast(options.wss, { type: "status", text: `🔧 ${name}` });
     },
     onToolResult(name: string, _output: string) {
-      broadcast(options.wss, { type: "status", text: `✅${name}` });
+      broadcast(options.wss, { type: "status", text: `✅ ${name}` });
     },
     onToolError(name: string, _error: string) {
-      broadcast(options.wss, { type: "status", text: `❌${name}` });
+      broadcast(options.wss, { type: "status", text: `❌ ${name}` });
     },
     onStatus(text: string) {
       broadcast(options.wss, { type: "status", text });

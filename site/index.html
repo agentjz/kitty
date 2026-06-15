@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kitty Agent - 小猫智能体</title>
+<meta name="description" content="Kitty Agent 是一个小而准的 AI Agent 编程工作台：找得准，改得对，跑得通，记得住。">
+<meta property="og:title" content="Kitty Agent">
+<meta property="og:description" content="一个把编程任务真正往前推的 AI Agent 工作台。">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.13.1/font/bootstrap-icons.min.css" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="navbar navbar-expand-lg sticky-top site-nav py-3">
+  <div class="container">
+    <a class="navbar-brand d-flex align-items-center gap-2 fw-bold" href="#top" aria-label="Kitty Agent home">
+      <span class="brand-cat" aria-hidden="true">🐱</span>
+      <span class="keycap">KT</span>
+      <span>Kitty Agent</span>
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#site-nav" aria-controls="site-nav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="site-nav">
+      <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-2">
+        <li class="nav-item"><a class="nav-link" href="#story">例子</a></li>
+        <li class="nav-item"><a class="nav-link" href="#fit">适合谁</a></li>
+        <li class="nav-item ms-lg-2">
+          <a class="btn btn-dark rounded-0 px-3" href="https://github.com/agentjz/kitty" target="_blank" rel="noopener">
+            GitHub
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="container py-5 py-lg-6">
+    <div class="hero-frame">
+      <div class="row align-items-center g-5">
+        <div class="col-lg-6">
+          <div class="label-chip">AI Agent 编程工作台</div>
+          <h1 class="display-2 fw-black lh-1 mt-4 mb-3">Kitty Agent</h1>
+          <p class="hero-line fs-3 fw-semibold mb-3">找得准，改得对，跑得通，记得住。</p>
+          <p class="lead text-secondary hero-copy">
+            Kitty Agent 是一套清晰的工程循环：精准定位问题，做出正确修改，运行验证，把现场记录下来。
+          </p>
+          <div class="d-flex flex-column flex-sm-row gap-3 mt-4">
+            <a class="btn btn-dark btn-lg rounded-0 px-4" href="https://github.com/agentjz/kitty" target="_blank" rel="noopener">
+              查看项目
+            </a>
+            <a class="btn btn-outline-dark btn-lg rounded-0 px-4" href="#story">
+              看一个例子
+            </a>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="terminal-card">
+            <div class="terminal-label px-4 pt-4 pb-2">kitty agent</div>
+            <div class="terminal-body">
+              <pre class="ascii-logo mb-4" aria-label="kitty agent ascii logo">██╗  ██╗██╗████████╗████████╗██╗   ██╗     █████╗  ██████╗ ███████╗███╗   ██╗████████╗
+██║ ██╔╝██║╚══██╔══╝╚══██╔══╝╚██╗ ██╔╝    ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝
+█████╔╝ ██║   ██║      ██║    ╚████╔╝     ███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║
+██╔═██╗ ██║   ██║      ██║     ╚██╔╝      ██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║
+██║  ██╗██║   ██║      ██║      ██║       ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║
+╚═╝  ╚═╝╚═╝   ╚═╝      ╚═╝      ╚═╝       ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝</pre>
+              <div class="terminal-lines">
+                <div><span class="prompt">kitty</span> locate the right files</div>
+                <div><span class="prompt">kitty</span> patch the smallest correct change</div>
+                <div><span class="prompt">kitty</span> run verification</div>
+                <div><span class="prompt">kitty</span> write down what changed</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="py-5 py-lg-6 story-section" id="story">
+    <div class="container">
+      <div class="row align-items-start g-5">
+        <div class="col-lg-5">
+          <div class="section-label">Example</div>
+          <h2 class="display-6 fw-bold">给它一个具体任务</h2>
+          <p class="text-secondary mb-0">
+            比如你说：“帮我修一个上传失败的问题，顺便确认测试能过。”Kitty Agent 会把这个任务拆成一轮可检查的工程工作。
+          </p>
+        </div>
+        <div class="col-lg-7">
+          <div class="story-board">
+            <div class="story-step">
+              <span>01</span>
+              <div>
+                <h3 class="h5">先定位</h3>
+                <p class="text-secondary mb-0">它会找上传入口、相关配置、报错位置和最近改动。</p>
+              </div>
+            </div>
+            <div class="story-step">
+              <span>02</span>
+              <div>
+                <h3 class="h5">再修改</h3>
+                <p class="text-secondary mb-0">它会围绕真正相关的文件做最小修改。</p>
+              </div>
+            </div>
+            <div class="story-step">
+              <span>03</span>
+              <div>
+                <h3 class="h5">跑检查</h3>
+                <p class="text-secondary mb-0">它会运行构建、测试或诊断，把结果摆出来。</p>
+              </div>
+            </div>
+            <div class="story-step">
+              <span>04</span>
+              <div>
+                <h3 class="h5">留现场</h3>
+                <p class="text-secondary mb-0">它会记录读过什么、改过哪里、验证结果如何。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="py-5 py-lg-6 fit-section" id="fit">
+    <div class="container">
+      <div class="row g-5 align-items-stretch">
+        <div class="col-lg-5">
+          <div class="fit-intro h-100">
+            <div class="section-label">Who it is for</div>
+            <h2 class="display-6 fw-bold">适合需要持续推进任务的人</h2>
+            <p class="text-secondary mb-0">Kitty Agent 适合维护项目、探索需求、修复问题和研究 agent 工作流。它把任务过程沉淀成下次能继续使用的事实。</p>
+          </div>
+        </div>
+        <div class="col-lg-7">
+          <div class="row g-3 h-100">
+            <div class="col-md-6 d-flex">
+              <div class="fit-item">
+                <h3 class="h5">维护项目</h3>
+                <p class="text-secondary mb-0">摸清现状，定位关键文件，围绕事实动手修。</p>
+              </div>
+            </div>
+            <div class="col-md-6 d-flex">
+              <div class="fit-item">
+                <h3 class="h5">做长任务</h3>
+                <p class="text-secondary mb-0">多轮、多文件、多次验证，都能保留现场。</p>
+              </div>
+            </div>
+            <div class="col-md-6 d-flex">
+              <div class="fit-item">
+                <h3 class="h5">探索新需求</h3>
+                <p class="text-secondary mb-0">一边确认事实，一边推进实现和验证。</p>
+              </div>
+            </div>
+            <div class="col-md-6 d-flex">
+              <div class="fit-item">
+                <h3 class="h5">研究 agent</h3>
+                <p class="text-secondary mb-0">直接观察上下文、工具、session 和验证如何协作。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer py-4">
+  <div class="container d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3">
+    <div>
+      <div class="fw-bold">Kitty Agent</div>
+      <div class="small text-secondary">找得准，改得对，跑得通，记得住。</div>
+    </div>
+    <div class="d-flex flex-wrap gap-3 small">
+      <a class="link-secondary text-decoration-none" href="https://github.com/agentjz/kitty" target="_blank" rel="noopener">GitHub</a>
+      <a class="link-secondary text-decoration-none" href="https://github.com/agentjz/kitty/issues" target="_blank" rel="noopener">Issues</a>
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/js/bootstrap.bundle.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

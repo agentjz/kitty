@@ -39,7 +39,7 @@ function detectLanIp(): string | null {
 function printBanner(port: number): void {
   const lanIp = detectLanIp();
   writeStdoutLine("");
-  writeStdoutLine("Kitty Web Shell");
+  writeStdoutLine("小猫智能体");
   writeStdoutLine("");
   writeStdoutLine(`局域网地址: http://${lanIp ?? "localhost"}:${port}`);
   writeStdoutLine("用手机浏览器打开此地址");
