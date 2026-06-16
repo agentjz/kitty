@@ -1,4 +1,5 @@
 import type { SessionStore } from "../session/index.js";
+import type { probeProviderConnection } from "../provider/connection.js";
 import type { resolveCliRuntime } from "./runtime.js";
 import type { OneShotPromptRunResult } from "./oneShot.js";
 import type { RuntimeConfig, SessionRecord } from "../types.js";
@@ -41,5 +42,6 @@ export interface CliProgramDependencies {
     pidFilePath: string;
     release(): Promise<void>;
   }>;
+  probeProviderConnection?: typeof probeProviderConnection;
   resolveRuntime?: typeof resolveCliRuntime;
 }

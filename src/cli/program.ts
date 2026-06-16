@@ -79,6 +79,7 @@ export function buildCliProgram(dependencies: CliProgramDependencies = {}): Comm
   registerDoctorCommand(program, {
     getCliOverrides,
     resolveRuntime,
+    probeProviderConnection: dependencies.probeProviderConnection,
   });
   registerEvaluationCommand(program, {
     getCwd: () => {

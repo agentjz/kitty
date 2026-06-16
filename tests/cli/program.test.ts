@@ -11,6 +11,7 @@ import { getAppPaths } from "../../src/config/paths.js";
 import { PROJECT_STATE_DIR_NAME, PROJECT_STATE_ENV_EXAMPLE_FILE_NAME, PROJECT_STATE_ENV_FILE_NAME, PROJECT_STATE_IGNORE_FILE_NAME } from "../../src/project/statePaths.js";
 import { SessionEventStore } from "../../src/session/events.js";
 import { SessionStore } from "../../src/session/store.js";
+import { createTestRuntimeConfig } from "../helpers.js";
 
 test("cli program exposes current top-level commands", () => {
   const program = buildCliProgram();
@@ -60,6 +61,30 @@ test("doctor prints preflight facts before runtime loading", async () => {
   );
 
   assert.equal(runtimeLoaded, true);
+});
+
+test("doctor does not report ready when local project template is incomplete", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "kitty-doctor-incomplete-"));
+  const program = buildCliProgram({
+    probeProviderConnection: async () => ({
+      kind: "ok",
+      models: 1,
+      resolvedBaseUrl: "https://api.deepseek.com",
+      probeTimeoutMs: 1000,
+    }),
+    resolveRuntime: async () => ({
+      cwd: root,
+      paths: getAppPaths(root),
+      overrides: { cwd: root },
+      config: createTestRuntimeConfig(root),
+    }),
+  });
+
+  program.exitOverride();
+  await assert.rejects(
+    () => program.parseAsync(["-C", root, "doctor"], { from: "user" }),
+    /local project template is incomplete/,
+  );
 });
 
 test("eval command can run local checks", async () => {

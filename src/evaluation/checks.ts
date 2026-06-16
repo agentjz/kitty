@@ -281,7 +281,7 @@ async function runRecoveryDrillsCheck(id: EvaluationCheckId, rootDir: string): P
   const { BackgroundExecutionStore, reconcileBackgroundExecutions } = await import("../execution/background.js");
   const { ExecutionStore } = await import("../execution/store.js");
   const { pauseExpiredLeadWaitExecutions } = await import("../execution/leadWait.js");
-  const { collectRunningProcesses, terminateProcesses } = await import("../interaction/exitGuard.js");
+  const { terminateRunningExecutionProcesses } = await import("../execution/lifecycle.js");
   const { buildRuntimeStatus } = await import("../runtime/status.js");
   const workspace = await prepareCheckWorkspace(rootDir, "recovery-drills");
 
@@ -312,15 +312,20 @@ async function runRecoveryDrillsCheck(id: EvaluationCheckId, rootDir: string): P
     cwd: workspace,
     requestedBy: "eval",
   });
-  executionStore.markRunning(active.id, { pid: process.pid });
-  const collected = await collectRunningProcesses(workspace);
-  const terminated = await terminateProcesses(collected, workspace);
+  const missingPid = 999_999_998;
+  executionStore.markRunning(active.id, { pid: missingPid });
+  const terminated = terminateRunningExecutionProcesses(workspace, [{
+    kind: "subagent",
+    id: active.id,
+    pid: missingPid,
+    summary: "missing worker",
+  }]);
   const status = await buildRuntimeStatus(workspace);
 
   if (
     stale.staleExecutions.length !== 1 ||
     paused.length !== 1 ||
-    !terminated.terminatedPids.includes(process.pid) ||
+    !terminated.terminatedPids.includes(missingPid) ||
     status.executions.total < 3
   ) {
     return {

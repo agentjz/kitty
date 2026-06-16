@@ -8,6 +8,7 @@ import { persistToolBatchCheckpoint } from "./persistence.js";
 import { executeToolBatch } from "./toolBatch.js";
 import { recordObservabilityEvent } from "../../observability/writer.js";
 import { throwIfAborted } from "../../utils/abort.js";
+import type { ToolBatchEvidence } from "./toolLoopProgress.js";
 import type { ChangeStore } from "../changes/store.js";
 import type { ProjectContext, SessionRecord, StoredMessage, ToolExecutionResult } from "../../types.js";
 import type { ToolRegistry } from "../../tools/core/types.js";
@@ -28,6 +29,7 @@ export interface ProcessToolCallBatchInput {
 export interface ProcessToolCallBatchResult {
   session: SessionRecord;
   changedPaths: Set<string>;
+  evidence: ToolBatchEvidence;
   yieldResult?: RunTurnResult;
 }
 
@@ -47,6 +49,7 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
   ]);
 
   const batchToolMessages: StoredMessage[] = [];
+  const batchModelOutputs: string[] = [];
   const batchChangedPaths = new Set<string>();
   const leadWaitExecutionsBefore = identity.kind === "lead"
     ? listLeadWaitExecutions(projectContext.stateRootDir)
@@ -109,6 +112,7 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
       toolName: toolCall.function.name,
       result,
     });
+    batchModelOutputs.push(modelOutput);
     const storedToolMessage = createToolMessage(toolCall.id, modelOutput, toolCall.function.name);
     batchToolMessages.push(storedToolMessage);
     session = await options.sessionStore.appendMessages(session, [storedToolMessage]);
@@ -142,6 +146,14 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
     return {
       session,
       changedPaths,
+      evidence: {
+        toolCalls: response.toolCalls.map((toolCall) => ({
+          name: toolCall.function.name,
+          arguments: toolCall.function.arguments,
+        })),
+        modelOutputs: batchModelOutputs,
+        changedPaths: [...batchChangedPaths],
+      },
       yieldResult: buildRunTurnResult({
         session,
         changedPaths,
@@ -152,5 +164,13 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
   return {
     session,
     changedPaths,
+    evidence: {
+      toolCalls: response.toolCalls.map((toolCall) => ({
+        name: toolCall.function.name,
+        arguments: toolCall.function.arguments,
+      })),
+      modelOutputs: batchModelOutputs,
+      changedPaths: [...batchChangedPaths],
+    },
   };
 }

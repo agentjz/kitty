@@ -17,6 +17,7 @@ import {
 import { processToolCallBatch } from "./toolBatchLifecycle.js";
 import { resolveToollessTurn } from "./toolless.js";
 import { extendPromptLayersForTurnState } from "./state.js";
+import { consumeToolLoopCloseout, createToolLoopProgressState, recordToolBatchProgress } from "./toolLoopProgress.js";
 import type { RunTurnOptions, RunTurnResult } from "../types.js";
 import { ChangeStore } from "../changes/store.js";
 import { ControlPlaneLedger } from "../../control/ledger.js";
@@ -52,11 +53,14 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
   const changeStore = new ChangeStore(options.config.paths.changesDir);
   let changedPaths = new Set<string>();
   let consecutiveRequestFailures = 0;
+  let toolLoopProgress = createToolLoopProgressState();
+  let runtimePromptState = options.runtimePromptState;
+  let unavailableToolProtocolOutputs = 0;
   try {
     for (;;) {
       throwIfAborted(options.abortSignal, "Turn aborted by user.");
       const turnRuntimeState = {
-        ...(options.runtimePromptState ?? {}),
+        ...(runtimePromptState ?? {}),
         identity,
       };
       const lifecycleLedger = new ControlPlaneLedger(projectContext.stateRootDir);
@@ -92,7 +96,7 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
         ...session,
         contextBudget: requestContext.budget,
       });
-      const turnToolDefinitions = toolRegistry.definitions;
+      const turnToolDefinitions = toolLoopProgress.forceCloseout ? [] : toolRegistry.definitions;
       if (requestContext.compressed) {
         options.callbacks?.onStatus?.(`Context compressed automatically at ~${requestContext.estimatedChars} chars to keep the turn running.`);
       }
@@ -168,6 +172,21 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
       emitAssistantReasoning(response, options);
       throwIfAborted(options.abortSignal, "Turn aborted by user.");
       if (response.toolCalls.length === 0) {
+        if (turnToolDefinitions.length === 0 && looksLikeToolProtocolText(response.content)) {
+          unavailableToolProtocolOutputs += 1;
+          if (unavailableToolProtocolOutputs > 2) {
+            throw new Error("Assistant emitted tool-call protocol text while no tools were available.");
+          }
+          runtimePromptState = {
+            ...(runtimePromptState ?? {}),
+            internalFactBlocks: [
+              ...(runtimePromptState?.internalFactBlocks ?? []),
+              "Tool protocol text was emitted while no tools were available. Produce a final natural-language answer from the available facts.",
+            ],
+          };
+          continue;
+        }
+        unavailableToolProtocolOutputs = 0;
         const completed = await resolveToollessTurn({
           session,
           response,
@@ -227,8 +246,20 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
       });
       session = batchResult.session;
       changedPaths = batchResult.changedPaths;
+      const progress = recordToolBatchProgress(toolLoopProgress, batchResult.evidence);
+      toolLoopProgress = progress.state;
       if (batchResult.yieldResult) {
+        toolLoopProgress = consumeToolLoopCloseout(toolLoopProgress);
         return batchResult.yieldResult;
+      }
+      if (progress.internalFactBlock) {
+        runtimePromptState = {
+          ...(runtimePromptState ?? {}),
+          internalFactBlocks: [
+            ...(runtimePromptState?.internalFactBlocks ?? []),
+            progress.internalFactBlock,
+          ],
+        };
       }
     }
   } catch (error) {
@@ -257,4 +288,11 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
   } finally {
     if (ownsToolRegistry) await toolRegistry.close?.().catch(() => undefined);
   }
+}
+
+function looksLikeToolProtocolText(content: string | null | undefined): boolean {
+  const text = String(content ?? "").trim();
+  return text.includes("<｜｜DSML｜｜tool_calls>") ||
+    text.includes("<tool_call>") ||
+    text.includes("\"tool_calls\"");
 }

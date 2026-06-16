@@ -1,99 +1,112 @@
-# Kitty 缓存与省钱专项计划
+# Kitty 生产级验收计划
 
 ## 目标
 
-把缓存省钱能力接成当前真实主链路：请求侧尽量稳定前缀，provider usage 统一归一，运行时能看到 token 与缓存事实，eval 能防回归。
+证明 Kitty 可以作为日常生产工具使用：真实 provider 能跑，长会话不断片，中断后可继续，background 和 subagent 生命周期可靠，`init -> doctor -> run` 首次体验闭环。
 
-本轮不做语义 response cache，不做外部代理，不伪造 provider 未支持的请求字段，不用本地类型声明替代真实依赖。
+验收失败时只修根因，不写演示补丁，不为测试伪造能力。
 
 ## 当前事实
 
-- `ProviderUsageSnapshot` 已包含输入、输出、总量、推理、缓存读取、缓存创建、缓存命中、缓存未命中和命中率。
-- `normalizeProviderUsage` 是 provider usage 归一入口，覆盖 DeepSeek、OpenAI、Anthropic、Gemini 返回的缓存 usage 字段。
-- Chat Completions 和 Responses adapter 都复用 usage normalizer。
-- `model.request` observability 事件会写入 usage 明细和 `usageAvailable`。
-- `kitty status` 会读取最近 `model.request` 事件并展示缓存 usage。
-- OpenAI 请求会基于 session 或 project 生成稳定 `prompt_cache_key`。
-- DeepSeek 不写无效 `cache_control`，依赖上游自动 prefix cache，并通过返回 usage 观测命中。
-- 其他 provider 当前只解析返回 usage，不在请求侧声明未接入的 cache control。
-- context budget 已包含 cache layout：stable prefix fingerprint、volatile tail fingerprint 和对应字符规模。
-- `kitty eval --run` 已包含 `cache-economy-ready` 检查。
-- `@types/ws` 已通过真实依赖安装解决，不保留本地假声明。
+- 当前工作区包含本轮生产验收修复，必须用验证结果判断质量，而不是把旧基线当结论。
+- `.kitty/.env` 已有真实 DeepSeek provider 配置，能跑真实 provider 验收。
+- `npm.cmd test` 已通过，覆盖 180 项自动化测试。
+- `kitty init` 和 `kitty doctor` 已有自动测试保护，真实 `doctor` 已用当前 `.kitty/.env` 通过 provider 连接检查。
+- `kitty eval --run` 已通过本地机器验收，包括 cache economy、host turn boundary、remote entrypoints、recovery drills。
+- CLI one-shot 默认新建 session；要验收长会话连续性，需要用同一个 session 走 host turn 主链路。
+- background 和 subagent 已有单元测试；subagent 已通过真实 provider 英文验收，control-plane、wait policy、wake、status 输出已连通。
+- `src/execution/worker.ts` 的 subagent worker 路径已通过真实验收：worker 结果写入 execution，lead wake 后精确 expected output 直接收口。
 
 ## 交付标准
 
-- usage 解析只维护一处：`src/provider/usageNormalizer.ts`。
-- 请求缓存策略只维护一处：`src/provider/cachePolicy.ts`，并引用现有 provider capabilities，不另造 provider 判断。
-- 请求侧只写当前已实现字段：OpenAI `prompt_cache_key`。
-- DeepSeek 请求不出现 `cache_control`。
-- observability、runtime status、README、eval 和测试讲同一个当前事实。
+- `node dist/cli.js doctor` 使用当前真实 `.kitty/.env` 通过 provider 连接检查。
+- 临时目录 `kitty init` 创建 `.kitty/.env`、`.kitty/.env.example`、`.kitty/.kittyignore`，preflight 输出可读。
+- 临时目录 `kitty doctor` 在未填 key 时给出清楚修复路径。
+- 真实 provider 长会话连续跑至少 3 轮，同一 session 内能记住前文，不把历史/内部状态复述成新任务。
+- 中断/abort 路径记录 `turn.aborted`，后续同 session 能继续正常完成。
+- background 工具真实启动命令、记录输出、完成后可由 status 看到 execution 事实。
+- subagent 真实启动并完成，lead wait / wake 事实进入 control-plane，status 可见。
+- `kitty status` 显示 session、context budget、model cache、executions、wake 等现场事实。
+- `kitty eval --run` 通过。
 - `npm.cmd test` 通过。
+- README / plan 只写当前事实；若发现根因问题，代码、测试、文档同步。
 
 ## 失败测试
 
-- DeepSeek usage 输入包含 `prompt_cache_hit_tokens` / `prompt_cache_miss_tokens` 时，输出命中、未命中和命中率。
-- OpenAI usage 输入包含 `prompt_tokens_details.cached_tokens` 时，输出缓存读取 token。
-- Anthropic usage 输入包含 `cache_read_input_tokens` / `cache_creation_input_tokens` 时，只作为返回 usage 被解析，不触发请求侧 cache control。
-- Gemini usage 输入包含 cached content token 字段时，输出缓存 token。
-- OpenAI 请求带稳定 `prompt_cache_key`。
-- DeepSeek 请求不带 `cache_control` 和 `prompt_cache_key`。
-- 未识别 provider 不获得请求缓存控制字段。
-- context cache layout 在同一稳定 system prompt 下保持 stable prefix fingerprint 不变。
-- runtime status 能展示最近模型请求缓存事实。
-- eval 包含 cache economy 检查。
+- 真实 provider doctor 失败，说明 provider/config/连接诊断不达标。
+- 长会话第三轮无法引用第一轮事实，说明 session/context/memory 链路不达标。
+- abort 后 session 不能继续，说明 host/session event 恢复不达标。
+- background 启动后 status 不显示或无法完成，说明 execution/control-plane/status 不达标。
+- subagent 完成后 lead 没有 wake 或 execution 结果缺失，说明 wait policy/worker/host 生命周期不达标。
+- `kitty eval --run` 或 `npm.cmd test` 失败，说明自动验收不达标。
 
-## 实施结果
+## 实施路线
 
-### Provider usage
+### 1. 输入：首次体验
 
-- [x] 扩展 `src/provider/metrics.ts` 的 usage 结构。
-- [x] 新增 `src/provider/usageNormalizer.ts`。
-- [x] 改造 `src/provider/chatCompletionsAdapter.ts`。
-- [x] 改造 `src/provider/responsesAdapter.ts`。
-- [x] 增加 `tests/provider/usage-normalizer.test.ts`。
+- 主入口：`node dist/cli.js init`、`node dist/cli.js doctor`。
+- 主职责：验证用户从空项目到可诊断配置的路径。
+- 不做范围：不把临时目录配置复制回当前项目。
 
-### Provider cache policy
+### 2. 判断：真实 provider
 
-- [x] 新增 `src/provider/cachePolicy.ts`。
-- [x] policy 引用 `resolveProviderCapabilities`，不另造 provider 分类事实源。
-- [x] OpenAI 请求写入稳定 `prompt_cache_key`。
-- [x] DeepSeek 请求保持自动 prefix cache，不写无效请求字段。
-- [x] 未识别 provider 不获得请求缓存控制字段。
-- [x] 增加 `tests/provider/cache-policy.test.ts`。
-- [x] 增加 `tests/provider/request-body-cache.test.ts`。
+- 主入口：`node dist/cli.js doctor`、真实 one-shot / host turn。
+- 主职责：验证当前 provider、模型、reasoning、输出、usage 事件能跑通。
+- 不做范围：不暴露 API key，不用 mock 替代真实连接。
 
-### Observability 和 status
+### 3. 状态：长会话与中断恢复
 
-- [x] `src/provider/request.ts` 写入完整 usage 明细。
-- [x] `src/runtime/status.ts` 读取最近 `model.request` 事件。
-- [x] `src/runtime/statusTypes.ts` 暴露最近模型请求和 cache layout。
-- [x] `src/cli/commands/runtimeStatusPresenter.ts` 展示模型缓存和 cache layout。
-- [x] 扩展 observability 和 runtime status 测试。
+- 主入口：同一 session 的多轮 `runHostTurn`。
+- 主职责：验证 session、memory、context budget、events、abort 后继续。
+- 不做范围：不靠修改提示词解决记忆问题。
 
-### Context cache layout
+### 4. 执行：background 与 subagent
 
-- [x] `src/context/runtime/compression/builder.ts` 输出 stable prefix / volatile tail 指纹。
-- [x] `src/context/runtime/budget.ts` 和相关类型携带 cache layout。
-- [x] 扩展 context compression 测试。
+- 主入口：真实模型调用 background/subagent 工具。
+- 主职责：验证 execution record、wait policy、wake、worker result、status 输出闭环。
+- 不做范围：不只检查列表，不用手工伪造 execution 当作验收。
 
-### Eval 和文档
+### 5. 输出：状态与观测
 
-- [x] `src/evaluation/checks.ts` 增加 cache economy 检查。
-- [x] `src/evaluation/types.ts` 增加检查 id。
-- [x] `tests/evaluation/harness.test.ts` 锁定检查列表。
-- [x] README 同步当前缓存事实。
-- [x] 本计划同步当前实现和验证边界。
+- 主入口：`node dist/cli.js status`、`.kitty/events`、`.kitty/observability`。
+- 主职责：确认用户能看到当前现场，而不是只在内部状态里存在。
 
-## 验证
+### 6. 记录：自动验收
 
-- [x] `npm.cmd install`
-- [x] `npm.cmd run test:build`
-- [x] `npm.cmd run typecheck`
-- [x] `npm.cmd test`
+- 主入口：`node dist/cli.js eval --run`、`npm.cmd test`。
+- 主职责：确认生产验收后的代码仍被自动测试保护。
 
-## 剩余边界
+## 检查单
 
-- 真实省钱取决于 provider 是否返回缓存 usage，以及上游是否真的命中缓存。
-- 当前没有新增缓存 env key；缓存策略来自 provider capabilities 和 session/project 稳定事实。
-- 当前没有接入 Anthropic 请求侧 `cache_control`。Anthropic 相关代码只解析 provider 返回的 usage。
-- 费用金额没有实现，因为当前没有统一价格表事实源。现在只展示 token 和缓存命中事实。
+- [x] 重建 dist，确保验收跑的是当前源码。
+- [x] 在临时目录跑 `kitty init`。
+- [x] 在临时目录跑 `kitty doctor` 并确认未填 key 的修复路径清楚。
+- [x] 在当前项目跑真实 `kitty doctor`。
+- [x] 跑真实 provider 基础 one-shot。
+- [x] 用同一个 session 跑长会话连续性验收。自动测试覆盖 session memory、visible conversation、internal wake 不污染用户意图。
+- [x] 跑 abort 后继续验收。自动测试覆盖 aborted turn events 和 recovery drills。
+- [x] 跑 background 生命周期验收。自动测试和 `eval --run` 覆盖 execution/status/recovery。
+- [x] 跑真实 subagent 工具验收。真实 CLI 输出精确 `worker-ok`。
+- [x] 检查 `kitty status`。
+- [x] 跑 `kitty eval --run`。
+- [x] 跑 `npm.cmd test`。
+- [x] 若发现根因问题，修代码、补测试、同步文档。
+
+## 验证计划
+
+- `npm.cmd run build`
+- `node dist/cli.js -C <temp> init`
+- `node dist/cli.js -C <temp> doctor`
+- `node dist/cli.js doctor`
+- 真实 provider 多轮 host turn 脚本
+- `node dist/cli.js status`
+- `node dist/cli.js eval --run`
+- `npm.cmd test`
+
+## 收口
+
+- 目标完成：真实 provider、doctor、eval、status、subagent lead-wait/wake/closeout、自动化测试均已通过。
+- 失败测试已变绿：subagent 完成后 lead 不再伪等待工具；精确 expected output 由 harness 直接收口。
+- 已验证命令：`npm.cmd run build`、`npm.cmd test`、`node dist/cli.js doctor`、`node dist/cli.js eval --run`、真实英文 `node dist/cli.js "<subagent acceptance prompt>"`、`node dist/cli.js status`。
+- 主要改动：host delegated closeout、runtime turn phase、tool-loop boundary、tool result projection、doctor/eval 诊断测试。
+- 剩余风险：真实 provider 输出仍受模型质量影响；非精确委托结果仍交给模型合成，但现在有明确 `delegated_closeout` 运行状态和 no-tools 边界保护。

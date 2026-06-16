@@ -7,6 +7,8 @@ import type { CliOverrides, RuntimeConfig } from "../../types.js";
 import { ui } from "../../utils/console.js";
 import { writeStdoutLine } from "../../utils/stdio.js";
 
+type ProviderProbe = typeof probeProviderConnection;
+
 export function registerDoctorCommand(
   program: Command,
   options: {
@@ -17,6 +19,7 @@ export function registerDoctorCommand(
       paths: RuntimeConfig["paths"];
       overrides: CliOverrides;
     }>;
+    probeProviderConnection?: ProviderProbe;
   },
 ): void {
   program
@@ -46,7 +49,8 @@ export function registerDoctorCommand(
         );
       }
 
-      const diagnosis = await probeProviderConnection({
+      const providerProbe = options.probeProviderConnection ?? probeProviderConnection;
+      const diagnosis = await providerProbe({
         provider: runtime.config.provider,
         model: runtime.config.model,
         baseUrl: runtime.config.baseUrl,
@@ -56,6 +60,9 @@ export function registerDoctorCommand(
         ui.success(`Provider reachable. models=${diagnosis.models}`);
         if (diagnosis.resolvedBaseUrl !== runtime.config.baseUrl) {
           ui.info(`resolvedBaseUrl: ${diagnosis.resolvedBaseUrl}`);
+        }
+        if (!preflight.ready) {
+          throw new Error("User-fixable error: local project template is incomplete. Run `kitty init`, then rerun `kitty doctor`.");
         }
         ui.success("Kitty is ready. Start with `kitty` or run `kitty \"your task\"`.");
         return;

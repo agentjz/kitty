@@ -28,11 +28,41 @@ export function projectToolResultForModel(input: {
       return projectWrite(parsed);
     case "bash":
       return projectBash(parsed);
+    case "background_check":
+    case "subagent_check":
+      return projectExecutionCheck(parsed);
     case "skill_load":
       return projectSkillLoad(parsed);
     default:
       return projectGenericSuccess(parsed, input.result.output);
   }
+}
+
+function projectExecutionCheck(payload: Record<string, unknown>): string {
+  const total = readNumber(payload.total);
+  const active = readArray(payload.active) ?? [];
+  const recent = readArray(payload.recent) ?? [];
+  const stale = readArray(payload.stale) ?? [];
+  const entries = [...active, ...recent]
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
+    .slice(0, 8)
+    .map((item) => {
+      const parts = [
+        readString(item.id) ?? "execution",
+        readString(item.kind),
+        readString(item.status),
+        readString(item.summary),
+        readString(item.outputPreview),
+        readString(item.error),
+      ].filter((part): part is string => Boolean(part));
+      return parts.join("  ");
+    });
+
+  return joinLines([
+    `total: ${total ?? recent.length + active.length}`,
+    stale.length > 0 ? `stale: ${stale.map(String).join(", ")}` : undefined,
+    ...entries,
+  ]);
 }
 
 function projectRead(payload: Record<string, unknown>): string {
