@@ -88,15 +88,6 @@ test("extension tool call display keeps summaries readable", () => {
     }), 80, "C:\\repo").summary,
     "worktree_create C:\\repo-worktree branch=feature/agent",
   );
-  assert.equal(
-    buildToolCallDisplay("spec_task_update", JSON.stringify({
-      specId: "S01",
-      taskId: "T01",
-      title: "Update design",
-      status: "completed",
-    }), 80).summary,
-    "spec_task_update task=T01",
-  );
 });
 
 function stripAnsi(value: string): string {

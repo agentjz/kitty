@@ -15,7 +15,7 @@
 
 `kitty events [sessionId]` 展示最近会话或指定会话的 session events。它是事件事实的审阅入口，不是聊天记录入口。
 
-`kitty status` 展示当前 runtime 现场：session、workset、task lifecycle、memory、execution、deadline、wake 和 spec。它只展示事实，不给下一步建议。
+`kitty status` 展示当前 runtime 现场：session、workset、task lifecycle、memory、execution、deadline、wake、skills、model cache 和 project map。它只展示事实，不给下一步建议。
 
 当前验证入口：
 

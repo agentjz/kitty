@@ -5,7 +5,6 @@ Host 负责把产品入口接到 agent turn。
 当前入口：
 
 - CLI agent
-- CLI spec
 - interactive shell
 - Telegram
 - local session/event API
@@ -22,9 +21,7 @@ Host 工具注册边界：
 
 `runHostTurn` 只接收 `extraTools` 和 `runtimePromptState`，不在 turn 生命周期里拼工具 registry。
 
-隔离模式通过 host 边界注入额外工具和 prompt 状态。当前隔离模式是 `kitty spec`。
-
-`kitty status` 使用 `src/runtime/status.ts` 聚合当前现场。CLI presenter 只负责呈现：当前焦点、下一步、阻塞项、session、context budget、memory、skills、project map、execution、wake 和 spec workflow。
+`kitty status` 使用 `src/runtime/status.ts` 聚合当前现场。CLI presenter 只负责呈现：当前焦点、下一步、阻塞项、session、context budget、memory、skills、project map、execution 和 wake。
 
 `src/host/localApi.ts` 提供本地 API：创建 session、发送消息、读取 session events、读取 status。它复用 `runHostTurn`，不绕过 agent 主循环。
 

@@ -7,7 +7,7 @@
 
 Core 工具固定为 `read`、`edit`、`write`、`bash`。
 
-Extension 是可启用、可禁用、独立存在的工具集合。当前 extension 是 `todo`、`worktree`、`network`、`background`、`subagent`、`skills`、`spec`。
+Extension 是可启用、可禁用、独立存在的工具集合。当前 extension 是 `todo`、`worktree`、`network`、`background`、`subagent`、`skills`。
 
 Skills 仍然是 extension，不是第三层工具体系。它只提供 skill 索引和按需加载；是否加载由模型判断。
 

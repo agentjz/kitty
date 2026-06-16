@@ -53,7 +53,6 @@ export function initializeControlPlaneSchema(db: Database.Database): void {
       boundary TEXT,
       reason TEXT,
       active_execution_ids_json TEXT NOT NULL,
-      active_spec_id TEXT,
       active_todo_ids_json TEXT NOT NULL,
       verification_facts_json TEXT NOT NULL,
       completion_facts_json TEXT NOT NULL,

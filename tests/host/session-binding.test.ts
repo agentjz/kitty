@@ -60,13 +60,13 @@ test("host tool registry can expose a focused core surface with extra workflow t
       const name = tool.definition.function.name;
       return name === "read" || name === "bash";
     },
-    extraTools: [createHostTestTool("spec_create")],
+    extraTools: [createHostTestTool("workflow_note")],
   });
   const names = registry.definitions.map((tool) => tool.function.name);
 
   const builtinNames = new Set(getBuiltinTools().map((tool) => tool.definition.function.name));
   assert.deepEqual(names.filter((name) => builtinNames.has(name)), ["read", "bash"]);
-  assert.equal(names.includes("spec_create"), true);
+  assert.equal(names.includes("workflow_note"), true);
 });
 
 function createHostTestTool(name: string): RegisteredTool {

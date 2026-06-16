@@ -19,14 +19,12 @@ test("enabled extensions expose governed capability packages that converge with 
 
   assert.deepEqual(packages.map((pkg) => pkg.packageId), EXTENSION_IDS.map((id) => `extension.${id}`));
   assert.equal(packages.every((pkg) => pkg.machinePermissions.decideStrategy === false), true);
-  assert.equal(packages.find((pkg) => pkg.packageId === "extension.spec")?.profile.tools.includes("spec_create"), true);
   assert.doesNotThrow(() => assertCapabilitySurfaceConvergence(surface, exposedTools));
 });
 
 test("extension capability diagnostics preserve protocol governance", async (t) => {
   const root = await createTempWorkspace("extension-capability-diagnostics", t);
   const config = createTestRuntimeConfig(root);
-  config.extensions.spec = true;
   const packages = listExtensionCapabilityPackages(createExtensionRegistry(config));
   const report = diagnoseCapabilityPackages(packages);
 

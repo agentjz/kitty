@@ -3,37 +3,8 @@ import path from "node:path";
 
 import { discoverSkills } from "../../skills/discovery.js";
 import { loadProjectIgnoreRules } from "../../utils/ignore.js";
-import { readRuntimeMemoryAsset } from "./store.js";
 import type { RuntimeMemoryAsset } from "./types.js";
-
-export async function appendRuntimeMemoryAssetToSpecNotes(input: {
-  rootDir: string;
-  memoryId: string;
-  specId: string;
-  heading?: string;
-}): Promise<{
-  memory: RuntimeMemoryAsset;
-  specId: string;
-  path: string;
-}> {
-  const { SpecStore } = await import("../../spec/store.js");
-  const memory = await readRuntimeMemoryAsset(input.rootDir, input.memoryId);
-  const result = await new SpecStore(input.rootDir, {
-    rootDir: input.rootDir,
-  }).appendNote(input.specId, {
-    heading: input.heading ?? `Runtime memory ${input.memoryId}`,
-    content: [
-      `Source memory asset: ${memory.path}`,
-      "",
-      memory.content.trim(),
-    ].join("\n"),
-  });
-  return {
-    memory,
-    specId: input.specId,
-    path: result.path,
-  };
-}
+import { readRuntimeMemoryAsset } from "./store.js";
 
 export async function appendRuntimeMemoryAssetToSkillReference(input: {
   rootDir: string;

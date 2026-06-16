@@ -11,7 +11,6 @@ interface TaskLifecycleRow {
   boundary: string | null;
   reason: string | null;
   active_execution_ids_json: string;
-  active_spec_id: string | null;
   active_todo_ids_json: string;
   verification_facts_json: string;
   completion_facts_json: string;
@@ -24,7 +23,6 @@ const TASK_LIFECYCLE_STAGES = new Set<TaskLifecycleStage>([
   "light_response",
   "normal_work",
   "deep_work",
-  "spec_work",
   "background_wait",
   "delegated_wait",
   "recovery",
@@ -48,7 +46,6 @@ export class TaskLifecycleLedgerRepo {
       boundary: existing?.boundary,
       reason: normalizeText(input.reason) ?? existing?.reason ?? "turn_started",
       activeExecutionIds: existing?.activeExecutionIds ?? [],
-      activeSpecId: existing?.activeSpecId,
       activeTodoIds: existing?.activeTodoIds ?? [],
       verificationFacts: existing?.verificationFacts ?? [],
       completionFacts: existing?.completionFacts ?? [],
@@ -76,7 +73,6 @@ export class TaskLifecycleLedgerRepo {
     boundary?: string;
     reason?: string;
     activeExecutionIds?: readonly string[];
-    activeSpecId?: string;
     activeTodoIds?: readonly string[];
     verificationFacts?: readonly string[];
     completionFacts?: readonly string[];
@@ -93,7 +89,6 @@ export class TaskLifecycleLedgerRepo {
       boundary: normalizeText(input.boundary) ?? current.boundary,
       reason: normalizeText(input.reason) ?? current.reason,
       activeExecutionIds: normalizeStringList(input.activeExecutionIds ?? current.activeExecutionIds),
-      activeSpecId: normalizeText(input.activeSpecId) ?? current.activeSpecId,
       activeTodoIds: normalizeStringList(input.activeTodoIds ?? current.activeTodoIds),
       verificationFacts: normalizeStringList(input.verificationFacts ?? current.verificationFacts),
       completionFacts: normalizeStringList(input.completionFacts ?? current.completionFacts),
@@ -139,12 +134,12 @@ export class TaskLifecycleLedgerRepo {
     this.db.prepare(`
       INSERT INTO task_lifecycle (
         id, session_id, stage, scope, boundary, reason,
-        active_execution_ids_json, active_spec_id, active_todo_ids_json,
+        active_execution_ids_json, active_todo_ids_json,
         verification_facts_json, completion_facts_json,
         created_at, updated_at, completed_at
       ) VALUES (
         @id, @sessionId, @stage, @scope, @boundary, @reason,
-        @activeExecutionIdsJson, @activeSpecId, @activeTodoIdsJson,
+        @activeExecutionIdsJson, @activeTodoIdsJson,
         @verificationFactsJson, @completionFactsJson,
         @createdAt, @updatedAt, @completedAt
       )
@@ -161,7 +156,6 @@ export class TaskLifecycleLedgerRepo {
         boundary=@boundary,
         reason=@reason,
         active_execution_ids_json=@activeExecutionIdsJson,
-        active_spec_id=@activeSpecId,
         active_todo_ids_json=@activeTodoIdsJson,
         verification_facts_json=@verificationFactsJson,
         completion_facts_json=@completionFactsJson,
@@ -183,7 +177,6 @@ function toTaskLifecycleRow(record: TaskLifecycleRecord): Record<string, unknown
     boundary: record.boundary,
     reason: record.reason,
     activeExecutionIdsJson: JSON.stringify(normalizeStringList(record.activeExecutionIds)),
-    activeSpecId: record.activeSpecId,
     activeTodoIdsJson: JSON.stringify(normalizeStringList(record.activeTodoIds)),
     verificationFactsJson: JSON.stringify(normalizeStringList(record.verificationFacts)),
     completionFactsJson: JSON.stringify(normalizeStringList(record.completionFacts)),
@@ -205,7 +198,6 @@ function fromTaskLifecycleRow(row: TaskLifecycleRow): TaskLifecycleRecord {
     boundary: row.boundary ?? undefined,
     reason: row.reason ?? undefined,
     activeExecutionIds: readStringList(row.active_execution_ids_json),
-    activeSpecId: row.active_spec_id ?? undefined,
     activeTodoIds: readStringList(row.active_todo_ids_json),
     verificationFacts: readStringList(row.verification_facts_json),
     completionFacts: readStringList(row.completion_facts_json),

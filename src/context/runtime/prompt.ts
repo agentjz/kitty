@@ -68,7 +68,6 @@ function buildTaskLifecyclePromptBlock(lifecycle: TaskLifecycleRecord | undefine
     lifecycle.activeExecutionIds.length > 0
       ? { label: "Active executions", value: formatLimitedList(lifecycle.activeExecutionIds, 8) }
       : undefined,
-    lifecycle.activeSpecId ? { label: "Active spec", value: lifecycle.activeSpecId } : undefined,
     lifecycle.activeTodoIds.length > 0
       ? { label: "Active todos", value: formatLimitedList(lifecycle.activeTodoIds, 8) }
       : undefined,

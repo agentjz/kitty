@@ -7,7 +7,6 @@ import { ControlPlaneLedger } from "../../src/control/ledger.js";
 import { formatRuntimeStatusText } from "../../src/cli/commands/runtimeStatusPresenter.js";
 import { buildRuntimeStatus } from "../../src/runtime/status.js";
 import { SessionStore } from "../../src/session/store.js";
-import { SpecStore } from "../../src/spec/store.js";
 import { createTempWorkspace, initGitRepo } from "../helpers.js";
 
 test("runtime status projects the current project runtime facts", async (t) => {
@@ -58,11 +57,6 @@ test("runtime status projects the current project runtime facts", async (t) => {
     },
   });
 
-  const spec = await new SpecStore(root, { rootDir: root }).create({
-    title: "Runtime Status",
-    sessionId: session.id,
-  });
-
   const ledger = new ControlPlaneLedger(root);
   try {
     ledger.taskLifecycle.startTurn({
@@ -109,14 +103,12 @@ test("runtime status projects the current project runtime facts", async (t) => {
   assert.equal(status.executions.active[0]?.assignment?.objective, "Inspect runtime visibility");
   assert.equal(status.executions.active[0]?.health?.state, "running");
   assert.equal(status.wakeSignals.recent.length, 1);
-  assert.equal(status.specs.total, 1);
-  assert.equal(status.specs.active[0]?.id, spec.id);
 
   const text = formatRuntimeStatusText(status);
   assert.match(text, /Current workspace:/);
   assert.match(text, /Focus: none/);
-  assert.match(text, /Next: Finish requirements\.md/);
-  assert.match(text, /Blocked: requirements confirmation, design confirmation, tasks confirmation/);
+  assert.match(text, /Next: Wait for active execution results or inspect them with status\/tools\./);
+  assert.match(text, /Blocked: no/);
   assert.match(text, /Skills: 0\/0 ready/);
   assert.match(text, /Executions: 1 active \/ 1 total/);
   assert.match(text, /Context budget: 45000\/900000 chars/);
@@ -127,10 +119,6 @@ test("runtime status projects the current project runtime facts", async (t) => {
   assert.match(text, /nearFieldConversation  chars=25000  messages=3/);
   assert.match(text, /Model cache: none/);
   assert.match(text, /Task lifecycle:/);
-  assert.match(text, /Spec workspace:/);
-  assert.match(text, /Next: Finish requirements\.md/);
-  assert.match(text, /Documents: 0\/4 documents ready/);
-  assert.match(text, /Tools: planning/);
 });
 
 test("runtime status surfaces recent model request cache facts", async (t) => {

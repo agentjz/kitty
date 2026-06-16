@@ -3,7 +3,6 @@ export type EvaluationCheckId =
   | "project-map-builds"
   | "memory-assets-readable"
   | "extension-surface-current"
-  | "spec-store-available"
   | "skill-packages-readable"
   | "config-preflight-readable"
   | "cache-economy-ready"

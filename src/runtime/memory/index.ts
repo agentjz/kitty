@@ -11,7 +11,6 @@ export {
 } from "./writer.js";
 export {
   appendRuntimeMemoryAssetToSkillReference,
-  appendRuntimeMemoryAssetToSpecNotes,
 } from "./sinks.js";
 export type {
   CreateRuntimeMemoryAssetInput,

@@ -22,7 +22,7 @@ test("extension registry is driven by one toggle map", async (t) => {
   for (const id of EXTENSION_IDS) {
     assert.equal(registry.entries.find((entry) => entry.id === id)?.tools.length, getExtensionDefinition(id).createTools().length);
   }
-  for (const name of getExtensionDefinition("spec").createTools().map((tool) => tool.definition.function.name)) {
+  for (const name of getExtensionDefinition("skills").createTools().map((tool) => tool.definition.function.name)) {
     assert.equal(names.includes(name), true, `${name} should be registered`);
   }
 });
@@ -30,12 +30,13 @@ test("extension registry is driven by one toggle map", async (t) => {
 test("disabled extensions are not callable", async (t) => {
   const root = await createTempWorkspace("disabled-extension", t);
   const context = createToolContext(root);
+  context.config.extensions.skills = false;
   const registry = await createDefaultAgentToolRegistry(context.config);
 
-  assert.equal(registry.definitions.some((tool) => tool.function.name === "spec_create"), false);
+  assert.equal(registry.definitions.some((tool) => tool.function.name === "skill_load"), false);
   await assert.rejects(
-    () => registry.execute("spec_create", "{}", context),
-    /Unknown tool: spec_create/,
+    () => registry.execute("skill_load", "{}", context),
+    /Unknown tool: skill_load/,
   );
 });
 

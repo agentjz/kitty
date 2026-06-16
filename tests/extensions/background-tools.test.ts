@@ -61,21 +61,25 @@ test("background run preserves streamed output after process close", async (t) =
 
 test("background wait returns settled execution facts", async (t) => {
   const root = await createTempWorkspace("background-tool-wait", t);
+  const store = new BackgroundExecutionStore(root);
+  const job = store.create({
+    command: "completed command",
+    cwd: root,
+    requestedBy: "lead",
+  });
+  store.close(job.id, {
+    status: "completed",
+    exitCode: 0,
+    output: "wait-ok",
+    summary: "wait-ok",
+  });
   const tools = createBackgroundTools();
   const context = createToolContext(root);
-  const run = tools.find((tool) => tool.definition.function.name === "background_run");
   const wait = tools.find((tool) => tool.definition.function.name === "background_wait");
-  assert.ok(run);
   assert.ok(wait);
 
-  const result = await run.execute(JSON.stringify({
-    command: "node -e \"console.log('wait-ok')\"",
-    cwd: root,
-    timeout_ms: 20_000,
-  }), context);
-  const payload = parseToolJson(result.output);
   const waited = parseToolJson((await wait.execute(JSON.stringify({
-    id: payload.id,
+    id: job.id,
     timeout_ms: 20_000,
   }), context)).output);
 

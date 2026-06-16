@@ -9,8 +9,6 @@ import { listRuntimeMemoryAssets } from "./memory/index.js";
 import { loadProjectContext } from "../context/projectContext.js";
 import { summarizeExecution, summarizeExecutionSet } from "./executionSummary.js";
 import { SessionStore } from "../session/store.js";
-import { SpecStore } from "../spec/store.js";
-import { buildSpecWorkflowSummary } from "../spec/workflowSummary.js";
 import type { SessionRecord } from "../types.js";
 import type {
   ObservabilityEventRecord,
@@ -35,11 +33,10 @@ export async function buildRuntimeStatus(rootDir: string): Promise<RuntimeStatus
     memorySessionsDir: paths.sessionMemoryDir,
   });
 
-  const [sessionRead, memoryAssets, control, specs, projectMap, projectContext, modelRequests] = await Promise.all([
+  const [sessionRead, memoryAssets, control, projectMap, projectContext, modelRequests] = await Promise.all([
     sessionStore.listReadable?.(DEFAULT_RECENT_LIMIT) ?? sessionStore.list(DEFAULT_RECENT_LIMIT).then((sessions) => ({ sessions, skipped: [] })),
     listRuntimeMemoryAssets(paths.rootDir),
     readControlPlaneStatus(paths.rootDir),
-    readSpecStatus(paths.rootDir),
     buildProjectMap(paths.rootDir),
     loadProjectContext(paths.rootDir, { projectDocMaxBytes: 24_576 }),
     readRecentModelRequests(paths.observabilityEventsDir),
@@ -68,7 +65,6 @@ export async function buildRuntimeStatus(rootDir: string): Promise<RuntimeStatus
     taskLifecycle,
     executions: control.executions,
     wakeSignals: control.wakeSignals,
-    specs,
   };
 }
 
@@ -241,45 +237,11 @@ function summarizeTaskLifecycle(lifecycle: TaskLifecycleRecord): RuntimeTaskLife
     stage: lifecycle.stage,
     reason: lifecycle.reason,
     activeExecutionIds: lifecycle.activeExecutionIds,
-    activeSpecId: lifecycle.activeSpecId,
     activeTodoIds: lifecycle.activeTodoIds,
     verificationFacts: lifecycle.verificationFacts,
     completionFacts: lifecycle.completionFacts,
     updatedAt: lifecycle.updatedAt,
     completedAt: lifecycle.completedAt,
-  };
-}
-
-async function readSpecStatus(rootDir: string): Promise<RuntimeStatus["specs"]> {
-  const store = new SpecStore(rootDir, { rootDir });
-  const specs = await store.list(DEFAULT_RECENT_LIMIT).catch(() => []);
-  const summaries = await Promise.all(specs.map(async (spec) => {
-    const state = await store.load(spec.id).catch(() => null);
-    const documents = state ? await store.readAllDocuments(state.id).catch(() => undefined) : undefined;
-    const workflow = buildSpecWorkflowSummary({ spec: state, documents });
-    return {
-    id: spec.id,
-    title: spec.title,
-    stage: spec.stage,
-    status: spec.status,
-    updatedAt: spec.updatedAt,
-    workspace: spec.workspace?.path,
-    workflow: {
-      nextGate: workflow.nextGate,
-      stageLabel: workflow.stageLabel,
-      nextAction: workflow.nextAction,
-      waitingFor: workflow.waitingFor,
-      writableTools: workflow.writableTools,
-      documentProgress: workflow.documentProgress,
-      confirmed: workflow.confirmed,
-      documents: workflow.documents,
-    },
-  };
-  }));
-  return {
-    total: summaries.length,
-    active: summaries.filter((spec) => spec.status === "active"),
-    recent: summaries,
   };
 }
 

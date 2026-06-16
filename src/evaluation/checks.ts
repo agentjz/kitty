@@ -10,7 +10,6 @@ export const EVALUATION_CHECK_IDS: readonly EvaluationCheckId[] = [
   "project-map-builds",
   "memory-assets-readable",
   "extension-surface-current",
-  "spec-store-available",
   "skill-packages-readable",
   "config-preflight-readable",
   "cache-economy-ready",
@@ -45,11 +44,6 @@ export async function runEvaluationCheck(id: EvaluationCheckId, rootDir: string)
         const { EXTENSION_DEFINITIONS } = await import("../extensions/definitions.js");
         const enabled = EXTENSION_DEFINITIONS.filter((extension) => extension.defaultEnabled).map((extension) => extension.id);
         return passed(id, `extension surface ready: default=${enabled.join(",")}`);
-      }
-      case "spec-store-available": {
-        const { SpecStore } = await import("../spec/store.js");
-        const specs = await new SpecStore(rootDir, { rootDir }).list(5).catch(() => []);
-        return passed(id, `spec store ready: total=${specs.length}`);
       }
       case "skill-packages-readable": {
         const { loadProjectContext } = await import("../context/projectContext.js");

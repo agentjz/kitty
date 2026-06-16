@@ -20,7 +20,6 @@ Extension 真相源：
 - `background`
 - `subagent`
 - `skills`
-- `spec`
 
 当前默认开关：
 
@@ -30,7 +29,6 @@ Extension 真相源：
 - `background`: 开
 - `subagent`: 开
 - `skills`: 开
-- `spec`: 关
 
 Registry：
 

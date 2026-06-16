@@ -1,117 +1,130 @@
-# Background 与 Spec 产品体验闭环计划
+# 删除 Runtime Spec 模式计划
 
 ## 目标
 
-把两个已有但体验不完整的能力补成可投入日常使用的闭环：
+删除 Kitty 的 runtime spec 模式，把当前任务管理统一到 `plan.md` 和 plan skill。
 
-- background：用户和模型都能启动、查看、等待、停止后台执行，并看到输出、健康、deadline 和最终状态。
-- spec：用户进入或查看 spec 时，能直接理解当前阶段、下一步、待确认项、文档进度、工具面和工作区。
+最终产品事实：
 
-不重建旧能力。不做假兼容。不把体验问题塞进提示词。
+- 没有 `kitty spec` 命令。
+- 没有 spec extension 工具。
+- 没有 spec runtime prompt、spec mode、spec workflow status、spec workspace/checkpoint 运行能力。
+- `.env` 不再有 `KITTY_EXTENSION_SPEC`。
+- `kitty status`、`kitty eval`、README、测试和运行时 prompt 不再呈现 spec 模式。
+- 仓库级 `spec/` 文档目录保留，作为项目设计和审阅文档，不是 runtime spec 模式。
 
 ## 当前事实
 
-- 当前基线已提交：`47539f8 Harden production turn lifecycle`。
-- background 已有 `background_run` 和 `background_check` 工具，execution 账本会记录 pid、输出摘要、deadline、wake 和 stale reconcile。
-- background 原先缺少 agent 可用的等待/停止工具，也缺少普通 CLI 用户可直接使用的 `list/wait/stop` 入口。
-- `kitty status` 会显示 execution，但它是全局现场，不是专门的后台任务控制台。
-- spec 已有独立 `kitty spec` 模式、阶段工具面、workflow summary、spec documents、checkpoint 和 status 展示。
-- spec 原先体验偏工程字段。用户需要更直接看到“现在在哪一步、下一步做什么、等我确认什么、哪些文档还没完成”。
-- 参考项目原则：Codex 的 background terminal 重在可读输出、可列出、可终止、完成不残留；Cline 强调长跑命令后台化并能看到新输出；成熟 spec/plan 体验把阶段与下一步作为第一屏事实。
+- 当前已提交基线：`dd01602 Strengthen background and spec UX`。
+- 现有 spec 模式由这些主干组成：
+  - CLI：`src/cli/commands/spec.ts`、`src/cli/specOneShot.ts`、`src/shell/cli/specInteractive.ts`。
+  - Runtime：`src/spec/`。
+  - Extension：`src/extensions/tools/spec/`。
+  - 配置：`KITTY_EXTENSION_SPEC`、`extensions.spec`。
+  - Status/eval/memory sink/project map：部分读取 `.kitty/specs` 或展示 spec facts。
+  - 测试：`tests/spec/`、`tests/extensions/spec-tools.test.ts`、`tests/cli/spec-cli.test.ts`、`tests/shell/spec-interactive.test.ts` 等。
+- `spec/` 目录不是 runtime spec 模式，它是仓库级设计文档和审阅资料。不能因为删除 runtime spec 模式就删掉该目录。
+- `plan.md` 和 `.codex/skills/plan` 已经承担当前任务总管职责。
 
 ## 交付标准
 
-- 新增 `background_wait` 工具：按 execution id 等待后台执行完成或超时，返回最新状态、输出预览、健康事实。
-- 新增 `background_stop` 工具：按 execution id 停止后台执行，返回最终账本状态。
-- 新增 `kitty background` CLI：
-  - `kitty background` 或 `kitty background list` 列出 active/recent background。
-  - `kitty background wait <id>` 等待指定任务完成。
-  - `kitty background stop <id>` 停止指定任务。
-- background wait 会 reconcile stale pid，不会无限假等。
-- spec workflow brief 集中维护一处，CLI intro、`kitty spec --status`、status presenter 复用同一格式。
-- `kitty spec --status` 可直接查看当前 session 绑定的 spec；没有 active spec 时给出下一步。
-- 测试覆盖工具、CLI 和 spec brief 的真实行为。
-- README / spec 文档同步当前事实。
+- CLI 顶层命令不包含 `spec`。
+- 默认 extension 集合不包含 `spec`，配置 schema 不要求 spec 开关。
+- 工具注册表和 provider tool definitions 不暴露任何 `spec_*` 工具。
+- runtime prompt 不再有 spec mode block。
+- runtime status 不再读取或展示 runtime spec workspace。
+- eval checks 不再包含 spec store 检查。
+- memory sink 不再支持 append-to-spec。
+- README 和仓库 spec 文档只描述当前事实：任务总管是 `plan.md`，`spec/` 是项目文档目录。
+- 删除无用源码和测试，不保留 legacy/废弃提示/兼容分支。
+- `npm.cmd run verify` 通过。
 
 ## 失败测试
 
-- 模型启动 background 后不能等待或停止，只能反复 check：已修复。
-- 后台进程已经结束或 pid 消失，wait 仍然卡住：已修复。
-- CLI 用户不能直接看后台任务、等待任务或停止任务：已修复。
-- spec 模式第一屏仍只显示工程字段，看不出阶段、下一步、待确认项：已修复。
-- `kitty spec --status` 不存在或无法显示当前 workflow：已修复。
-- 自动测试或 `eval --run` 失败：已验证通过。
+- `kitty --help` 仍出现 `spec`：失败。
+- `KITTY_EXTENSION_SPEC` 仍出现在 `.env`、`.env.example`、配置 schema 或测试：失败。
+- 任意 `spec_*` 工具仍进入 extension surface：失败。
+- `kitty status` 仍显示 `Spec workspace` 或 specs 运行事实：失败。
+- `kitty eval --run` 仍检查 spec store：失败。
+- README 仍把 spec 模式当产品能力：失败。
+- `npm.cmd run verify` 失败：失败。
 
-## 实施结果
+## 实施路线
 
-### 1. Background 主干
+### 1. CLI 与 Host 入口
 
-- 主文件：`src/execution/background.ts`
-- 完成：新增 `waitForBackgroundExecution` 和 `isBackgroundExecutionActive`。
-- 结果：等待逻辑复用 control-plane 账本、stale reconcile 和状态判断；不会在 CLI 或工具里各写一套生命周期规则。
+- 主文件：`src/cli/program.ts`、`src/cli/dependencies.ts`
+- 动作：删除 `registerSpecCommand`、`runSpecOneShot`、`startSpecInteractive` 接线。
+- 删除文件：`src/cli/commands/spec.ts`、`src/cli/specOneShot.ts`、`src/shell/cli/specInteractive.ts`。
 
-### 2. Background 工具
+### 2. Spec runtime 与 extension
 
-- 主文件：`src/extensions/tools/background/`
-- 完成：新增 `background_wait`、`background_stop`。
-- 结果：模型可以按 execution id 等待或停止后台任务，并拿到统一的 lifecycle summary。
+- 删除目录：`src/spec/`、`src/extensions/tools/spec/`。
+- 动作：删除 extension registry 里的 spec 定义和工具挂载。
+- 不做：不删除仓库根目录 `spec/` 文档。
 
-### 3. Background CLI
+### 3. 配置与 env
 
-- 主文件：`src/cli/commands/background.ts`、`src/cli/program.ts`、`src/cli/runtime.ts`
-- 完成：新增 `kitty background/list/wait/stop`。
-- 结果：普通用户可直接审阅和控制后台任务；CLI runtime 显式暴露 `stateRootDir`，避免把工作目录和状态目录混用。
+- 主文件：`src/config/extensions.ts`、`src/extensions/definitions.ts`、env 模板生成链路、`.kitty/.env`、`.kitty/.env.example`。
+- 动作：删除 `extensions.spec` 和 `KITTY_EXTENSION_SPEC`。
 
-### 4. Spec workflow brief
+### 4. Runtime status / eval / memory
 
-- 主文件：`src/spec/workflowSummary.ts`
-- 完成：新增 `formatSpecWorkflowBrief`。
-- 结果：spec 当前阶段、下一步、等待项、文档进度、工具面、workspace 由同一处生成，边缘入口只负责呈现。
+- 主文件：`src/runtime/status.ts`、`src/runtime/statusTypes.ts`、`src/cli/commands/runtimeStatusPresenter.ts`、`src/evaluation/checks.ts`、`src/evaluation/types.ts`、`src/cli/commands/memory.ts`、`src/runtime/memory/sinks.ts`。
+- 动作：删除 runtime specs 状态、spec store eval、append-to-spec 入口。
+- 保留：project map 读取仓库 `spec/` 文档作为项目事实。
 
-### 5. Spec CLI
+### 5. Prompt / UI / tests
 
-- 主文件：`src/cli/commands/spec.ts`、`src/shell/cli/specInteractive.ts`、`src/cli/commands/runtimeStatusPresenter.ts`
-- 完成：新增 `kitty spec --status`，spec intro 和 status presenter 复用 workflow brief。
-- 结果：spec 入口第一屏更像产品现场，不像底层状态表。
+- 主文件：`src/agent/prompt/*`、`src/runtime-ui/toolDisplay/call.ts`、相关测试。
+- 动作：删除 spec mode prompt 测试、spec tool display 分支、spec CLI/extension/store 测试。
+- 保留：`spec/` 文档目录相关 project map 测试。
 
-### 6. 验证与文档
+### 6. 文档
 
-- 主文件：`tests/extensions/background-tools.test.ts`、`tests/cli/program.test.ts`、`tests/cli/spec-cli.test.ts`、`tests/runtime/status.test.ts`、`README.md`、`spec/用户审阅/系统核心/核心地图.md`、`spec/技术实现/T03-工具与扩展/03-Extension工具清单.md`
-- 完成：补齐工具、CLI、runtime status、spec brief 测试和文档。
+- 主文件：`README.md`、`spec/用户审阅/系统核心/核心地图.md`、`spec/用户审阅/T03-工具与扩展/`、`spec/技术实现/T03-工具与扩展/`、`spec/技术实现/T04-Host边界.md`。
+- 动作：删除 runtime spec 模式描述；把总管工作流改为 `plan.md + plan skill`。
 
 ## 检查单
 
-- [x] 写 background wait/stop 主干函数。
-- [x] 新增 `background_wait` 工具并测试完成、超时、stale reconcile。
-- [x] 新增 `background_stop` 工具并测试停止状态。
-- [x] 新增 `kitty background list/wait/stop` CLI。
-- [x] 补 CLI 命令注册测试。
-- [x] 写 spec workflow brief 并替换分散展示。
-- [x] 新增 `kitty spec --status`。
-- [x] spec interactive intro 展示 workflow brief。
-- [x] README 与 spec 文档同步。
-- [x] 运行 `npm.cmd test`。
-- [x] 运行 `node dist/cli.js eval --run`。
-- [x] 运行真实 background CLI 验收。
-- [x] 运行 `node dist/cli.js spec --status` 验收。
+- [x] 删除 CLI spec 入口和依赖接口。
+- [x] 删除 `src/spec/` 与 `src/extensions/tools/spec/`。
+- [x] 删除 extension/config/env 中的 spec 开关。
+- [x] 删除 status/eval/memory sink 中的 runtime spec 运行事实。
+- [x] 删除 prompt/UI/tests 中的 spec mode 和 `spec_*` 工具引用。
+- [x] 同步 README 和仓库 spec 文档。
+- [x] 跑 `rg` 确认只剩仓库文档语义的 `spec/` 引用。
+- [x] 跑 `npm.cmd run verify`。
+- [x] 更新本计划收口。
 
-## 验证结果
+## 验证计划
 
-- `npm.cmd test`：通过，184/184。
-- `npm.cmd run verify`：通过，184/184。
-- `node dist/cli.js eval --run`：通过，所有 eval checks passed。
-- `node dist/cli.js background`：通过，显示 completed/failed background execution 的状态、健康、deadline、输出。
-- `node dist/cli.js background wait exec-mqg72idv-mjwimq0w`：通过，返回 completed execution。
-- `node dist/cli.js background stop exec-mqga5f6y-b2053j8z`：通过，running execution 关闭为 aborted。
-- `node dist/cli.js spec --status`：通过，无 active spec 时显示下一步。
-- `node dist/cli.js status`：通过，runtime status 显示当前现场、cache、executions、memory、spec facts。
+- `rg -n "kitty spec|spec mode|spec_\\w+|KITTY_EXTENSION_SPEC|Spec workspace|spec-store-available" src tests README.md .kitty/.env .kitty/.env.example spec plan.md`
+- `node dist/cli.js --help`
+- `node dist/cli.js eval --run`
+- `node dist/cli.js status`
+- `npm.cmd run verify`
 
 ## 收口
 
 目标已完成。
 
-失败测试已变绿。
+已删除 runtime spec 模式的 CLI、runtime、extension、prompt、status、eval、memory sink、测试和文档入口。当前默认 extension surface 是：
 
-改动范围集中在 background lifecycle、background CLI/tool、spec workflow brief、runtime status 呈现、测试和文档。
+`todo,worktree,network,background,subagent,skills`
 
-剩余风险：本轮真实 background CLI 验收覆盖了 list、wait completed、stop running 账本闭环；没有再跑一次真实模型主动调用 `background_wait/background_stop` 的端到端对话，因为自动工具测试已经覆盖工具执行，真实 provider 对话会额外消耗 token。
+仓库根目录 `spec/` 保留为项目文档和审阅事实源，不再作为 runtime spec 模式或工具能力。
+
+验证已跑：
+
+- `npm.cmd run typecheck`：通过。
+- `node dist/cli.js --help`：通过，顶层命令没有 `spec`。
+- `node dist/cli.js status`：通过，runtime status 不显示 spec workspace。
+- `node dist/cli.js eval --run`：通过，10 项 eval checks 全部 passed。
+- `npm.cmd run verify`：通过，166/166 tests passed。
+- `rg -n "kitty spec|spec mode|spec_\\w+|KITTY_EXTENSION_SPEC|Spec workspace|spec-store-available|extensions\\.spec|extension\\.spec|append-to-spec|appendRuntimeMemoryAssetToSpec|src/spec|extensions/tools/spec|tests/spec|Spec runtime|CLI spec|active_spec_id|activeSpecId|spec_work" src tests README.md .kitty/.env .kitty/.env.example spec`：无输出。
+
+剩余风险：
+
+- 旧 `.kitty` 运行状态目录和历史数据库如果来自删除前版本，可能仍然有旧文件或旧表结构；当前源码不创建、不读取、不展示 runtime spec 能力。
+- `plan.md` 保留本次删除任务的旧名词，因为它是执行记录，不是产品能力入口。

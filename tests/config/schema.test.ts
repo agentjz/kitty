@@ -59,7 +59,7 @@ test("runtime config schema rejects missing required values instead of hiding de
     /Missing Telegram API base URL/,
   );
   assert.throws(
-    () => normalizeRuntimeConfig({ ...config, extensions: { ...config.extensions, spec: undefined as unknown as boolean } }),
-    /Missing or invalid extension switch: spec/,
+    () => normalizeRuntimeConfig({ ...config, extensions: { ...config.extensions, skills: undefined as unknown as boolean } }),
+    /Missing or invalid extension switch: skills/,
   );
 });

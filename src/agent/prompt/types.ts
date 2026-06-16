@@ -3,7 +3,6 @@ import type { AgentIdentity } from "../types.js";
 export interface PromptRuntimeState {
   identity?: AgentIdentity;
   taskSummary?: string;
-  mode?: "agent" | "spec";
   turnPhase?: "normal" | "delegated_closeout";
   extraStaticBlocks?: string[];
   internalFactBlocks?: string[];

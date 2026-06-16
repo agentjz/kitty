@@ -1,6 +1,5 @@
 import type { RuntimeStatus } from "../../runtime/status.js";
 import { truncateCliValue } from "../cliValues.js";
-import { formatSpecWorkflowBrief } from "../../spec/workflowSummary.js";
 
 export function formatRuntimeStatusText(status: RuntimeStatus): string {
   const lines: string[] = [];
@@ -20,7 +19,6 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
   lines.push(`- Model cache: ${readModelCacheLine(status)}`);
   lines.push(`- Project map: ${status.projectMap ? "ready" : "missing"}`);
   lines.push(`- Executions: ${status.executions.active.length} active / ${status.executions.total} total`);
-  lines.push(`- Specs: ${status.specs.active.length} active / ${status.specs.total} total`);
   lines.push(`- Wake signals: ${status.wakeSignals.recent.length}`);
 
   if (status.taskLifecycle) {
@@ -168,36 +166,6 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
     }
   }
 
-  if (status.specs.active.length > 0) {
-    lines.push("");
-    lines.push("Spec workspace:");
-    for (const spec of status.specs.active) {
-      if (spec.workflow) {
-        lines.push(indent(formatSpecWorkflowBrief({
-          active: true,
-          specId: spec.id,
-          title: spec.title,
-          stage: spec.stage,
-          status: spec.status,
-          confirmed: spec.workflow.confirmed,
-          nextGate: spec.workflow.nextGate,
-          stageLabel: spec.workflow.stageLabel,
-          nextAction: spec.workflow.nextAction,
-          waitingFor: spec.workflow.waitingFor,
-          writableTools: spec.workflow.writableTools as "planning" | "implementation",
-          documents: spec.workflow.documents,
-          documentProgress: spec.workflow.documentProgress,
-          workspace: spec.workspace ? {
-            path: spec.workspace,
-            branch: "spec",
-          } : undefined,
-        }), "  "));
-      } else {
-        lines.push(`  ${spec.id}  ${spec.stage}  ${spec.title}`);
-      }
-    }
-  }
-
   if (status.skills.needsAttention.length > 0) {
     lines.push("");
     lines.push("Skills needing attention:");
@@ -227,15 +195,7 @@ function readSessionLine(status: RuntimeStatus): string {
   return `${status.sessions.latest.id} (${status.sessions.latest.messageCount} message(s))`;
 }
 
-function indent(value: string, prefix: string): string {
-  return value.split(/\r?\n/).map((line) => `${prefix}${line}`).join("\n");
-}
-
 function readNextStep(status: RuntimeStatus): string {
-  const activeSpec = status.specs.active.find((spec) => spec.workflow);
-  if (activeSpec?.workflow) {
-    return activeSpec.workflow.nextAction;
-  }
   if (status.executions.active.length > 0) {
     return "Wait for active execution results or inspect them with status/tools.";
   }
@@ -246,10 +206,6 @@ function readNextStep(status: RuntimeStatus): string {
 }
 
 function readBlockedLine(status: RuntimeStatus): string {
-  const waitingFor = status.specs.active.flatMap((spec) => spec.workflow?.waitingFor ?? []);
-  if (waitingFor.length > 0) {
-    return waitingFor.join(", ");
-  }
   const unhealthy = status.executions.active.find((execution) =>
     execution.health?.state === "stale" || execution.health?.state === "deadline_passed",
   );

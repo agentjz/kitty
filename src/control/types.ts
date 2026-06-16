@@ -51,7 +51,6 @@ export type TaskLifecycleStage =
   | "light_response"
   | "normal_work"
   | "deep_work"
-  | "spec_work"
   | "background_wait"
   | "delegated_wait"
   | "recovery"
@@ -65,7 +64,6 @@ export interface TaskLifecycleRecord {
   boundary?: string;
   reason?: string;
   activeExecutionIds: string[];
-  activeSpecId?: string;
   activeTodoIds: string[];
   verificationFacts: string[];
   completionFacts: string[];

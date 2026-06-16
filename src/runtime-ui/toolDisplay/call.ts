@@ -124,46 +124,6 @@ export function buildToolCallDisplay(
         summary: `${name} items=${items.length}`,
       };
     }
-    case "spec_list":
-      return {
-        summary: name,
-      };
-    case "spec_search":
-      return {
-        summary: `${name} ${readStringField(args, "query") ?? ""}`.trim(),
-      };
-    case "spec_create":
-    case "spec_write_document": {
-      const title = readStringField(args, "title");
-      const specId = readStringField(args, "specId");
-      return {
-        summary: `${name}${title ? ` ${title}` : specId ? ` spec=${specId}` : ""}`.trim(),
-      };
-    }
-    case "spec_open":
-    case "spec_update_state":
-    case "spec_append_note":
-    case "spec_read_document":
-    case "spec_checkpoint_list":
-    case "spec_task_update": {
-      const specId = readStringField(args, "specId");
-      const taskId = readStringField(args, "taskId");
-      return {
-        summary: `${name}${taskId ? ` task=${taskId}` : specId ? ` spec=${specId}` : ""}`.trim(),
-      };
-    }
-    case "spec_checkpoint_create": {
-      const label = readStringField(args, "label");
-      return {
-        summary: `${name}${label ? ` ${label}` : ""}`.trim(),
-      };
-    }
-    case "spec_checkpoint_restore": {
-      const checkpointId = readStringField(args, "checkpointId");
-      return {
-        summary: `${name}${checkpointId ? ` ${checkpointId}` : ""}`.trim(),
-      };
-    }
     default:
       return {
         summary: `${name} ${truncate(rawArgs, maxChars)}`,

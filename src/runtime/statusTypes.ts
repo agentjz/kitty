@@ -28,11 +28,6 @@ export interface RuntimeStatus {
   wakeSignals: {
     recent: RuntimeWakeSignalSummary[];
   };
-  specs: {
-    total: number;
-    active: RuntimeSpecSummary[];
-    recent: RuntimeSpecSummary[];
-  };
 }
 
 export interface RuntimeProjectMapSummary {
@@ -147,7 +142,6 @@ export interface RuntimeTaskLifecycleSummary {
   stage: string;
   reason?: string;
   activeExecutionIds: string[];
-  activeSpecId?: string;
   activeTodoIds: string[];
   verificationFacts: string[];
   completionFacts: string[];
@@ -196,33 +190,3 @@ export interface RuntimeWakeSignalSummary {
   createdAt: string;
 }
 
-export interface RuntimeSpecSummary {
-  id: string;
-  title: string;
-  stage: string;
-  status: string;
-  updatedAt: string;
-  workspace?: string;
-  workflow?: {
-    nextGate: string;
-    stageLabel: string;
-    nextAction: string;
-    waitingFor: string[];
-    writableTools: string;
-    documentProgress: {
-      ready: number;
-      total: number;
-      summary: string;
-    };
-    confirmed: {
-      requirements: boolean;
-      design: boolean;
-      tasks: boolean;
-    };
-    documents: Record<string, {
-      present: boolean;
-      bytes: number;
-      initial: boolean;
-    }>;
-  };
-}

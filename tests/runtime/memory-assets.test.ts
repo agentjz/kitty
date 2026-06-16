@@ -5,7 +5,6 @@ import test from "node:test";
 
 import {
   appendRuntimeMemoryAssetToSkillReference,
-  appendRuntimeMemoryAssetToSpecNotes,
   createRuntimeMemoryAsset,
   deleteRuntimeMemoryAsset,
   listRuntimeMemoryAssets,
@@ -13,8 +12,7 @@ import {
   searchRuntimeMemoryAssets,
 } from "../../src/runtime/memory/index.js";
 import { SessionStore } from "../../src/session/store.js";
-import { SpecStore } from "../../src/spec/store.js";
-import { createTempWorkspace, initGitRepo } from "../helpers.js";
+import { createTempWorkspace } from "../helpers.js";
 
 test("runtime memory assets can be listed, read, and searched", async (t) => {
   const root = await createTempWorkspace("runtime-memory-assets", t);
@@ -170,54 +168,6 @@ test("runtime memory assets expose asset kinds and evidence references", async (
   assert.equal(assets.find((asset) => asset.id === session.id)?.evidenceRefs[0], `session:${session.id}`);
   assert.equal(assets.find((asset) => asset.kind === "project")?.id, "project/repo");
   assert.equal(assets.find((asset) => asset.kind === "user")?.id, "user/preferences");
-});
-
-test("runtime memory assets can be appended to spec notes as evidence", async (t) => {
-  const root = await createTempWorkspace("runtime-memory-to-spec", t);
-  await initGitRepo(root);
-  const sessionStore = new SessionStore(`${root}/.kitty/sessions`);
-  const session = await sessionStore.save({
-    ...(await sessionStore.create(root)),
-    sessionMemory: {
-      version: 1,
-      summary: [
-        "## Current Focus",
-        "None",
-        "",
-        "## User Constraints",
-        "None",
-        "",
-        "## Decisions",
-        "None",
-        "",
-        "## Open Threads",
-        "None",
-        "",
-        "## Verification Facts",
-        "None",
-        "",
-        "## Reusable Lessons",
-        "Reusable lesson: keep runtime state visible.",
-      ].join("\n"),
-      updatedAt: "2026-05-22T00:00:00.000Z",
-    },
-  });
-  const specStore = new SpecStore(root, { rootDir: root });
-  const spec = await specStore.create({
-    title: "Memory Evidence",
-    sessionId: session.id,
-  });
-
-  const appended = await appendRuntimeMemoryAssetToSpecNotes({
-    rootDir: root,
-    memoryId: session.id,
-    specId: spec.id,
-  });
-  const notes = await specStore.readDocument(spec.id, "notes");
-
-  assert.equal(appended.specId, spec.id);
-  assert.match(notes, /Source memory asset:/);
-  assert.match(notes, /Reusable lesson/);
 });
 
 test("runtime memory assets can be appended to runtime skill references", async (t) => {

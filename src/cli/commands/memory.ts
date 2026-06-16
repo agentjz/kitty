@@ -6,7 +6,6 @@ import {
   createRuntimeMemoryAsset,
   deleteRuntimeMemoryAsset,
   readRuntimeMemoryAsset,
-  appendRuntimeMemoryAssetToSpecNotes,
   searchRuntimeMemoryAssets,
 } from "../../runtime/memory/index.js";
 import type { WritableRuntimeMemoryAssetKind } from "../../runtime/memory/index.js";
@@ -31,7 +30,6 @@ export function registerMemoryCommand(
     .description("List readable runtime memory assets.")
     .argument("[memoryId]", "Optional runtime memory asset id to read.")
     .option("--delete", "Delete the selected runtime memory asset.")
-    .option("--append-to-spec <specId>", "Append the selected memory asset to a spec notes.md document.")
     .option("--append-to-skill <skillName>", "Append the selected memory asset to a runtime skill references/ file.")
     .option("--create <kind>", "Create a project, user, or evidence memory asset.")
     .option("--title <title>", "Title for --create.")
@@ -44,7 +42,6 @@ export function registerMemoryCommand(
     .option("--json", "Print structured JSON.")
     .action(async (memoryId: string | undefined, commandOptions: {
       appendToSkill?: string;
-      appendToSpec?: string;
       content?: string;
       create?: string;
       delete?: boolean;
@@ -119,12 +116,8 @@ async function handleMemoryCreate(
 async function handleSelectedMemory(
   cwd: string,
   memoryId: string,
-  options: { appendToSkill?: string; appendToSpec?: string; delete?: boolean; file?: string; json?: boolean },
+  options: { appendToSkill?: string; delete?: boolean; file?: string; json?: boolean },
 ): Promise<void> {
-  if (options.appendToSkill && options.appendToSpec) {
-    throw new Error("Choose either --append-to-spec or --append-to-skill, not both.");
-  }
-
   if (options.appendToSkill) {
     const appended = await appendRuntimeMemoryAssetToSkillReference({
       rootDir: cwd,
@@ -137,21 +130,6 @@ async function handleSelectedMemory(
       return;
     }
     ui.success(`Appended memory asset ${memoryId} to skill ${options.appendToSkill}`);
-    writeStdoutLine(appended.path);
-    return;
-  }
-
-  if (options.appendToSpec) {
-    const appended = await appendRuntimeMemoryAssetToSpecNotes({
-      rootDir: cwd,
-      memoryId,
-      specId: options.appendToSpec,
-    });
-    if (options.json) {
-      writeStdoutLine(JSON.stringify({ appended }, null, 2));
-      return;
-    }
-    ui.success(`Appended memory asset ${memoryId} to spec ${options.appendToSpec}`);
     writeStdoutLine(appended.path);
     return;
   }
