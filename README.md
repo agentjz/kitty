@@ -37,6 +37,7 @@
 | 💾 Session | 会话记录、checkpoint、todo、工作集、恢复现场、结构化可审阅 memory assets |
 | 🗺️ Project Map | 目录、入口、脚本、测试、spec 和 git 事实进入短项目地图 |
 | 🔌 Provider | OpenAI-compatible provider、请求恢复、连接诊断 |
+| ❄️ 缓存与省钱 | 读取 provider usage 里的缓存命中事实，记录 cache hit / miss / read / write，展示稳定前缀指纹和最近请求命中状态 |
 | 🛠️ Core tools | `read`、`edit`、`write`、`bash` |
 | 🧩 Extensions | `todo`、`worktree`、`network`、`background`、`subagent`、`skills`、`spec` |
 | 🧾 Control plane | SQLite 账本记录 task lifecycle、execution、deadline、输出健康、wait policy、pid、状态和 wake 事实；host 负责等待和恢复 lead |
@@ -131,6 +132,10 @@ Runtime skills 放在项目 `SKILL.md`、`.skills/**/SKILL.md` 或 `skills/**/SK
 当前仓库内置四个开发阶段 runtime skill：`research`、`plan`、`development`、`verification`。其中 `plan` 强制把 `plan.md` 写成从目标、当前事实、交付标准、失败测试、实施路线、详细检查单到验证计划的完整执行合同。
 
 Provider 请求优先携带同 session 的近场可见对话。短会话不靠账本拼上下文；长会话超预算时摘要旧对话，保留最近对话 tail。Session memory 由模型在 turn 收口时按固定 Markdown 区块写出：`Current Focus`、`User Constraints`、`Decisions`、`Open Threads`、`Verification Facts`、`Reusable Lessons`。机器只维护格式和保存边界，不替模型判断事实重要性。
+
+Provider usage 会归一化缓存事实：DeepSeek 的 `prompt_cache_hit_tokens` / `prompt_cache_miss_tokens`，OpenAI 的 `prompt_tokens_details.cached_tokens`，Anthropic 的 `cache_read_input_tokens` / `cache_creation_input_tokens`，以及 Gemini cached content tokens。`model.request` observability 事件会记录这些字段，`kitty status` 会显示最近模型请求的缓存命中和 context cache layout。OpenAI 请求会使用同 session 稳定 `prompt_cache_key`；DeepSeek 不写无效 `cache_control`，优先保持稳定前缀和命中观测。
+
+`kitty eval --run` 包含 cache economy 检查：usage 字段解析、provider cache policy 和 stable prefix fingerprint 都必须能机器验证。真实省钱仍取决于 provider 是否返回 usage，以及同一 session 的前缀是否真的被上游缓存命中。
 
 Session workset 记录当前会话实际读过和改过的文件。`read` 成功后记录读取事实，`edit` / `write` 成功后记录变更事实和 change id。工作集会进入 session、working memory 和 `kitty status`，让用户看到当前任务真正碰过哪些文件。
 

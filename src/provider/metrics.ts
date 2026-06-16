@@ -3,6 +3,11 @@ export interface ProviderUsageSnapshot {
   outputTokens?: number;
   totalTokens?: number;
   reasoningTokens?: number;
+  cacheReadTokens?: number;
+  cacheCreationTokens?: number;
+  cacheHitTokens?: number;
+  cacheMissTokens?: number;
+  cacheHitRate?: number;
 }
 
 export interface ModelRequestMetric {

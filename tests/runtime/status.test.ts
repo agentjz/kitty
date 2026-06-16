@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import path from "node:path";
 import test from "node:test";
 
 import { ControlPlaneLedger } from "../../src/control/ledger.js";
@@ -123,10 +125,49 @@ test("runtime status projects the current project runtime facts", async (t) => {
   assert.match(text, /Context budget hotspots:/);
   assert.match(text, /Context budget sources:/);
   assert.match(text, /nearFieldConversation  chars=25000  messages=3/);
+  assert.match(text, /Model cache: none/);
   assert.match(text, /Task lifecycle:/);
   assert.match(text, /Spec workspace:/);
   assert.match(text, /next: Finish requirements\.md/);
   assert.match(text, /documents: 0\/4 documents ready/);
+});
+
+test("runtime status surfaces recent model request cache facts", async (t) => {
+  const root = await createTempWorkspace("runtime-status-cache", t);
+  await initGitRepo(root);
+  const paths = path.join(root, ".kitty", "observability", "events");
+  await fs.mkdir(paths, { recursive: true });
+  await fs.writeFile(
+    path.join(paths, "2026-06-16.jsonl"),
+    JSON.stringify({
+      version: 1,
+      timestamp: "2026-06-16T00:00:00.000Z",
+      event: "model.request",
+      status: "completed",
+      model: "gpt-5.5",
+      durationMs: 123,
+      details: {
+        provider: "openai",
+        usage: {
+          inputTokens: 1200,
+          outputTokens: 50,
+          totalTokens: 1250,
+          cacheReadTokens: 900,
+          cacheHitRate: 0.75,
+        },
+        usageAvailable: true,
+      },
+    }) + "\n",
+    "utf8",
+  );
+
+  const status = await buildRuntimeStatus(root);
+  const text = formatRuntimeStatusText(status);
+
+  assert.equal(status.modelRequests.recent.length, 1);
+  assert.match(text, /Model cache: cached=900/);
+  assert.match(text, /Recent model requests:/);
+  assert.match(text, /cacheRead=900/);
 });
 
 test("runtime status exposes background executions that are running without output", async (t) => {

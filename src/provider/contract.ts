@@ -1,4 +1,4 @@
-﻿import type OpenAI from "openai";
+import type OpenAI from "openai";
 
 import type { FunctionToolDefinition } from "../tools/index.js";
 import type { ModelReasoningEffort, ToolCallRecord } from "../types.js";
@@ -24,6 +24,8 @@ export interface ProviderAdapterRequest {
   thinking?: "enabled" | "disabled";
   reasoningEffort?: ModelReasoningEffort;
   maxOutputTokens?: number;
+  sessionId?: string;
+  projectRoot?: string;
   abortSignal?: AbortSignal;
   onRequestMetric?: (metric: ModelRequestMetric) => void;
 }

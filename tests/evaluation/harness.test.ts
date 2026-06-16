@@ -13,6 +13,7 @@ test("evaluation harness defines machine checks only", () => {
     "spec-store-available",
     "skill-packages-readable",
     "config-preflight-readable",
+    "cache-economy-ready",
     "host-turn-boundary-runs",
     "remote-entrypoints-available",
     "recovery-drills-pass",
@@ -28,6 +29,7 @@ test("evaluation harness runs local machine-verifiable checks", async (t) => {
   assert.equal(result.status, "passed");
   assert.ok(result.checks.every((check) => check.status === "passed"));
   assert.ok(result.checks.some((check) => check.id === "runtime-status-builds"));
+  assert.ok(result.checks.some((check) => check.id === "cache-economy-ready"));
   assert.ok(result.checks.some((check) => check.id === "host-turn-boundary-runs"));
   assert.ok(result.checks.some((check) => check.id === "remote-entrypoints-available"));
   assert.ok(result.checks.some((check) => check.id === "recovery-drills-pass"));

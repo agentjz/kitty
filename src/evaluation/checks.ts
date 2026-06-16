@@ -13,6 +13,7 @@ export const EVALUATION_CHECK_IDS: readonly EvaluationCheckId[] = [
   "spec-store-available",
   "skill-packages-readable",
   "config-preflight-readable",
+  "cache-economy-ready",
   "host-turn-boundary-runs",
   "remote-entrypoints-available",
   "recovery-drills-pass",
@@ -60,6 +61,9 @@ export async function runEvaluationCheck(id: EvaluationCheckId, rootDir: string)
         const preflight = await inspectConfigPreflight(rootDir);
         return passed(id, `config preflight ready: ready=${preflight.ready}`);
       }
+      case "cache-economy-ready": {
+        return await runCacheEconomyCheck(id);
+      }
       case "host-turn-boundary-runs": {
         return await runHostTurnBoundaryCheck(id, rootDir);
       }
@@ -78,6 +82,71 @@ export async function runEvaluationCheck(id: EvaluationCheckId, rootDir: string)
       error: error instanceof Error ? error.message : String(error),
     };
   }
+}
+
+async function runCacheEconomyCheck(id: EvaluationCheckId): Promise<EvaluationCheckResult> {
+  const { normalizeProviderUsage } = await import("../provider/usageNormalizer.js");
+  const { resolveProviderCachePolicy } = await import("../provider/cachePolicy.js");
+  const { buildCompressedContextRequest } = await import("../context/runtime/compression/builder.js");
+
+  const deepSeek = normalizeProviderUsage({
+    prompt_tokens: 1000,
+    prompt_cache_hit_tokens: 800,
+    prompt_cache_miss_tokens: 200,
+    completion_tokens: 40,
+  });
+  const openai = normalizeProviderUsage({
+    prompt_tokens: 1200,
+    prompt_tokens_details: {
+      cached_tokens: 960,
+    },
+  });
+  const policy = resolveProviderCachePolicy({
+    provider: "openai",
+    model: "gpt-5.5",
+    sessionId: "eval-session",
+  });
+  const first = buildCompressedContextRequest(
+    "stable system",
+    [{ role: "user", content: "first", createdAt: "2026-06-16T00:00:00.000Z" }],
+    {
+      contextWindowMessages: 120,
+      model: "gpt-5.5",
+      maxContextChars: 900_000,
+      contextSummaryChars: 120_000,
+    },
+  );
+  const second = buildCompressedContextRequest(
+    "stable system",
+    [
+      { role: "user", content: "first", createdAt: "2026-06-16T00:00:00.000Z" },
+      { role: "user", content: "second", createdAt: "2026-06-16T00:01:00.000Z" },
+    ],
+    {
+      contextWindowMessages: 120,
+      model: "gpt-5.5",
+      maxContextChars: 900_000,
+      contextSummaryChars: 120_000,
+    },
+  );
+
+  if (
+    deepSeek?.cacheHitRate !== 0.8 ||
+    openai?.cacheReadTokens !== 960 ||
+    !policy.promptCacheKey ||
+    first.cacheLayout?.stablePrefixFingerprint !== second.cacheLayout?.stablePrefixFingerprint
+  ) {
+    return {
+      id,
+      status: "failed",
+      fact: "cache economy checks did not converge",
+    };
+  }
+
+  return passed(
+    id,
+    `cache economy ready: deepseekHit=${deepSeek?.cacheHitRate}, openaiCached=${openai?.cacheReadTokens}, stablePrefix=${first.cacheLayout?.stablePrefixFingerprint ?? "unknown"}`,
+  );
 }
 
 async function runHostTurnBoundaryCheck(id: EvaluationCheckId, rootDir: string): Promise<EvaluationCheckResult> {

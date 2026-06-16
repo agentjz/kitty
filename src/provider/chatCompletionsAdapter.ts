@@ -8,6 +8,7 @@ import { collapseContentParts, readReasoningContent } from "../session/messages.
 import { buildProviderRequestBody } from "./chatRequestBody.js";
 import type { ProviderAdapterRequest, ProviderMessage, ProviderWireAdapter } from "./contract.js";
 import type { ProviderUsageSnapshot } from "./metrics.js";
+import { normalizeProviderUsage } from "./usageNormalizer.js";
 import { createAbortError, throwIfAborted } from "../utils/abort.js";
 
 export const chatCompletionsAdapter: ProviderWireAdapter = {
@@ -29,6 +30,8 @@ export const chatCompletionsAdapter: ProviderWireAdapter = {
             thinking: request.thinking,
             reasoningEffort: request.reasoningEffort,
             maxOutputTokens: request.maxOutputTokens,
+            sessionId: request.sessionId,
+            projectRoot: request.projectRoot,
           }),
           signal: request.abortSignal,
         } as never,
@@ -65,7 +68,7 @@ export const chatCompletionsAdapter: ProviderWireAdapter = {
           throw createAbortError("Streaming aborted");
         }
 
-        usage = extractProviderUsage(chunk.usage) ?? usage;
+        usage = normalizeProviderUsage(chunk.usage) ?? usage;
         const delta = chunk.choices?.[0]?.delta;
         if (!delta) {
           continue;
@@ -147,11 +150,13 @@ export const chatCompletionsAdapter: ProviderWireAdapter = {
             thinking: request.thinking,
             reasoningEffort: request.reasoningEffort,
             maxOutputTokens: request.maxOutputTokens,
+            sessionId: request.sessionId,
+            projectRoot: request.projectRoot,
           }),
           signal: request.abortSignal,
         } as never,
       );
-      usage = extractProviderUsage((completion as { usage?: unknown }).usage);
+      usage = normalizeProviderUsage((completion as { usage?: unknown }).usage);
 
       const message = completion.choices[0]?.message;
       if (!message) {
@@ -190,38 +195,6 @@ function abortStream(stream: { controller?: AbortController } | undefined): void
   } catch {
     // best-effort abort
   }
-}
-
-function extractProviderUsage(usage: unknown): ProviderUsageSnapshot | undefined {
-  if (!usage || typeof usage !== "object") {
-    return undefined;
-  }
-
-  const record = usage as {
-    prompt_tokens?: unknown;
-    input_tokens?: unknown;
-    completion_tokens?: unknown;
-    output_tokens?: unknown;
-    total_tokens?: unknown;
-    completion_tokens_details?: { reasoning_tokens?: unknown };
-    output_tokens_details?: { reasoning_tokens?: unknown };
-  };
-
-  const snapshot: ProviderUsageSnapshot = {
-    inputTokens: readUsageNumber(record.prompt_tokens ?? record.input_tokens),
-    outputTokens: readUsageNumber(record.completion_tokens ?? record.output_tokens),
-    totalTokens: readUsageNumber(record.total_tokens),
-    reasoningTokens: readUsageNumber(
-      record.completion_tokens_details?.reasoning_tokens ??
-      record.output_tokens_details?.reasoning_tokens,
-    ),
-  };
-
-  return Object.values(snapshot).some((value) => typeof value === "number") ? snapshot : undefined;
-}
-
-function readUsageNumber(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.round(value) : undefined;
 }
 
 export function toChatCompletionMessages(messages: ProviderMessage[]): ChatCompletionMessageParam[] {

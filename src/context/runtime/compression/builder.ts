@@ -7,7 +7,7 @@ import { buildContextBudgetReport } from "../budget.js";
 import type { ProviderMessage } from "../../../provider/contract.js";
 import type { PromptLayerMetrics, PromptLayers } from "../../../agent/prompt/types.js";
 import type { RuntimeConfig, StoredMessage } from "../../../types.js";
-import type { ContextBudgetReport } from "../../../types/contextBudget.js";
+import type { ContextBudgetReport, ContextCacheLayoutReport } from "../../../types/contextBudget.js";
 import type { ContextRuntimeRequest } from "../types.js";
 
 const MIN_TAIL_MESSAGES = 8;
@@ -27,6 +27,7 @@ export function buildCompressedContextRequest(
   const initialEstimatedChars = estimateChatMessagesChars(fullMessages);
   const initialPromptMetrics = measureSystemPrompt(systemPrompt);
   const initialSources = buildBudgetSources(systemPrompt, conversationMessages);
+  const initialCacheLayout = buildCacheLayoutReport(systemPrompt, conversationMessages);
 
   if (initialEstimatedChars <= safeMaxChars) {
     return {
@@ -39,8 +40,10 @@ export function buildCompressedContextRequest(
         compressed: false,
         sources: initialSources,
         promptHotspots: initialPromptMetrics?.hotspots,
+        cacheLayout: initialCacheLayout,
       }),
       promptMetrics: initialPromptMetrics,
+      cacheLayout: initialCacheLayout,
     };
   }
 
@@ -59,6 +62,7 @@ export function buildCompressedContextRequest(
     let requestMessages = composeChatMessages(summaryPrompt, workingTail, config.model);
     let estimatedChars = estimateChatMessagesChars(requestMessages);
     let promptMetrics = measureSystemPrompt(summaryPrompt);
+    let cacheLayout = buildCacheLayoutReport(summaryPrompt, workingTail);
 
     if (estimatedChars <= safeMaxChars) {
       return {
@@ -73,9 +77,11 @@ export function buildCompressedContextRequest(
           sources: buildBudgetSources(systemPrompt, workingTail, summary),
           promptHotspots: promptMetrics?.hotspots,
           compressionMode: summary ? "normal" : "none",
+          cacheLayout,
         }),
         summary,
         promptMetrics,
+        cacheLayout,
       };
     }
 
@@ -83,6 +89,7 @@ export function buildCompressedContextRequest(
     requestMessages = composeChatMessages(summaryPrompt, workingTail, config.model);
     estimatedChars = estimateChatMessagesChars(requestMessages);
     promptMetrics = measureSystemPrompt(summaryPrompt);
+    cacheLayout = buildCacheLayoutReport(summaryPrompt, workingTail);
 
     if (estimatedChars <= safeMaxChars) {
       return {
@@ -97,9 +104,11 @@ export function buildCompressedContextRequest(
           sources: buildBudgetSources(systemPrompt, workingTail, summary),
           promptHotspots: promptMetrics?.hotspots,
           compressionMode: "aggressive",
+          cacheLayout,
         }),
         summary,
         promptMetrics,
+        cacheLayout,
       };
     }
 
@@ -120,6 +129,7 @@ export function buildCompressedContextRequest(
         config.model,
       );
       const hardEstimatedChars = estimateChatMessagesChars(hardMessages);
+      const hardCacheLayout = buildCacheLayoutReport(hardPrompt, compactedHardTail);
       if (hardEstimatedChars <= safeMaxChars || hardTailCount === 1) {
         return {
           messages: hardMessages,
@@ -133,9 +143,11 @@ export function buildCompressedContextRequest(
             sources: buildBudgetSources(systemPrompt, compactedHardTail, hardSummary),
             promptHotspots: measureSystemPrompt(hardPrompt)?.hotspots,
             compressionMode: "hard",
+            cacheLayout: hardCacheLayout,
           }),
           summary: hardSummary,
           promptMetrics: measureSystemPrompt(hardPrompt),
+          cacheLayout: hardCacheLayout,
         };
       }
     }
@@ -338,6 +350,44 @@ function buildBudgetSources(
 
 function estimateStoredMessagesChars(messages: StoredMessage[]): number {
   return messages.reduce((total, message) => total + JSON.stringify(message).length, 0);
+}
+
+function buildCacheLayoutReport(
+  systemPrompt: string | PromptLayers,
+  messages: StoredMessage[],
+): ContextCacheLayoutReport {
+  const stablePrefix = renderSystemPrompt(systemPrompt);
+  const volatileTail = JSON.stringify(messages.map((message) => ({
+    role: message.role,
+    name: message.name,
+    content: message.content,
+    toolCallId: message.tool_call_id,
+    toolCalls: message.tool_calls,
+  })));
+  return {
+    stablePrefixFingerprint: stableHash(stablePrefix),
+    volatileTailFingerprint: stableHash(volatileTail),
+    stablePrefixChars: stablePrefix.length,
+    volatileTailChars: volatileTail.length,
+    stableSources: typeof systemPrompt === "string"
+      ? ["systemPrompt"]
+      : [
+          "staticPrompt",
+          "profilePersona",
+          "runtimeFacts",
+        ],
+    volatileSources: ["nearFieldConversation"],
+  };
+}
+
+function stableHash(value: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+
+  return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
 function oneLine(value: string): string {

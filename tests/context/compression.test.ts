@@ -236,3 +236,46 @@ test("internal wake turn is excluded from visible near-field conversation", () =
   assert.doesNotMatch(rawMessages, /wake/);
   assert.doesNotMatch(rawMessages, /内部唤醒处理完成/);
 });
+
+test("context cache layout keeps stable prefix fingerprint separate from volatile tail", () => {
+  const first = buildCompressedContextRequest(
+    "system prompt",
+    [
+      {
+        role: "user",
+        content: "first turn",
+        createdAt: "2026-05-20T00:00:00.000Z",
+      },
+    ],
+    {
+      contextWindowMessages: 120,
+      model: "deepseek-v4-flash",
+      maxContextChars: 900_000,
+      contextSummaryChars: 120_000,
+    },
+  );
+  const second = buildCompressedContextRequest(
+    "system prompt",
+    [
+      {
+        role: "user",
+        content: "first turn",
+        createdAt: "2026-05-20T00:00:00.000Z",
+      },
+      {
+        role: "user",
+        content: "second turn",
+        createdAt: "2026-05-20T00:01:00.000Z",
+      },
+    ],
+    {
+      contextWindowMessages: 120,
+      model: "deepseek-v4-flash",
+      maxContextChars: 900_000,
+      contextSummaryChars: 120_000,
+    },
+  );
+
+  assert.equal(first.cacheLayout?.stablePrefixFingerprint, second.cacheLayout?.stablePrefixFingerprint);
+  assert.notEqual(first.cacheLayout?.volatileTailFingerprint, second.cacheLayout?.volatileTailFingerprint);
+});

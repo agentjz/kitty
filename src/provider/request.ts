@@ -1,7 +1,8 @@
 ﻿import type OpenAI from "openai";
 
 import { withApiRetries } from "./apiRetry.js";
-import type { ModelRequestMetric, ProviderUsageSnapshot } from "./metrics.js";
+import type { ModelRequestMetric } from "./metrics.js";
+import { hasProviderUsageSnapshot } from "./usageNormalizer.js";
 import { isAbortError } from "../utils/abort.js";
 import type { AssistantResponse, AgentCallbacks } from "../agent/types.js";
 import { recordObservabilityEvent } from "../observability/writer.js";
@@ -22,6 +23,8 @@ export async function fetchAssistantResponse(
     thinking?: ModelThinkingMode;
     reasoningEffort?: ModelReasoningEffort;
     maxOutputTokens?: number;
+    sessionId?: string;
+    projectRoot?: string;
   },
   tools: FunctionToolDefinition[] | undefined,
   callbacks: AgentCallbacks | undefined,
@@ -62,6 +65,8 @@ async function tryFetch(
     thinking?: ModelThinkingMode;
     reasoningEffort?: ModelReasoningEffort;
     maxOutputTokens?: number;
+    sessionId?: string;
+    projectRoot?: string;
   },
   tools: FunctionToolDefinition[] | undefined,
   callbacks: AgentCallbacks | undefined,
@@ -116,6 +121,8 @@ async function tryFetch(
           thinking: request.thinking,
           reasoningEffort: request.reasoningEffort,
           maxOutputTokens: request.maxOutputTokens,
+          sessionId: request.sessionId,
+          projectRoot: request.projectRoot,
           abortSignal,
           onRequestMetric: forwardMetric,
         });
@@ -138,7 +145,8 @@ async function tryFetch(
           requestModel: request.model,
           wireApi: adapter.wireApi,
           baseUrl: resolvedBaseUrl,
-          usageAvailable: hasUsageSnapshot(latestMetric?.usage),
+          usage: latestMetric?.usage,
+          usageAvailable: hasProviderUsageSnapshot(latestMetric?.usage),
         },
       });
     }
@@ -162,6 +170,8 @@ async function tryFetch(
             thinking: request.thinking,
             reasoningEffort: request.reasoningEffort,
             maxOutputTokens: request.maxOutputTokens,
+            sessionId: request.sessionId,
+            projectRoot: request.projectRoot,
             abortSignal,
             onRequestMetric: forwardMetric,
           });
@@ -184,7 +194,8 @@ async function tryFetch(
             requestModel: request.model,
             wireApi: adapter.wireApi,
             baseUrl: resolvedBaseUrl,
-            usageAvailable: hasUsageSnapshot(latestMetric?.usage),
+            usage: latestMetric?.usage,
+            usageAvailable: hasProviderUsageSnapshot(latestMetric?.usage),
           },
         });
       }
@@ -206,7 +217,8 @@ async function tryFetch(
             requestModel: request.model,
             wireApi: adapter.wireApi,
             baseUrl: resolvedBaseUrl,
-            usageAvailable: hasUsageSnapshot(latestMetric?.usage),
+            usage: latestMetric?.usage,
+            usageAvailable: hasProviderUsageSnapshot(latestMetric?.usage),
           },
         });
       }
@@ -223,18 +235,6 @@ function selectProviderWireAdapter(
   }
 
   return chatCompletionsAdapter;
-}
-
-function hasUsageSnapshot(usage: ProviderUsageSnapshot | undefined): boolean {
-  return Boolean(
-    usage &&
-    (
-      typeof usage.inputTokens === "number" ||
-      typeof usage.outputTokens === "number" ||
-      typeof usage.totalTokens === "number" ||
-      typeof usage.reasoningTokens === "number"
-    ),
-  );
 }
 
 async function invokeWithProviderClients<T>(

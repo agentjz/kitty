@@ -9,6 +9,7 @@ export function buildContextBudgetReport(input: {
   sources?: ContextBudgetReport["sources"];
   promptHotspots?: readonly PromptBlockMetric[];
   compressionMode?: ContextBudgetReport["compressionMode"];
+  cacheLayout?: ContextBudgetReport["cacheLayout"];
 }): ContextBudgetReport {
   const limitChars = Math.max(1, Math.trunc(input.limitChars));
   const estimatedChars = Math.max(0, Math.trunc(input.estimatedChars));
@@ -33,6 +34,7 @@ export function buildContextBudgetReport(input: {
       chars: hotspot.chars,
       lines: hotspot.lines,
     })),
+    cacheLayout: input.cacheLayout,
   };
 }
 

@@ -6,6 +6,7 @@ export type EvaluationCheckId =
   | "spec-store-available"
   | "skill-packages-readable"
   | "config-preflight-readable"
+  | "cache-economy-ready"
   | "host-turn-boundary-runs"
   | "remote-entrypoints-available"
   | "recovery-drills-pass";

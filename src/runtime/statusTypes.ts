@@ -16,6 +16,9 @@ export interface RuntimeStatus {
     needsAttention: RuntimeSkillSummary[];
   };
   projectMap?: RuntimeProjectMapSummary;
+  modelRequests: {
+    recent: RuntimeModelRequestSummary[];
+  };
   taskLifecycle?: RuntimeTaskLifecycleSummary;
   executions: {
     total: number;
@@ -88,6 +91,33 @@ export interface RuntimeContextBudgetSummary {
     chars: number;
     lines: number;
   }>;
+  cacheLayout?: {
+    stablePrefixFingerprint: string;
+    volatileTailFingerprint: string;
+    stablePrefixChars: number;
+    volatileTailChars: number;
+    stableSources: string[];
+    volatileSources: string[];
+  };
+}
+
+export interface RuntimeModelRequestSummary {
+  timestamp: string;
+  provider?: string;
+  model?: string;
+  durationMs?: number;
+  usageAvailable: boolean;
+  usage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+    reasoningTokens?: number;
+    cacheReadTokens?: number;
+    cacheCreationTokens?: number;
+    cacheHitTokens?: number;
+    cacheMissTokens?: number;
+    cacheHitRate?: number;
+  };
 }
 
 export interface RuntimeMemoryAssetSummary {

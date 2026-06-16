@@ -3,6 +3,8 @@ import type OpenAI from "openai";
 import { resolveProviderCapabilities } from "./capabilities.js";
 import type { ProviderUsageSnapshot } from "./metrics.js";
 import type { ProviderAdapterRequest, ProviderMessage, ProviderWireAdapter } from "./contract.js";
+import { resolveProviderCachePolicy } from "./cachePolicy.js";
+import { normalizeProviderUsage } from "./usageNormalizer.js";
 import { createAbortError, throwIfAborted } from "../utils/abort.js";
 
 export const responsesAdapter: ProviderWireAdapter = {
@@ -54,7 +56,7 @@ export const responsesAdapter: ProviderWireAdapter = {
           throw createAbortError("Streaming aborted");
         }
 
-        usage = extractProviderUsage(event.response?.usage) ?? usage;
+        usage = normalizeProviderUsage(event.response?.usage) ?? usage;
 
         if (event.type === "response.output_text.delta" && typeof event.delta === "string") {
           content += event.delta;
@@ -147,7 +149,7 @@ export const responsesAdapter: ProviderWireAdapter = {
           signal: request.abortSignal,
         },
       );
-      usage = extractProviderUsage((response as { usage?: unknown }).usage);
+      usage = normalizeProviderUsage((response as { usage?: unknown }).usage);
 
       return {
         content: normalizeOutputText(response),
@@ -186,6 +188,16 @@ function buildResponsesRequestBody(request: ProviderAdapterRequest): Record<stri
 
   if (typeof request.maxOutputTokens === "number" && Number.isFinite(request.maxOutputTokens)) {
     body.max_output_tokens = Math.max(1, Math.trunc(request.maxOutputTokens));
+  }
+
+  const cachePolicy = resolveProviderCachePolicy({
+    provider: request.provider,
+    model: request.model,
+    sessionId: request.sessionId,
+    projectRoot: request.projectRoot,
+  });
+  if (cachePolicy.promptCacheKey) {
+    body.prompt_cache_key = cachePolicy.promptCacheKey;
   }
 
   const reasoningEffort = normalizeResponsesReasoningEffort(
@@ -346,36 +358,4 @@ function abortStream(stream: { controller?: AbortController } | undefined): void
   } catch {
     // best-effort abort
   }
-}
-
-function extractProviderUsage(usage: unknown): ProviderUsageSnapshot | undefined {
-  if (!usage || typeof usage !== "object") {
-    return undefined;
-  }
-
-  const record = usage as {
-    prompt_tokens?: unknown;
-    input_tokens?: unknown;
-    completion_tokens?: unknown;
-    output_tokens?: unknown;
-    total_tokens?: unknown;
-    completion_tokens_details?: { reasoning_tokens?: unknown };
-    output_tokens_details?: { reasoning_tokens?: unknown };
-  };
-
-  const snapshot: ProviderUsageSnapshot = {
-    inputTokens: readUsageNumber(record.prompt_tokens ?? record.input_tokens),
-    outputTokens: readUsageNumber(record.completion_tokens ?? record.output_tokens),
-    totalTokens: readUsageNumber(record.total_tokens),
-    reasoningTokens: readUsageNumber(
-      record.completion_tokens_details?.reasoning_tokens ??
-      record.output_tokens_details?.reasoning_tokens,
-    ),
-  };
-
-  return Object.values(snapshot).some((value) => typeof value === "number") ? snapshot : undefined;
-}
-
-function readUsageNumber(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.round(value) : undefined;
 }

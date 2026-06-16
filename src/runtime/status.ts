@@ -1,3 +1,6 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+
 import { ControlPlaneLedger, type ExecutionRecord, type WakeSignalRecord } from "../control/ledger.js";
 import type { TaskLifecycleRecord } from "../control/ledger.js";
 import { getProjectStatePaths } from "../project/statePaths.js";
@@ -10,7 +13,11 @@ import { SpecStore } from "../spec/store.js";
 import { buildSpecWorkflowSummary } from "../spec/workflowSummary.js";
 import type { SessionRecord } from "../types.js";
 import type {
+  ObservabilityEventRecord,
+} from "../observability/schema.js";
+import type {
   RuntimeExecutionSummary,
+  RuntimeModelRequestSummary,
   RuntimeProjectMapSummary,
   RuntimeSessionSummary,
   RuntimeStatus,
@@ -28,13 +35,14 @@ export async function buildRuntimeStatus(rootDir: string): Promise<RuntimeStatus
     memorySessionsDir: paths.sessionMemoryDir,
   });
 
-  const [sessionRead, memoryAssets, control, specs, projectMap, projectContext] = await Promise.all([
+  const [sessionRead, memoryAssets, control, specs, projectMap, projectContext, modelRequests] = await Promise.all([
     sessionStore.listReadable?.(DEFAULT_RECENT_LIMIT) ?? sessionStore.list(DEFAULT_RECENT_LIMIT).then((sessions) => ({ sessions, skipped: [] })),
     listRuntimeMemoryAssets(paths.rootDir),
     readControlPlaneStatus(paths.rootDir),
     readSpecStatus(paths.rootDir),
     buildProjectMap(paths.rootDir),
     loadProjectContext(paths.rootDir, { projectDocMaxBytes: 24_576 }),
+    readRecentModelRequests(paths.observabilityEventsDir),
   ]);
 
   const sessions = sessionRead.sessions.map(summarizeSession);
@@ -54,6 +62,9 @@ export async function buildRuntimeStatus(rootDir: string): Promise<RuntimeStatus
     },
     skills: summarizeSkills(projectContext.skills),
     projectMap: summarizeProjectMap(projectMap),
+    modelRequests: {
+      recent: modelRequests,
+    },
     taskLifecycle,
     executions: control.executions,
     wakeSignals: control.wakeSignals,
@@ -93,6 +104,7 @@ function summarizeSession(session: SessionRecord): RuntimeSessionSummary {
       compressionReason: session.contextBudget.compressionReason,
       sources: session.contextBudget.sources,
       promptHotspots: session.contextBudget.promptHotspots,
+      cacheLayout: session.contextBudget.cacheLayout,
     } : undefined,
     workset: session.workset ? {
       total: session.workset.files.length,
@@ -106,6 +118,76 @@ function summarizeSession(session: SessionRecord): RuntimeSessionSummary {
       })),
     } : undefined,
   };
+}
+
+async function readRecentModelRequests(eventsDir: string): Promise<RuntimeModelRequestSummary[]> {
+  const files = await fs.readdir(eventsDir).catch(() => []);
+  const jsonlFiles = files
+    .filter((file) => file.endsWith(".jsonl"))
+    .sort()
+    .slice(-3);
+  const records: RuntimeModelRequestSummary[] = [];
+
+  for (const file of jsonlFiles) {
+    const content = await fs.readFile(path.join(eventsDir, file), "utf8").catch(() => "");
+    for (const line of content.split(/\r?\n/)) {
+      if (!line.trim()) {
+        continue;
+      }
+      const record = parseObservabilityRecord(line);
+      if (!record || record.event !== "model.request" || record.status !== "completed") {
+        continue;
+      }
+      records.push(summarizeModelRequest(record));
+    }
+  }
+
+  return records.slice(-DEFAULT_RECENT_LIMIT).reverse();
+}
+
+function parseObservabilityRecord(line: string): ObservabilityEventRecord | undefined {
+  try {
+    const parsed = JSON.parse(line) as ObservabilityEventRecord;
+    return parsed && typeof parsed === "object" ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function summarizeModelRequest(record: ObservabilityEventRecord): RuntimeModelRequestSummary {
+  const details = record.details ?? {};
+  const usage = readUsageSummary(details.usage);
+  return {
+    timestamp: record.timestamp,
+    provider: typeof details.provider === "string" ? details.provider : undefined,
+    model: record.model,
+    durationMs: record.durationMs,
+    usageAvailable: typeof details.usageAvailable === "boolean" ? details.usageAvailable : Boolean(usage),
+    usage,
+  };
+}
+
+function readUsageSummary(value: unknown): RuntimeModelRequestSummary["usage"] | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+  const record = value as Record<string, unknown>;
+  const usage = {
+    inputTokens: readNumber(record.inputTokens),
+    outputTokens: readNumber(record.outputTokens),
+    totalTokens: readNumber(record.totalTokens),
+    reasoningTokens: readNumber(record.reasoningTokens),
+    cacheReadTokens: readNumber(record.cacheReadTokens),
+    cacheCreationTokens: readNumber(record.cacheCreationTokens),
+    cacheHitTokens: readNumber(record.cacheHitTokens),
+    cacheMissTokens: readNumber(record.cacheMissTokens),
+    cacheHitRate: readNumber(record.cacheHitRate),
+  };
+  return Object.values(usage).some((item) => typeof item === "number") ? usage : undefined;
+}
+
+function readNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 function summarizeSkills(skills: Awaited<ReturnType<typeof loadProjectContext>>["skills"]): RuntimeStatus["skills"] {

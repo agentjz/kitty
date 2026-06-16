@@ -9,6 +9,7 @@ export interface ContextBudgetReport {
   compressionReason: string;
   sources: ContextBudgetSource[];
   promptHotspots: ContextBudgetHotspot[];
+  cacheLayout?: ContextCacheLayoutReport;
 }
 
 export interface ContextBudgetSource {
@@ -22,4 +23,13 @@ export interface ContextBudgetHotspot {
   title: string;
   chars: number;
   lines: number;
+}
+
+export interface ContextCacheLayoutReport {
+  stablePrefixFingerprint: string;
+  volatileTailFingerprint: string;
+  stablePrefixChars: number;
+  volatileTailChars: number;
+  stableSources: string[];
+  volatileSources: string[];
 }
