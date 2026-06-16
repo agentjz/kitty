@@ -12,6 +12,7 @@ test("spec command uses the isolated spec one-shot path", async (t) => {
   const program = buildCliProgram({
     resolveRuntime: async () => ({
       cwd: root,
+      stateRootDir: root,
       config,
       paths: config.paths,
       overrides: {},
@@ -47,6 +48,7 @@ test("spec command opens interactive spec mode without a prompt", async (t) => {
   const program = buildCliProgram({
     resolveRuntime: async () => ({
       cwd: root,
+      stateRootDir: root,
       config,
       paths: config.paths,
       overrides: {},
@@ -60,4 +62,40 @@ test("spec command opens interactive spec mode without a prompt", async (t) => {
   await program.parseAsync(["spec"], { from: "user" });
 
   assert.equal(started, true);
+});
+
+test("spec command can print workflow status without starting a turn", async (t) => {
+  const root = await createTempWorkspace("spec-cli-status", t);
+  const config = createTestRuntimeConfig(root);
+  let started = false;
+  let ranOneShot = false;
+  const program = buildCliProgram({
+    resolveRuntime: async () => ({
+      cwd: root,
+      stateRootDir: root,
+      config,
+      paths: config.paths,
+      overrides: {},
+    }),
+    startSpecInteractive: async () => {
+      started = true;
+    },
+    runSpecOneShot: async (options) => {
+      ranOneShot = true;
+      return {
+        session: options.session,
+        closeout: {
+          sessionId: options.session.id,
+          completed: true,
+          terminalTransition: null,
+        },
+      };
+    },
+  });
+  program.exitOverride();
+
+  await program.parseAsync(["spec", "--status"], { from: "user" });
+
+  assert.equal(started, false);
+  assert.equal(ranOneShot, false);
 });

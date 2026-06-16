@@ -1,5 +1,6 @@
 import type { RuntimeStatus } from "../../runtime/status.js";
 import { truncateCliValue } from "../cliValues.js";
+import { formatSpecWorkflowBrief } from "../../spec/workflowSummary.js";
 
 export function formatRuntimeStatusText(status: RuntimeStatus): string {
   const lines: string[] = [];
@@ -171,12 +172,28 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
     lines.push("");
     lines.push("Spec workspace:");
     for (const spec of status.specs.active) {
-      lines.push(`${spec.id}  ${spec.workflow?.stageLabel ?? spec.stage}  ${spec.title}`);
       if (spec.workflow) {
-        lines.push(`  next: ${spec.workflow.nextAction}`);
-        lines.push(`  waiting: ${spec.workflow.waitingFor.join(", ") || "none"}`);
-        lines.push(`  documents: ${spec.workflow.documentProgress.summary}`);
-        lines.push(`  tools: ${spec.workflow.writableTools}`);
+        lines.push(indent(formatSpecWorkflowBrief({
+          active: true,
+          specId: spec.id,
+          title: spec.title,
+          stage: spec.stage,
+          status: spec.status,
+          confirmed: spec.workflow.confirmed,
+          nextGate: spec.workflow.nextGate,
+          stageLabel: spec.workflow.stageLabel,
+          nextAction: spec.workflow.nextAction,
+          waitingFor: spec.workflow.waitingFor,
+          writableTools: spec.workflow.writableTools as "planning" | "implementation",
+          documents: spec.workflow.documents,
+          documentProgress: spec.workflow.documentProgress,
+          workspace: spec.workspace ? {
+            path: spec.workspace,
+            branch: "spec",
+          } : undefined,
+        }), "  "));
+      } else {
+        lines.push(`  ${spec.id}  ${spec.stage}  ${spec.title}`);
       }
     }
   }
@@ -208,6 +225,10 @@ function readSessionLine(status: RuntimeStatus): string {
     return "none";
   }
   return `${status.sessions.latest.id} (${status.sessions.latest.messageCount} message(s))`;
+}
+
+function indent(value: string, prefix: string): string {
+  return value.split(/\r?\n/).map((line) => `${prefix}${line}`).join("\n");
 }
 
 function readNextStep(status: RuntimeStatus): string {

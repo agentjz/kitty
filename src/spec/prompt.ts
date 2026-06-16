@@ -1,5 +1,5 @@
 import { formatPromptBlock } from "../agent/prompt/format.js";
-import { formatSpecWorkflowSummary, type SpecWorkflowSummary } from "./workflowSummary.js";
+import { formatSpecWorkflowBrief, formatSpecWorkflowSummary, type SpecWorkflowSummary } from "./workflowSummary.js";
 import type { SpecState } from "./types.js";
 
 export function buildSpecModePromptBlock(activeSpec: SpecState | null, workflow?: SpecWorkflowSummary): string {
@@ -65,6 +65,9 @@ export function buildSpecModePromptBlock(activeSpec: SpecState | null, workflow?
 
   if (workflow) {
     lines.push(
+      "",
+      "Workflow brief:",
+      formatSpecWorkflowBrief(workflow),
       "",
       "Workflow summary:",
       formatSpecWorkflowSummary(workflow),

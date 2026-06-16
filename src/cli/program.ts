@@ -10,6 +10,7 @@ import { registerEvaluationCommand } from "./commands/evaluation.js";
 import { registerEventsCommand } from "./commands/events.js";
 import { registerProjectCommands } from "./commands/project.js";
 import { registerAgentCommand } from "./commands/agent.js";
+import { registerBackgroundCommand } from "./commands/background.js";
 import { registerSpecCommand } from "./commands/spec.js";
 import { registerSessionCommands } from "./commands/session.js";
 import { registerWorkerCommand } from "./commands/worker.js";
@@ -58,6 +59,10 @@ export function buildCliProgram(dependencies: CliProgramDependencies = {}): Comm
     getCliOverrides,
     resolveRuntime,
     dependencies,
+  });
+  registerBackgroundCommand(program, {
+    getCliOverrides,
+    resolveRuntime,
   });
   registerSessionCommands(program, {
     getCliOverrides,

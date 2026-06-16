@@ -4,6 +4,8 @@ import type { CliProgramDependencies } from "../dependencies.js";
 import { createHostSession } from "../../host/session.js";
 import type { CliOverrides, RuntimeConfig, SessionRecord } from "../../types.js";
 import { ui } from "../../utils/console.js";
+import { writeStdoutLine } from "../../utils/stdio.js";
+import { formatSpecWorkflowBrief } from "../../spec/workflowSummary.js";
 import { createSessionStore } from "./sessionHelpers.js";
 
 export function registerSpecCommand(
@@ -24,13 +26,20 @@ export function registerSpecCommand(
     .description("Start spec mode: isolated requirements, design, tasks, implementation, and validation workflow.")
     .argument("[prompt...]", "Optional one-shot spec prompt. Without a prompt, opens interactive spec mode.")
     .option("--resume <sessionId>", "Resume a saved session in spec mode.")
-    .action(async (promptParts: string[], commandOptions: { resume?: string }) => {
+    .option("--status", "Print the current spec workflow status without starting a turn.")
+    .action(async (promptParts: string[], commandOptions: { resume?: string; status?: boolean }) => {
       const prompt = promptParts.join(" ").trim();
       const runtime = await options.resolveRuntime(options.getCliOverrides());
       const sessionStore = await createSessionStore(runtime.paths.sessionsDir);
       const session = commandOptions.resume
         ? await sessionStore.load(commandOptions.resume)
         : await createHostSession(sessionStore, runtime.cwd);
+
+      if (commandOptions.status) {
+        const specRuntime = await loadSpecRuntimeForCli(runtime.cwd, session.id, runtime.config.projectDocMaxBytes);
+        writeStdoutLine(formatSpecWorkflowBrief(specRuntime.workflow));
+        return;
+      }
 
       if (!prompt) {
         await startSpecInteractive(options.dependencies, {
@@ -54,6 +63,15 @@ export function registerSpecCommand(
         process.exitCode = 1;
       }
     });
+}
+
+async function loadSpecRuntimeForCli(cwd: string, sessionId: string, projectDocMaxBytes: number) {
+  const { loadSpecRuntime } = await import("../../spec/runtime.js");
+  return loadSpecRuntime({
+    cwd,
+    sessionId,
+    projectDocMaxBytes,
+  });
 }
 
 async function startSpecInteractive(

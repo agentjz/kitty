@@ -99,6 +99,22 @@ export function formatSpecWorkflowSummary(summary: SpecWorkflowSummary): string 
   return lines.join("\n");
 }
 
+export function formatSpecWorkflowBrief(summary: SpecWorkflowSummary): string {
+  const lines = [
+    summary.active
+      ? `${summary.specId}  ${summary.stageLabel}  ${summary.title ?? "(untitled)"}`
+      : "No active spec",
+    `Next: ${summary.nextAction}`,
+    `Waiting: ${summary.waitingFor.join(", ") || "none"}`,
+    `Documents: ${summary.documentProgress.summary}`,
+    `Confirmed: requirements=${summary.confirmed.requirements}, design=${summary.confirmed.design}, tasks=${summary.confirmed.tasks}`,
+    `Tools: ${summary.writableTools}`,
+    summary.workspace ? `Workspace: ${summary.workspace.path} (${summary.workspace.branch})` : undefined,
+  ].filter((line): line is string => Boolean(line));
+
+  return lines.join("\n");
+}
+
 function summarizeDocuments(documents: Partial<Record<SpecDocumentName, string>>): Record<SpecDocumentName, SpecDocumentSummary> {
   return Object.fromEntries(SPEC_DOCUMENT_NAMES.map((name) => {
     const content = documents[name];

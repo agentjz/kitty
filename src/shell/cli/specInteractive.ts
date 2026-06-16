@@ -13,6 +13,7 @@ import { getBuiltinTools } from "../../tools/toolCatalog.js";
 import type { RuntimeConfig, SessionRecord } from "../../types.js";
 import { writeCliInteractiveIntro } from "./intro.js";
 import { createCliInteractionShell } from "./shell.js";
+import { formatSpecWorkflowBrief } from "../../spec/workflowSummary.js";
 
 interface SpecInteractiveOptions {
   cwd: string;
@@ -49,6 +50,7 @@ export async function startSpecInteractiveChat(
     toolsLabel: formatSpecToolsLabel(initialRuntime.builtinToolFilter, initialRuntime.tools),
   });
   terminalShell.output.info("Spec mode: requirements -> design -> tasks -> implement -> validate.");
+  terminalShell.output.info(formatSpecWorkflowBrief(initialRuntime.workflow));
 
   const driver = new InteractiveSessionDriver({
     ...options,

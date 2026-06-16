@@ -31,6 +31,9 @@ test("spec interactive intro reflects the initial spec-stage tool surface", asyn
   const expectedToolsLabel = formatExpectedSpecToolsLabel();
   assert.match(rendered, new RegExp(`Tools: ${escapeRegExp(expectedToolsLabel)}`));
   assert.match(rendered, /Spec mode: requirements -> design -> tasks -> implement -> validate/);
+  assert.match(rendered, /No active spec/);
+  assert.match(rendered, /Next: Create a spec/);
+  assert.match(rendered, /Documents: 0\/4 documents ready/);
 });
 
 function formatExpectedSpecToolsLabel(): string {

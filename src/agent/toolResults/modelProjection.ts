@@ -31,11 +31,28 @@ export function projectToolResultForModel(input: {
     case "background_check":
     case "subagent_check":
       return projectExecutionCheck(parsed);
+    case "background_wait":
+    case "background_stop":
+      return projectExecutionAction(parsed);
     case "skill_load":
       return projectSkillLoad(parsed);
     default:
       return projectGenericSuccess(parsed, input.result.output);
   }
+}
+
+function projectExecutionAction(payload: Record<string, unknown>): string {
+  const execution = readObject(payload.execution) ?? payload;
+  return joinLines([
+    readString(execution.id) ?? "execution",
+    readString(execution.kind),
+    readString(execution.status),
+    readString(execution.command),
+    readString(execution.summary),
+    readString(execution.outputPreview),
+    readObject(execution.health) ? readString(readObject(execution.health)?.message) : undefined,
+    readString(execution.error),
+  ]);
 }
 
 function projectExecutionCheck(payload: Record<string, unknown>): string {

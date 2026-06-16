@@ -11,6 +11,8 @@ const activeBackgroundProcesses = new Map<string, {
   settled: Promise<void>;
 }>();
 
+const DEFAULT_BACKGROUND_WAIT_INTERVAL_MS = 250;
+
 export class BackgroundExecutionStore {
   constructor(private readonly rootDir: string) {}
 
@@ -151,6 +153,37 @@ export function reconcileBackgroundExecutions(rootDir: string): { staleExecution
   return { staleExecutions };
 }
 
+export async function waitForBackgroundExecution(input: {
+  rootDir: string;
+  id: string;
+  timeoutMs?: number;
+  pollIntervalMs?: number;
+  abortSignal?: AbortSignal;
+}): Promise<ExecutionRecord> {
+  const store = new BackgroundExecutionStore(input.rootDir);
+  const startedAt = Date.now();
+  const timeoutMs = Math.max(0, Math.trunc(input.timeoutMs ?? 60_000));
+  const pollIntervalMs = Math.max(25, Math.trunc(input.pollIntervalMs ?? DEFAULT_BACKGROUND_WAIT_INTERVAL_MS));
+
+  for (;;) {
+    if (input.abortSignal?.aborted) {
+      throw new Error("Background wait aborted.");
+    }
+    reconcileBackgroundExecutions(input.rootDir);
+    const execution = store.load(input.id);
+    if (!execution) {
+      throw new Error(`Unknown background execution: ${input.id}`);
+    }
+    if (!isBackgroundExecutionActive(execution)) {
+      return execution;
+    }
+    if (Date.now() - startedAt >= timeoutMs) {
+      return execution;
+    }
+    await sleep(pollIntervalMs);
+  }
+}
+
 export function terminateBackgroundExecution(rootDir: string, id: string): ExecutionRecord {
   const store = new BackgroundExecutionStore(rootDir);
   const execution = store.load(id);
@@ -170,6 +203,13 @@ export function terminateBackgroundExecution(rootDir: string, id: string): Execu
     closeReason: "terminated",
     terminatedBy: "host",
   });
+}
+
+export function isBackgroundExecutionActive(execution: ExecutionRecord): boolean {
+  return execution.kind === "background" && (
+    execution.status === "created" ||
+    execution.status === "running"
+  );
 }
 
 export function registerBackgroundProcess(id: string, subprocess: BackgroundProcessHandle): void {
@@ -213,4 +253,8 @@ function toWakeReason(status: ExecutionRecord["status"]): WakeSignalReason {
     return status;
   }
   return "failed";
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

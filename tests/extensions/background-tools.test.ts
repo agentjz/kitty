@@ -1,16 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { waitForRegisteredBackgroundProcess } from "../../src/execution/background.js";
+import { BackgroundExecutionStore, waitForRegisteredBackgroundProcess } from "../../src/execution/background.js";
 import { createBackgroundTools } from "../../src/extensions/tools/background/index.js";
 import { createToolContext, parseToolJson, createTempWorkspace } from "../helpers.js";
 
-test("background extension exposes run, check, and terminate tools", async (t) => {
+test("background extension exposes run, check, wait, stop, and terminate tools", async (t) => {
   const root = await createTempWorkspace("background-tools", t);
   const tools = createBackgroundTools();
   const names = tools.map((tool) => tool.definition.function.name).sort();
 
-  assert.deepEqual(names, ["background_check", "background_run", "background_terminate"]);
+  assert.deepEqual(names, ["background_check", "background_run", "background_stop", "background_terminate", "background_wait"]);
 
   const context = createToolContext(root);
   const run = tools.find((tool) => tool.definition.function.name === "background_run");
@@ -58,3 +58,55 @@ test("background run preserves streamed output after process close", async (t) =
   assert.match(String(job?.outputPreview), /background-smoke/);
   assert.match(String(job?.summary), /background-smoke/);
 });
+
+test("background wait returns settled execution facts", async (t) => {
+  const root = await createTempWorkspace("background-tool-wait", t);
+  const tools = createBackgroundTools();
+  const context = createToolContext(root);
+  const run = tools.find((tool) => tool.definition.function.name === "background_run");
+  const wait = tools.find((tool) => tool.definition.function.name === "background_wait");
+  assert.ok(run);
+  assert.ok(wait);
+
+  const result = await run.execute(JSON.stringify({
+    command: "node -e \"console.log('wait-ok')\"",
+    cwd: root,
+    timeout_ms: 20_000,
+  }), context);
+  const payload = parseToolJson(result.output);
+  const waited = parseToolJson((await wait.execute(JSON.stringify({
+    id: payload.id,
+    timeout_ms: 20_000,
+  }), context)).output);
+
+  const waitedExecution = readExecutionPayload(waited);
+  assert.equal(waitedExecution.status, "completed");
+  assert.match(String(waitedExecution.outputPreview), /wait-ok/);
+});
+
+test("background stop closes a running execution", async (t) => {
+  const root = await createTempWorkspace("background-tool-stop", t);
+  const store = new BackgroundExecutionStore(root);
+  const job = store.create({
+    command: "long-running",
+    cwd: root,
+    requestedBy: "lead",
+  });
+  store.markRunning(job.id, { pid: process.pid });
+  const tools = createBackgroundTools();
+  const context = createToolContext(root);
+  const stop = tools.find((tool) => tool.definition.function.name === "background_stop");
+  assert.ok(stop);
+
+  const stopped = parseToolJson((await stop.execute(JSON.stringify({ id: job.id }), context)).output);
+
+  const stoppedExecution = readExecutionPayload(stopped);
+  assert.equal(stoppedExecution.status, "aborted");
+  assert.equal(store.load(job.id)?.status, "aborted");
+});
+
+function readExecutionPayload(payload: Record<string, unknown>): Record<string, unknown> {
+  assert.equal(typeof payload.execution, "object");
+  assert.notEqual(payload.execution, null);
+  return payload.execution as Record<string, unknown>;
+}

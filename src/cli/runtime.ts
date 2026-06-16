@@ -5,12 +5,15 @@ import { resolveProjectRoots } from "../context/repoRoots.js";
 import { installCrashRecorder } from "../observability/crashRecorder.js";
 import type { CliOverrides, RuntimeConfig } from "../types.js";
 
-export async function resolveCliRuntime(overrides: CliOverrides): Promise<{
+export interface CliRuntime {
   cwd: string;
+  stateRootDir: string;
   config: RuntimeConfig;
   paths: RuntimeConfig["paths"];
   overrides: CliOverrides;
-}> {
+}
+
+export async function resolveCliRuntime(overrides: CliOverrides): Promise<CliRuntime> {
   const cwd = overrides.cwd ? path.resolve(overrides.cwd) : process.cwd();
   const projectRoots = await resolveProjectRoots(cwd).catch(() => ({
     rootDir: cwd,
@@ -27,6 +30,7 @@ export async function resolveCliRuntime(overrides: CliOverrides): Promise<{
 
   return {
     cwd,
+    stateRootDir: projectRoots.stateRootDir,
     config,
     paths: config.paths,
     overrides,

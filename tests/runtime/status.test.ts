@@ -128,8 +128,9 @@ test("runtime status projects the current project runtime facts", async (t) => {
   assert.match(text, /Model cache: none/);
   assert.match(text, /Task lifecycle:/);
   assert.match(text, /Spec workspace:/);
-  assert.match(text, /next: Finish requirements\.md/);
-  assert.match(text, /documents: 0\/4 documents ready/);
+  assert.match(text, /Next: Finish requirements\.md/);
+  assert.match(text, /Documents: 0\/4 documents ready/);
+  assert.match(text, /Tools: planning/);
 });
 
 test("runtime status surfaces recent model request cache facts", async (t) => {

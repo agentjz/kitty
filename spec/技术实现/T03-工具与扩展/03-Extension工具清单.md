@@ -28,6 +28,8 @@
 
 - `background_run`：启动后台命令，写入 control-plane execution 账本，持续记录运行输出预览、摘要、last output 和 deadline，返回 execution id、pid、deadline 和状态。
 - `background_check`：读取后台 execution 摘要，并 reconcile 已丢失的 running pid；输出 total、active、recent、health、deadline、last output 和 output preview。
+- `background_wait`：等待指定后台 execution 完成或超时，返回最新 lifecycle、health 和 output preview。
+- `background_stop`：停止指定后台 execution，并返回最终 lifecycle 事实。
 - `background_terminate`：终止一个后台 execution，等待当前宿主进程内的后台 handle 释放，并把生命周期关闭为 aborted。
 
 ## subagent

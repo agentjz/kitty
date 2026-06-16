@@ -41,7 +41,7 @@
 | 🛠️ Core tools | `read`、`edit`、`write`、`bash` |
 | 🧩 Extensions | `todo`、`worktree`、`network`、`background`、`subagent`、`skills`、`spec` |
 | 🧾 Control plane | SQLite 账本记录 task lifecycle、execution、deadline、输出健康、wait policy、pid、状态和 wake 事实；host 负责等待和恢复 lead |
-| 📐 Spec 模式 | `requirements.md`、`design.md`、`tasks.md`、`notes.md`、workflow summary 和隔离 worktree |
+| 📐 Spec 模式 | `requirements.md`、`design.md`、`tasks.md`、`notes.md`、workflow brief、workflow summary、`kitty spec --status` 和隔离 worktree |
 | 💬 产品面 | CLI、交互终端、Telegram 私聊服务 |
 | 📎 证据记录 | session events、终端日志、崩溃记录、文件变更记录 |
 | 🧪 Evaluation | `kitty eval` 只暴露机器检查，`--run` 会跑本地检查闭环 |
@@ -88,6 +88,8 @@ kitty spec
 | `kitty` | 进入默认 agent 交互；有历史会话时先选择继续或新建，也可直接接收一次性 prompt |
 | `kitty agent` | 显式进入 agent 模式 |
 | `kitty spec` | 进入 requirements -> design -> tasks -> implement -> validate 工作流 |
+| `kitty spec --status` | 查看当前 spec 阶段、下一步、待确认项、文档进度、工具面和工作区 |
+| `kitty background` | 查看后台任务；`wait <id>` 等待任务；`stop <id>` 停止任务 |
 | `kitty resume [sessionId]` | 恢复最近会话或指定会话 |
 | `kitty sessions` | 查看最近会话 |
 | `kitty events [sessionId]` | 查看最近会话或指定会话的机器事件 |
@@ -120,7 +122,7 @@ Extension 是可启用、可禁用、独立存在的工具集合：
 | `todo` | 会话级 todo 写入和可见 checklist |
 | `worktree` | Git worktree 事实、创建、保留和删除 |
 | `network` | HTTP session、请求、探测、下载、trace、OpenAPI 检查 |
-| `background` | 后台命令执行、运行输出摘要、deadline、last output、检查、终止和生命周期记录 |
+| `background` | 后台命令执行、运行输出摘要、deadline、last output、检查、等待、停止和生命周期记录 |
 | `subagent` | 聚焦子执行启动、派工边界、deadline、状态检查、worker 结论回传、wait policy、lead 挂起与 wake 恢复 |
 | `skills` | 项目运行时 skill 包索引、正文加载、资源读取和脚本运行；使用事实进入 observability 和 task lifecycle |
 | `spec` | durable spec 文档、状态、任务、checkpoint、隔离 worktree，并把 spec stage 接入 task lifecycle |
