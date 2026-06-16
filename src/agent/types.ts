@@ -31,6 +31,7 @@ export interface AgentCallbacks {
 
 export interface RunTurnOptions {
   input: string;
+  inputSource?: "external" | "internal";
   cwd: string;
   config: RuntimeConfig;
   session: SessionRecord;

@@ -1,6 +1,6 @@
 import type { ProviderMessage } from "../provider/contract.js";
 import type { AssistantResponse } from "../agent/types.js";
-import type { SessionRecord } from "../types.js";
+import type { SessionRecord, StoredMessage } from "../types.js";
 import { readUserInput } from "./turnFrame.js";
 
 const MAX_TITLE_FACT_CHARS = 4_000;
@@ -8,7 +8,7 @@ const MAX_SESSION_TITLE_CHARS = 36;
 
 export function shouldGenerateSessionTitle(input: {
   session: SessionRecord;
-  userInput: string;
+  userInput: Pick<StoredMessage, "content" | "source">;
   assistantResponse: Pick<AssistantResponse, "content">;
 }): boolean {
   if (input.session.title?.trim()) {
@@ -27,7 +27,7 @@ export function shouldGenerateSessionTitle(input: {
 }
 
 export function buildSessionTitleMessages(input: {
-  userInput: string;
+  userInput: Pick<StoredMessage, "content" | "source">;
   assistantResponse: Pick<AssistantResponse, "content">;
 }): ProviderMessage[] {
   return [

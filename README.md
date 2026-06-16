@@ -122,7 +122,7 @@ Extension 是可启用、可禁用、独立存在的工具集合：
 
 Runtime skills 放在项目 `SKILL.md`、`.skills/**/SKILL.md` 或 `skills/**/SKILL.md`。默认上下文只显示 skill 名称、说明、路径、健康状态和资源索引；完整正文必须由模型明确调用 `skill_load` 后进入当前轮。Skill 包内的 `references/`、`scripts/`、`examples/` 和 `assets/` 会作为资源分组出现，需要时用 `skill_read_resource` 读取资源，或用 `skill_run_script` 运行已声明的 `scripts/` 资源。Skill frontmatter 可用 `requires` 声明命令依赖，运行时用 `skill_check` 检查包健康和依赖可用性。`.codex/skills/**` 是 Codex 维护本仓库用的开发规范，不属于小猫运行时 skill。
 
-当前仓库内置四个开发阶段 runtime skill：`research`、`plan`、`development`、`verification`。其中 `plan` 强制把 `plan.md` 写成单文件规格驱动执行合同：需求文档、当前事实、失败测试、目标、不做范围、设计、实施任务、验证计划和收口记录都在一个文件里闭环。
+当前仓库内置四个开发阶段 runtime skill：`research`、`plan`、`do`、`verification`。其中 `plan` 强制把 `plan.md` 写成单文件规格驱动执行合同：需求文档、当前事实、失败测试、目标、不做范围、设计、实施任务、验证计划和收口记录都在一个文件里闭环。
 
 Provider 请求优先携带同 session 的近场可见对话。短会话不靠账本拼上下文；长会话超预算时摘要旧对话，保留最近对话 tail。Session memory 由模型在 turn 收口时按固定 Markdown 区块写出：`Current Focus`、`User Constraints`、`Decisions`、`Open Threads`、`Verification Facts`、`Reusable Lessons`。机器只维护格式和保存边界，不替模型判断事实重要性。
 
@@ -217,3 +217,4 @@ npm.cmd run verify
 - `spec/技术实现/`
 
 项目文档、代码和测试共同描述同一个当前现实。项目入口、配置、文档和测试都跟随当前实现同步维护。
+

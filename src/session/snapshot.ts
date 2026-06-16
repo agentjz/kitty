@@ -215,6 +215,7 @@ function readMessage(value: unknown, index: number, sessionPath: string): Stored
   return {
     role,
     content: readMessageContent(record.content, sessionPath, `messages[${index}]`),
+    source: readMessageSource(record.source, sessionPath, `messages[${index}]`),
     name: readOptionalString(record.name, "name", sessionPath, `messages[${index}]`),
     tool_call_id: readOptionalString(record.tool_call_id, "tool_call_id", sessionPath, `messages[${index}]`),
     tool_calls: readToolCalls(record.tool_calls, sessionPath, index),
@@ -303,6 +304,22 @@ function readRequiredString(
   if (!value) {
     throw createSessionCorruptError(sessionPath, `${scope ? `${scope}.` : ""}${key} is required`);
   }
+  return value;
+}
+
+function readMessageSource(
+  value: unknown,
+  sessionPath: string,
+  scope: string,
+): StoredMessage["source"] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value !== "external" && value !== "internal") {
+    throw createSessionCorruptError(sessionPath, `${scope}.source must be external or internal`);
+  }
+
   return value;
 }
 

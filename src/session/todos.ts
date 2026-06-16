@@ -119,7 +119,7 @@ export function normalizeSessionTodos(session: SessionRecord): SessionRecord {
 function findLatestUserInputBoundaryIndex(messages: StoredMessage[]): number {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
-    if (message?.role === "user" && readUserInput(message.content)) {
+    if (message?.role === "user" && readUserInput(message)) {
       return index;
     }
   }

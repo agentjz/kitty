@@ -30,7 +30,7 @@ export function collectVisibleConversationMessages(messages: StoredMessage[]): S
 
   for (const message of messages) {
     if (message.role === "user") {
-      includeCurrentTurn = Boolean(readUserInput(message.content));
+      includeCurrentTurn = Boolean(readUserInput(message));
       if (includeCurrentTurn) {
         output.push(message);
       }
@@ -45,7 +45,7 @@ export function collectVisibleConversationMessages(messages: StoredMessage[]): S
       continue;
     }
 
-    if (message.role === "assistant" && isInternalMessage(message.content)) {
+    if (message.role === "assistant" && isInternalMessage(message)) {
       continue;
     }
 

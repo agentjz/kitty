@@ -31,11 +31,13 @@ export function createMessage(
     reasoningContent?: string;
     toolCalls?: ToolCallRecord[];
     name?: string;
+    source?: StoredMessage["source"];
   } = {},
 ): StoredMessage {
   return {
     role,
     content,
+    source: options.source,
     name: options.name,
     tool_calls: options.toolCalls,
     reasoningContent: options.reasoningContent,

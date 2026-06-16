@@ -82,6 +82,10 @@ async function runCacheEconomyCheck(id: EvaluationCheckId): Promise<EvaluationCh
   const { normalizeProviderUsage } = await import("../provider/usageNormalizer.js");
   const { resolveProviderCachePolicy } = await import("../provider/cachePolicy.js");
   const { buildCompressedContextRequest } = await import("../context/runtime/compression/builder.js");
+  const { buildContextRuntimePromptLayers } = await import("../context/runtime/prompt.js");
+  const { getInitialRuntimeConfig } = await import("../config/initialConfig.js");
+  const { getAppPaths } = await import("../config/paths.js");
+  const { resolveTelegramRuntimeConfig } = await import("../config/hosts.js");
 
   const deepSeek = normalizeProviderUsage({
     prompt_tokens: 1000,
@@ -100,35 +104,95 @@ async function runCacheEconomyCheck(id: EvaluationCheckId): Promise<EvaluationCh
     model: "gpt-5.5",
     sessionId: "eval-session",
   });
-  const first = buildCompressedContextRequest(
-    "stable system",
-    [{ role: "user", content: "first", createdAt: "2026-06-16T00:00:00.000Z" }],
-    {
-      contextWindowMessages: 120,
-      model: "gpt-5.5",
-      maxContextChars: 900_000,
-      contextSummaryChars: 120_000,
+  const config = {
+    ...getInitialRuntimeConfig(),
+    apiKey: "eval-key",
+    model: "gpt-5.5",
+    telegram: resolveTelegramRuntimeConfig(getInitialRuntimeConfig().telegram, process.cwd()),
+    paths: getAppPaths(process.cwd()),
+  };
+  const projectContext = {
+    rootDir: process.cwd(),
+    stateRootDir: process.cwd(),
+    cwd: process.cwd(),
+    instructions: [],
+    instructionText: "",
+    instructionTruncated: false,
+    ignoreRules: [],
+    skills: [],
+  };
+  const firstPrompt = buildContextRuntimePromptLayers({
+    cwd: process.cwd(),
+    config,
+    projectContext: {
+      ...projectContext,
+      projectMap: {
+        rootDir: process.cwd(),
+        cwd: process.cwd(),
+        topLevelDirectories: ["src"],
+        entryFiles: ["src/cli.ts"],
+        testDirectories: ["tests"],
+        packageScripts: ["test"],
+        specDocuments: ["spec/README.md"],
+        git: {
+          available: true,
+          hasChanges: false,
+          recentChanges: [],
+        },
+        summary: "Evaluation project map fixture.",
+        updatedAt: "2026-06-16T00:00:00.000Z",
+      },
     },
+  });
+  const secondPrompt = buildContextRuntimePromptLayers({
+    cwd: process.cwd(),
+    config,
+    projectContext: {
+      ...projectContext,
+      projectMap: {
+        rootDir: process.cwd(),
+        cwd: process.cwd(),
+        topLevelDirectories: ["src"],
+        entryFiles: ["src/cli.ts"],
+        testDirectories: ["tests"],
+        packageScripts: ["test"],
+        specDocuments: ["spec/README.md"],
+        git: {
+          available: true,
+          hasChanges: true,
+          recentChanges: ["M src/context/runtime/compression/builder.ts"],
+        },
+        summary: "Evaluation project map fixture.",
+        updatedAt: "2026-06-16T00:01:00.000Z",
+      },
+    },
+  });
+  const requestConfig = {
+    contextWindowMessages: 120,
+    model: "gpt-5.5",
+    maxContextChars: 900_000,
+    contextSummaryChars: 120_000,
+  };
+  const first = buildCompressedContextRequest(
+    firstPrompt,
+    [{ role: "user", content: "first", createdAt: "2026-06-16T00:00:00.000Z" }],
+    requestConfig,
   );
   const second = buildCompressedContextRequest(
-    "stable system",
+    secondPrompt,
     [
       { role: "user", content: "first", createdAt: "2026-06-16T00:00:00.000Z" },
       { role: "user", content: "second", createdAt: "2026-06-16T00:01:00.000Z" },
     ],
-    {
-      contextWindowMessages: 120,
-      model: "gpt-5.5",
-      maxContextChars: 900_000,
-      contextSummaryChars: 120_000,
-    },
+    requestConfig,
   );
 
   if (
     deepSeek?.cacheHitRate !== 0.8 ||
     openai?.cacheReadTokens !== 960 ||
     !policy.promptCacheKey ||
-    first.cacheLayout?.stablePrefixFingerprint !== second.cacheLayout?.stablePrefixFingerprint
+    first.cacheLayout?.stablePrefixFingerprint !== second.cacheLayout?.stablePrefixFingerprint ||
+    first.cacheLayout?.volatileTailFingerprint === second.cacheLayout?.volatileTailFingerprint
   ) {
     return {
       id,

@@ -80,8 +80,9 @@ export function applyCurrentTurnFrame(
   session: SessionRecord,
   input: string,
   timestamp = new Date().toISOString(),
+  source: StoredMessage["source"] = "external",
 ): SessionRecord {
-  const userInput = readUserInput(input);
+  const userInput = readUserInput({ content: input, source });
   if (!userInput) {
     return {
       ...session,
@@ -111,7 +112,7 @@ function findCurrentTurn(messages: StoredMessage[]): {
       continue;
     }
 
-    const normalized = readUserInput(message.content);
+    const normalized = readUserInput(message);
     if (normalized) {
       return {
         startIndex: index,

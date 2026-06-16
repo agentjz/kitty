@@ -4,7 +4,6 @@ import test from "node:test";
 import { runAgentTurn } from "../../src/agent/turn/run.js";
 import { runHostTurn } from "../../src/host/turn.js";
 import { InProcessSessionStore } from "../../src/session/store.js";
-import { readUserInput } from "../../src/session/turnFrame.js";
 import { createToolRegistry } from "../../src/tools/core/registry.js";
 import { ExecutionStore } from "../../src/execution/store.js";
 import { ControlPlaneLedger } from "../../src/control/ledger.js";
@@ -179,7 +178,7 @@ test("host waits for yielded execution and resumes lead with wake facts", async 
         };
       }
 
-      assert.equal(readUserInput(options.input), undefined);
+      assert.equal(options.inputSource, "internal");
       assert.equal(options.toolRegistry?.definitions.length, 0);
       assert.match(options.runtimePromptState?.internalFactBlocks?.join("\n") ?? "", /delegated executions settled/);
       assert.match(options.runtimePromptState?.internalFactBlocks?.join("\n") ?? "", new RegExp(execution.id));

@@ -29,6 +29,14 @@ test("project skills are discovered from runtime skill roots but not .codex skil
   assert.equal(context.skills[0]?.health.resourceGroups.references, 1);
 });
 
+test("repository runtime skills expose the current four-stage workflow", async () => {
+  const context = await loadProjectContext(process.cwd(), { projectDocMaxBytes: 24_576 });
+  const runtimeSkillNames = context.skills.map((skill) => skill.name);
+
+  assert.deepEqual(runtimeSkillNames, ["do", "plan", "research", "verification"]);
+  assert.equal(runtimeSkillNames.includes("development"), false);
+});
+
 test("runtime prompt shows the skill index without loading full skill bodies", async (t) => {
   const root = await createTempWorkspace("skill-prompt-index", t);
   await writeSkill(root, "skills/skepticism/SKILL.md", "skepticism", "Skeptical review method.", "SECRET_FULL_SKILL_BODY");

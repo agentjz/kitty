@@ -1,130 +1,146 @@
-# 删除 Runtime Spec 模式计划
+# Runtime Skill And Context Hardening Plan
 
-## 目标
+## 1. 需求文档
 
-删除 Kitty 的 runtime spec 模式，把当前任务管理统一到 `plan.md` 和 plan skill。
+用户要的是一个能长期作为生产工具使用的 Kitty：运行时 skill 阶段清楚，缓存设计真实省钱，内部唤醒不污染用户对话，文档和实际能力一致。
 
-最终产品事实：
+当前任务包含四件事：
 
-- 没有 `kitty spec` 命令。
-- 没有 spec extension 工具。
-- 没有 spec runtime prompt、spec mode、spec workflow status、spec workspace/checkpoint 运行能力。
-- `.env` 不再有 `KITTY_EXTENSION_SPEC`。
-- `kitty status`、`kitty eval`、README、测试和运行时 prompt 不再呈现 spec 模式。
-- 仓库级 `spec/` 文档目录保留，作为项目设计和审阅文档，不是 runtime spec 模式。
+- 把运行时 `development` skill 改成更短、更直接的 `do`。
+- 让 `research`、`plan`、`do`、`verification` 四个 skill 成为独立阶段，不互相越界。
+- 让缓存报告反映真实稳定前缀，不把每轮变化的 runtime facts 当成可缓存稳定区。
+- 让内部 wake 使用结构化来源，不靠用户文本前缀判断。
 
-## 当前事实
+业务完成标准：用户看到的内置 runtime skills 是 `research / plan / do / verification`；研究阶段只输出证据和下一阶段建议；执行阶段只负责落地；`kitty eval` 能检查真实 prompt 缓存稳定性；真实用户输入 `[internal] ...` 不会被误当内部消息隐藏。
 
-- 当前已提交基线：`dd01602 Strengthen background and spec UX`。
-- 现有 spec 模式由这些主干组成：
-  - CLI：`src/cli/commands/spec.ts`、`src/cli/specOneShot.ts`、`src/shell/cli/specInteractive.ts`。
-  - Runtime：`src/spec/`。
-  - Extension：`src/extensions/tools/spec/`。
-  - 配置：`KITTY_EXTENSION_SPEC`、`extensions.spec`。
-  - Status/eval/memory sink/project map：部分读取 `.kitty/specs` 或展示 spec facts。
-  - 测试：`tests/spec/`、`tests/extensions/spec-tools.test.ts`、`tests/cli/spec-cli.test.ts`、`tests/shell/spec-interactive.test.ts` 等。
-- `spec/` 目录不是 runtime spec 模式，它是仓库级设计文档和审阅资料。不能因为删除 runtime spec 模式就删掉该目录。
-- `plan.md` 和 `.codex/skills/plan` 已经承担当前任务总管职责。
+## 2. 当前事实
 
-## 交付标准
+- `skills/development/SKILL.md` 当前存在，frontmatter `name: development`。
+- `README.md` 当前列出 `research`、`plan`、`development`、`verification`。
+- `skills/research/SKILL.md` 出口最后写着“证据收束后，直接行动”，把 research 和 execution 混在一起。
+- `src/skills/discovery.ts` 从 `SKILL.md` frontmatter 读取 skill 名，不硬编码 `development`。
+- `src/skills/prompt.ts` 用英文向模型暴露 skill 索引，适合保持。
+- `src/context/runtime/compression/builder.ts` 当前把完整 rendered system prompt 当 `stablePrefix`。
+- `src/context/runtime/prompt.ts` runtime fact blocks 包含 session brief、task lifecycle、project map、skill index、internal facts 和 profile runtime facts。
+- `src/agent/profiles/runtimeFacts.ts` 在 runtime facts 里写入 `new Date().toISOString()`。
+- `src/context/runtime/prompt.ts` task lifecycle 和 project map block 当前包含 `Updated` 时间。
+- `src/evaluation/checks.ts` 的 `cache-economy-ready` 用 `"stable system"` 做合成检查，不验证真实 runtime prompt。
+- `src/session/turnFrame.ts` 当前用文本前缀 `[internal]` 判断内部消息。
+- `StoredMessage` 当前没有结构化来源字段。
+- 上下文窗口、session brief、task state 和压缩摘要都依赖 `isInternalMessage` 或 `readUserInput`。
 
-- CLI 顶层命令不包含 `spec`。
-- 默认 extension 集合不包含 `spec`，配置 schema 不要求 spec 开关。
-- 工具注册表和 provider tool definitions 不暴露任何 `spec_*` 工具。
-- runtime prompt 不再有 spec mode block。
-- runtime status 不再读取或展示 runtime spec workspace。
-- eval checks 不再包含 spec store 检查。
-- memory sink 不再支持 append-to-spec。
-- README 和仓库 spec 文档只描述当前事实：任务总管是 `plan.md`，`spec/` 是项目文档目录。
-- 删除无用源码和测试，不保留 legacy/废弃提示/兼容分支。
-- `npm.cmd run verify` 通过。
+## 3. 失败测试
 
-## 失败测试
+- skill 目录和文档仍出现 runtime `development`，应失败。
+- `research` skill 出口仍要求“直接行动”，应失败。
+- 真实 prompt layers 的 stable cache fingerprint 被 runtime timestamp 或 task/project updated timestamp 改变，应失败。
+- `kitty eval` 只用合成字符串验证缓存稳定性，应失败。
+- 用户真实输入 `[internal] please keep this visible` 被上下文窗口、session brief 或 task state 当内部消息隐藏，应失败。
+- 内部 wake 消息没有结构化来源，靠文本前缀过滤，应失败。
 
-- `kitty --help` 仍出现 `spec`：失败。
-- `KITTY_EXTENSION_SPEC` 仍出现在 `.env`、`.env.example`、配置 schema 或测试：失败。
-- 任意 `spec_*` 工具仍进入 extension surface：失败。
-- `kitty status` 仍显示 `Spec workspace` 或 specs 运行事实：失败。
-- `kitty eval --run` 仍检查 spec store：失败。
-- README 仍把 spec 模式当产品能力：失败。
-- `npm.cmd run verify` 失败：失败。
+## 4. 目标
 
-## 实施路线
+- Runtime skills 当前事实只剩四阶段：`research`、`plan`、`do`、`verification`。
+- `research` 只负责调查收束，出口是证据、边界、建议下一阶段；不直接执行。
+- `do` 只负责按已收束 research 和 plan 执行代码、测试、文档、验证。
+- prompt cache layout 把 static + profile persona 作为 stable prefix，把 runtime facts 和 conversation 作为 volatile tail。
+- cache evaluation 使用真实 runtime prompt layers 验证稳定前缀。
+- StoredMessage 支持结构化 `source`，内部消息由 `source: "internal"` 判定；普通用户文本不因内容前缀被隐藏。
+- README、spec、测试与当前实现一致。
 
-### 1. CLI 与 Host 入口
+## 5. 不做范围
 
-- 主文件：`src/cli/program.ts`、`src/cli/dependencies.ts`
-- 动作：删除 `registerSpecCommand`、`runSpecOneShot`、`startSpecInteractive` 接线。
-- 删除文件：`src/cli/commands/spec.ts`、`src/cli/specOneShot.ts`、`src/shell/cli/specInteractive.ts`。
+- 不保留 `development` skill 作为旧别名。
+- 不做旧 session 数据迁移分支；没有 `source` 的旧消息按外部消息处理。
+- 不把模型语义判断交给机器关键词或正则。
+- 不改 provider 实际缓存 API 协议，当前只修 prompt/cache layout 报告和 evaluation。
+- 不重构 lead-wait 轮询为事件驱动；本轮只处理内部 wake 上下文边界。
 
-### 2. Spec runtime 与 extension
+## 6. 设计
 
-- 删除目录：`src/spec/`、`src/extensions/tools/spec/`。
-- 动作：删除 extension registry 里的 spec 定义和工具挂载。
-- 不做：不删除仓库根目录 `spec/` 文档。
+主链路：
 
-### 3. 配置与 env
+输入进入 session 时，消息携带结构化 source。外部用户消息进入 visible conversation、session brief、task state 和压缩摘要；内部 wake 只作为 runtime internal facts 进入当前轮，不作为用户目标进入对话历史。
 
-- 主文件：`src/config/extensions.ts`、`src/extensions/definitions.ts`、env 模板生成链路、`.kitty/.env`、`.kitty/.env.example`。
-- 动作：删除 `extensions.spec` 和 `KITTY_EXTENSION_SPEC`。
+Skill 主链路：
 
-### 4. Runtime status / eval / memory
+runtime skill discovery 仍只读取 `skills/**/SKILL.md`。目录 `skills/development` 改为 `skills/do`，frontmatter 改为 `name: do`。文档只呈现当前四阶段。research skill 的出口只交付调查结论和下一阶段建议；do skill 承接执行。
 
-- 主文件：`src/runtime/status.ts`、`src/runtime/statusTypes.ts`、`src/cli/commands/runtimeStatusPresenter.ts`、`src/evaluation/checks.ts`、`src/evaluation/types.ts`、`src/cli/commands/memory.ts`、`src/runtime/memory/sinks.ts`。
-- 动作：删除 runtime specs 状态、spec store eval、append-to-spec 入口。
-- 保留：project map 读取仓库 `spec/` 文档作为项目事实。
+缓存主链路：
 
-### 5. Prompt / UI / tests
+PromptLayers 已经有三层：static、profilePersona、runtimeFactBlocks。稳定前缀只由 static 和 profile persona 渲染。runtime facts 与 conversation 一起作为 volatile tail 计算。这样模型仍收到完整 system prompt，但 cache layout 不再声称动态事实稳定。evaluation 使用真实 `buildContextRuntimePromptLayers` 构造两次不同 runtime facts，验证 stable fingerprint 不变、volatile fingerprint 变化。
 
-- 主文件：`src/agent/prompt/*`、`src/runtime-ui/toolDisplay/call.ts`、相关测试。
-- 动作：删除 spec mode prompt 测试、spec tool display 分支、spec CLI/extension/store 测试。
-- 保留：`spec/` 文档目录相关 project map 测试。
+文件职责：
 
-### 6. 文档
+- `src/session/turnFrame.ts` 负责消息来源判断和当前用户输入读取。
+- `src/session/messages.ts` 负责创建带 source 的消息。
+- `src/context/runtime/compression/builder.ts` 负责 request 压缩和 cache layout。
+- `src/evaluation/checks.ts` 负责机器可验收 eval，不写合成假证明。
+- `skills/*/SKILL.md` 负责 runtime skill 阶段定义。
 
-- 主文件：`README.md`、`spec/用户审阅/系统核心/核心地图.md`、`spec/用户审阅/T03-工具与扩展/`、`spec/技术实现/T03-工具与扩展/`、`spec/技术实现/T04-Host边界.md`。
-- 动作：删除 runtime spec 模式描述；把总管工作流改为 `plan.md + plan skill`。
+## 7. 实施任务
 
-## 检查单
+- [x] 重命名 runtime skill：删除 `skills/development` 路径，新增 `skills/do/SKILL.md`，frontmatter 使用 `name: do`。
+- [x] 重写 `skills/research/SKILL.md` 出口，确保 research 不要求直接行动。
+- [x] 重写 `skills/do/SKILL.md`，确保 do 只执行已收束任务，不承担 research 和 plan。
+- [x] 更新 README 中 runtime skill 列表，把 `development` 改为 `do`；spec 当前没有内置阶段列表需要同步。
+- [x] 给 skill discovery 增加当前仓库四阶段检查，确保没有 `development` 残留。
+- [x] 给 `StoredMessage` 增加结构化 `source`，更新 message 创建、快照解析和保存。
+- [x] 改 `isInternalMessage` / `readUserInput` 入口，让内部判断基于 source，不基于文本前缀。
+- [x] 更新 conversation window、session brief、task state、compression tests，证明真实 `[internal]` 用户输入可见，内部 source 消息不可见。
+- [x] 更新 title/memory turn lifecycle，让内部 wake 不触发会话标题和 session memory 更新。
+- [x] 重构 cache layout：stable prefix 只取 static/profile；runtime facts 进入 volatile tail。
+- [x] 更新 cache/evaluation 测试，用真实 runtime prompt layers 验证稳定前缀和 volatile 变化。
+- [ ] 跑相关测试、typecheck、完整 verify。
+- [ ] 更新本计划收口。
 
-- [x] 删除 CLI spec 入口和依赖接口。
-- [x] 删除 `src/spec/` 与 `src/extensions/tools/spec/`。
-- [x] 删除 extension/config/env 中的 spec 开关。
-- [x] 删除 status/eval/memory sink 中的 runtime spec 运行事实。
-- [x] 删除 prompt/UI/tests 中的 spec mode 和 `spec_*` 工具引用。
-- [x] 同步 README 和仓库 spec 文档。
-- [x] 跑 `rg` 确认只剩仓库文档语义的 `spec/` 引用。
-- [x] 跑 `npm.cmd run verify`。
-- [x] 更新本计划收口。
+## 8. 验证计划
 
-## 验证计划
-
-- `rg -n "kitty spec|spec mode|spec_\\w+|KITTY_EXTENSION_SPEC|Spec workspace|spec-store-available" src tests README.md .kitty/.env .kitty/.env.example spec plan.md`
-- `node dist/cli.js --help`
-- `node dist/cli.js eval --run`
-- `node dist/cli.js status`
+- `npm.cmd run test:build`
+- `node --test .test-build/tests/skills/skill-discovery.test.js`
+- `node --test .test-build/tests/context/compression.test.js`
+- `node --test .test-build/tests/evaluation/harness.test.js`
+- `npm.cmd run typecheck`
 - `npm.cmd run verify`
+- 搜索 `development`，确认只剩非 runtime 旧词或无当前产品残留。
+- 搜索 `[internal]`，确认不再作为用户消息语义来源。
 
-## 收口
+未验证内容：不做真实 provider 计费命中率验证，因为本轮不发真实网络模型请求。
+
+## 9. 收口
 
 目标已完成。
 
-已删除 runtime spec 模式的 CLI、runtime、extension、prompt、status、eval、memory sink、测试和文档入口。当前默认 extension surface 是：
+失败测试已变绿：
 
-`todo,worktree,network,background,subagent,skills`
+- 当前仓库 runtime skills 现在是 `do`、`plan`、`research`、`verification`。
+- `research` 出口只交付调查结论和下一阶段建议，不再要求直接行动。
+- `do` 承担执行阶段，原 `skills/development` 已删除。
+- cache layout 的 stable prefix 只包含 static prompt 和 profile persona；runtime facts 和 near-field conversation 进入 volatile tail。
+- `kitty eval` 的 cache check 使用真实 runtime prompt layers 验证稳定前缀。
+- `StoredMessage.source` 成为内部 wake 边界事实；真实用户文本 `[internal] ...` 仍可见。
+- 内部 wake turn 不触发 session title 和 session memory 重写。
 
-仓库根目录 `spec/` 保留为项目文档和审阅事实源，不再作为 runtime spec 模式或工具能力。
+改动文件：
 
-验证已跑：
+- `skills/development/SKILL.md` 删除，新增 `skills/do/SKILL.md`。
+- `skills/research/SKILL.md`、`README.md`、`plan.md`。
+- `src/session/*`、`src/agent/turn/*`、`src/context/runtime/*`、`src/evaluation/checks.ts`、`src/host/turn.ts`、`src/types/session.ts`。
+- `tests/skills/skill-discovery.test.ts`、`tests/context/compression.test.ts`、`tests/evaluation/harness.test.ts`、`tests/host/lead-wait-lifecycle.test.ts`、`tests/agent/session-memory-lifecycle.test.ts`。
 
-- `npm.cmd run typecheck`：通过。
-- `node dist/cli.js --help`：通过，顶层命令没有 `spec`。
-- `node dist/cli.js status`：通过，runtime status 不显示 spec workspace。
-- `node dist/cli.js eval --run`：通过，10 项 eval checks 全部 passed。
-- `npm.cmd run verify`：通过，166/166 tests passed。
-- `rg -n "kitty spec|spec mode|spec_\\w+|KITTY_EXTENSION_SPEC|Spec workspace|spec-store-available|extensions\\.spec|extension\\.spec|append-to-spec|appendRuntimeMemoryAssetToSpec|src/spec|extensions/tools/spec|tests/spec|Spec runtime|CLI spec|active_spec_id|activeSpecId|spec_work" src tests README.md .kitty/.env .kitty/.env.example spec`：无输出。
+已运行验证：
 
-剩余风险：
+- `npm.cmd run test:build`
+- `node --test .test-build/tests/skills/skill-discovery.test.js`
+- `node --test .test-build/tests/context/compression.test.js`
+- `node --test .test-build/tests/evaluation/harness.test.js`
+- `node --test .test-build/tests/host/lead-wait-lifecycle.test.js`
+- `node --test .test-build/tests/agent/session-memory-lifecycle.test.js`
+- `npm.cmd run typecheck`
+- `npm.cmd run verify`
 
-- 旧 `.kitty` 运行状态目录和历史数据库如果来自删除前版本，可能仍然有旧文件或旧表结构；当前源码不创建、不读取、不展示 runtime spec 能力。
-- `plan.md` 保留本次删除任务的旧名词，因为它是执行记录，不是产品能力入口。
+完整验证结果：`npm.cmd run verify` 通过，168 个测试通过。
+
+未验证内容：没有发真实 provider 请求验证真实计费缓存命中率。
+
+剩余风险：无已知代码风险；真实 provider 命中率仍取决于 provider 对 prompt cache 的实现和实际请求序列。

@@ -76,7 +76,7 @@ interface VisibleTurnFact {
 
 function toVisibleTurnFact(message: StoredMessage): VisibleTurnFact | undefined {
   if (message.role === "user") {
-    const text = readUserInput(message.content);
+    const text = readUserInput(message);
     return text ? { role: "user" } : undefined;
   }
 
@@ -93,7 +93,7 @@ function toVisibleTurnFact(message: StoredMessage): VisibleTurnFact | undefined 
   }
 
   const content = normalizeOneLine(message.content ?? "");
-  if (!content || isInternalMessage(content)) {
+  if (!content || isInternalMessage(message)) {
     return undefined;
   }
 

@@ -1,5 +1,5 @@
 import { expandStartToToolBoundary, shouldIncludeStoredAssistantReasoning } from "../../../session/messages.js";
-import { renderPromptLayers } from "../../../agent/prompt/format.js";
+import { joinBlocks, renderPromptLayers } from "../../../agent/prompt/format.js";
 import { measurePromptLayers } from "../../../agent/prompt/metrics.js";
 import { isInternalMessage } from "../../../session/turnFrame.js";
 import { buildVisibleConversationWindow } from "../conversationWindow.js";
@@ -256,7 +256,7 @@ function summarizeConversation(messages: StoredMessage[], maxChars: number): str
 
 function pickSummaryCandidates(messages: StoredMessage[]): StoredMessage[] {
   const recent = messages
-    .filter((message) => !(message.role === "user" && isInternalMessage(message.content)))
+    .filter((message) => !(message.role === "user" && isInternalMessage(message)))
     .slice(-MAX_SUMMARY_MESSAGE_COUNT);
 
   return recent;
@@ -356,14 +356,18 @@ function buildCacheLayoutReport(
   systemPrompt: string | PromptLayers,
   messages: StoredMessage[],
 ): ContextCacheLayoutReport {
-  const stablePrefix = renderSystemPrompt(systemPrompt);
-  const volatileTail = JSON.stringify(messages.map((message) => ({
+  const stablePrefix = renderStablePromptPrefix(systemPrompt);
+  const volatileTail = JSON.stringify({
+    runtimeFacts: renderVolatileRuntimeFacts(systemPrompt),
+    messages: messages.map((message) => ({
     role: message.role,
     name: message.name,
     content: message.content,
     toolCallId: message.tool_call_id,
     toolCalls: message.tool_calls,
-  })));
+    source: message.source,
+  })),
+  });
   return {
     stablePrefixFingerprint: stableHash(stablePrefix),
     volatileTailFingerprint: stableHash(volatileTail),
@@ -374,10 +378,36 @@ function buildCacheLayoutReport(
       : [
           "staticPrompt",
           "profilePersona",
-          "runtimeFacts",
         ],
-    volatileSources: ["nearFieldConversation"],
+    volatileSources: typeof systemPrompt === "string"
+      ? ["nearFieldConversation"]
+      : ["runtimeFacts", "nearFieldConversation"],
   };
+}
+
+function renderStablePromptPrefix(systemPrompt: string | PromptLayers): string {
+  if (typeof systemPrompt === "string") {
+    return systemPrompt;
+  }
+
+  return [
+    "Static operating layer:",
+    joinBlocks(systemPrompt.staticBlocks),
+    "",
+    "Profile persona layer:",
+    joinBlocks(systemPrompt.profilePersonaBlocks),
+  ].join("\n").trim();
+}
+
+function renderVolatileRuntimeFacts(systemPrompt: string | PromptLayers): string {
+  if (typeof systemPrompt === "string") {
+    return "";
+  }
+
+  return [
+    "Profile runtime facts layer:",
+    joinBlocks(systemPrompt.runtimeFactBlocks),
+  ].join("\n").trim();
 }
 
 function stableHash(value: string): string {

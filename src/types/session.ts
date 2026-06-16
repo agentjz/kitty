@@ -14,6 +14,7 @@ export interface ToolCallRecord {
 export interface StoredMessage {
   role: "system" | "user" | "assistant" | "tool";
   content: string | null;
+  source?: "external" | "internal";
   name?: string;
   tool_call_id?: string;
   tool_calls?: ToolCallRecord[];

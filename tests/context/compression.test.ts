@@ -190,7 +190,7 @@ test("runtime prompt carries same-session memory while raw request keeps near-fi
   assert.match(rawMessages, /你还记得刚刚让我做什么吗/);
 });
 
-test("internal wake turn is excluded from visible near-field conversation", () => {
+test("internal source wake turn is excluded while literal internal-looking user text stays visible", () => {
   const messages: StoredMessage[] = [
     {
       role: "user",
@@ -205,6 +205,7 @@ test("internal wake turn is excluded from visible near-field conversation", () =
     {
       role: "user",
       content: "[internal] wake: subagent completed",
+      source: "internal",
       createdAt: "2026-05-21T19:57:00.000Z",
     },
     {
@@ -214,7 +215,7 @@ test("internal wake turn is excluded from visible near-field conversation", () =
     },
     {
       role: "user",
-      content: "继续。",
+      content: "[internal] 这是用户真实输入，必须可见。",
       createdAt: "2026-05-21T19:58:00.000Z",
     },
   ];
@@ -232,8 +233,8 @@ test("internal wake turn is excluded from visible near-field conversation", () =
   const rawMessages = request.messages.slice(1).map((message) => String(message.content ?? "")).join("\n");
 
   assert.match(rawMessages, /先聊 DeepSeek/);
-  assert.match(rawMessages, /继续/);
-  assert.doesNotMatch(rawMessages, /wake/);
+  assert.match(rawMessages, /这是用户真实输入，必须可见/);
+  assert.doesNotMatch(rawMessages, /subagent completed/);
   assert.doesNotMatch(rawMessages, /内部唤醒处理完成/);
 });
 
@@ -278,4 +279,106 @@ test("context cache layout keeps stable prefix fingerprint separate from volatil
 
   assert.equal(first.cacheLayout?.stablePrefixFingerprint, second.cacheLayout?.stablePrefixFingerprint);
   assert.notEqual(first.cacheLayout?.volatileTailFingerprint, second.cacheLayout?.volatileTailFingerprint);
+});
+
+test("runtime prompt cache stable prefix ignores volatile runtime facts", () => {
+  const root = process.cwd();
+  const config = createTestRuntimeConfig(root);
+  const baseProjectContext = {
+    rootDir: root,
+    stateRootDir: root,
+    cwd: root,
+    instructions: [],
+    instructionText: "",
+    instructionTruncated: false,
+    ignoreRules: [],
+    skills: [],
+  };
+  const firstPrompt = buildContextRuntimePromptLayers({
+    cwd: root,
+    config,
+    projectContext: {
+      ...baseProjectContext,
+      projectMap: {
+        rootDir: root,
+        cwd: root,
+        topLevelDirectories: ["src"],
+        entryFiles: ["src/cli.ts"],
+        testDirectories: ["tests"],
+        packageScripts: ["test"],
+        specDocuments: ["spec/README.md"],
+        git: {
+          available: true,
+          hasChanges: false,
+          recentChanges: [],
+        },
+        summary: "Runtime prompt cache fixture.",
+        updatedAt: "2026-06-16T00:00:00.000Z",
+      },
+    },
+    taskLifecycle: {
+      id: "task-1",
+      sessionId: "session-1",
+      stage: "normal_work",
+      reason: "first",
+      activeExecutionIds: [],
+      activeTodoIds: [],
+      verificationFacts: [],
+      completionFacts: [],
+      createdAt: "2026-06-16T00:00:00.000Z",
+      updatedAt: "2026-06-16T00:00:00.000Z",
+    },
+  });
+  const secondPrompt = buildContextRuntimePromptLayers({
+    cwd: root,
+    config,
+    projectContext: {
+      ...baseProjectContext,
+      projectMap: {
+        rootDir: root,
+        cwd: root,
+        topLevelDirectories: ["src"],
+        entryFiles: ["src/cli.ts"],
+        testDirectories: ["tests"],
+        packageScripts: ["test"],
+        specDocuments: ["spec/README.md"],
+        git: {
+          available: true,
+          hasChanges: true,
+          recentChanges: ["M src/context/runtime/compression/builder.ts"],
+        },
+        summary: "Runtime prompt cache fixture.",
+        updatedAt: "2026-06-16T00:01:00.000Z",
+      },
+    },
+    taskLifecycle: {
+      id: "task-1",
+      sessionId: "session-1",
+      stage: "normal_work",
+      reason: "second",
+      activeExecutionIds: ["exec-1"],
+      activeTodoIds: [],
+      verificationFacts: ["one check passed"],
+      completionFacts: [],
+      createdAt: "2026-06-16T00:00:00.000Z",
+      updatedAt: "2026-06-16T00:01:00.000Z",
+    },
+  });
+  const first = buildCompressedContextRequest(firstPrompt, [], {
+    contextWindowMessages: 120,
+    model: "deepseek-v4-flash",
+    maxContextChars: 900_000,
+    contextSummaryChars: 120_000,
+  });
+  const second = buildCompressedContextRequest(secondPrompt, [], {
+    contextWindowMessages: 120,
+    model: "deepseek-v4-flash",
+    maxContextChars: 900_000,
+    contextSummaryChars: 120_000,
+  });
+
+  assert.equal(first.cacheLayout?.stablePrefixFingerprint, second.cacheLayout?.stablePrefixFingerprint);
+  assert.notEqual(first.cacheLayout?.volatileTailFingerprint, second.cacheLayout?.volatileTailFingerprint);
+  assert.deepEqual(first.cacheLayout?.stableSources, ["staticPrompt", "profilePersona"]);
+  assert.deepEqual(first.cacheLayout?.volatileSources, ["runtimeFacts", "nearFieldConversation"]);
 });

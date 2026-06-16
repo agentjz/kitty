@@ -37,7 +37,12 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
   if (!turnModelConfig.apiKey) {
     throw new Error("Missing API key. Open the project's .env file and add KITTY_API_KEY.");
   }
-  let session = await initializeTurnSession(options.session, options.input, options.sessionStore);
+  let session = await initializeTurnSession(
+    options.session,
+    options.input,
+    options.sessionStore,
+    options.inputSource ?? "external",
+  );
   const controlLedger = new ControlPlaneLedger(projectContext.stateRootDir);
   try {
     controlLedger.taskLifecycle.startTurn({

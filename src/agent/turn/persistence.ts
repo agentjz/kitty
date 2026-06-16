@@ -26,12 +26,13 @@ export async function initializeTurnSession(
   session: SessionRecord,
   input: string,
   sessionStore: SessionStoreLike,
+  source: StoredMessage["source"] = "external",
 ): Promise<SessionRecord> {
   const appended = await sessionStore.appendMessages(session, [
-    createMessage("user", input),
+    createMessage("user", input, { source }),
   ]);
 
-  const framed = applyCurrentTurnFrame(appended, input);
+  const framed = applyCurrentTurnFrame(appended, input, undefined, source);
 
   return sessionStore.save(noteCheckpointTurnInput(framed, input));
 }

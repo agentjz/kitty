@@ -105,6 +105,7 @@ export async function runHostTurn(
         config: options.config,
         session,
         sessionStore: options.sessionStore,
+        inputSource: wakeCloseoutTurn ? "internal" : "external",
         abortSignal: options.abortSignal,
         callbacks: options.callbacks,
         toolRegistry: wakeCloseoutTurn ? createToollessRegistry(toolRegistry) : toolRegistry,

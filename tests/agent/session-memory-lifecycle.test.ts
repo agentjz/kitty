@@ -553,6 +553,7 @@ test("internal wake turns do not rewrite same-session memory as user intent", as
     config,
     session,
     sessionStore,
+    inputSource: "internal",
     toolRegistry: createToolRegistry({ onlyNames: [] }),
     fetchAssistantResponse: async (): Promise<AssistantResponse> => ({
       content: "继续当前工作。",
@@ -570,6 +571,7 @@ test("internal wake turns do not rewrite same-session memory as user intent", as
 
   assert.equal(memoryRequestCount, 0);
   assert.equal(result.session.sessionMemory, undefined);
+  assert.equal(result.session.title, undefined);
 });
 
 function createWriteStatusTool(root: string): RegisteredTool {

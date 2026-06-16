@@ -28,7 +28,10 @@ export async function updateSessionMemoryAfterTurn(
   if (!input.response.content?.trim()) {
     return input.session;
   }
-  const userInput = readUserInput(input.input);
+  const userInput = readUserInput({
+    content: input.input,
+    source: input.options.inputSource ?? "external",
+  });
   if (!userInput) {
     return input.session;
   }
@@ -128,14 +131,20 @@ export async function updateSessionTitleAfterTurn(
 ): Promise<RunTurnResult["session"]> {
   if (!shouldGenerateSessionTitle({
     session: input.session,
-    userInput: input.input,
+    userInput: {
+      content: input.input,
+      source: input.options.inputSource ?? "external",
+    },
     assistantResponse: input.response,
   })) {
     return input.session;
   }
 
   const messages = buildSessionTitleMessages({
-    userInput: input.input,
+    userInput: {
+      content: input.input,
+      source: input.options.inputSource ?? "external",
+    },
     assistantResponse: input.response,
   });
   const modelRequest = {
