@@ -40,6 +40,14 @@ test("runtime status projects the current project runtime facts", async (t) => {
         chars: 10_000,
         lines: 120,
       }],
+      cacheLayout: {
+        stablePrefixFingerprint: "stable123",
+        volatileTailFingerprint: "tail456",
+        stablePrefixChars: 30_000,
+        volatileTailChars: 15_000,
+        stableSources: ["staticPrompt", "profilePersona"],
+        volatileSources: ["runtimeFacts", "nearFieldConversation"],
+      },
     },
     workset: {
       version: 1,
@@ -117,6 +125,11 @@ test("runtime status projects the current project runtime facts", async (t) => {
   assert.match(text, /Context budget hotspots:/);
   assert.match(text, /Context budget sources:/);
   assert.match(text, /nearFieldConversation  chars=25000  messages=3/);
+  assert.match(text, /Cache layout:/);
+  assert.match(text, /stable=stable123/);
+  assert.match(text, /tail=tail456/);
+  assert.match(text, /stableRatio=67%/);
+  assert.match(text, /stableSources=staticPrompt,profilePersona/);
   assert.match(text, /Model cache: none/);
   assert.match(text, /Task lifecycle:/);
 });
@@ -142,6 +155,7 @@ test("runtime status surfaces recent model request cache facts", async (t) => {
           outputTokens: 50,
           totalTokens: 1250,
           cacheReadTokens: 900,
+          cacheMissTokens: 300,
           cacheHitRate: 0.75,
         },
         usageAvailable: true,
@@ -155,6 +169,7 @@ test("runtime status surfaces recent model request cache facts", async (t) => {
 
   assert.equal(status.modelRequests.recent.length, 1);
   assert.match(text, /Model cache: cached=900/);
+  assert.match(text, /miss=300/);
   assert.match(text, /Recent model requests:/);
   assert.match(text, /cacheRead=900/);
 });

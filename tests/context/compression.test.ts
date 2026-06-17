@@ -382,3 +382,120 @@ test("runtime prompt cache stable prefix ignores volatile runtime facts", () => 
   assert.deepEqual(first.cacheLayout?.stableSources, ["staticPrompt", "profilePersona"]);
   assert.deepEqual(first.cacheLayout?.volatileSources, ["runtimeFacts", "nearFieldConversation"]);
 });
+
+test("runtime prompt skill index does not inject skill body or resources by default", () => {
+  const root = process.cwd();
+  const config = createTestRuntimeConfig(root);
+  const promptLayers = buildContextRuntimePromptLayers({
+    cwd: root,
+    config: {
+      ...config,
+      extensions: {
+        ...config.extensions,
+        skills: true,
+      },
+    },
+    projectContext: {
+      rootDir: root,
+      stateRootDir: root,
+      cwd: root,
+      instructions: [],
+      instructionText: "",
+      instructionTruncated: false,
+      ignoreRules: [],
+      skills: [{
+        name: "expensive-method",
+        description: "Use this only when needed.",
+        path: "skills/expensive-method/SKILL.md",
+        absolutePath: `${root}/skills/expensive-method/SKILL.md`,
+        body: "FULL_SKILL_BODY_SHOULD_NOT_BE_IN_DEFAULT_PROMPT",
+        dependencies: [],
+        resources: [{
+          path: "references/large.md",
+          size: 120_000,
+          kind: "references",
+        }],
+        health: {
+          status: "ready",
+          bodyPresent: true,
+          resourceCount: 1,
+          dependencyCount: 0,
+          resourceGroups: {
+            references: 1,
+            scripts: 0,
+            examples: 0,
+            assets: 0,
+            other: 0,
+          },
+          issues: [],
+        },
+      }],
+    },
+  });
+  const prompt = renderPromptLayers(promptLayers);
+
+  assert.match(prompt, /Available skills/);
+  assert.match(prompt, /expensive-method/);
+  assert.match(prompt, /resources=1/);
+  assert.doesNotMatch(prompt, /FULL_SKILL_BODY_SHOULD_NOT_BE_IN_DEFAULT_PROMPT/);
+  assert.doesNotMatch(prompt, /references\/large\.md/);
+});
+
+test("large old tool output is compacted without changing the stable prefix", () => {
+  const promptLayers = {
+    staticBlocks: ["Static contract"],
+    profilePersonaBlocks: ["Profile contract"],
+    runtimeFactBlocks: ["Runtime facts one"],
+  };
+  const messages: StoredMessage[] = [
+    {
+      role: "user",
+      content: "run test",
+      createdAt: "2026-06-17T00:00:00.000Z",
+    },
+    {
+      role: "assistant",
+      content: "I will run the test.",
+      createdAt: "2026-06-17T00:00:01.000Z",
+    },
+    {
+      role: "tool",
+      name: "bash",
+      content: `huge output ${"x".repeat(20_000)}`,
+      createdAt: "2026-06-17T00:00:02.000Z",
+    },
+    {
+      role: "user",
+      content: "continue",
+      createdAt: "2026-06-17T00:00:03.000Z",
+    },
+  ];
+  const first = buildCompressedContextRequest(promptLayers, messages, {
+    contextWindowMessages: 4,
+    model: "deepseek-v4-flash",
+    maxContextChars: 3_000,
+    contextSummaryChars: 500,
+  });
+  const second = buildCompressedContextRequest({
+    ...promptLayers,
+    runtimeFactBlocks: ["Runtime facts two with changed execution state"],
+  }, [
+    ...messages,
+    {
+      role: "user",
+      content: "next",
+      createdAt: "2026-06-17T00:00:04.000Z",
+    },
+  ], {
+    contextWindowMessages: 5,
+    model: "deepseek-v4-flash",
+    maxContextChars: 3_000,
+    contextSummaryChars: 500,
+  });
+
+  assert.equal(first.compressed, true);
+  assert.equal(second.compressed, true);
+  assert.equal(first.cacheLayout?.stablePrefixFingerprint, second.cacheLayout?.stablePrefixFingerprint);
+  assert.notEqual(first.cacheLayout?.volatileTailFingerprint, second.cacheLayout?.volatileTailFingerprint);
+  assert.ok((first.cacheLayout?.volatileTailChars ?? 0) < 20_000);
+});

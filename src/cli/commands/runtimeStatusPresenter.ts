@@ -97,6 +97,10 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
 
   if (status.sessions.latest?.contextBudget?.cacheLayout) {
     const layout = status.sessions.latest.contextBudget.cacheLayout;
+    const totalChars = layout.stablePrefixChars + layout.volatileTailChars;
+    const stableRatio = totalChars > 0
+      ? `${Math.round((layout.stablePrefixChars / totalChars) * 100)}%`
+      : "unknown";
     lines.push("");
     lines.push("Cache layout:");
     lines.push([
@@ -104,6 +108,11 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
       `stableChars=${layout.stablePrefixChars}`,
       `tail=${layout.volatileTailFingerprint}`,
       `tailChars=${layout.volatileTailChars}`,
+      `stableRatio=${stableRatio}`,
+    ].join("  "));
+    lines.push([
+      `stableSources=${layout.stableSources.join(",") || "none"}`,
+      `volatileSources=${layout.volatileSources.join(",") || "none"}`,
     ].join("  "));
   }
 
@@ -235,14 +244,16 @@ function readModelCacheLine(status: RuntimeStatus): string {
     return "none";
   }
   if (!latest.usage) {
-    return "usage unavailable";
+    return latest.usageAvailable ? "usage unavailable" : "usage unavailable from provider";
   }
   const cacheTokens = latest.usage.cacheHitTokens ?? latest.usage.cacheReadTokens;
+  const missTokens = latest.usage.cacheMissTokens;
   const rate = latest.usage.cacheHitRate === undefined
     ? undefined
     : `${Math.round(latest.usage.cacheHitRate * 100)}%`;
   return [
     cacheTokens === undefined ? "cached=unknown" : `cached=${cacheTokens}`,
+    missTokens === undefined ? undefined : `miss=${missTokens}`,
     rate ? `hit=${rate}` : undefined,
   ].filter(Boolean).join("  ");
 }

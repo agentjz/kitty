@@ -1,5 +1,6 @@
 import type { EvaluationCheckId, EvaluationCheckResult, EvaluationScenario } from "./types.js";
 import { passed } from "./types.js";
+import type { LoadedSkill } from "../types.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { once } from "node:events";
@@ -58,8 +59,8 @@ export const EVALUATION_SCENARIOS: readonly EvaluationScenario[] = [
   {
     id: "cache-economy-ready",
     title: "成本事实可审阅",
-    userPath: "用户能看到 provider usage、cache hit/miss 和稳定前缀事实，而不是只看到 token 总数。",
-    evidence: "验证 usage 归一化、provider cache policy 和 stable/volatile prompt fingerprint。",
+    userPath: "用户能看到 provider usage、cache hit/miss、稳定前缀和按需 skill 边界，而不是只看到 token 总数。",
+    evidence: "验证 usage 归一化、provider cache policy、stable/volatile prompt fingerprint、skill index boundary 和大输出压缩。",
   },
   {
     id: "host-turn-boundary-runs",
@@ -150,6 +151,7 @@ async function runCacheEconomyCheck(id: EvaluationCheckId): Promise<EvaluationCh
   const { resolveProviderCachePolicy } = await import("../provider/cachePolicy.js");
   const { buildCompressedContextRequest } = await import("../context/runtime/compression/builder.js");
   const { buildContextRuntimePromptLayers } = await import("../context/runtime/prompt.js");
+  const { renderPromptLayers } = await import("../agent/prompt/format.js");
   const { getInitialRuntimeConfig } = await import("../config/initialConfig.js");
   const { getAppPaths } = await import("../config/paths.js");
   const { resolveTelegramRuntimeConfig } = await import("../config/hosts.js");
@@ -186,7 +188,7 @@ async function runCacheEconomyCheck(id: EvaluationCheckId): Promise<EvaluationCh
     instructionText: "",
     instructionTruncated: false,
     ignoreRules: [],
-    skills: [],
+    skills: [buildCostSkillFixture()],
   };
   const firstPrompt = buildContextRuntimePromptLayers({
     cwd: process.cwd(),
@@ -242,24 +244,46 @@ async function runCacheEconomyCheck(id: EvaluationCheckId): Promise<EvaluationCh
   };
   const first = buildCompressedContextRequest(
     firstPrompt,
-    [{ role: "user", content: "first", createdAt: "2026-06-16T00:00:00.000Z" }],
+    [
+      { role: "user", content: "first", createdAt: "2026-06-16T00:00:00.000Z" },
+      { role: "tool", name: "bash", content: `large output ${"x".repeat(20_000)}`, createdAt: "2026-06-16T00:00:01.000Z" },
+    ],
     requestConfig,
   );
   const second = buildCompressedContextRequest(
     secondPrompt,
     [
       { role: "user", content: "first", createdAt: "2026-06-16T00:00:00.000Z" },
+      { role: "tool", name: "bash", content: `large output ${"x".repeat(20_000)}`, createdAt: "2026-06-16T00:00:01.000Z" },
       { role: "user", content: "second", createdAt: "2026-06-16T00:01:00.000Z" },
     ],
     requestConfig,
   );
+  const compactedLargeOutput = buildCompressedContextRequest(
+    firstPrompt,
+    [
+      { role: "user", content: "large output", createdAt: "2026-06-16T00:00:00.000Z" },
+      { role: "tool", name: "bash", content: `large output ${"x".repeat(20_000)}`, createdAt: "2026-06-16T00:00:01.000Z" },
+      { role: "user", content: "continue", createdAt: "2026-06-16T00:00:02.000Z" },
+    ],
+    {
+      contextWindowMessages: 3,
+      model: "gpt-5.5",
+      maxContextChars: 8_000,
+      contextSummaryChars: 600,
+    },
+  );
+  const renderedPrompt = renderPromptLayers(firstPrompt);
 
   if (
     deepSeek?.cacheHitRate !== 0.8 ||
     openai?.cacheReadTokens !== 960 ||
     !policy.promptCacheKey ||
     first.cacheLayout?.stablePrefixFingerprint !== second.cacheLayout?.stablePrefixFingerprint ||
-    first.cacheLayout?.volatileTailFingerprint === second.cacheLayout?.volatileTailFingerprint
+    first.cacheLayout?.volatileTailFingerprint === second.cacheLayout?.volatileTailFingerprint ||
+    renderedPrompt.includes("FULL_SKILL_BODY_MUST_NOT_ENTER_DEFAULT_CONTEXT") ||
+    !renderedPrompt.includes("cost-skill") ||
+    (compactedLargeOutput.cacheLayout?.volatileTailChars ?? Number.POSITIVE_INFINITY) >= 20_000
   ) {
     return {
       id,
@@ -270,8 +294,38 @@ async function runCacheEconomyCheck(id: EvaluationCheckId): Promise<EvaluationCh
 
   return passed(
     id,
-    `cache economy ready: deepseekHit=${deepSeek?.cacheHitRate}, openaiCached=${openai?.cacheReadTokens}, stablePrefix=${first.cacheLayout?.stablePrefixFingerprint ?? "unknown"}`,
+    `cache economy ready: deepseekHit=${deepSeek?.cacheHitRate}, openaiCached=${openai?.cacheReadTokens}, stablePrefix=${first.cacheLayout?.stablePrefixFingerprint ?? "unknown"}, stableChars=${first.cacheLayout?.stablePrefixChars ?? 0}, compactedTailChars=${compactedLargeOutput.cacheLayout?.volatileTailChars ?? 0}, skillIndex=only`,
   );
+}
+
+function buildCostSkillFixture(): LoadedSkill {
+  return {
+    name: "cost-skill",
+    description: "Loaded only when needed.",
+    path: "skills/cost-skill/SKILL.md",
+    absolutePath: "skills/cost-skill/SKILL.md",
+    body: "FULL_SKILL_BODY_MUST_NOT_ENTER_DEFAULT_CONTEXT",
+    dependencies: [],
+    resources: [{
+      path: "references/cost.md",
+      size: 100_000,
+      kind: "references",
+    }],
+    health: {
+      status: "ready",
+      bodyPresent: true,
+      resourceCount: 1,
+      dependencyCount: 0,
+      resourceGroups: {
+        references: 1,
+        scripts: 0,
+        examples: 0,
+        assets: 0,
+        other: 0,
+      },
+      issues: [],
+    },
+  };
 }
 
 async function runHostTurnBoundaryCheck(id: EvaluationCheckId, rootDir: string): Promise<EvaluationCheckResult> {

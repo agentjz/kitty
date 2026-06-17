@@ -21,7 +21,7 @@
 它的主线不是自我改造，而是把本地 coding agent 做成可恢复、可验收、省钱的执行系统：
 
 - 本地执行内核：聊天只是入口，session、workset、execution、events、memory 和 status 才是任务现场。
-- 成本优先上下文：近场对话负责自然连续，session memory 负责长任务续命，机器账本只在需要时取证，稳定前缀服务 prompt cache。
+- Cost Kernel：即使只用一个模型，也通过稳定前缀、易变尾部、大内容压缩、按需 skill 和 cache usage 审阅来省 token。
 - 产品级验收合同：`kitty eval` 验证真实用户路径，而不是只证明模块能 import。
 
 ## ✨ 为什么是小猫智能体
@@ -43,7 +43,7 @@
 | 💾 Session | 会话记录、checkpoint、todo、工作集、恢复现场、结构化可审阅 memory assets |
 | 🗺️ Project Map | 目录、入口、脚本、测试、仓库文档和 git 事实进入短项目地图 |
 | 🔌 Provider | OpenAI-compatible provider、请求恢复、连接诊断 |
-| ❄️ 缓存与省钱 | 读取 provider usage 里的缓存命中事实，记录 cache hit / miss / read / write，展示稳定前缀指纹和最近请求命中状态 |
+| ❄️ Cost Kernel | 稳定前缀和易变尾部分离，大输出压缩，skill 默认只给索引，读取 provider usage 里的 cache hit / miss / read / write，status 显示稳定比例和最近请求命中状态 |
 | 🛠️ Core tools | `read`、`edit`、`write`、`bash` |
 | 🧩 Extensions | `todo`、`worktree`、`network`、`background`、`subagent`、`skills` |
 | 🧾 Control plane | SQLite 账本记录 task lifecycle、execution、deadline、输出健康、wait policy、pid、状态和 wake 事实；host 负责等待和恢复 lead |
@@ -132,9 +132,11 @@ Runtime skills 放在项目 `SKILL.md`、`.skills/**/SKILL.md` 或 `skills/**/SK
 
 Provider 请求优先携带同 session 的近场可见对话。短会话不靠账本拼上下文；长会话超预算时摘要旧对话，保留最近对话 tail。Session memory 由模型在 turn 收口时按固定 Markdown 区块写出：`Current Focus`、`User Constraints`、`Decisions`、`Open Threads`、`Verification Facts`、`Reusable Lessons`。机器只维护格式和保存边界，不替模型判断事实重要性。
 
+Cost Kernel 的边界很硬：省钱不靠模型路由，不靠把能力关掉，而靠上下文结构。稳定内容放在前缀，易变事实放在尾部；大段工具输出和旧历史进入压缩摘要或证据资产；skill 正文、resources、examples 不默认注入，模型需要时再加载。
+
 Provider usage 会归一化缓存事实：DeepSeek 的 `prompt_cache_hit_tokens` / `prompt_cache_miss_tokens`，OpenAI 的 `prompt_tokens_details.cached_tokens`，Anthropic 的 `cache_read_input_tokens` / `cache_creation_input_tokens`，以及 Gemini cached content tokens。`model.request` observability 事件会记录这些字段，`kitty status` 会显示最近模型请求的缓存命中和 context cache layout。OpenAI 请求会使用同 session 稳定 `prompt_cache_key`；DeepSeek 不写无效 `cache_control`，优先保持稳定前缀和命中观测。
 
-`kitty eval` 是产品验收合同：每个场景都说明用户路径和机器证据。`kitty eval --run` 包含 cache economy 检查：usage 字段解析、provider cache policy 和 stable prefix fingerprint 都必须能机器验证。真实省钱仍取决于 provider 是否返回 usage，以及同一 session 的前缀是否真的被上游缓存命中。
+`kitty eval` 是产品验收合同：每个场景都说明用户路径和机器证据。`kitty eval --run` 包含 cache economy 检查：usage 字段解析、provider cache policy、stable prefix fingerprint、volatile tail、skill index boundary 和大输出压缩都必须能机器验证。真实省钱仍取决于 provider 是否返回 usage，以及同一 session 的前缀是否真的被上游缓存命中。
 
 Session workset 记录当前会话实际读过和改过的文件。`read` 成功后记录读取事实，`edit` / `write` 成功后记录变更事实和 change id。工作集会进入 session、working memory 和 `kitty status`，让用户看到当前任务真正碰过哪些文件。
 

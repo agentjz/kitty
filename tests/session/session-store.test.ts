@@ -21,6 +21,51 @@ test("session store persists and reloads session snapshots", async (t) => {
   assert.equal(latest?.id, session.id);
 });
 
+test("session store preserves context cache layout facts", async (t) => {
+  const root = await createTempWorkspace("session-cache-layout", t);
+  const store = new SessionStore(getAppPaths(root).sessionsDir);
+  const session = await store.create(root);
+  await store.save({
+    ...session,
+    contextBudget: {
+      version: 1,
+      limitChars: 900_000,
+      estimatedChars: 12_000,
+      remainingChars: 888_000,
+      usageRatio: 0.0133,
+      compressed: false,
+      compressionMode: "none",
+      compressionReason: "within_budget",
+      sources: [
+        { name: "systemPrompt", chars: 8_000 },
+        { name: "nearFieldConversation", chars: 4_000, messages: 2 },
+      ],
+      promptHotspots: [
+        { layer: "static", title: "Project Instructions", chars: 4_000, lines: 80 },
+      ],
+      cacheLayout: {
+        stablePrefixFingerprint: "aaaaaaaa",
+        volatileTailFingerprint: "bbbbbbbb",
+        stablePrefixChars: 6_000,
+        volatileTailChars: 2_000,
+        stableSources: ["staticPrompt", "profilePersona"],
+        volatileSources: ["runtimeFacts", "nearFieldConversation"],
+      },
+    },
+  });
+
+  const loaded = await store.load(session.id);
+
+  assert.deepEqual(loaded.contextBudget?.cacheLayout, {
+    stablePrefixFingerprint: "aaaaaaaa",
+    volatileTailFingerprint: "bbbbbbbb",
+    stablePrefixChars: 6_000,
+    volatileTailChars: 2_000,
+    stableSources: ["staticPrompt", "profilePersona"],
+    volatileSources: ["runtimeFacts", "nearFieldConversation"],
+  });
+});
+
 test("session store projects model-written session memory into a readable asset", async (t) => {
   const root = await createTempWorkspace("session-memory-asset", t);
   const paths = getAppPaths(root);

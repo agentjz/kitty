@@ -159,6 +159,22 @@ function readContextBudget(value: unknown, sessionPath: string): SessionRecord["
     compressionReason: readRequiredString(record, "compressionReason", sessionPath, "contextBudget"),
     sources: readContextBudgetSources(record.sources, sessionPath),
     promptHotspots: readContextBudgetHotspots(record.promptHotspots, sessionPath),
+    cacheLayout: readContextCacheLayout(record.cacheLayout, sessionPath),
+  };
+}
+
+function readContextCacheLayout(value: unknown, sessionPath: string): NonNullable<SessionRecord["contextBudget"]>["cacheLayout"] {
+  if (value === undefined) {
+    return undefined;
+  }
+  const record = expectRecord(value, sessionPath, "contextBudget.cacheLayout");
+  return {
+    stablePrefixFingerprint: readRequiredString(record, "stablePrefixFingerprint", sessionPath, "contextBudget.cacheLayout"),
+    volatileTailFingerprint: readRequiredString(record, "volatileTailFingerprint", sessionPath, "contextBudget.cacheLayout"),
+    stablePrefixChars: readRequiredNumber(record, "stablePrefixChars", sessionPath, "contextBudget.cacheLayout"),
+    volatileTailChars: readRequiredNumber(record, "volatileTailChars", sessionPath, "contextBudget.cacheLayout"),
+    stableSources: readStringArray(record.stableSources, sessionPath, "contextBudget.cacheLayout.stableSources"),
+    volatileSources: readStringArray(record.volatileSources, sessionPath, "contextBudget.cacheLayout.volatileSources"),
   };
 }
 
@@ -202,6 +218,18 @@ function readContextBudgetHotspots(value: unknown, sessionPath: string): NonNull
       chars: readRequiredNumber(record, "chars", sessionPath, `contextBudget.promptHotspots[${index}]`),
       lines: readRequiredNumber(record, "lines", sessionPath, `contextBudget.promptHotspots[${index}]`),
     };
+  });
+}
+
+function readStringArray(value: unknown, sessionPath: string, scope: string): string[] {
+  if (!Array.isArray(value)) {
+    throw createSessionCorruptError(sessionPath, `${scope} must be an array`);
+  }
+  return value.map((entry, index) => {
+    if (typeof entry !== "string") {
+      throw createSessionCorruptError(sessionPath, `${scope}[${index}] must be a string`);
+    }
+    return entry;
   });
 }
 
