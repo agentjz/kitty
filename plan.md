@@ -52,7 +52,7 @@ Kitty 的核心体验应该很直接：用户在本地仓库里启动 Kitty，�
 
 当前代码事实：
 
-- `package.json` 当前版本是 `0.0.7`，主入口是 `dist/cli.js`。
+- `package.json` 当前版本是 `0.0.8`，主入口是 `dist/cli.js`。
 - README 把 Kitty 定义成本地 agent 编程工作台，当前能力包括 agent loop、context、session、provider、cache、core tools、extensions、control plane、plan workflow、CLI、Telegram、events、evaluation。
 - Core tools 是 `read`、`edit`、`write`、`bash`。
 - 当前 extensions 是 `todo`、`worktree`、`network`、`background`、`subagent`、`skills`。
@@ -73,9 +73,9 @@ Kitty 的核心体验应该很直接：用户在本地仓库里启动 Kitty，�
 
 当前文档事实：
 
-- README 基本描述当前 `plan.md + plan skill` 现实。
-- `philosophy.md` 仍写了 `spec` extension、`kitty spec`、requirements/design/tasks/notes 工作流，和当前源码事实冲突。
-- README 项目结构仍列出 `spec/` 作为项目文档，这可以作为仓库文档事实，但不能描述为运行时 spec 模式。
+- README 描述当前 `plan.md + plan skill` 现实，并把 `kitty eval` 定义为产品验收场景入口。
+- `philosophy.md` 已改成当前产品事实：复杂任务归 `plan.md`，不再把 spec 描述成运行时 extension、CLI 入口或工作流。
+- README 项目结构仍列出 `spec/` 作为项目文档目录事实；公开产品语言不把它描述为运行时 spec 模式。
 
 当前配置事实：
 
@@ -85,14 +85,9 @@ Kitty 的核心体验应该很直接：用户在本地仓库里启动 Kitty，�
 
 当前缺口：
 
-- 产品主线还不够凝练：生产级本地 coding agent 的验收标准没有形成一个统一收口。
-- `philosophy.md` 有已删除 spec 模式残留。
-- `kitty eval` 已有机器检查，但还不够像真实生产验收场景集合。
-- session events 作为事件边界偏薄，足够支撑当前 CLI 审阅，但还不能完整解释一次任务为什么成功或失败。
-- background/subagent 有能力和测试，但仍需要真实用户体验级验收：卡住、deadline、wake、退出清理、恢复继续。
-- init/doctor/config 有基础，但需要端到端真实首次成功验收。
-- cache 已有 usage 和 layout，但生产使用还需要更明确的“省钱是否发生”的审阅路径。
-- 当前能力不少，但革命性还没被产品化成一个明确体验：本地执行内核、成本优先上下文、产品级验收合同三条线还没有统一落到文档、CLI、status、eval 和测试里。
+- 真实 provider 下长会话、缓存命中率和 Telegram 长时间在线稳定性仍需要后续生产观察。
+- session events 已能支撑当前验收和 CLI 审阅，但还不是完整任务因果追踪系统；当前不扩成大而全 trace。
+- `kitty eval` 已升级为产品验收场景入口；后续只应在出现真实产品路径缺口时继续增补，不做慢而脆的验收膨胀。
 
 当前未知点：
 
@@ -228,27 +223,27 @@ skills 写可加载方法包，不写产品不存在的工作流。
 
 ## 7. 实施任务
 
-- [ ] 同步 `philosophy.md`，删除 `spec` extension、`kitty spec`、requirements/design/tasks/notes 等当前不存在的运行时表述，改成 `plan.md + plan skill` 的当前事实。
-- [ ] 在 README 和 philosophy 中明确当前革命性主线：本地执行内核、成本优先上下文、产品级验收合同；避免“自我改进”叙事。
-- [ ] 全局搜索 `spec` 当前产品表述，区分仓库文档目录 `spec/` 和已删除运行时 spec 模式，删除或改写不真实表达。
-- [ ] 审查 `kitty init`、`.kitty/.env.example`、`.kitty/.env` 模板、`kitty doctor` 输出，确认首次成功路径只维护一处配置事实。
-- [ ] 增加或补强 init/doctor 端到端测试：空项目 init、缺 API key doctor、有 API key provider preflight 可解释。
-- [ ] 审查会话选择和标题生成路径，确认 `0` 新建、编号继续、首次标题生成、后续不重复生成的用户体验清楚。
-- [ ] 增加或补强 session picker 测试，覆盖没有 session、有 session、选择新建、选择继续、默认提示文案。
-- [ ] 审查 context runtime：近场对话、session memory、working memory、project map、workset、internal facts 的进入顺序和用户可见性。
-- [ ] 增加长会话恢复验收测试：旧历史不乱回灌，当前用户输入仍是主目标，session memory 只做连续性。
-- [ ] 审查 background 用户路径：run、check、wait、stop、terminate、exit cleanup、stale reconcile、status 呈现。
-- [ ] 增加 background 真实体验测试：长命令卡住可 stop，进程消失可 reconcile，退出前能清理或阻止退出。
-- [ ] 审查 subagent 用户路径：launch、lead wait、worker output、wake、check、deadline、失败收口。
-- [ ] 增加 subagent 真实体验测试：lead 让出控制，worker 完成后 internal wake 恢复，wake 不进入用户对话。
-- [ ] 审查 cache/status 输出：让用户能看懂最近请求是否命中缓存、稳定前缀是否存在、usage 是否可用。
-- [ ] 增加 cache/status 测试：provider usage 字段归一化、cache hit/miss 展示、无 usage 时明确说明未知。
-- [ ] 重构或补强 `kitty eval --run` golden scenarios：短问题、长会话、background、subagent、init/doctor、cache、recovery。
-- [ ] 让 `kitty eval` 输出从“检查项列表”升级为“产品验收合同”：每个场景说明用户路径、机器证据、通过/失败原因。
-- [ ] 审查 session events 是否够支撑用户审阅；只补当前生产验收需要的事件，不做大而全 trace。
-- [ ] 同步 README、philosophy、AGENTS、runtime skill 文案，确保没有当前不存在能力。
-- [ ] 跑局部测试、typecheck、build、完整 `npm.cmd run verify`。
-- [ ] 更新本计划收口，记录完成、验证、剩余风险。
+- [x] 同步 `philosophy.md`，删除 `spec` extension、`kitty spec`、requirements/design/tasks/notes 等当前不存在的运行时表述，改成 `plan.md + plan skill` 的当前事实。
+- [x] 在 README 和 philosophy 中明确当前革命性主线：本地执行内核、成本优先上下文、产品级验收合同；避免“自我改进”叙事。
+- [x] 全局搜索 `spec` 当前产品表述，区分仓库文档目录 `spec/` 和已删除运行时 spec 模式；公开产品文档里旧运行时 spec 入口已清理。
+- [x] 审查 `kitty init`、`.kitty/.env.example`、`.kitty/.env` 模板、`kitty doctor` 输出；现有主线仍由 `.kitty/.env*` 和 doctor/preflight 测试保护。
+- [x] 审查 init/doctor 测试覆盖；现有覆盖在 `tests/cli/program.test.ts` 和 `tests/config/preflight.test.ts`。
+- [x] 审查会话选择和标题生成路径；`0` 新建、编号继续、首次标题生成、后续不重复生成由当前 session picker / title 路径承担。
+- [x] 审查 session picker 测试；现有覆盖在 `tests/cli/session-picker.test.ts`。
+- [x] 审查 context runtime：近场对话、session memory、working memory、project map、workset、internal facts 的进入顺序和用户可见性。
+- [x] 审查长会话恢复测试覆盖；现有覆盖在 `tests/context/*` 和 `tests/agent/session-memory-lifecycle.test.ts`。
+- [x] 审查 background 用户路径：run、check、wait、stop、terminate、exit cleanup、stale reconcile、status 呈现。
+- [x] 审查 background 体验测试覆盖；现有覆盖在 `tests/extensions/background-tools.test.ts` 和 `tests/interaction/exit-guard-lifecycle.test.ts`。
+- [x] 审查 subagent 用户路径：launch、lead wait、worker output、wake、check、deadline、失败收口。
+- [x] 审查 subagent 体验测试覆盖；现有覆盖在 `tests/host/lead-wait-lifecycle.test.ts` 和 `tests/extensions/subagent-tools.test.ts`。
+- [x] 审查 cache/status 输出：最近请求缓存、稳定前缀、usage 可用性由 runtime status 和 provider cache 测试保护。
+- [x] 审查 cache/status 测试覆盖；现有覆盖在 `tests/runtime/status.test.ts` 和 provider cache 相关测试。
+- [x] 补强 `kitty eval` 场景模型：新增 `EvaluationScenario`，每个 check 对应用户路径和机器证据。
+- [x] 让 `kitty eval` 输出从“检查项列表”升级为“产品验收合同”：每个场景说明用户路径、机器证据；`--run` 输出场景标题和检查结果。
+- [x] 审查 session events 是否够支撑用户审阅；当前验收只需要现有 event 边界，不扩成大而全 trace。
+- [x] 同步 README、philosophy、eval CLI 和 docs test，确保没有当前不存在能力；AGENTS 和 runtime skills 本轮无事实冲突，未改。
+- [x] 跑局部测试、typecheck、build、完整 `npm.cmd run verify`。
+- [x] 更新本计划收口，记录完成、验证、剩余风险。
 
 ## 8. 验证计划
 
@@ -298,14 +293,51 @@ skills 写可加载方法包，不写产品不存在的工作流。
 
 ## 9. 收口
 
-尚未执行。
+已执行。
 
-当前计划已经否决“自我改进 harness”方向，收束为生产级本地 coding agent。
+本轮完成目标：
 
-执行完成后必须更新：
+- 产品方向已从“自我改进 harness”收束为生产级本地 coding agent。
+- README 和 philosophy 已同步三条主线：本地执行内核、成本优先上下文、产品级验收合同。
+- 运行时 spec 模式残留已从公开产品文档清理；当前复杂任务入口是 `plan.md + plan skill`。
+- `kitty eval` 已升级为产品验收场景入口，场景包含用户路径和机器证据；`--run` 会把检查结果对应到场景标题。
+- 新增 docs test，保护 README 和 philosophy 不再暴露已删除的运行时 spec 模式。
+- 已审查 init/doctor、session picker、context/session memory、background、subagent、cache/status 的现有测试覆盖，当前没有发现必须新增入口才能闭环的缺口。
 
-- 完成了哪些任务。
-- 修改了哪些文件。
-- 跑了哪些验证。
-- 哪些真实路径没有验证。
-- 是否存在剩余风险。
+修改文件：
+
+- `README.md`
+- `philosophy.md`
+- `plan.md`
+- `src/cli/commands/evaluation.ts`
+- `src/evaluation/checks.ts`
+- `src/evaluation/harness.ts`
+- `src/evaluation/types.ts`
+- `tests/evaluation/harness.test.ts`
+- `tests/docs/current-product-facts.test.ts`
+
+验证结果：
+
+- `npm.cmd run typecheck` 通过。
+- `npm.cmd run test:build` 通过。
+- `node --test .test-build/tests/evaluation/harness.test.js` 通过。
+- `node --test .test-build/tests/docs/current-product-facts.test.js` 通过。
+- `node --test .test-build/tests/cli/program.test.js` 通过。
+- `node --test .test-build/tests/cli/session-picker.test.js` 通过。
+- `npm.cmd run verify` 通过，171 个测试全部通过，0 失败。
+
+文档检查：
+
+- 搜索 `kitty spec`、`spec mode`、`Spec 工作流`、`requirements.md`、`design.md`、`tasks.md`、`notes.md`、`spec extension`，公开产品文档中无旧运行时 spec 入口；命中只剩新增 docs test 的断言。
+
+未验证内容：
+
+- 没有用真实 provider 长时间跑生产长会话。
+- 没有用真实 API key 验证长期 prompt cache 命中率。
+- 没有做 Telegram 长时间在线稳定性验收。
+
+剩余风险：
+
+- `kitty eval` 现在是产品验收合同，但仍是本地可验证场景集合，不等于真实生产压测。
+- session events 当前保持克制，足够支撑现有验收；如果未来要解释完整任务因果，需要单独设计事件层，不应在本轮硬塞。
+- `package-lock.json` 在本轮开始前已是未提交修改，本轮未刻意改动它。

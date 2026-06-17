@@ -18,6 +18,12 @@
 
 它把模型、工具、上下文、会话、变更记录和验证事实收进一个稳定的本地编程体验里，让长任务可以被推进、保存、恢复和继续。
 
+它的主线不是自我改造，而是把本地 coding agent 做成可恢复、可验收、省钱的执行系统：
+
+- 本地执行内核：聊天只是入口，session、workset、execution、events、memory 和 status 才是任务现场。
+- 成本优先上下文：近场对话负责自然连续，session memory 负责长任务续命，机器账本只在需要时取证，稳定前缀服务 prompt cache。
+- 产品级验收合同：`kitty eval` 验证真实用户路径，而不是只证明模块能 import。
+
 ## ✨ 为什么是小猫智能体
 
 小猫智能体的核心体验很明确：
@@ -44,7 +50,7 @@
 | 📋 Plan 工作流 | `plan.md` 是当前任务总管，配合 plan skill 管理需求、事实、失败测试、目标、设计、任务、验证和收口 |
 | 💬 产品面 | CLI、交互终端、Telegram 私聊服务 |
 | 📎 证据记录 | session events、终端日志、崩溃记录、文件变更记录 |
-| 🧪 Evaluation | `kitty eval` 只暴露机器检查，`--run` 会跑本地检查闭环 |
+| 🧪 Evaluation | `kitty eval` 暴露产品验收场景，`--run` 会跑本地可验证检查闭环 |
 
 ## ⚡ 快速开始
 
@@ -93,7 +99,7 @@ kitty "检查这个仓库并修复失败测试"
 | `kitty undo [changeId]` | 撤销最近一次或指定变更 |
 | `kitty diff [path]` | 查看当前 git diff |
 | `kitty doctor` | 检查 `.kitty` 文件、env contract、provider preset、runtime、provider 连接和下一步 |
-| `kitty eval` | 查看机器检查；`kitty eval --run` 运行本地机器验收 |
+| `kitty eval` | 查看产品验收场景；`kitty eval --run` 运行本地机器验收 |
 | `kitty telegram serve` | 启动 Telegram 私聊服务 |
 
 ## 🛠️ 工具体系
@@ -128,7 +134,7 @@ Provider 请求优先携带同 session 的近场可见对话。短会话不靠�
 
 Provider usage 会归一化缓存事实：DeepSeek 的 `prompt_cache_hit_tokens` / `prompt_cache_miss_tokens`，OpenAI 的 `prompt_tokens_details.cached_tokens`，Anthropic 的 `cache_read_input_tokens` / `cache_creation_input_tokens`，以及 Gemini cached content tokens。`model.request` observability 事件会记录这些字段，`kitty status` 会显示最近模型请求的缓存命中和 context cache layout。OpenAI 请求会使用同 session 稳定 `prompt_cache_key`；DeepSeek 不写无效 `cache_control`，优先保持稳定前缀和命中观测。
 
-`kitty eval --run` 包含 cache economy 检查：usage 字段解析、provider cache policy 和 stable prefix fingerprint 都必须能机器验证。真实省钱仍取决于 provider 是否返回 usage，以及同一 session 的前缀是否真的被上游缓存命中。
+`kitty eval` 是产品验收合同：每个场景都说明用户路径和机器证据。`kitty eval --run` 包含 cache economy 检查：usage 字段解析、provider cache policy 和 stable prefix fingerprint 都必须能机器验证。真实省钱仍取决于 provider 是否返回 usage，以及同一 session 的前缀是否真的被上游缓存命中。
 
 Session workset 记录当前会话实际读过和改过的文件。`read` 成功后记录读取事实，`edit` / `write` 成功后记录变更事实和 change id。工作集会进入 session、working memory 和 `kitty status`，让用户看到当前任务真正碰过哪些文件。
 

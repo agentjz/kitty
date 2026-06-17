@@ -13,11 +13,11 @@
 - 同一个 session 的近场可见对话原样进入当前轮，负责“模型一直在场”的自然连续体验。
 - 同一个 session 的更长对话脉络由模型写出的 session memory 进入当前轮，负责长任务连续性。
 - 当前任务工作记忆自动进入当前轮，负责执行连续性。
-- 项目地图把目录、入口、脚本、测试、spec 和 git 状态作为机器事实进入当前轮，负责快速定向。
+- 项目地图把目录、入口、脚本、测试、项目文档和 git 状态作为机器事实进入当前轮，负责快速定向。
 - checkpoint、工具产物、运行事件和文件变更记录留在证据里，只在需要取证或恢复时使用。
 - 当前上下文是模型当下工作的桌面，只放近场可见对话、同 session 记忆、当前任务工作记忆、项目地图和必要工作集。
 - 上下文预算是机器测量事实：limit、estimated、remaining、usage ratio、压缩模式、来源分桶和 prompt hotspots 会进入 session 和 status，帮助用户看到当前上下文压力。
-- 长期原则写进可审阅的 spec、测试和源码。
+- 长期原则写进可审阅的项目文档、测试和源码。
 
 近场对话负责在场感，模型写记忆负责续命，历史负责取证，上下文负责当下推理。
 
@@ -39,30 +39,25 @@ Agent 应该更忠于用户，还是更忠于事实？
 
 小猫智能体的核心固定为 `read / edit / write / bash`。这四个工具负责基础编程闭环。
 
-复杂能力通过 extension 独立存在。当前 extension 是 `todo`、`worktree`、`network`、`background`、`subagent`、`skills`、`spec`。它们可启用、可禁用，打开后进入同一个 agent 工具面，关闭后从工具面移除。
+复杂能力通过 extension 独立存在。当前 extension 是 `todo`、`worktree`、`network`、`background`、`subagent`、`skills`。它们可启用、可禁用，打开后进入同一个 agent 工具面，关闭后从工具面移除。
 
-默认 agent 打开 `todo`、`worktree`、`network`、`background`、`subagent`、`skills`。`spec` 不默认混进普通 agent；需要计划工作流时，通过 `kitty spec` 进入隔离的 spec 模式。
+默认 agent 打开 `todo`、`worktree`、`network`、`background`、`subagent`、`skills`。
 
 扩展是工具集合。核心保持清楚，扩展保持独立。
 
 Skills 也是 extension，不是第三套工具体系。它把可复用方法、资料、脚本、示例和素材组织成 runtime 能力包。默认上下文只出现 skill 索引、健康状态和资源索引；是否加载正文、读取资源、运行脚本，由模型根据当前请求和工作焦点决定。机器只负责发现、分组、读取、执行、检查依赖和记录事实。
 
-## 📐 Spec
+## 📐 Plan
 
-复杂任务应该只是聊天里的临时文字，还是应该成为可审阅的工作流？
+复杂任务应该只是聊天里的临时文字，还是应该成为可审阅的执行合同？
 
-小猫智能体把复杂任务交给 spec 工作流。`kitty spec` 会进入隔离的 spec 模式，围绕四个文档推进：
+小猫智能体把复杂任务交给 `plan.md`。它不是另一个运行模式，也不是隐藏工作流；它是当前任务的单文件总管。
 
-- `requirements.md`
-- `design.md`
-- `tasks.md`
-- `notes.md`
+`plan.md` 同时承担需求、事实、失败测试、目标、设计、任务、验证和收口。用户能看懂要解决什么，开发者能按它改代码，后续接手者能知道已经完成什么、还剩什么。
 
-Spec 的主流程是 requirements、design、tasks 三阶段；implement、validate、archive 是执行和收口状态。Workflow summary 会暴露 active spec、当前阶段、确认门、下一 gate、四个文档状态、工具面和隔离 workspace。
+Plan 只服务当前现实。它不保留旧兼容，不写不存在的入口，不把历史能力伪装成当前产品。执行中发现事实推翻计划，先更新 `plan.md`，再继续。
 
-任务拆解进入 `tasks.md`，事实笔记和审阅痕迹进入 `notes.md`。checkpoint 保存 spec 状态、四个文档和隔离 worktree 的代码位置。
-
-Spec 不是普通文档目录。它负责把模糊目标变成可审阅的计划资产：需求、设计、任务、过程笔记、验证证据和 checkpoint。重要的 session memory 可以沉淀进 spec notes，成为后续继续工作的证据。
+Plan 的价值不是制造流程，而是把模糊目标压成可验证合同：做什么、为什么做、怎么做、怎么证明完成。
 
 ## 💾 记忆与沉淀
 
@@ -78,7 +73,7 @@ Spec 不是普通文档目录。它负责把模糊目标变成可审阅的计划
 - `.kitty/memory/project/*.md` 保存项目经验。
 - `.kitty/memory/user/*.md` 保存用户画像。
 - `.kitty/memory/evidence/*.md` 保存可审阅证据资产。
-- memory asset 暴露 kind、id、title、scope、tags、路径和 evidence references，可以被用户创建、读取、搜索、删除，也可以沉淀到 spec `notes.md` 或 runtime skill `references/`。
+- memory asset 暴露 kind、id、title、scope、tags、路径和 evidence references，可以被用户创建、读取、搜索、删除，也可以沉淀到 runtime skill `references/`。
 
 Memory 搜索是候选召回，不是语义裁判。机器按文本 token、路径、标签和证据引用暴露命中行；是否采用这些记忆，由模型结合当前请求判断。
 
@@ -94,7 +89,7 @@ Memory 搜索是候选召回，不是语义裁判。机器按文本 token、路�
 
 小猫智能体用 control plane 保存这些死事实：background、subagent execution、派工边界、pid、状态、退出码、输出摘要、wait policy 和 wake signal。
 
-`kitty status` 让用户看到运行现场：当前焦点、下一步、阻塞项、session、context budget、memory、skills、project map、execution、wake、spec。它先呈现用户能理解的当前现场，再呈现机器账本细节；它只呈现事实，不替模型做判断。
+`kitty status` 让用户看到运行现场：当前焦点、下一步、阻塞项、session、context budget、memory、skills、project map、execution、wake。它先呈现用户能理解的当前现场，再呈现机器账本细节；它只呈现事实，不替模型做判断。
 
 Background 是长任务现场。它记录运行输出摘要，能检查、终止、reconcile，也能在完成后把事实暴露给 lead。
 
@@ -110,7 +105,7 @@ Subagent 是隔离上下文协作现场。lead 派出有边界的任务后让出
 
 Runtime 提供运行边界。Control plane 保存执行账本。Observability 记录事实。Checkpoint 保存可恢复现场。工具执行明确的机器操作。
 
-Task Lifecycle 保存当前任务阶段和运行事实：阶段、原因、active execution、spec、todo、验证事实和完成事实。它是 control plane 里的事实账本，不是机器语义分类器，不把用户原话升级成目标。
+Task Lifecycle 保存当前任务阶段和运行事实：阶段、原因、active execution、todo、验证事实和完成事实。它是 control plane 里的事实账本，不是机器语义分类器，不把用户原话升级成目标。
 
 Agent turn 生命周期负责把当前输入、工具批次、provider 恢复、checkpoint、session diff 和记忆更新串成可恢复的现场。生命周期只保存和暴露事实，不决定路线。
 
@@ -122,14 +117,14 @@ Session events 是宿主和未来入口共享的事件边界。它记录 session
 
 Agent 不能只靠单元测试证明成熟。
 
-小猫智能体用 evaluation harness 暴露真实体验场景：简单问题不疯狂工作、长会话不失忆、旧目标不回灌、项目地图帮助定向、memory 可审阅可追溯、background 可恢复可终止、subagent 能唤醒 lead、spec 工作流能闭环。
+小猫智能体用 evaluation harness 暴露真实体验场景：简单问题不疯狂工作、长会话不失忆、旧目标不回灌、项目地图帮助定向、memory 可审阅可追溯、background 可恢复可终止、subagent 能唤醒 lead、plan 能形成可验证执行合同。
 
-`kitty eval` 列出验收场景和机器事实。`kitty eval --run` 运行本地可验证检查，也会用假 provider 跑真实 host turn golden 场景，检查工具、session、workset 和 events 的闭环。它不替模型打分，也不把口号写成测试。
+`kitty eval` 是产品验收合同。它列出关键用户路径和机器证据；`kitty eval --run` 运行本地可验证检查，也会用假 provider 跑真实 host turn golden 场景，检查工具、session、workset 和 events 的闭环。它不替模型打分，也不把口号写成测试。
 
 ## 🧱 当前事实主干
 
 当前产品面只承认当前实现真实存在的能力。
 
-源码、测试、spec、README、CLI 输出和运行状态必须讲同一个当前事实。没有当前入口、当前工具、当前状态或当前测试支撑的能力，不进入产品语言。
+源码、测试、项目文档、README、CLI 输出和运行状态必须讲同一个当前事实。没有当前入口、当前工具、当前状态或当前测试支撑的能力，不进入产品语言。
 
 历史用于研究和判断，不进入当前产品主干。需要的能力按当前现实建立；不需要的能力不写说明、不写分支、不写测试。

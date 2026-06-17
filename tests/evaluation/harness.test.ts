@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { listEvaluationChecks, runEvaluationChecks } from "../../src/evaluation/harness.js";
+import { listEvaluationChecks, listEvaluationScenarios, runEvaluationChecks } from "../../src/evaluation/harness.js";
 import { createTempWorkspace } from "../helpers.js";
 
-test("evaluation harness defines machine checks only", () => {
+test("evaluation harness defines current local acceptance checks", () => {
   assert.deepEqual(listEvaluationChecks(), [
     "runtime-status-builds",
     "project-map-builds",
@@ -17,6 +17,18 @@ test("evaluation harness defines machine checks only", () => {
     "remote-entrypoints-available",
     "recovery-drills-pass",
   ]);
+});
+
+test("evaluation harness exposes product acceptance scenarios for every check", () => {
+  const checks = listEvaluationChecks();
+  const scenarios = listEvaluationScenarios();
+
+  assert.deepEqual(scenarios.map((scenario) => scenario.id), checks);
+  for (const scenario of scenarios) {
+    assert.ok(scenario.title.trim().length > 0);
+    assert.ok(scenario.userPath.trim().length > 20);
+    assert.ok(scenario.evidence.trim().length > 0);
+  }
 });
 
 test("evaluation harness runs local machine-verifiable checks", async (t) => {

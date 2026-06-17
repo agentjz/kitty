@@ -15,6 +15,13 @@ export interface EvaluationRunResult {
   checks: EvaluationCheckResult[];
 }
 
+export interface EvaluationScenario {
+  id: EvaluationCheckId;
+  title: string;
+  userPath: string;
+  evidence: string;
+}
+
 export interface EvaluationCheckResult {
   id: EvaluationCheckId;
   status: "passed" | "failed" | "skipped";
