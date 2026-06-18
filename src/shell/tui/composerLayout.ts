@@ -28,6 +28,7 @@ export interface ComposerLayoutInput {
 export interface ComposerLayoutModel {
   readonly contentWidth: number;
   readonly cursor: { x: number; y: number } | undefined;
+  readonly cursorCell: { x: number; y: number } | undefined;
   readonly rows: readonly string[];
   readonly visibleRows: number;
 }
@@ -69,10 +70,18 @@ export function layoutComposer(input: ComposerLayoutInput): ComposerLayoutModel 
       value: input.value,
     })
     : undefined;
+  const cursorCell = measureComposerCursorCell({
+    contentWidth,
+    cursor: input.cursor,
+    rows,
+    visibleStart,
+    value: input.value,
+  });
 
   return {
     contentWidth,
     cursor,
+    cursorCell,
     rows: visible,
     visibleRows,
   };
@@ -86,14 +95,28 @@ function measureComposerCursor(input: {
   readonly value: string;
   readonly visibleStart: number;
 }): { x: number; y: number } {
+  const cell = measureComposerCursorCell(input);
+  return {
+    x: input.origin.x + cell.x,
+    y: input.origin.y + cell.y,
+  };
+}
+
+function measureComposerCursorCell(input: {
+  readonly contentWidth: number;
+  readonly cursor: number;
+  readonly rows: readonly string[];
+  readonly value: string;
+  readonly visibleStart: number;
+}): { x: number; y: number } {
   const beforeCursor = input.value.slice(0, Math.max(0, Math.min(input.cursor, input.value.length)));
   const rowsBeforeCursor = wrapComposerRows(beforeCursor, input.contentWidth);
   const cursorRow = Math.max(0, rowsBeforeCursor.length - 1);
   const cursorVisibleRow = Math.max(0, cursorRow - input.visibleStart);
   const cursorLine = rowsBeforeCursor.at(-1) ?? "";
   return {
-    x: input.origin.x + Math.min(stringWidth(cursorLine), input.contentWidth),
-    y: input.origin.y + cursorVisibleRow,
+    x: Math.min(stringWidth(cursorLine), input.contentWidth),
+    y: cursorVisibleRow,
   };
 }
 

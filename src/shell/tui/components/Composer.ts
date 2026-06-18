@@ -20,7 +20,14 @@ export function createComposerComponent(kit: Pick<InkRuntime, "React" | "Box" | 
   }): React.ReactNode {
     const [draft, setDraft] = React.useState({ cursor: 0, value: "" });
     const contentRef = React.useRef<import("ink").DOMElement | null>(null);
+    const cursorRowRef = React.useRef<import("ink").DOMElement | null>(null);
     const [measuredFrame, setMeasuredFrame] = React.useState<ComposerFrameMetrics>({
+      hasMeasured: false,
+      left: 0,
+      top: 0,
+      width: props.frame.width,
+    });
+    const [measuredCursorRow, setMeasuredCursorRow] = React.useState<ComposerFrameMetrics>({
       hasMeasured: false,
       left: 0,
       top: 0,
@@ -37,6 +44,15 @@ export function createComposerComponent(kit: Pick<InkRuntime, "React" | "Box" | 
           ? previous
           : next
       ));
+      const nextCursorRow = measureAbsoluteBox(cursorRowRef.current);
+      setMeasuredCursorRow((previous) => (
+        previous.hasMeasured === nextCursorRow.hasMeasured
+          && previous.left === nextCursorRow.left
+          && previous.top === nextCursorRow.top
+          && previous.width === nextCursorRow.width
+          ? previous
+          : nextCursorRow
+      ));
     });
 
     const contentWidth = measuredFrame.hasMeasured
@@ -49,12 +65,18 @@ export function createComposerComponent(kit: Pick<InkRuntime, "React" | "Box" | 
       value: draft.value,
     });
     const { setCursorPosition } = useCursor();
+    const cursorPosition = layout.cursorCell && measuredCursorRow.hasMeasured
+      ? {
+        x: measuredCursorRow.left + layout.cursorCell.x,
+        y: measuredCursorRow.top,
+      }
+      : layout.cursor;
 
     React.useEffect(() => {
       props.controller.updateComposerVisibleRows(layout.visibleRows);
     }, [props.controller, layout.visibleRows]);
 
-    setCursorPosition(layout.cursor);
+    setCursorPosition(cursorPosition);
 
     useInput((input, key) => {
       const action = applyComposerInput(draft, input, key);
@@ -85,14 +107,32 @@ export function createComposerComponent(kit: Pick<InkRuntime, "React" | "Box" | 
         },
         ...(draft.value
           ? layout.rows.map((row, index) => React.createElement(
-            Text,
-            { key: index, color: TUI_COLORS.text, wrap: "truncate-end" },
-            row || " ",
+            Box,
+            {
+              key: index,
+              ref: layout.cursorCell?.y === index ? cursorRowRef : undefined,
+              height: 1,
+              width: layout.contentWidth,
+            },
+            React.createElement(
+              Text,
+              { color: TUI_COLORS.text, wrap: "truncate-end" },
+              row || " ",
+            ),
           ))
           : [React.createElement(
-            Text,
-            { key: "placeholder", color: TUI_COLORS.muted, wrap: "truncate-end" },
-            "输入消息",
+            Box,
+            {
+              key: "placeholder",
+              ref: cursorRowRef,
+              height: 1,
+              width: layout.contentWidth,
+            },
+            React.createElement(
+              Text,
+              { color: TUI_COLORS.muted, wrap: "truncate-end" },
+              "输入消息",
+            ),
           )]),
       ),
     );

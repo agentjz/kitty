@@ -89,6 +89,7 @@ test("tui composer layout derives visible rows and cursor from one frame model",
   assert.deepEqual(measureComposerTextOrigin(frame), { x: 10, y: 20 });
   assert.equal(measureComposerContentWidth(frame.width), 73);
   assert.deepEqual(layout.cursor, { x: 13, y: 20 });
+  assert.deepEqual(layout.cursorCell, { x: 3, y: 0 });
   assert.deepEqual(layout.rows, ["111"]);
   assert.equal(layout.visibleRows, 1);
 });
@@ -108,6 +109,7 @@ test("tui composer layout grows for wrapped multiline input and keeps cursor on 
     layout.cursor,
     { x: 8, y: 11 },
   );
+  assert.deepEqual(layout.cursorCell, { x: 8, y: 1 });
 });
 
 test("tui composer cursor may sit after the last column instead of covering the last character", () => {
@@ -130,6 +132,18 @@ test("tui composer cursor uses display width for Chinese input", () => {
 
   assert.deepEqual(layout.rows, ["你好"]);
   assert.deepEqual(layout.cursor, { x: 5, y: 2 });
+});
+
+test("tui composer separates cursor cell from measured terminal row", () => {
+  const layout = layoutComposer({
+    cursor: "first\nsecond".length,
+    frame: { hasMeasured: true, left: 4, top: 10, width: 20 },
+    value: "first\nsecond",
+  });
+
+  assert.deepEqual(layout.rows, ["first", "second"]);
+  assert.deepEqual(layout.cursorCell, { x: 6, y: 1 });
+  assert.deepEqual(layout.cursor, { x: 10, y: 11 });
 });
 
 test("tui composer editor handles common editing keys and explicit multiline insertion", () => {
