@@ -47,7 +47,6 @@
     "marked": "^15.0.7",
     "openai": "^6.4.0",
     "react": "^19.2.7",
-    "react-ink-textarea": "^0.2.0",
     "string-width": "^8.2.1",
     "wrap-ansi": "^10.0.0",
     "ws": "^8.21.0"

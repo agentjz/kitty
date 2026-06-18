@@ -6,8 +6,9 @@ export interface InkRuntime {
   Box: typeof import("ink").Box;
   Text: typeof import("ink").Text;
   useInput: typeof import("ink").useInput;
+  useBoxMetrics: typeof import("ink").useBoxMetrics;
+  useCursor: typeof import("ink").useCursor;
   useStdout: typeof import("ink").useStdout;
-  TextArea: typeof import("react-ink-textarea").TextArea;
 }
 
 export type InkInputKey = Key;

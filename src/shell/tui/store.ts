@@ -1,23 +1,19 @@
 import type { SessionRecord, StoredMessage } from "../../types.js";
-import { renderMarkdownLines } from "./markdown.js";
-import wrapAnsi from "wrap-ansi";
+import { TUI_COLORS } from "./theme.js";
+import {
+  measureTranscriptRows as measureTranscriptLayoutRows,
+  renderTranscriptLineViews as renderTranscriptLayoutLineViews,
+  renderTranscriptRows as renderTranscriptLayoutRows,
+  type TuiTranscriptEntry,
+  type TuiTranscriptLineView,
+  type TuiTranscriptRole,
+} from "./transcriptLayout.js";
 
-export type TuiTranscriptRole = "user" | "assistant" | "reasoning" | "system";
-
-export interface TuiTranscriptEntry {
-  id: string;
-  role: TuiTranscriptRole;
-  text: string;
-}
-
-export interface TuiTranscriptLineView {
-  id: string;
-  entryId: string;
-  role: TuiTranscriptRole;
-  kind: "spacer" | "content";
-  text: string;
-  isFirstContentLine: boolean;
-}
+export type {
+  TuiTranscriptEntry,
+  TuiTranscriptLineView,
+  TuiTranscriptRole,
+} from "./transcriptLayout.js";
 
 export interface TuiRuntimeDockState {
   work: {
@@ -59,7 +55,7 @@ const DEFAULT_DOCK: TuiRuntimeDockState = {
   },
   background: "空闲",
   subagent: "空闲",
-  context: "未知",
+  context: "0 chars (0%)",
 };
 
 export function createInitialTuiState(session?: SessionRecord): TuiState {
@@ -197,24 +193,24 @@ export function getVisibleTranscriptRows(state: TuiState, viewport: TuiViewport)
 }
 
 export function renderTranscriptRows(entries: readonly TuiTranscriptEntry[], width: number): string[] {
-  return renderTranscriptLineViews(entries, width).map((line) => line.text);
+  return renderTranscriptLayoutRows(entries, width, TUI_COLORS);
 }
 
 export function measureTranscriptRows(entries: readonly TuiTranscriptEntry[], width: number): number {
-  return renderTranscriptLineViews(entries, width).length;
+  return measureTranscriptLayoutRows(entries, width, TUI_COLORS);
 }
 
 export function renderTranscriptLineViews(
   entries: readonly TuiTranscriptEntry[],
   width: number,
 ): TuiTranscriptLineView[] {
-  return entries.flatMap((entry) => renderEntryLineViews(entry, width));
+  return renderTranscriptLayoutLineViews(entries, width, TUI_COLORS);
 }
 
 export function formatContextBudget(session: SessionRecord | undefined): string {
   const budget = session?.contextBudget;
   if (!budget) {
-    return "未知";
+    return "0 chars (0%)";
   }
   const percent = Math.round(budget.usageRatio * 100);
   return `${budget.estimatedChars}/${budget.limitChars} chars (${percent}%)`;
@@ -246,18 +242,6 @@ function toTranscriptEntry(message: StoredMessage, index: number): TuiTranscript
   return [];
 }
 
-function renderEntryRows(entry: TuiTranscriptEntry, width: number): string[] {
-  return renderEntryLineViews(entry, width).map((line) => line.text);
-}
-
-function readEntryDisplayRows(entry: TuiTranscriptEntry): string[] {
-  if (entry.role === "assistant" || entry.role === "reasoning") {
-    const markdownRows = renderMarkdownLines(entry.text);
-    return markdownRows.length > 0 ? markdownRows : [""];
-  }
-  return entry.text.split(/\r?\n/);
-}
-
 export function parseSubmittedInputEcho(text: string): string | undefined {
   const lines = text.split(/\r?\n/);
   if (lines.length === 0 || !lines[0]?.startsWith("> ")) {
@@ -270,43 +254,8 @@ export function parseSubmittedInputEcho(text: string): string | undefined {
   return parsed.trim() ? parsed : undefined;
 }
 
-function wrapText(text: string, width: number): string[] {
-  const rows: string[] = [];
-  for (const line of text.split(/\r?\n/)) {
-    const wrapped = wrapAnsi(line, width, { hard: true, trim: false });
-    rows.push(...wrapped.split(/\r?\n/));
-  }
-  return rows.length > 0 ? rows : [""];
-}
-
 function createEntryId(index: number): string {
   return `entry-${index + 1}`;
-}
-
-function renderEntryLineViews(entry: TuiTranscriptEntry, width: number): TuiTranscriptLineView[] {
-  const bodyWidth = Math.max(8, width - 6);
-  const sourceRows = readEntryDisplayRows(entry);
-  const wrapped = sourceRows.flatMap((line) => wrapText(line, bodyWidth));
-  const rows = wrapped.length > 0 ? wrapped : [""];
-  const entryId = entry.id;
-  return [
-    {
-      id: `${entryId}-spacer`,
-      entryId,
-      role: entry.role,
-      kind: "spacer",
-      text: "",
-      isFirstContentLine: false,
-    },
-    ...rows.map((row, index): TuiTranscriptLineView => ({
-      id: `${entryId}-line-${index + 1}`,
-      entryId,
-      role: entry.role,
-      kind: "content",
-      text: row,
-      isFirstContentLine: index === 0,
-    })),
-  ];
 }
 
 function clamp(value: number, min: number, max: number): number {

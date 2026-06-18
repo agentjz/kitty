@@ -22,10 +22,9 @@ interface StartTuiChatOptions {
 
 export async function startTuiChat(options: StartTuiChatOptions): Promise<void> {
   const cleanup = createCleanupStack();
-  const [{ default: React }, ink, textarea, { createTuiAppComponent }] = await Promise.all([
+  const [{ default: React }, ink, { createTuiAppComponent }] = await Promise.all([
     import("react"),
     import("ink"),
-    import("react-ink-textarea"),
     import("./components/App.js"),
   ]);
   const selected = await selectTuiSession({
@@ -56,8 +55,9 @@ export async function startTuiChat(options: StartTuiChatOptions): Promise<void> 
     Box: ink.Box,
     Text: ink.Text,
     useInput: ink.useInput,
+    useBoxMetrics: ink.useBoxMetrics,
+    useCursor: ink.useCursor,
     useStdout: ink.useStdout,
-    TextArea: textarea.TextArea,
   });
   const app = ink.render(
     React.createElement(TuiApp, {

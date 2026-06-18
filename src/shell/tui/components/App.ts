@@ -1,5 +1,13 @@
 import type { TuiController } from "../controller.js";
-import { measureTuiFooterRows, TUI_MIN_HEIGHT, TUI_MIN_WIDTH } from "../layout.js";
+import {
+  measureTuiFooterRows,
+  TUI_DOCK_ROWS,
+  TUI_FOOTER_BORDER_TOP_ROWS,
+  TUI_FOOTER_PADDING_BOTTOM_ROWS,
+  TUI_FOOTER_PADDING_X,
+  TUI_MIN_HEIGHT,
+  TUI_MIN_WIDTH,
+} from "../layout.js";
 import type { TuiState, TuiViewport } from "../store.js";
 import { TUI_COLORS } from "../theme.js";
 import type { InkRuntime } from "./kit.js";
@@ -26,6 +34,12 @@ export function createTuiAppComponent(kit: InkRuntime) {
       width,
       height: Math.max(1, height - footerRows),
     }), [footerRows, height, width]);
+    const composerFrame = React.useMemo(() => ({
+      hasMeasured: false,
+      left: 0,
+      top: 0,
+      width: Math.max(1, width - TUI_FOOTER_PADDING_X * 2),
+    }), [transcriptViewport.height, width]);
 
     React.useEffect(() => {
       props.controller.setViewport(transcriptViewport);
@@ -67,13 +81,14 @@ export function createTuiAppComponent(kit: InkRuntime) {
           borderRight: false,
           borderColor: TUI_COLORS.border,
           backgroundColor: TUI_COLORS.panel,
-          paddingX: 2,
-          paddingBottom: 1,
+          paddingX: TUI_FOOTER_PADDING_X,
+          paddingBottom: TUI_FOOTER_PADDING_BOTTOM_ROWS,
           width: "100%",
         },
         React.createElement(RuntimeDock, { dock: state.dock }),
         React.createElement(Composer, {
           controller: props.controller,
+          frame: composerFrame,
           state,
         }),
       ),
