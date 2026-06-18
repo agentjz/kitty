@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kitty Agent - 小猫智能体</title>
-<meta name="description" content="Kitty Agent 是一个小而准的 AI Agent 编程工作台：找得准，改得对，跑得通，记得住。">
+<title>Kitty Agent — 找得准，改得对</title>
+<meta name="description" content="Kitty Agent 是一个 AI Agent 编程工作台。一个高级工程师就会这样工作：找得准，改得对。">
 <meta property="og:title" content="Kitty Agent">
-<meta property="og:description" content="一个把编程任务真正往前推的 AI Agent 工作台。">
+<meta property="og:description" content="一个把编程任务真正往前推的 AI Agent 工作台。找得准，改得对。">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet">
@@ -14,151 +14,89 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<nav class="navbar sticky-top site-nav py-3">
-  <div class="container">
-    <a class="navbar-brand d-flex align-items-center gap-2 fw-bold" href="#top" aria-label="Kitty Agent home">
-      <span class="brand-cat" aria-hidden="true">🐱</span>
-      <span class="keycap">KT</span>
-      <span>Kitty Agent</span>
-    </a>
+
+<nav class="site-topbar py-3">
+  <div class="container d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-2">
+    <div class="d-flex align-items-center gap-3">
+      <a class="navbar-brand d-flex align-items-center fw-bold" href="#top" aria-label="Kitty Agent home">
+        <span>Kitty Agent</span>
+      </a>
+      <span class="small text-secondary d-none d-md-inline">找得准，改得对，跑得通，记得住。</span>
+    </div>
     <a class="github-link" href="https://github.com/agentjz/kitty" target="_blank" rel="noopener" aria-label="Open Kitty Agent on GitHub">
       <i class="bi bi-github" aria-hidden="true"></i>
     </a>
   </div>
 </nav>
 
-<header class="hero" id="top">
-  <div class="container py-5 py-lg-6">
-    <div class="hero-frame bg-white">
-      <div class="row align-items-center g-4 g-lg-5">
-        <div class="col-lg-6">
-          <div class="label-chip">AI Agent 编程工作台</div>
-          <h1 class="display-2 fw-black lh-1 mt-4 mb-3">Kitty Agent</h1>
-          <p class="hero-line fs-3 fw-semibold mb-3">找得准，改得对，跑得通，记得住。</p>
-          <p class="lead text-secondary hero-copy">
-            Kitty Agent 把一个编程任务推进成清楚的工程循环：先调查项目事实，再实施修改，最后运行验证并留下现场。
-          </p>
-        </div>
-        <div class="col-lg-6">
-          <div class="terminal-card" aria-label="Kitty Agent workflow preview">
-            <div class="terminal-label px-4 pt-4 pb-2">kitty agent</div>
-            <div class="terminal-body">
-              <div class="terminal-title mb-4">帮我做一个团队任务看板</div>
-              <div class="terminal-lines">
-                <div><span class="prompt">research</span> 读取入口、组件、状态和测试</div>
-                <div><span class="prompt">plan</span> 明确页面结构、数据流和边界</div>
-                <div><span class="prompt">build</span> 修改相关文件并保持风格一致</div>
-                <div><span class="prompt">verify</span> 运行检查，记录读过和改过的现场</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</header>
-
 <main>
-  <section class="py-5 py-lg-6 story-section" id="story">
-    <div class="container">
-      <div class="row align-items-start g-5">
-        <div class="col-lg-5">
-          <div class="section-label">How it works</div>
-          <h2 class="display-6 fw-bold">把一句需求变成一轮工程工作</h2>
-          <p class="text-secondary mb-0">
-            比如你说：“帮我做一个团队任务看板。”Kitty Agent 会先看清项目，再动手实现，不把凭空想象写进代码。
-          </p>
+
+<section class="py-5 py-lg-6" id="main">
+  <div class="container">
+
+    <!-- Hero text -->
+    <div class="text-center mb-5">
+      <h1 class="display-2 fw-black lh-1 mb-3">找得准，改得对</h1>
+      <p class="hero-line fs-3 fw-semibold mb-3">一个高级工程师的工作方式</p>
+      <p class="lead text-secondary mx-auto" style="max-width:680px;">
+        Kitty Agent 不靠猜测写代码。先调查项目事实，再动手修改，最后自动验证并记录现场。每一步都像资深工程师一样严谨。
+      </p>
+    </div>
+
+    <!-- product.png centered -->
+    <div class="text-center mb-5">
+      <div class="page-img">
+        <img src="images/product.png" alt="Kitty Agent 产品界面" class="img-fluid rounded-3 shadow">
+      </div>
+    </div>
+
+    <!-- Cards heading -->
+    <div class="text-center mb-5">
+      <h2 class="display-6 fw-bold">不猜，不蒙，不返工</h2>
+      <p class="lead text-secondary mx-auto mt-3" style="max-width:600px;">
+        每一步都有事实依据，每一轮修改都有验证收口。
+      </p>
+    </div>
+
+    <!-- Three capability cards -->
+    <div class="row g-4 justify-content-center mb-5">
+      <div class="col-md-6 col-lg-4">
+        <div class="cap-card">
+          <div class="cap-number">01</div>
+          <div class="cap-icon">🎯</div>
+          <h3 class="h4 fw-bold">找得准</h3>
+          <p class="text-secondary mb-0">先读入口、组件、状态、测试。精确定位要改什么、不改什么，不凭空想象。</p>
         </div>
-        <div class="col-lg-7">
-          <div class="story-board">
-            <div class="story-step">
-              <span>01</span>
-              <div>
-                <h3 class="h5">调查项目</h3>
-                <p class="text-secondary mb-0">先读入口、路由、组件、样式和已有测试，判断这个项目真正怎么组织。</p>
-              </div>
-            </div>
-            <div class="story-step">
-              <span>02</span>
-              <div>
-                <h3 class="h5">确定做法</h3>
-                <p class="text-secondary mb-0">确认任务看板需要哪些状态、交互和页面层级，避免一上来乱写。</p>
-              </div>
-            </div>
-            <div class="story-step">
-              <span>03</span>
-              <div>
-                <h3 class="h5">实施修改</h3>
-                <p class="text-secondary mb-0">围绕相关文件完成界面、状态和数据处理，保持项目原有风格。</p>
-              </div>
-            </div>
-            <div class="story-step">
-              <span>04</span>
-              <div>
-                <h3 class="h5">验证收口</h3>
-                <p class="text-secondary mb-0">运行检查，说明改了什么、验证了什么、下一轮还能从哪里继续。</p>
-              </div>
-            </div>
-          </div>
+      </div>
+      <div class="col-md-6 col-lg-4">
+        <div class="cap-card">
+          <div class="cap-number">02</div>
+          <div class="cap-icon">✅</div>
+          <h3 class="h4 fw-bold">改得对</h3>
+          <p class="text-secondary mb-0">改完立即跑验证。不改第二遍同样的问题，不把未验证的代码交出去。</p>
+        </div>
+      </div>
+      <div class="col-md-6 col-lg-4">
+        <div class="cap-card">
+          <div class="cap-number">03</div>
+          <div class="cap-icon">🔄</div>
+          <h3 class="h4 fw-bold">跑得通</h3>
+          <p class="text-secondary mb-0">长任务不中断，现场可恢复。每次都能从上次停下的地方继续推进。</p>
         </div>
       </div>
     </div>
-  </section>
 
-  <section class="py-5 py-lg-6 fit-section" id="fit">
-    <div class="container">
-      <div class="row g-5 align-items-stretch">
-        <div class="col-lg-5">
-          <div class="fit-intro h-100">
-            <div class="section-label">Who it is for</div>
-          <h2 class="display-6 fw-bold">适合需要持续推进任务的人</h2>
-          <p class="text-secondary mb-0">它不是一次性问答工具，而是一个能反复读项目、改代码、跑验证、保存现场的本地工作台。</p>
-          </div>
-        </div>
-        <div class="col-lg-7">
-          <div class="row g-3 h-100">
-            <div class="col-md-6 d-flex">
-              <div class="fit-item">
-                <h3 class="h5">维护项目</h3>
-                <p class="text-secondary mb-0">摸清现状，围绕事实动手。</p>
-              </div>
-            </div>
-            <div class="col-md-6 d-flex">
-              <div class="fit-item">
-                <h3 class="h5">做长任务</h3>
-                <p class="text-secondary mb-0">多轮、多文件、多次验证，现场能继续。</p>
-              </div>
-            </div>
-            <div class="col-md-6 d-flex">
-              <div class="fit-item">
-                <h3 class="h5">探索新需求</h3>
-                <p class="text-secondary mb-0">一边确认事实，一边推进实现。</p>
-              </div>
-            </div>
-            <div class="col-md-6 d-flex">
-              <div class="fit-item">
-                <h3 class="h5">研究 agent</h3>
-                <p class="text-secondary mb-0">观察上下文、工具和 session 如何协作。</p>
-              </div>
-            </div>
-          </div>
-        </div>
+    <!-- demo.png centered -->
+    <div class="text-center">
+      <div class="page-img">
+        <img src="images/demo.png" alt="Kitty Agent 运行演示 — research → plan → build → verify" class="img-fluid rounded-3 shadow">
       </div>
     </div>
-  </section>
-</main>
 
-<footer class="site-footer py-4">
-  <div class="container d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3">
-    <div>
-      <div class="fw-bold">Kitty Agent</div>
-      <div class="small text-secondary">找得准，改得对，跑得通，记得住。</div>
-    </div>
-    <a class="github-link footer-github" href="https://github.com/agentjz/kitty" target="_blank" rel="noopener" aria-label="Open Kitty Agent on GitHub">
-      <i class="bi bi-github" aria-hidden="true"></i>
-    </a>
   </div>
-</footer>
+</section>
+
+</main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/js/bootstrap.bundle.min.js"></script>
 <script src="script.js"></script>
