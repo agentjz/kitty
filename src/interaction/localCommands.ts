@@ -22,7 +22,7 @@ export interface LocalCommandContext {
   sessionStore?: SessionStoreLike;
 }
 
-export type LocalCommandResult = "continue" | "handled" | "quit" | "multiline";
+export type LocalCommandResult = "continue" | "handled" | "quit";
 
 export function isExplicitExitCommand(input: string): boolean {
   return isLocalCommand(input, "exit");
@@ -56,10 +56,6 @@ export async function handleLocalCommand(
   if (command === "help") {
     output.plain(formatLocalCommandHelp());
     return "handled";
-  }
-
-  if (command === "multiline") {
-    return "multiline";
   }
 
   if (command === "session") {

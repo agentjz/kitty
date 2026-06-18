@@ -28,6 +28,7 @@ export interface InteractiveSessionDriverOptions {
   runTurn?: HostTurnRunner;
   localCommandHandler?: typeof handleLocalCommand;
   turnContextProvider?: (session: SessionRecord, input: string) => Promise<InteractiveTurnContext>;
+  onSessionUpdated?: (session: SessionRecord) => void;
 }
 
 export class InteractiveSessionDriver {
@@ -97,8 +98,6 @@ export class InteractiveSessionDriver {
       await this.runTurn(input);
     } else if (localCommandResult === "quit") {
       return this.handleQuitRequest();
-    } else if (localCommandResult === "multiline") {
-      await this.handleMultilineInput();
     }
 
     return localCommandResult;
@@ -148,30 +147,6 @@ export class InteractiveSessionDriver {
       this.options.shell.output.error(`Failed to stop background processes: ${getErrorMessage(error)}`);
       return "handled";
     }
-  }
-
-  private async handleMultilineInput(): Promise<void> {
-    this.options.shell.output.info("Entered multiline mode. Use ::end to submit or ::cancel to cancel.\n");
-    const multiline = await this.options.shell.input.readMultiline("… ");
-
-    if (multiline.kind === "cancel") {
-      this.options.shell.output.warn("Cancelled multiline input.\n");
-      return;
-    }
-
-    if (multiline.kind === "closed") {
-      await this.terminateRunningProcessesForForcedExit("Input closed during multiline mode. Stopping running processes before exit.");
-      this.exitRequested = true;
-      return;
-    }
-
-    const value = multiline.value.trim();
-    if (!value) {
-      this.options.shell.output.warn("Multiline input was empty, nothing was sent.\n");
-      return;
-    }
-
-    await this.runTurn(value);
   }
 
   private handleInterrupt(): void {
@@ -280,6 +255,7 @@ export class InteractiveSessionDriver {
       });
 
       this.session = outcome.session;
+      this.options.onSessionUpdated?.(this.session);
       if (outcome.status === "aborted") {
         turnDisplay.flush();
         this.options.shell.output.warn(outcome.errorMessage ?? "Turn interrupted. You can keep chatting.");

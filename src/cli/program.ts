@@ -16,6 +16,7 @@ import { registerWorkerCommand } from "./commands/worker.js";
 import { writeStderr, writeStdout, writeStdoutLine } from "../utils/stdio.js";
 import { registerTelegramCommands } from "../telegram/cli.js";
 import { registerWebCommand } from "./commands/web.js";
+import { registerTuiCommand } from "./commands/tui.js";
 
 export { type CliProgramDependencies } from "./dependencies.js";
 
@@ -97,6 +98,10 @@ export function buildCliProgram(dependencies: CliProgramDependencies = {}): Comm
     resolveRuntime,
   });
   registerWebCommand(program, {
+    getCliOverrides,
+    resolveRuntime,
+  });
+  registerTuiCommand(program, {
     getCliOverrides,
     resolveRuntime,
   });

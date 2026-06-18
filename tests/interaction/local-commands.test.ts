@@ -29,7 +29,6 @@ test("slash command metadata comes from the local command registry", () => {
     "/copy",
     "/export",
     "/clear",
-    "/multi",
     "/reset",
     "/exit",
   ]) {
@@ -40,7 +39,7 @@ test("slash command metadata comes from the local command registry", () => {
   assert.equal(normalizeLocalCommand("/resume"), "sessions");
 });
 
-test("local commands classify empty, exit, help, session, config, and multiline input", async (t) => {
+test("local commands classify empty, exit, help, session, and config input", async (t) => {
   const root = await createTempWorkspace("local-commands", t);
   const output = createRecordingOutput();
   const context = createLocalCommandContext(root);
@@ -48,7 +47,6 @@ test("local commands classify empty, exit, help, session, config, and multiline 
   assert.equal(isExplicitExitCommand(" /QUIT "), true);
   assert.equal(await handleLocalCommand("   ", context, output), "handled");
   assert.equal(await handleLocalCommand("/exit", context, output), "quit");
-  assert.equal(await handleLocalCommand("/multi", context, output), "multiline");
   assert.equal(await handleLocalCommand("/help", context, output), "handled");
   assert.equal(await handleLocalCommand("/session", context, output), "handled");
   assert.equal(await handleLocalCommand("/config", context, output), "handled");
@@ -67,7 +65,6 @@ test("local commands classify empty, exit, help, session, config, and multiline 
   assert.match(help, /\/copy\s+Print current session transcript/);
   assert.match(help, /\/export\s+Print current session snapshot JSON/);
   assert.match(help, /\/clear\s+Clear the current prompt in UI shells/);
-  assert.match(help, /\/multi\s+Enter multiline input/);
   assert.match(help, /quit\s+Exit the session/);
   assert.deepEqual(output.infoText, [
     "Current session: session-local-command",

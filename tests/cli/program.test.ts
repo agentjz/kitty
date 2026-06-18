@@ -18,7 +18,7 @@ test("cli program exposes current top-level commands", () => {
   const program = buildCliProgram();
   const commands = program.commands.map((command) => command.name());
 
-  for (const name of ["agent", "background", "resume", "sessions", "events", "config", "init", "status", "memory", "changes", "undo", "diff", "doctor", "eval", "telegram", "version", "__worker__"]) {
+  for (const name of ["agent", "background", "resume", "sessions", "events", "config", "init", "status", "memory", "changes", "undo", "diff", "doctor", "eval", "telegram", "web", "tui", "version", "__worker__"]) {
     assert.equal(commands.includes(name), true, `${name} command should exist`);
   }
   assert.equal(program.helpInformation().includes("__worker__"), false);
@@ -181,4 +181,14 @@ test("cli setup errors explain missing provider key", () => {
   assert.match(message ?? "", /Provider API key is missing/);
   assert.match(message ?? "", /KITTY_API_KEY/);
   assert.match(message ?? "", /kitty doctor/);
+});
+
+test("tui command requires an interactive TTY", async () => {
+  const program = buildCliProgram();
+
+  program.exitOverride();
+  await assert.rejects(
+    () => program.parseAsync(["tui"], { from: "user" }),
+    /requires an interactive TTY/,
+  );
 });

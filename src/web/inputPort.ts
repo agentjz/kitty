@@ -1,4 +1,4 @@
-import type { ShellInputPort, ShellInputResult, ShellMultilineInputResult } from "../interaction/shell.js";
+import type { ShellInputPort, ShellInputResult } from "../interaction/shell.js";
 import { WebSocketServer } from "ws";
 
 export function createWebInputPort(wss: WebSocketServer): ShellInputPort {
@@ -40,15 +40,6 @@ export function createWebInputPort(wss: WebSocketServer): ShellInputPort {
 
       return new Promise((resolve) => {
         pendingResolve = resolve;
-      });
-    },
-
-    readMultiline(_promptLabel?: string): Promise<ShellMultilineInputResult> {
-      return this.readInput(_promptLabel).then((result) => {
-        if (result.kind === "submit") {
-          return { kind: "submit" as const, value: result.value };
-        }
-        return { kind: "cancel" as const };
       });
     },
 

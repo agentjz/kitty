@@ -77,6 +77,15 @@ kitty
 
 如果已有会话，`kitty` 会先显示最近会话列表：输入 `1` 继续最近会话，输入 `0` 新建会话。没有历史会话时会直接新建。会话标题由模型在第一次真实对话完成后生成，后续保持稳定。
 
+启动 Ink TUI：
+
+```bash
+kitty tui
+node dist/cli.js tui
+```
+
+TUI 是可替换的终端壳层，复用同一套 session、driver、工具和斜杠命令。主区显示用户输入、thinking 和回复；工具、后台任务、subagent 和上下文占用在底部现场区呈现，不灌进主对话区。按键：`Enter` 发送，`Ctrl+J` 换行，`PageUp` / `PageDown` 滚动，`Home` / `End` 跳到顶部 / 底部，鼠标滚轮滚动，`Ctrl+C` 中断当前轮。
+
 交互模式支持本地斜杠命令。斜杠命令直接读取本地现场，不发送给模型：
 
 | 斜杠命令 | 用途 |
@@ -93,7 +102,6 @@ kitty
 | `/copy` | 打印当前 session 对话文本 |
 | `/export` | 打印当前 session JSON 快照 |
 | `/clear` | 清空 UI shell 的当前输入语义 |
-| `/multi` | 进入多行输入 |
 | `/reset` | 清空当前项目运行状态并退出 |
 | `/exit`、`quit`、`q` | 退出当前会话 |
 
@@ -109,6 +117,7 @@ kitty "检查这个仓库并修复失败测试"
 | --- | --- |
 | `kitty` | 进入默认 agent 交互；有历史会话时先选择继续或新建，也可直接接收一次性 prompt |
 | `kitty agent` | 显式进入 agent 模式 |
+| `kitty tui` | 进入 Ink 终端工作台，支持主区滚动、底部输入和运行现场 |
 | `kitty background` | 查看后台任务；`wait <id>` 等待任务；`stop <id>` 停止任务 |
 | `kitty resume [sessionId]` | 恢复最近会话或指定会话 |
 | `kitty sessions` | 查看最近会话 |

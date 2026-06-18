@@ -24,7 +24,7 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "build": "tsup src/cli.ts --format cjs --platform node --target node20 --outDir dist --clean --sourcemap",
+    "build": "tsup src/cli.ts --format cjs --platform node --target node20 --outDir dist --clean --sourcemap && tsup src/tui.ts --format esm --platform node --target node20 --outDir dist --clean=false --external typescript",
     "check": "npm run typecheck && npm run build",
     "dev": "tsx src/cli.ts",
     "test:build": "node -e \"require('node:fs').rmSync('.test-build', { recursive: true, force: true })\" && tsc -p tsconfig.tests.json",
@@ -43,12 +43,19 @@
     "execa": "^9.6.0",
     "fast-glob": "^3.3.3",
     "figlet": "^1.11.0",
+    "ink": "^7.1.0",
+    "marked": "^15.0.7",
     "openai": "^6.4.0",
+    "react": "^19.2.7",
+    "react-ink-textarea": "^0.2.0",
+    "string-width": "^8.2.1",
+    "wrap-ansi": "^10.0.0",
     "ws": "^8.21.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.5.2",
+    "@types/react": "^19.2.17",
     "@types/ws": "^8.18.1",
     "tsup": "^8.5.0",
     "tsx": "^4.20.5",

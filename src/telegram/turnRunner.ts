@@ -77,11 +77,6 @@ export async function runTelegramTurn(options: {
         return;
       }
 
-      if (localCommandResult === "multiline") {
-        options.markQueuedTurnStarted(options.message.peerKey);
-        output.warn("Telegram does not support interactive multiline mode. Send the full message directly.");
-        return;
-      }
     }
 
     const display = new TelegramTurnDisplay({

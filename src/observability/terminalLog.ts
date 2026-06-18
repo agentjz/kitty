@@ -192,15 +192,6 @@ function mirrorInput(input: ShellInputPort, writer: TerminalLogWriter): ShellInp
       }
       return result;
     },
-    async readMultiline(promptLabel) {
-      const result = await input.readMultiline(promptLabel);
-      if (result.kind === "submit") {
-        writer.write(`${promptLabel ?? "... "}${result.value}\n`);
-      } else if (result.kind === "cancel") {
-        writer.write(`${promptLabel ?? "... "}::cancel\n`);
-      }
-      return result;
-    },
     bindInterrupt(handler) {
       return input.bindInterrupt(handler);
     },

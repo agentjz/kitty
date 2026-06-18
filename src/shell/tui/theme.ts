@@ -1,0 +1,16 @@
+export const TUI_COLORS = {
+  background: "#080808",
+  panel: "#191919",
+  panelStrong: "#222222",
+  border: "#303030",
+  muted: "#8d8d8d",
+  text: "#e5e7eb",
+  user: "#d6a84f",
+  assistant: "#e5e7eb",
+  reasoning: "#a8a8a8",
+  thought: "#c99a3f",
+  system: "#cbd5e1",
+  success: "#34d399",
+  warning: "#d6a84f",
+  error: "#f87171",
+} as const;

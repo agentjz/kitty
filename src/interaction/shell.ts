@@ -5,14 +5,8 @@ export type ShellInputResult =
   | { kind: "submit"; value: string }
   | { kind: "closed" };
 
-export type ShellMultilineInputResult =
-  | { kind: "submit"; value: string }
-  | { kind: "cancel" }
-  | { kind: "closed" };
-
 export interface ShellInputPort {
   readInput(promptLabel?: string): Promise<ShellInputResult>;
-  readMultiline(promptLabel?: string): Promise<ShellMultilineInputResult>;
   bindInterrupt(handler: () => void): () => void;
 }
 

@@ -9,7 +9,6 @@ export type LocalCommandId =
   | "export"
   | "help"
   | "memory"
-  | "multiline"
   | "reset"
   | "session"
   | "sessions"
@@ -167,16 +166,6 @@ export const LOCAL_COMMAND_DEFINITIONS = [
     description: "Clear the current prompt in UI shells",
     helpLabel: "/clear",
     helpText: "Clear the current prompt in UI shells",
-  },
-  {
-    id: "multiline",
-    category: "session",
-    aliases: ["/multi"],
-    slashName: "multi",
-    description: "Enter multiline input",
-    helpLabel: "/multi",
-    helpText: "Enter multiline input; use ::end to submit and ::cancel to cancel",
-    showInIntro: true,
   },
 ] as const satisfies readonly LocalCommandDefinition[];
 

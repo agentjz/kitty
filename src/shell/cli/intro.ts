@@ -1,23 +1,9 @@
 import chalk from "chalk";
-import figlet from "figlet";
 
 import { formatLocalCommandHelpLine, listIntroLocalCommands } from "../../interaction/localCommandDefinitions.js";
 import type { ShellOutputPort } from "../../interaction/shell.js";
 import type { SessionRecord } from "../../types.js";
-
-const KITTY_WORDMARK_FONT = "ANSI Shadow";
-
-function renderKittyBanner(): string {
-  return figlet
-    .textSync("kitty agent", {
-      font: KITTY_WORDMARK_FONT,
-      horizontalLayout: "default",
-      verticalLayout: "default",
-      width: 120,
-      whitespaceBreak: false,
-    })
-    .trimEnd();
-}
+import { renderKittyBanner } from "../banner.js";
 
 export function writeCliInteractiveIntro(options: {
   cwd: string;
@@ -35,6 +21,5 @@ export function writeCliInteractiveIntro(options: {
   for (const command of listIntroLocalCommands()) {
     options.output.dim(formatLocalCommandHelpLine(command.id));
   }
-  options.output.dim("::end        Submit multiline input");
-  options.output.dim("::cancel     Cancel multiline input\n");
+  options.output.dim("");
 }

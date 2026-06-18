@@ -5,6 +5,16 @@ import type { SessionStoreLike } from "../../session/index.js";
 import type { SessionRecord } from "../../types.js";
 import { writeStdout, writeStdoutLine } from "../../utils/stdio.js";
 import { createHostSession } from "../../host/session.js";
+export {
+  formatRelativeSessionTime,
+  formatSessionPickerTitle,
+  parseSessionPickerChoice,
+} from "../../session/picker.js";
+import {
+  formatRelativeSessionTime,
+  formatSessionPickerTitle,
+  parseSessionPickerChoice,
+} from "../../session/picker.js";
 
 const DEFAULT_SESSION_PICKER_LIMIT = 10;
 
@@ -85,81 +95,6 @@ export function renderSessionPicker(options: {
     );
   });
   options.io.writeLine();
-}
-
-export function parseSessionPickerChoice(
-  input: string,
-  sessionCount: number,
-): { kind: "new" } | { kind: "existing"; index: number } | { kind: "invalid" } {
-  const trimmed = input.trim();
-  if (trimmed === "") {
-    return sessionCount > 0 ? { kind: "existing", index: 0 } : { kind: "new" };
-  }
-
-  const value = Number.parseInt(trimmed, 10);
-  if (!Number.isInteger(value) || String(value) !== trimmed) {
-    return { kind: "invalid" };
-  }
-
-  if (value === 0) {
-    return { kind: "new" };
-  }
-
-  if (value >= 1 && value <= sessionCount) {
-    return { kind: "existing", index: value - 1 };
-  }
-
-  return { kind: "invalid" };
-}
-
-export function formatRelativeSessionTime(updatedAt: string, now: Date): string {
-  const updatedTime = new Date(updatedAt).getTime();
-  if (!Number.isFinite(updatedTime)) {
-    return updatedAt;
-  }
-
-  const seconds = Math.max(0, Math.floor((now.getTime() - updatedTime) / 1000));
-  if (seconds < 60) {
-    return "刚刚";
-  }
-
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) {
-    return `${minutes} 分钟前`;
-  }
-
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) {
-    return `${hours} 小时前`;
-  }
-
-  const days = Math.floor(hours / 24);
-  if (days < 7) {
-    return `${days} 天前`;
-  }
-
-  const weeks = Math.floor(days / 7);
-  if (days < 30) {
-    return `${weeks} 周前`;
-  }
-
-  const months = Math.floor(days / 30);
-  if (days < 365) {
-    return `${months} 个月前`;
-  }
-
-  return `${Math.floor(days / 365)} 年前`;
-}
-
-export function formatSessionPickerTitle(session: Pick<SessionRecord, "title" | "id">): string {
-  const title = session.title?.trim();
-  return truncateDisplayTitle(title || `未命名会话 ${session.id}`);
-}
-
-function truncateDisplayTitle(title: string): string {
-  const chars = Array.from(title);
-  const maxChars = 36;
-  return chars.length > maxChars ? `${chars.slice(0, maxChars).join("")}...` : title;
 }
 
 function resolveSessionPickerIo(io: Partial<SessionPickerIo> | undefined): SessionPickerIo {
