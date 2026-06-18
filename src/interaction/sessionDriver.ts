@@ -84,6 +84,7 @@ export class InteractiveSessionDriver {
           cwd: this.options.cwd,
           session: this.session,
           config: this.options.config,
+          sessionStore: this.options.sessionStore,
         },
         this.options.shell.output,
       );

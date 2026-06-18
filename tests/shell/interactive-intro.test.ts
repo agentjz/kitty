@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { ShellOutputPort } from "../../src/interaction/shell.js";
+import { listIntroLocalCommands } from "../../src/interaction/localCommandDefinitions.js";
 import { writeCliInteractiveIntro } from "../../src/shell/cli/intro.js";
 
 test("interactive intro prints session, cwd, and local commands", () => {
@@ -17,8 +18,10 @@ test("interactive intro prints session, cwd, and local commands", () => {
   assert.match(rendered, /session: session-intro/);
   assert.match(rendered, /cwd: C:\\workspace\\kitty/);
   assert.doesNotMatch(rendered, /Tools:/);
-  assert.match(rendered, /\/multi\s+Enter multiline input/);
-  assert.match(rendered, /quit\s+Exit the session/);
+  for (const command of listIntroLocalCommands()) {
+    assert.match(rendered, new RegExp(`${escapeRegExp(command.helpLabel)}\\s+${escapeRegExp(command.helpText)}`));
+  }
+  assert.doesNotMatch(rendered, /\/status\s+Show current project scene/);
 });
 
 test("interactive intro can print a supplied active tool surface label", () => {
@@ -52,4 +55,8 @@ function createRecordingOutput(): ShellOutputPort & {
     heading: () => undefined,
     interrupt: () => undefined,
   };
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

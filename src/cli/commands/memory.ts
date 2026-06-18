@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 
-import { buildRuntimeStatus } from "../../runtime/status.js";
+import { buildRuntimeStatus, type RuntimeStatus } from "../../runtime/status.js";
 import {
   appendRuntimeMemoryAssetToSkillReference,
   createRuntimeMemoryAsset,
@@ -185,27 +185,36 @@ function parseCsvOption(value: string | undefined): string[] {
     .filter(Boolean);
 }
 
+export async function readMemoryListForCli(cwd: string): Promise<RuntimeStatus["memory"]> {
+  return (await buildRuntimeStatus(cwd)).memory;
+}
+
+export function formatMemoryListForCli(memory: Awaited<ReturnType<typeof readMemoryListForCli>>): string {
+  if (memory.assets.length === 0) {
+    return "No runtime memory assets yet.";
+  }
+  return memory.assets.map((asset) => [
+    asset.id,
+    asset.kind,
+    asset.updatedAt ?? "",
+    `bytes=${asset.size}`,
+    asset.evidenceRefs.length > 0 ? `evidence=${asset.evidenceRefs.join(",")}` : undefined,
+    asset.path,
+  ].filter(Boolean).join("  ")).join("\n");
+}
+
 async function handleMemoryList(cwd: string, json: boolean): Promise<void> {
-  const status = await buildRuntimeStatus(cwd);
+  const memory = await readMemoryListForCli(cwd);
 
   if (json) {
-    writeStdoutLine(JSON.stringify(status.memory, null, 2));
+    writeStdoutLine(JSON.stringify(memory, null, 2));
     return;
   }
 
-  if (status.memory.assets.length === 0) {
+  if (memory.assets.length === 0) {
     ui.info("No runtime memory assets yet.");
     return;
   }
 
-  for (const memory of status.memory.assets) {
-    writeStdoutLine([
-      memory.id,
-      memory.kind,
-      memory.updatedAt ?? "",
-      `bytes=${memory.size}`,
-      memory.evidenceRefs.length > 0 ? `evidence=${memory.evidenceRefs.join(",")}` : undefined,
-      memory.path,
-    ].filter(Boolean).join("  "));
-  }
+  writeStdoutLine(formatMemoryListForCli(memory));
 }

@@ -77,6 +77,26 @@ kitty
 
 如果已有会话，`kitty` 会先显示最近会话列表：输入 `1` 继续最近会话，输入 `0` 新建会话。没有历史会话时会直接新建。会话标题由模型在第一次真实对话完成后生成，后续保持稳定。
 
+交互模式支持本地斜杠命令。斜杠命令直接读取本地现场，不发送给模型：
+
+| 斜杠命令 | 用途 |
+| --- | --- |
+| `/help` | 查看当前可用斜杠命令 |
+| `/status` | 查看当前项目现场 |
+| `/background`、`/bg` | 查看后台任务现场 |
+| `/memory` | 查看 runtime memory assets |
+| `/skills` | 查看 runtime skills 健康状态 |
+| `/events` | 查看当前 session 最近事件 |
+| `/doctor` | 运行本地配置 preflight |
+| `/sessions` | 查看最近会话 |
+| `/session` | 查看当前 session id |
+| `/copy` | 打印当前 session 对话文本 |
+| `/export` | 打印当前 session JSON 快照 |
+| `/clear` | 清空 UI shell 的当前输入语义 |
+| `/multi` | 进入多行输入 |
+| `/reset` | 清空当前项目运行状态并退出 |
+| `/exit`、`quit`、`q` | 退出当前会话 |
+
 执行一次明确任务：
 
 ```bash

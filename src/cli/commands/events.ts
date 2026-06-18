@@ -54,7 +54,7 @@ export function registerEventsCommand(
       }
 
       for (const event of result.events) {
-        writeStdoutLine(formatSessionEvent(event));
+        writeStdoutLine(formatSessionEventForCli(event));
       }
     });
 }
@@ -80,7 +80,17 @@ export async function readSessionEventsForCli(input: {
   };
 }
 
-function formatSessionEvent(event: SessionEventRecord): string {
+export function formatSessionEventsForCli(result: { sessionId: string | null; events: SessionEventRecord[] }): string {
+  if (!result.sessionId) {
+    return "No saved sessions yet.";
+  }
+  if (result.events.length === 0) {
+    return `No events recorded for session ${result.sessionId}.`;
+  }
+  return result.events.map(formatSessionEventForCli).join("\n");
+}
+
+export function formatSessionEventForCli(event: SessionEventRecord): string {
   const parts = [
     event.createdAt,
     event.type,

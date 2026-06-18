@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import figlet from "figlet";
 
-import { formatLocalCommandHelpLine } from "../../interaction/localCommandDefinitions.js";
+import { formatLocalCommandHelpLine, listIntroLocalCommands } from "../../interaction/localCommandDefinitions.js";
 import type { ShellOutputPort } from "../../interaction/shell.js";
 import type { SessionRecord } from "../../types.js";
 
@@ -32,10 +32,9 @@ export function writeCliInteractiveIntro(options: {
     options.output.dim(`Tools: ${options.toolsLabel}`);
   }
   options.output.dim("Commands:");
-  options.output.dim(formatLocalCommandHelpLine("help"));
-  options.output.dim(formatLocalCommandHelpLine("multiline"));
-  options.output.dim(formatLocalCommandHelpLine("reset"));
-  options.output.dim(formatLocalCommandHelpLine("exit"));
+  for (const command of listIntroLocalCommands()) {
+    options.output.dim(formatLocalCommandHelpLine(command.id));
+  }
   options.output.dim("::end        Submit multiline input");
   options.output.dim("::cancel     Cancel multiline input\n");
 }
