@@ -98,6 +98,20 @@ test("tui transcript layout uses terminal display width for wide characters", ()
   assert.equal(rows.every((row) => row.kind === "spacer" || !row.text.includes("你好你好你好你好你好")), true);
 });
 
+test("tui transcript keeps markdown structure as display facts", () => {
+  const rows = renderTranscriptLineViews([{
+    id: "entry-1",
+    role: "assistant",
+    text: "## Title\n\n- first\n\n```ts\nconst ok = true;\n```\n\n> note",
+  }], 80).filter((row) => row.kind === "content");
+
+  assert.equal(rows.some((row) => row.markdownKind === "heading" && row.text === "Title"), true);
+  assert.equal(rows.some((row) => row.markdownKind === "list" && row.text === "• first"), true);
+  assert.equal(rows.some((row) => row.markdownKind === "code" && row.text === "const ok = true;"), true);
+  assert.equal(rows.some((row) => row.markdownKind === "quote" && row.text === "│ note"), true);
+  assert.equal(rows.some((row) => row.text.includes("```")), false);
+});
+
 test("tui parses submitted input echo from session driver", () => {
   assert.equal(parseSubmittedInputEcho("> hello\n… world"), "hello\nworld");
   assert.equal(parseSubmittedInputEcho("plain output"), undefined);

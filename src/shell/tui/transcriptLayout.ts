@@ -1,7 +1,7 @@
 import wrapAnsi from "wrap-ansi";
 import stringWidth from "string-width";
 
-import { renderMarkdownLines } from "./markdown.js";
+import { renderMarkdownLines, type TuiMarkdownLineKind } from "./markdown.js";
 
 export type TuiTranscriptRole = "user" | "assistant" | "reasoning" | "system";
 
@@ -18,6 +18,7 @@ export interface TuiTranscriptLineView {
   kind: "spacer" | "content";
   text: string;
   prefix: string;
+  markdownKind: TuiMarkdownLineKind | undefined;
   isFirstContentLine: boolean;
   frame: TuiTranscriptLineFrame;
   style: TuiTranscriptLineStyle;
@@ -37,6 +38,7 @@ export interface TuiTranscriptLineStyle {
   background: string | undefined;
   text: string;
   bold: boolean;
+  dim: boolean;
   italicPrefix: boolean;
 }
 
@@ -46,6 +48,7 @@ export interface TuiTranscriptTheme {
   panel: string;
   panelStrong: string;
   text: string;
+  muted: string;
   user: string;
   assistant: string;
   reasoning: string;
@@ -91,7 +94,7 @@ function renderEntryLineViews(
   const style = readRoleStyle(entry.role, theme);
   const sourceRows = readEntryDisplayRows(entry);
   const contentRows = wrapEntryRows(entry, sourceRows, frame.bodyWidth);
-  const rows = contentRows.length > 0 ? contentRows : [{ prefix: "", text: "" }];
+  const rows = contentRows.length > 0 ? contentRows : [{ markdownKind: undefined, prefix: "", text: "" }];
   const entryId = entry.id;
   return [
     {
@@ -101,6 +104,7 @@ function renderEntryLineViews(
       kind: "spacer",
       text: "",
       prefix: "",
+      markdownKind: undefined,
       isFirstContentLine: false,
       frame,
       style,
@@ -112,9 +116,10 @@ function renderEntryLineViews(
       kind: "content",
       text: row.text,
       prefix: row.prefix,
+      markdownKind: row.markdownKind,
       isFirstContentLine: index === 0,
       frame,
-      style,
+      style: applyMarkdownStyle(style, row.markdownKind, theme),
     })),
   ];
 }
@@ -177,6 +182,7 @@ function readRoleStyle(role: TuiTranscriptRole, theme: TuiTranscriptTheme): TuiT
         background: theme.panelStrong,
         text: theme.text,
         bold: true,
+        dim: false,
         italicPrefix: false,
       };
     case "reasoning":
@@ -185,6 +191,7 @@ function readRoleStyle(role: TuiTranscriptRole, theme: TuiTranscriptTheme): TuiT
         background: undefined,
         text: theme.reasoning,
         bold: false,
+        dim: true,
         italicPrefix: true,
       };
     case "system":
@@ -193,6 +200,7 @@ function readRoleStyle(role: TuiTranscriptRole, theme: TuiTranscriptTheme): TuiT
         background: theme.panel,
         text: theme.system,
         bold: false,
+        dim: false,
         italicPrefix: false,
       };
     case "assistant":
@@ -201,35 +209,48 @@ function readRoleStyle(role: TuiTranscriptRole, theme: TuiTranscriptTheme): TuiT
         background: undefined,
         text: theme.assistant,
         bold: false,
+        dim: false,
         italicPrefix: false,
       };
   }
 }
 
-function readEntryDisplayRows(entry: TuiTranscriptEntry): string[] {
+interface TuiTranscriptSourceRow {
+  readonly markdownKind: TuiMarkdownLineKind | undefined;
+  readonly text: string;
+}
+
+function readEntryDisplayRows(entry: TuiTranscriptEntry): TuiTranscriptSourceRow[] {
   if (entry.role === "assistant" || entry.role === "reasoning") {
     const markdownRows = renderMarkdownLines(entry.text);
-    return markdownRows.length > 0 ? markdownRows : [""];
+    return markdownRows.length > 0
+      ? markdownRows.map((row) => ({ markdownKind: row.kind, text: row.text }))
+      : [{ markdownKind: undefined, text: "" }];
   }
-  return entry.text.split(/\r?\n/);
+  return entry.text.split(/\r?\n/).map((text) => ({ markdownKind: undefined, text }));
 }
 
 function wrapEntryRows(
   entry: TuiTranscriptEntry,
-  sourceRows: readonly string[],
+  sourceRows: readonly TuiTranscriptSourceRow[],
   bodyWidth: number,
-): Array<{ prefix: string; text: string }> {
+): Array<{ markdownKind: TuiMarkdownLineKind | undefined; prefix: string; text: string }> {
   if (entry.role !== "reasoning") {
-    return sourceRows.flatMap((line) => wrapText(line, bodyWidth).map((text) => ({ prefix: "", text })));
+    return sourceRows.flatMap((line) => wrapText(line.text, bodyWidth).map((text) => ({
+      markdownKind: line.markdownKind,
+      prefix: "",
+      text,
+    })));
   }
 
-  const rows: Array<{ prefix: string; text: string }> = [];
+  const rows: Array<{ markdownKind: TuiMarkdownLineKind | undefined; prefix: string; text: string }> = [];
   const firstBodyWidth = Math.max(1, bodyWidth - stringWidth(REASONING_PREFIX));
   sourceRows.forEach((line, sourceIndex) => {
     const width = sourceIndex === 0 ? firstBodyWidth : bodyWidth;
-    const wrapped = wrapText(line, width);
+    const wrapped = wrapText(line.text, width);
     wrapped.forEach((text, wrappedIndex) => {
       rows.push({
+        markdownKind: line.markdownKind,
         prefix: sourceIndex === 0 && wrappedIndex === 0 ? REASONING_PREFIX : "",
         text,
       });
@@ -245,4 +266,41 @@ function wrapText(text: string, width: number): string[] {
     rows.push(...wrapped.split(/\r?\n/));
   }
   return rows.length > 0 ? rows : [""];
+}
+
+function applyMarkdownStyle(
+  base: TuiTranscriptLineStyle,
+  kind: TuiMarkdownLineKind | undefined,
+  theme: TuiTranscriptTheme,
+): TuiTranscriptLineStyle {
+  switch (kind) {
+    case "heading":
+      return {
+        ...base,
+        text: theme.user,
+        bold: true,
+      };
+    case "code":
+      return {
+        ...base,
+        background: theme.panel,
+        text: theme.system,
+      };
+    case "quote":
+      return {
+        ...base,
+        text: theme.reasoning,
+        dim: true,
+      };
+    case "rule":
+    case "table":
+      return {
+        ...base,
+        text: theme.muted,
+      };
+    case "list":
+    case "text":
+    case undefined:
+      return base;
+  }
 }

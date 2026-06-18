@@ -281,9 +281,9 @@ test("tui transcript renders assistant markdown without changing stored text", a
   );
 
   assert.equal(state.transcript[0]?.text, source);
-  assert.match(output, /## 标题/);
-  assert.match(output, /- 第一项/);
-  assert.match(output, /```ts/);
+  assert.match(output, /标题/);
+  assert.match(output, /• 第一项/);
+  assert.doesNotMatch(output, /```ts/);
   assert.match(output, /const ok = true;/);
 });
 

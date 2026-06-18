@@ -70,6 +70,7 @@ function renderTranscriptLine(
         : React.createElement(Text, {
           color: row.style.text,
           bold: row.style.bold,
+          dimColor: row.style.dim,
           wrap: "truncate-end",
         }, row.text),
     ),
