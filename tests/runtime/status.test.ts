@@ -111,11 +111,24 @@ test("runtime status projects the current project runtime facts", async (t) => {
   assert.equal(status.executions.active[0]?.assignment?.objective, "Inspect runtime visibility");
   assert.equal(status.executions.active[0]?.health?.state, "running");
   assert.equal(status.wakeSignals.recent.length, 1);
+  assert.equal(status.scene.headline, "1 execution(s) are running.");
+  assert.equal(status.scene.nextAction, "Let active work finish, or inspect it with `kitty status` / `kitty background`.");
+  assert.match(status.scene.cost, /5% context/);
+  assert.match(status.scene.cost, /stable 67%/);
+  assert.equal(status.scene.recovery, "1 wake signal(s) recorded.");
+  assert.equal(status.scene.skills.nextAction, "No runtime skills discovered.");
+  assert.equal(status.scene.memory.latestSessionMemory, true);
+  assert.equal(status.scene.memory.nextAction, "Session memory is available; use assets only when needed.");
 
   const text = formatRuntimeStatusText(status);
+  assert.match(text, /Scene:/);
+  assert.match(text, /Now: 1 execution\(s\) are running\./);
+  assert.match(text, /Skills: 0\/0 ready; No runtime skills discovered\./);
+  assert.match(text, /Memory: 1 asset\(s\), session=yes; Session memory is available; use assets only when needed\./);
+  assert.match(text, /Cost: 5% context; stable 67%; no model request yet/);
   assert.match(text, /Current workspace:/);
-  assert.match(text, /Focus: none/);
-  assert.match(text, /Next: Wait for active execution results or inspect them with status\/tools\./);
+  assert.match(text, /Focus: Investigate runtime/);
+  assert.match(text, /Next: Let active work finish, or inspect it with `kitty status` \/ `kitty background`\./);
   assert.match(text, /Blocked: no/);
   assert.match(text, /Skills: 0\/0 ready/);
   assert.match(text, /Executions: 1 active \/ 1 total/);
@@ -168,6 +181,9 @@ test("runtime status surfaces recent model request cache facts", async (t) => {
   const text = formatRuntimeStatusText(status);
 
   assert.equal(status.modelRequests.recent.length, 1);
+  assert.match(status.scene.cost, /1250 tokens/);
+  assert.match(status.scene.cost, /900 cached/);
+  assert.match(status.scene.cost, /75% hit/);
   assert.match(text, /Model cache: cached=900/);
   assert.match(text, /miss=300/);
   assert.match(text, /Recent model requests:/);
@@ -195,4 +211,20 @@ test("runtime status exposes background executions that are running without outp
   assert.equal(status.executions.active.length, 1);
   assert.equal(status.executions.active[0]?.health?.state, "no_output");
   assert.match(status.executions.active[0]?.health?.message ?? "", /has not published output/);
+  assert.equal(status.scene.background.active, 1);
+  assert.equal(status.scene.background.blocked, 1);
+  assert.match(status.scene.background.nextAction, /kitty background wait/);
+  assert.equal(status.scene.executions[0]?.risk, "watch");
+  assert.match(formatRuntimeStatusText(status), /risk=watch/);
+});
+
+test("runtime scene gives a direct starting action when no session exists", async (t) => {
+  const root = await createTempWorkspace("runtime-status-empty-scene", t);
+
+  const status = await buildRuntimeStatus(root);
+
+  assert.equal(status.scene.headline, "No active session yet.");
+  assert.equal(status.scene.nextAction, "Start a session with `kitty`.");
+  assert.equal(status.scene.blocked, "no");
+  assert.match(formatRuntimeStatusText(status), /Now: No active session yet\./);
 });

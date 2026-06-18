@@ -421,6 +421,7 @@ test("lead turn disables tools after repeated identical tool evidence", async (t
         toolCalls: [],
       };
     },
+    ...fastTurnFinalizers(),
   });
 
   assert.equal(result.transition?.action, "finalize");
@@ -512,6 +513,7 @@ test("lead tool loop boundary resets when tool arguments change", async (t) => {
         toolCalls: [],
       };
     },
+    ...fastTurnFinalizers(),
   });
 
   assert.equal(result.transition?.action, "finalize");
@@ -552,6 +554,7 @@ test("toolless closeout retries when assistant emits tool protocol text", async 
         toolCalls: [],
       };
     },
+    ...fastTurnFinalizers(),
   });
 
   assert.equal(result.transition?.action, "finalize");
@@ -656,5 +659,16 @@ function createDelegatingTool(createExecution: () => string, name = "delegate_on
         output: JSON.stringify({ executionId }, null, 2),
       };
     },
+  };
+}
+
+function fastTurnFinalizers() {
+  const emptyResponse = async (): Promise<AssistantResponse> => ({
+    content: "",
+    toolCalls: [],
+  });
+  return {
+    fetchSessionTitleResponse: emptyResponse,
+    fetchSessionMemoryResponse: emptyResponse,
   };
 }

@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { BackgroundExecutionStore, waitForRegisteredBackgroundProcess } from "../../src/execution/background.js";
+import { formatBackgroundExecution } from "../../src/cli/commands/background.js";
 import { createBackgroundTools } from "../../src/extensions/tools/background/index.js";
+import { summarizeExecution } from "../../src/runtime/executionSummary.js";
 import { createToolContext, parseToolJson, createTempWorkspace } from "../helpers.js";
 
 test("background extension exposes run, check, wait, stop, and terminate tools", async (t) => {
@@ -107,6 +109,24 @@ test("background stop closes a running execution", async (t) => {
   const stoppedExecution = readExecutionPayload(stopped);
   assert.equal(stoppedExecution.status, "aborted");
   assert.equal(store.load(job.id)?.status, "aborted");
+});
+
+test("background CLI format explains risk and next action", async (t) => {
+  const root = await createTempWorkspace("background-tool-scene-format", t);
+  const store = new BackgroundExecutionStore(root);
+  const job = store.create({
+    command: "long-running-without-output",
+    cwd: root,
+    requestedBy: "lead",
+  });
+  store.markRunning(job.id, { pid: process.pid });
+
+  const formatted = formatBackgroundExecution(summarizeExecution(store.load(job.id)!));
+
+  assert.match(formatted, /risk=watch/);
+  assert.match(formatted, /has not published output/);
+  assert.match(formatted, /kitty background wait/);
+  assert.match(formatted, /summary=long-running-without-output/);
 });
 
 function readExecutionPayload(payload: Record<string, unknown>): Record<string, unknown> {

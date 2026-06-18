@@ -3,6 +3,7 @@ import type { Command } from "commander";
 import { BackgroundExecutionStore, terminateBackgroundExecution, waitForBackgroundExecution, waitForRegisteredBackgroundProcess } from "../../execution/background.js";
 import { summarizeExecution } from "../../runtime/executionSummary.js";
 import type { RuntimeExecutionSummary } from "../../runtime/statusTypes.js";
+import { buildExecutionScene } from "../../runtime/scene.js";
 import type { CliOverrides, RuntimeConfig } from "../../types.js";
 import { ui } from "../../utils/console.js";
 import { writeStdoutLine } from "../../utils/stdio.js";
@@ -82,15 +83,17 @@ function printBackgroundExecutions(executions: RuntimeExecutionSummary[], json: 
   }
 }
 
-function formatBackgroundExecution(execution: RuntimeExecutionSummary): string {
+export function formatBackgroundExecution(execution: RuntimeExecutionSummary): string {
+  const scene = buildExecutionScene(execution);
   return [
     execution.id,
     execution.status,
+    `risk=${scene.risk}`,
     execution.pid === undefined ? undefined : `pid=${execution.pid}`,
-    execution.health ? `health=${execution.health.state}` : undefined,
+    `health=${truncateCliValue(scene.health, 90)}`,
     execution.deadlineAt ? `deadline=${execution.deadlineAt}` : undefined,
-    execution.command ? `cmd=${truncateCliValue(execution.command, 70)}` : undefined,
-    execution.summary ? `summary=${truncateCliValue(execution.summary, 90)}` : undefined,
-    execution.outputPreview ? `output=${truncateCliValue(execution.outputPreview, 120)}` : undefined,
+    `summary=${truncateCliValue(scene.summary, 90)}`,
+    `next=${scene.nextAction}`,
+    scene.lastOutput ? `lastOutput=${truncateCliValue(scene.lastOutput, 120)}` : undefined,
   ].filter(Boolean).join("  ");
 }

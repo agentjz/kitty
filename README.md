@@ -21,6 +21,7 @@
 它的主线不是自我改造，而是把本地 coding agent 做成可恢复、可验收、省钱的执行系统：
 
 - 本地执行内核：聊天只是入口，session、workset、execution、events、memory 和 status 才是任务现场。
+- 生产现场：`kitty status` 把当前目标、下一步、阻塞、后台、成本、恢复、skill 和 memory 汇成一眼可读的现场。
 - Cost Kernel：即使只用一个模型，也通过稳定前缀、易变尾部、大内容压缩、按需 skill 和 cache usage 审阅来省 token。
 - 产品级验收合同：`kitty eval` 验证真实用户路径，而不是只证明模块能 import。
 
@@ -47,6 +48,7 @@
 | 🛠️ Core tools | `read`、`edit`、`write`、`bash` |
 | 🧩 Extensions | `todo`、`worktree`、`network`、`background`、`subagent`、`skills` |
 | 🧾 Control plane | SQLite 账本记录 task lifecycle、execution、deadline、输出健康、wait policy、pid、状态和 wake 事实；host 负责等待和恢复 lead |
+| 🧯 Production scene | `status` 把 session、background、subagent、memory、skills、cache、wake 和失败边界投影成当前现场、下一步和阻塞原因 |
 | 📋 Plan 工作流 | `plan.md` 是当前任务总管，配合 plan skill 管理需求、事实、失败测试、目标、设计、任务、验证和收口 |
 | 💬 产品面 | CLI、交互终端、Telegram 私聊服务 |
 | 📎 证据记录 | session events、终端日志、崩溃记录、文件变更记录 |
@@ -93,7 +95,7 @@ kitty "检查这个仓库并修复失败测试"
 | `kitty events [sessionId]` | 查看最近会话或指定会话的机器事件 |
 | `kitty config show` | 查看从 `.kitty/.env` 解析出的当前运行配置 |
 | `kitty config path` | 查看当前项目 `.kitty/.env` 路径 |
-| `kitty status` | 查看当前项目现场：焦点、下一步、阻塞项、session、context budget、memory、skills、project map、execution、wake |
+| `kitty status` | 查看当前项目现场：当前目标、下一步、阻塞、后台、恢复、成本、session、context budget、memory、skills、project map、execution、wake |
 | `kitty memory` | 创建、查看、读取、搜索、删除 runtime memory assets，或把 memory 沉淀到 skill references |
 | `kitty changes` | 查看记录的文件变更 |
 | `kitty undo [changeId]` | 撤销最近一次或指定变更 |
@@ -136,7 +138,7 @@ Cost Kernel 的边界很硬：省钱不靠模型路由，不靠把能力关掉�
 
 Provider usage 会归一化缓存事实：DeepSeek 的 `prompt_cache_hit_tokens` / `prompt_cache_miss_tokens`，OpenAI 的 `prompt_tokens_details.cached_tokens`，Anthropic 的 `cache_read_input_tokens` / `cache_creation_input_tokens`，以及 Gemini cached content tokens。`model.request` observability 事件会记录这些字段，`kitty status` 会显示最近模型请求的缓存命中和 context cache layout。OpenAI 请求会使用同 session 稳定 `prompt_cache_key`；DeepSeek 不写无效 `cache_control`，优先保持稳定前缀和命中观测。
 
-`kitty eval` 是产品验收合同：每个场景都说明用户路径和机器证据。`kitty eval --run` 包含 cache economy 检查：usage 字段解析、provider cache policy、stable prefix fingerprint、volatile tail、skill index boundary 和大输出压缩都必须能机器验证。真实省钱仍取决于 provider 是否返回 usage，以及同一 session 的前缀是否真的被上游缓存命中。
+`kitty eval` 是产品验收合同：每个场景都说明用户路径和机器证据。`kitty eval --run` 包含生产现场、恢复演练、远程入口、cache economy、skill/memory readiness 和失败边界检查。usage 字段解析、provider cache policy、stable prefix fingerprint、volatile tail、skill index boundary 和大输出压缩都必须能机器验证。真实省钱仍取决于 provider 是否返回 usage，以及同一 session 的前缀是否真的被上游缓存命中。
 
 Session workset 记录当前会话实际读过和改过的文件。`read` 成功后记录读取事实，`edit` / `write` 成功后记录变更事实和 change id。工作集会进入 session、working memory 和 `kitty status`，让用户看到当前任务真正碰过哪些文件。
 

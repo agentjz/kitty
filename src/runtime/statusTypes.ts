@@ -1,6 +1,7 @@
 export interface RuntimeStatus {
   rootDir: string;
   stateDir: string;
+  scene: RuntimeSceneSummary;
   sessions: {
     total: number;
     latest?: RuntimeSessionSummary;
@@ -28,6 +29,42 @@ export interface RuntimeStatus {
   wakeSignals: {
     recent: RuntimeWakeSignalSummary[];
   };
+}
+
+export interface RuntimeSceneSummary {
+  headline: string;
+  focus: string;
+  nextAction: string;
+  blocked: string;
+  cost: string;
+  recovery: string;
+  skills: {
+    ready: number;
+    total: number;
+    nextAction: string;
+  };
+  memory: {
+    assets: number;
+    latestSessionMemory: boolean;
+    nextAction: string;
+  };
+  background: {
+    active: number;
+    blocked: number;
+    nextAction: string;
+  };
+  executions: RuntimeExecutionSceneSummary[];
+}
+
+export interface RuntimeExecutionSceneSummary {
+  id: string;
+  kind: string;
+  status: string;
+  health: string;
+  risk: "none" | "watch" | "blocked";
+  summary: string;
+  nextAction: string;
+  lastOutput?: string;
 }
 
 export interface RuntimeProjectMapSummary {

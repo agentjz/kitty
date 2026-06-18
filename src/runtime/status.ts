@@ -8,6 +8,7 @@ import { buildProjectMap } from "../project/map.js";
 import { listRuntimeMemoryAssets } from "./memory/index.js";
 import { loadProjectContext } from "../context/projectContext.js";
 import { summarizeExecution, summarizeExecutionSet } from "./executionSummary.js";
+import { buildRuntimeScene } from "./scene.js";
 import { SessionStore } from "../session/store.js";
 import type { SessionRecord } from "../types.js";
 import type {
@@ -45,7 +46,7 @@ export async function buildRuntimeStatus(rootDir: string): Promise<RuntimeStatus
   const sessions = sessionRead.sessions.map(summarizeSession);
   const taskLifecycle = sessions[0] ? readTaskLifecycleStatus(paths.rootDir, sessions[0].id) : undefined;
 
-  return {
+  const statusWithoutScene = {
     rootDir: paths.rootDir,
     stateDir: paths.kittyDir,
     sessions: {
@@ -65,6 +66,11 @@ export async function buildRuntimeStatus(rootDir: string): Promise<RuntimeStatus
     taskLifecycle,
     executions: control.executions,
     wakeSignals: control.wakeSignals,
+  };
+
+  return {
+    ...statusWithoutScene,
+    scene: buildRuntimeScene(statusWithoutScene),
   };
 }
 

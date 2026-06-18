@@ -7,11 +7,23 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
   lines.push(`Project: ${status.rootDir}`);
   lines.push(`State: ${status.stateDir}`);
   lines.push("");
+  lines.push("Scene:");
+  lines.push(`- Now: ${status.scene.headline}`);
+  lines.push(`- Focus: ${status.scene.focus}`);
+  lines.push(`- Next: ${status.scene.nextAction}`);
+  lines.push(`- Blocked: ${status.scene.blocked}`);
+  lines.push(`- Background: ${status.scene.background.active} active / ${status.scene.background.blocked} need attention`);
+  lines.push(`- Background next: ${status.scene.background.nextAction}`);
+  lines.push(`- Skills: ${status.scene.skills.ready}/${status.scene.skills.total} ready; ${status.scene.skills.nextAction}`);
+  lines.push(`- Memory: ${status.scene.memory.assets} asset(s), session=${status.scene.memory.latestSessionMemory ? "yes" : "no"}; ${status.scene.memory.nextAction}`);
+  lines.push(`- Cost: ${status.scene.cost}`);
+  lines.push(`- Recovery: ${status.scene.recovery}`);
+  lines.push("");
   lines.push("Current workspace:");
-  lines.push(`- Focus: ${readFocus(status)}`);
+  lines.push(`- Focus: ${status.scene.focus}`);
   lines.push(`- Session: ${readSessionLine(status)}`);
-  lines.push(`- Next: ${readNextStep(status)}`);
-  lines.push(`- Blocked: ${readBlockedLine(status)}`);
+  lines.push(`- Next: ${status.scene.nextAction}`);
+  lines.push(`- Blocked: ${status.scene.blocked}`);
   lines.push(`- Context budget: ${readContextBudgetLine(status)}`);
   lines.push(`- Workset: ${status.sessions.latest?.workset ? `${status.sessions.latest.workset.total} file(s)` : "none"}`);
   lines.push(`- Memory: ${status.memory.assets.length > 0 ? `${status.memory.assets.length} asset(s)` : "none"}`);
@@ -132,17 +144,18 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
   if (status.executions.active.length > 0) {
     lines.push("");
     lines.push("Active executions:");
-    for (const execution of status.executions.active) {
+    for (const execution of status.scene.executions) {
       lines.push([
         execution.id,
         execution.kind,
         execution.status,
-        execution.actorName ? `actor=${execution.actorName}` : undefined,
-        execution.waitPolicy ? `wait=${execution.waitPolicy}` : undefined,
-        execution.health ? `health=${execution.health.state}` : undefined,
-        execution.deadlineAt ? `deadline=${execution.deadlineAt}` : undefined,
-        execution.assignment?.objective ? `objective=${truncateCliValue(execution.assignment.objective, 60)}` : undefined,
+        `risk=${execution.risk}`,
+        `summary=${truncateCliValue(execution.summary, 80)}`,
+        `next=${execution.nextAction}`,
       ].filter(Boolean).join("  "));
+      if (execution.lastOutput) {
+        lines.push(`  lastOutput=${execution.lastOutput}`);
+      }
     }
   }
 
@@ -192,36 +205,11 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
   return `${lines.join("\n")}\n`;
 }
 
-function readFocus(status: RuntimeStatus): string {
-  const focus = status.sessions.latest?.focus;
-  return focus ? truncateCliValue(focus, 100) : "none";
-}
-
 function readSessionLine(status: RuntimeStatus): string {
   if (!status.sessions.latest) {
     return "none";
   }
   return `${status.sessions.latest.id} (${status.sessions.latest.messageCount} message(s))`;
-}
-
-function readNextStep(status: RuntimeStatus): string {
-  if (status.executions.active.length > 0) {
-    return "Wait for active execution results or inspect them with status/tools.";
-  }
-  if (!status.sessions.latest) {
-    return "Start a session with `kitty` or run a prompt.";
-  }
-  return "Continue from the current session focus.";
-}
-
-function readBlockedLine(status: RuntimeStatus): string {
-  const unhealthy = status.executions.active.find((execution) =>
-    execution.health?.state === "stale" || execution.health?.state === "deadline_passed",
-  );
-  if (unhealthy) {
-    return `${unhealthy.kind} ${unhealthy.id}: ${unhealthy.health?.message}`;
-  }
-  return "no";
 }
 
 function readContextBudgetLine(status: RuntimeStatus): string {

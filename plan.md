@@ -1,139 +1,138 @@
-# Cost Kernel Plan
+# Production Runtime Experience Plan
 
 ## 1. 需求文档
 
-用户要把 Kitty 当作长期生产工具使用，核心成本压力来自 token 和缓存命中率。
+用户想把 Kitty 当作日常生产工具，而不是只在开发者理解内部账本时才好用。
 
-现在只有一个模型，所以省钱不靠模型路由。省钱主线应该落在 harness 本身：稳定前缀尽量稳定，易变事实尽量后置，大内容尽量外置，skill 和 memory 尽量按需，缓存命中和浪费点必须能被用户审阅。
+真正要解决的问题是：长任务运行时，用户要能随时看懂当前现场、后台状态、恢复风险、成本状态和下一步动作。
 
 使用者是本地开发者。用户完成任务时应该看到：
 
-- Kitty 每轮请求尽量复用稳定前缀。
-- 大段历史、工具输出和运行事实不会无脑塞进上下文。
-- `kitty status` 能说明当前上下文成本结构、缓存布局和最近请求是否有缓存命中。
-- `kitty eval --run` 能验证缓存主线不是口号。
+- `kitty status` 像现场说明，不像数据库摘要。
+- `kitty background` 能直接说明后台任务是否健康、是否卡住、能做什么。
+- `kitty eval --run` 能验证生产关键路径：现场可读、后台可控、恢复可演练、成本可审阅。
+- README 说明当前生产级路线：现场、恢复、验收、成本。
 
 当前范围包含：
 
-- 固化 Cost Kernel 作为当前产品主线的一部分。
-- 保证 context budget 持久化后不丢 cache layout。
-- 让 status 更直接呈现“省钱现场”。
-- 让 eval 覆盖稳定前缀、按需 skill、大内容压缩和 cache usage 事实。
-- 同步 README / philosophy / plan。
+- 建立 runtime scene 作为当前现场的统一投影。
+- 让 status 和 background 命令复用该现场投影。
+- 强化长任务恢复表达：中断、后台、subagent、wake、卡住状态必须能被用户看见。
+- 强化 eval 场景和检查，覆盖现场表达、真实恢复、后台用户体验、成本观测、skill readiness、memory 可审阅和失败体验。
+- 强化成本观测：最近请求 token/cache、稳定前缀、易变尾部和缓存未知边界都能看到。
+- 强化 skill 产品化可见性：ready、资源、依赖、问题都出现在现场里，不默认灌正文。
+- 强化 memory 自然性可见性：近期 session 是否有 memory、memory assets 是否可审阅。
+- 强化失败体验：provider usage 缺失、后台无输出、deadline/stale、无 session 都有明确下一步。
+- 同步 README 和 plan 收口。
 
 当前范围不包含：
 
-- 不做模型路由。
-- 不做多模型自动切换。
-- 不做外部缓存服务。
-- 不做向量记忆系统。
-- 不做 provider 价格表和人民币金额估算。
+- 不新增模型路由。
+- 不新增长期记忆系统。
+- 不恢复已删除的 spec/team 能力。
 
 业务完成标准：
 
-- 一个模型也能通过上下文结构和 prompt cache 尽量省钱。
-- 缓存布局事实能跨 session 保存和重新读取。
-- 用户能从 status 看出稳定前缀、易变尾部和最近 cache hit/miss。
-- eval 能证明省钱主线当前可验证。
+- 用户能用 `kitty status` 直接知道当前目标、下一步、阻塞、后台、成本和恢复现场。
+- 用户能用 `kitty background` 看懂后台任务状态，不需要理解 execution 字段。
+- `kitty eval --run` 能机器验证这些生产现场能力存在。
 
 ## 2. 当前事实
 
 当前代码事实：
 
-- `src/context/runtime/compression/builder.ts` 已把 prompt 分成 stable prefix 和 volatile tail，并生成 `ContextCacheLayoutReport`。
-- stable prefix 当前包含 static prompt 和 profile persona；runtime facts、project map、task lifecycle、session brief、skill index 和近场对话属于 volatile tail。
-- `src/skills/prompt.ts` 默认只注入 skill 索引，不注入 skill 正文和资源。
-- `src/provider/usageNormalizer.ts` 已归一化 OpenAI、DeepSeek、Anthropic、Gemini 的缓存 usage 字段。
-- `src/runtime/status.ts` 已从 observability 读取最近 `model.request` usage。
-- `src/cli/commands/runtimeStatusPresenter.ts` 已显示 context budget、cache layout 和 recent model requests。
-- `src/evaluation/checks.ts` 已有 `cache-economy-ready` 检查。
-- `src/session/snapshot.ts` 保存 session snapshot 时会写出 `contextBudget.cacheLayout`，但读取时没有恢复 `cacheLayout`。
+- `src/runtime/status.ts` 聚合 session、memory、skills、project map、model usage、task lifecycle、execution 和 wake signals。
+- `src/cli/commands/runtimeStatusPresenter.ts` 直接把 runtime status 格式化成 CLI 文本，里面混合了现场判断、成本呈现和字段渲染。
+- `src/cli/commands/background.ts` 只按 execution 字段输出后台任务，用户需要自己理解 health、deadline、summary、output。
+- `src/runtime/executionHealth.ts` 已能判断 running、no_output、stale、deadline_passed、settled。
+- `src/evaluation/checks.ts` 已有 runtime-status、cache-economy、host-turn-boundary、remote-entrypoints、recovery-drills 检查。
+- `src/evaluation/checks.ts` 文件较重，当前本轮只增加必要验收，不做无关拆分。
 
 当前测试事实：
 
-- `tests/context/compression.test.ts` 已验证稳定前缀不受 runtime facts 变化影响。
-- `tests/provider/*cache*` 和 `tests/provider/usage-normalizer.test.ts` 已覆盖 provider cache policy 和 usage 归一化。
-- `tests/runtime/status.test.ts` 已覆盖 status 显示 recent model cache facts。
-- `tests/evaluation/harness.test.ts` 已覆盖 eval check 列表和运行。
+- `tests/runtime/status.test.ts` 覆盖 runtime status 的 session、context budget、cache layout、model usage 和 background health。
+- `tests/evaluation/harness.test.ts` 覆盖 evaluation scenario 与 check 对齐，并跑本地机器验收。
+- `tests/extensions/background-tools.test.ts` 覆盖 background 工具能力。
 
 当前文档事实：
 
-- README 已写成本优先上下文，但还没有把 Cost Kernel 作为一条明确能力写厚。
-- philosophy 已写上下文预算和 prompt cache 思路，但 status / eval / 持久化边界还不够明确。
+- README 已声明 Kitty 主线是本地执行内核、Cost Kernel 和产品级验收合同。
+- README 已列出 status、background、evaluation，但还没有把“生产现场模型”讲成当前能力主线。
 
 当前缺口：
 
-- `contextBudget.cacheLayout` 重载丢失，这是硬 bug，会削弱生产可审阅性。
-- 省钱事实散在 context、status、eval、provider 中，没有一个清晰的成本核验结构。
-- `kitty status` 的模型缓存行还偏技术字段，没有明确说明 stable/tail 比例和 usage 不可用时的含义。
-- `kitty eval` 的 cache economy 检查还不够覆盖“skill 只给索引”和“大内容压缩不污染稳定前缀”。
-
+- status 的现场判断只存在 presenter 内部，不能被 background 和 eval 复用。
+- background CLI 输出偏字段列表，不像生产用户可读的现场说明。
+- eval 没有明确检查“现场投影”“后台用户体验输出”“成本观测”“skill/memory 可审阅”和“失败体验”。
 当前未知点：
 
-- 真实 provider 长会话 cache hit 率仍需带 API key 长时间观察。
-- 不同 provider 的 usage 字段完整性由上游决定，Kitty 只能记录和呈现事实。
+- 真实 provider 长会话缓存命中率仍需长期实测。
 
 ## 3. 失败测试
 
-- session snapshot 写入 `contextBudget.cacheLayout` 后再读取，如果 `cacheLayout` 丢失，应失败。
-- runtime prompt 中 skill 正文或 resource 内容默认进入上下文，应失败。
-- runtime facts / project map / task lifecycle 改变后 stable prefix fingerprint 变化，应失败。
-- 大量旧 tool 输出触发压缩后，稳定前缀 fingerprint 变化，应失败。
-- `kitty status` 有 cache layout 时不显示 stable/tail 字符结构，应失败。
-- `kitty eval --run` 不能验证 cache economy、stable prefix、usage normalization 和 skill index boundary，应失败。
+- 如果 runtime status 无法生成统一 scene summary，应失败。
+- 如果 `kitty status` 文本不包含当前现场、下一步、阻塞、后台、成本、恢复提示，应失败。
+- 如果 background 命令不能把 no_output / deadline_passed / stale 翻译成用户可理解动作，应失败。
+- 如果 eval 没有覆盖 production scene、background UX、cost observability、skill/memory readiness 和 failure experience，应失败。
+- 如果 README 没有说明生产级路线是现场、恢复、验收、成本，应失败。
 
 ## 4. 目标
 
-- 修复 session snapshot 的 `cacheLayout` 读取。
-- 为 Cost Kernel 建立明确的代码事实：稳定前缀、易变尾部、cache layout、usage 和 skill 按需加载都能被测试覆盖。
-- 强化 `kitty status` 的成本呈现：用户能看到 cached、hit rate、stable/tail 字符、stable ratio。
-- 强化 `kitty eval --run` 的 cache economy 检查：不仅验证 provider usage，也验证 stable prefix、volatile tail 和 skill index boundary。
-- 同步 README / philosophy，明确一个模型下的省钱主线。
+- 新增 runtime scene 模块，把 RuntimeStatus 转成用户可理解的现场投影。
+- RuntimeStatus 类型携带 scene，status presenter 复用 scene，不在 presenter 内独立维护现场判断。
+- Background CLI 复用同一套 execution 现场描述，输出 health、risk、next action 和 last output。
+- Evaluation 增加生产现场验收场景，机器验证 scene、background UX、cost observability、skill/memory readiness 和 failure experience。
+- README 同步生产级路线。
 
 ## 5. 不做范围
 
-- 不加入模型路由。
-- 不新增 env 配置。
-- 不改变 provider 选择策略。
-- 不引入外部数据库或缓存服务。
-- 不把价格估算写死进代码。
-- 不把语义判断交给机器规则。
+- 不改 provider 策略。
+- 不新增配置项。
+- 不做旧兼容或 legacy 输出。
 
 ## 6. 设计
 
 主链路：
 
-输入 -> context prompt layers -> compressed request -> provider request -> usage observability -> session contextBudget -> status/eval 审阅。
+RuntimeStatus 原始事实 -> RuntimeScene 当前现场投影 -> status/background/eval 复用。
 
 模块边界：
 
-- `src/context/runtime/compression/builder.ts` 继续负责 cache layout 和预算事实。
-- `src/session/snapshot.ts` 只负责把已生成的预算事实完整保存和恢复。
-- `src/runtime/status.ts` 继续聚合 session budget 和 provider usage。
-- `src/cli/commands/runtimeStatusPresenter.ts` 只负责把成本事实呈现给用户。
-- `src/evaluation/checks.ts` 负责产品验收，不替代单元测试。
+- `src/runtime/status.ts` 继续聚合机器事实。
+- 新增 `src/runtime/scene.ts` 负责从机器事实生成现场投影。
+- `src/runtime/statusTypes.ts` 只定义 status 与 scene 类型。
+- `src/cli/commands/runtimeStatusPresenter.ts` 只负责呈现 scene 和详细事实。
+- `src/cli/commands/background.ts` 只负责 background 命令接线和输出。
+- `src/evaluation/checks.ts` 增加产品验收，不替代单元测试。
 
 状态归属：
 
-- stable prefix fingerprint 和 volatile tail fingerprint 属于 context budget。
-- provider cache hit/miss 属于 observability model.request usage。
-- 是否“值得加载某个 skill”仍由模型判断；机器只保证默认上下文只给索引。
+- scene 不产生新事实，只投影已有 status。
+- 阻塞判断来自 active executions 的 health。
+- 下一步建议来自当前 session、active execution、blocked state、cache/model usage 等死事实。
+- 成本状态来自 context budget cache layout 和 recent model usage。
+- skill 状态来自 project context skill health。
+- memory 状态来自 session memory 和 memory asset index。
 
-错误和恢复：
+错误与恢复：
 
-- 旧 session 缺 `cacheLayout` 时允许读取为 undefined；当前新 session 保存后必须能恢复。
-- provider 不返回 usage 时 status 明确显示 usage unavailable，不伪造命中率。
+- 没有 session 时 scene 明确提示 start session。
+- 没有 provider usage 时显示 usage unavailable，不伪造成本结论。
+- 后台无输出、超时、stale 都给出明确 next action。
+- 中断、失败和 wake 只作为现场事实呈现，不伪装成用户新目标。
 
 ## 7. 实施任务
 
-- [x] 修复 `src/session/snapshot.ts`，读取 `contextBudget.cacheLayout`。
-- [x] 补测试：session snapshot roundtrip 保留 cache layout。
-- [x] 补测试：runtime prompt skill index 不包含 skill body/resource 内容。
-- [x] 补测试：压缩大 tool 输出后 stable prefix 保持稳定，volatile tail 变化。
-- [x] 强化 status 成本呈现，显示 stable/tail ratio 和 usage unavailable 边界。
-- [x] 强化 eval cache economy 检查，覆盖 stable prefix、volatile tail、usage normalization、skill index boundary。
-- [x] 同步 README / philosophy 的 Cost Kernel 描述，删除模型路由暗示。
-- [x] 运行局部测试、typecheck、build、完整 verify。
+- [x] 新增 `src/runtime/scene.ts`，定义并生成现场投影。
+- [x] 扩展 `src/runtime/statusTypes.ts`，让 `RuntimeStatus` 携带 `scene`。
+- [x] 修改 `src/runtime/status.ts`，在聚合事实后生成 scene。
+- [x] 修改 `src/cli/commands/runtimeStatusPresenter.ts`，优先呈现 scene，再呈现详细事实。
+- [x] 修改 `src/cli/commands/background.ts`，后台输出使用 scene execution 描述。
+- [x] 扩展 `tests/runtime/status.test.ts`，覆盖 scene、status 文本和后台 next action。
+- [x] 扩展 eval 类型、场景和检查，覆盖 production scene / background UX。
+- [x] 扩展 eval 检查，覆盖 cost observability、skill/memory readiness 和 failure experience。
+- [x] 同步 README 的生产级路线。
+- [x] 运行局部测试、build、完整 verify。
 - [x] 更新收口。
 
 ## 8. 验证计划
@@ -141,12 +140,9 @@
 局部验证：
 
 - `npm.cmd run test:build`
-- `node --test .test-build/tests/session/session-store.test.js`
-- `node --test .test-build/tests/context/compression.test.js`
 - `node --test .test-build/tests/runtime/status.test.js`
 - `node --test .test-build/tests/evaluation/harness.test.js`
-- `node --test .test-build/tests/provider/usage-normalizer.test.js`
-- `node --test .test-build/tests/provider/cache-policy.test.js`
+- `node --test .test-build/tests/extensions/background-tools.test.js`
 
 完整验证：
 
@@ -154,62 +150,67 @@
 
 手动检查：
 
-- `node dist/cli.js eval --run`
 - `node dist/cli.js status`
+- `node dist/cli.js background`
+- `node dist/cli.js eval --run`
 
 未验证内容：
 
-- 真实 provider 长会话 cache hit 率。
-- 真实价格节省金额。
+- 真实 provider 长会话成本曲线。
 
 剩余风险：
 
-- provider 不返回 usage 时，Kitty 只能显示未知，不能判断省钱是否发生。
-- 字符数不是 token 数，只能作为本地预算近似；真实 token 仍由 provider 计量。
+- 现场投影只能基于已有机器事实；如果底层 execution 没有记录输出，scene 不能凭空知道任务语义。
+- 真实 provider 成本曲线仍需长期运行后判断。
 
 ## 9. 收口
 
-已执行。
+已完成。
 
 完成事实：
 
-- 修复 `contextBudget.cacheLayout` 读取丢失问题，session snapshot roundtrip 后缓存布局事实不再丢。
-- `kitty status` 的成本呈现增强：显示 stable/tail 字符、stable ratio、stable sources、volatile sources、cache miss 和 provider usage unavailable 边界。
-- `kitty eval --run` 的 cache economy 场景增强：验证 provider usage 归一化、provider cache policy、stable/volatile fingerprint、skill index boundary 和大输出压缩。
-- context 测试补齐：skill 默认只注入索引，不注入正文或 resource 路径；大 tool 输出压缩不改变稳定前缀。
-- README 和 philosophy 已同步 Cost Kernel：一个模型也要省钱，省钱来自上下文结构和缓存命中，不来自模型路由。
+- 新增 `src/runtime/scene.ts`，把 RuntimeStatus 投影成用户可读现场：当前状态、焦点、下一步、阻塞、后台、skill、memory、成本、恢复和 execution 风险。
+- `buildRuntimeStatus` 现在携带 `scene`，status presenter 不再自己维护现场判断。
+- `kitty status` 顶部新增 Scene 区域，先讲当前现场，再列详细事实。
+- `kitty background` 输出新增 risk、health、summary、next、lastOutput，让后台任务不再只是字段列表。
+- `kitty eval --run` 新增 `production-scene-ready` 场景，覆盖现场、后台、成本、skill、memory 和失败边界。
+- README 已同步生产级路线：现场、恢复、验收、成本。
+- `.codex/skills/plan/SKILL.md` 和 `skills/plan/SKILL.md` 已同步一次性完整交付标准。
 
 修改文件：
 
+- `.codex/skills/plan/SKILL.md`
+- `skills/plan/SKILL.md`
 - `README.md`
-- `philosophy.md`
 - `plan.md`
-- `src/session/snapshot.ts`
+- `src/runtime/scene.ts`
+- `src/runtime/status.ts`
+- `src/runtime/statusTypes.ts`
 - `src/cli/commands/runtimeStatusPresenter.ts`
+- `src/cli/commands/background.ts`
 - `src/evaluation/checks.ts`
-- `tests/session/session-store.test.ts`
-- `tests/context/compression.test.ts`
+- `src/evaluation/types.ts`
 - `tests/runtime/status.test.ts`
+- `tests/evaluation/harness.test.ts`
+- `tests/extensions/background-tools.test.ts`
 
 验证结果：
 
 - `npm.cmd run test:build` 通过。
-- `node --test .test-build/tests/session/session-store.test.js` 通过。
-- `node --test .test-build/tests/context/compression.test.js` 通过。
 - `node --test .test-build/tests/runtime/status.test.js` 通过。
 - `node --test .test-build/tests/evaluation/harness.test.js` 通过。
-- `node --test .test-build/tests/provider/usage-normalizer.test.js` 通过。
-- `node --test .test-build/tests/provider/cache-policy.test.js` 通过。
-- `npm.cmd run verify` 通过，174 个测试全部通过，0 失败。
-- `node dist/cli.js eval --run` 通过，cache economy 场景显示 `stablePrefix`、`compactedTailChars` 和 `skillIndex=only`。
-- `node dist/cli.js status` 通过，当前仓库能正常显示 workspace、skills、model cache、project map 和 execution 现场。
+- `node --test .test-build/tests/extensions/background-tools.test.js` 通过。
+- `npm.cmd run build` 通过。
+- `node dist/cli.js status` 通过，Scene 区域可见。
+- `node dist/cli.js background` 通过，当前无后台任务时清楚提示。
+- `node dist/cli.js eval --run` 通过，`production-scene-ready` 场景通过。
+- `npm.cmd run verify` 通过，176 个测试全部通过。
 
 未验证内容：
 
-- 没有带真实 API key 跑长会话 cache hit 率。
-- 没有估算真实金额节省。
+- 真实 provider 长会话成本曲线仍需长期运行观察。
 
 剩余风险：
 
-- provider 不返回 usage 时，Kitty 只能显示 unavailable，不能伪造命中率。
-- 当前预算仍以字符数做本地近似；真实 token 和真实缓存账单以 provider usage 为准。
+- scene 只投影已有机器事实；底层没有记录的输出或语义不会被凭空推断。
+- 成本命中率仍以 provider 返回 usage 为准，provider 不返回时只能显示未知。
