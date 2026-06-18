@@ -87,6 +87,20 @@ export function layoutComposer(input: ComposerLayoutInput): ComposerLayoutModel 
   };
 }
 
+export function composeInkCursorPosition(input: {
+  readonly cell: { x: number; y: number } | undefined;
+  readonly fallback: { x: number; y: number } | undefined;
+  readonly rowFrame: ComposerFrameMetrics;
+}): { x: number; y: number } | undefined {
+  if (!input.cell || !input.rowFrame.hasMeasured) {
+    return input.fallback ? shiftInkCursorRow(input.fallback) : undefined;
+  }
+  return {
+    x: input.rowFrame.left + input.cell.x,
+    y: input.rowFrame.top + 1,
+  };
+}
+
 function measureComposerCursor(input: {
   readonly contentWidth: number;
   readonly cursor: number;
@@ -117,6 +131,13 @@ function measureComposerCursorCell(input: {
   return {
     x: Math.min(stringWidth(cursorLine), input.contentWidth),
     y: cursorVisibleRow,
+  };
+}
+
+function shiftInkCursorRow(position: { x: number; y: number }): { x: number; y: number } {
+  return {
+    x: position.x,
+    y: position.y + 1,
   };
 }
 

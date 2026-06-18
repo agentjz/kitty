@@ -12,6 +12,7 @@ import { TUI_COLORS } from "../../src/shell/tui/theme.js";
 import { applyComposerInput } from "../../src/shell/tui/composerEditing.js";
 import { measureAbsoluteBox } from "../../src/shell/tui/inkGeometry.js";
 import {
+  composeInkCursorPosition,
   layoutComposer,
   measureComposerContentWidth,
   measureComposerTextOrigin,
@@ -144,6 +145,20 @@ test("tui composer separates cursor cell from measured terminal row", () => {
   assert.deepEqual(layout.rows, ["first", "second"]);
   assert.deepEqual(layout.cursorCell, { x: 6, y: 1 });
   assert.deepEqual(layout.cursor, { x: 10, y: 11 });
+});
+
+test("tui composer translates measured row into Ink cursor suffix coordinates", () => {
+  assert.deepEqual(composeInkCursorPosition({
+    cell: { x: 6, y: 1 },
+    fallback: { x: 10, y: 11 },
+    rowFrame: { hasMeasured: true, left: 4, top: 11, width: 20 },
+  }), { x: 10, y: 12 });
+
+  assert.deepEqual(composeInkCursorPosition({
+    cell: { x: 6, y: 1 },
+    fallback: { x: 10, y: 11 },
+    rowFrame: { hasMeasured: false, left: 0, top: 0, width: 20 },
+  }), { x: 10, y: 12 });
 });
 
 test("tui composer editor handles common editing keys and explicit multiline insertion", () => {

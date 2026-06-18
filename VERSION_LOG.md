@@ -1,5 +1,36 @@
 # 版本记录
 
+## 2026-06-18 - TUI 光标定位初步满意基线
+
+状态：TUI 初步成功版本。
+
+基线代码锚点：`d99fd52`（`fix: update Composer, composerLayout, and tui-render test`）。
+
+包版本：`@jun133/kitty@0.0.9`。
+
+验证结果：
+
+- `npm run check`
+- `npm run test:core`
+- `npm publish --access public`
+
+这个版本重要的原因：
+
+- Composer 光标定位重构，分离 measured row 与 cursor cell 计算。
+- 新增 `composeInkCursorPosition()` 统一 Ink 光标坐标转换。
+- 新增 `shiftInkCursorRow()` 处理行偏移。
+- 测试覆盖 cursor 组合逻辑的边界情况。
+
+设计基线：
+
+- TUI Composer 组件职责保持单一：Composer 只渲染，layout 只计算，编辑逻辑在 composerEditing。
+- 光标位置计算全部收敛到 `composeInkCursorPosition`，不再在组件内联条件拼凑。
+- 版本已发布到 npm，并同步推送到 GitHub。
+
+参考提交：
+
+- `d99fd52` - Composer、composerLayout、tui-render test 更新。
+
 ## 2026-06-17 - 运行时边界与生产发布满意基线
 
 状态：第二个满意版本。

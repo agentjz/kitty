@@ -4,6 +4,7 @@ import { TUI_COLORS } from "../theme.js";
 import { applyComposerInput } from "../composerEditing.js";
 import {
   COMPOSER_FRAME,
+  composeInkCursorPosition,
   layoutComposer,
   measureComposerContentWidth,
   type ComposerFrameMetrics,
@@ -65,12 +66,11 @@ export function createComposerComponent(kit: Pick<InkRuntime, "React" | "Box" | 
       value: draft.value,
     });
     const { setCursorPosition } = useCursor();
-    const cursorPosition = layout.cursorCell && measuredCursorRow.hasMeasured
-      ? {
-        x: measuredCursorRow.left + layout.cursorCell.x,
-        y: measuredCursorRow.top,
-      }
-      : layout.cursor;
+    const cursorPosition = composeInkCursorPosition({
+      cell: layout.cursorCell,
+      fallback: layout.cursor,
+      rowFrame: measuredCursorRow,
+    });
 
     React.useEffect(() => {
       props.controller.updateComposerVisibleRows(layout.visibleRows);
