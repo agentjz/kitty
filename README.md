@@ -14,6 +14,9 @@
   <img alt="agent" src="https://img.shields.io/badge/mode-agent-7c3aed">
 </p>
 
+![demo](site/images/demo.png)
+
+
 小猫智能体是给本地代码仓库使用的 agent harness。
 
 它把模型、工具、上下文、会话、变更记录和验证事实收进一个稳定的本地编程体验里，让长任务可以被推进、保存、恢复和继续。
