@@ -1,3 +1,5 @@
+![demo](site/images/product.png)
+
 ﻿# 小猫智能体 Kitty
 
 官网：https://agentjz.github.io/kitty/
