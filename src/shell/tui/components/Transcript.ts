@@ -1,6 +1,7 @@
 import {
   renderTranscriptLineViews,
   type TuiState,
+  type TuiTranscriptLineSpan,
   type TuiTranscriptLineView,
   type TuiViewport,
 } from "../store.js";
@@ -69,14 +70,57 @@ function renderTranscriptLine(
           Text,
           { color: row.style.text, wrap: "truncate-end" },
           React.createElement(Text, { color: TUI_COLORS.thought, italic: row.style.italicPrefix, wrap: "truncate-end" }, row.prefix),
-          row.text,
+          ...renderTranscriptSpans(React, Text, row),
         )
         : React.createElement(Text, {
           color: row.style.text,
           bold: row.style.bold,
           dimColor: row.style.dim,
           wrap: "truncate-end",
-        }, row.text),
+        }, ...renderTranscriptSpans(React, Text, row)),
     ),
   );
+}
+
+function renderTranscriptSpans(
+  React: InkRuntime["React"],
+  Text: typeof import("ink").Text,
+  row: TuiTranscriptLineView,
+): React.ReactNode[] {
+  const spans: readonly TuiTranscriptLineSpan[] = row.spans.length > 0
+    ? row.spans
+    : [createPlainSpan(row.text)];
+  return spans.map((span, index) => React.createElement(Text, {
+    key: `${row.id}-span-${index}`,
+    color: readSpanColor(row, span),
+    backgroundColor: span.code ? TUI_COLORS.panelStrong : undefined,
+    bold: row.style.bold || span.bold,
+    dimColor: row.style.dim || span.dim,
+    italic: span.italic,
+    strikethrough: span.strike,
+    underline: Boolean(span.href),
+    wrap: "truncate-end",
+  }, span.text));
+}
+
+function readSpanColor(row: TuiTranscriptLineView, span: TuiTranscriptLineSpan): string {
+  if (span.href) {
+    return TUI_COLORS.warning;
+  }
+  if (span.code) {
+    return TUI_COLORS.system;
+  }
+  return row.style.text;
+}
+
+function createPlainSpan(text: string): TuiTranscriptLineSpan {
+  return {
+    text,
+    bold: false,
+    italic: false,
+    code: false,
+    dim: false,
+    strike: false,
+    href: undefined,
+  };
 }

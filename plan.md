@@ -1,202 +1,148 @@
-# 工具输出治理系统 Plan
+# TUI Markdown Render Kernel Plan
 
 ## 1. 需求文档
 
-用户要解决的是省 token 和保持上下文干净。
+Kitty 的 TUI 要像成熟 agent 终端一样显示模型回复：标题、列表、引用、代码块、表格、行内代码、链接、加粗和斜体都应该自然呈现。
 
-Kitty 执行命令、搜索、测试、构建、后台任务时，经常会产生很长输出。成熟体验不是把这些输出直接塞给模型，也不是简单截断后丢失证据，而是：
+使用者是在 TUI 里长时间对话、读代码、看计划、看工具结论的人。用户不应该看到 Markdown 源码符号漏出来，也不应该因为回复变长而滚动、换行、缓存变慢。
 
-- 用户和模型先看到短、准、可行动的结果。
-- 完整原始输出仍然可恢复。
-- 上下文只承载当前推理需要的证据。
-- 状态里能看到哪些工具输出最费 token、压缩是否有效。
+当前范围包含 TUI 里的 assistant / reasoning Markdown 展示、终端宽度换行、滚动行数计算、长会话投影缓存和测试保护。
 
-使用者是日常用 Kitty 做开发、测试、搜索、调试和长任务的人。
+当前范围不包含 Web Markdown 重写、完整 HTML 渲染、浏览器复制按钮、重型语法高亮系统。
 
-完成后的体验：
-
-- 命令输出很长时，模型不会被日志淹没。
-- 失败测试、构建错误、搜索结果会更像“证据摘要”，不是原始日志。
-- 需要完整输出时，能看到保存路径。
-- `kitty status` 能看到最近工具输出治理情况和节省比例。
-
-当前范围包含：
-
-- bash 工具输出治理。
-- 工具结果进入模型前的统一投影。
-- 原始输出保存、压缩输出、节省事实和降级事实。
-- status/observability 暴露最近工具输出治理事实。
-- 针对常见命令的轻量结构化压缩：test/build/typecheck/search/git diff。
-
-当前范围不包含：
-
-- 不接入 RTK 作为运行时依赖。
-- 不做外部命令自动改写。
-- 不做向量检索或长期记忆改造。
-- 不做 provider 价格计算。
-
-业务完成标准：
-
-- 工具输出进入模型前经过同一治理主干。
-- 长输出可恢复，短证据可用。
-- 节省事实可见。
-- 测试覆盖真实用户路径。
+业务完成标准：TUI 回复看起来像结构化文档，长会话仍按可见行滚动，源码消息仍原样保存在 transcript，不为了渲染改变事实。
 
 ## 2. 当前事实
 
-- `src/tools/outputCapture.ts` 已经能保存 bash 大输出，并返回 `outputPath`、`truncated`、`outputChars`、`outputBytes`。
-- `src/tools/bash.ts` 把 bash 运行结果序列化为 JSON，并把输出截断到 4000 字符。
-- `src/agent/toolResults/modelProjection.ts` 是工具结果进入模型前的投影层。
-- `src/agent/turn/toolBatchLifecycle.ts` 是工具调用结果写入 session 和 observability 的主链路。
-- `src/context/runtime/compression/builder.ts` 会在上下文超预算时压缩旧消息。
-- `src/provider/usageNormalizer.ts` 已有 provider cache usage 归一化。
-- `src/runtime/status.ts` 和 `src/cli/commands/runtimeStatusPresenter.ts` 已显示 context/cache/model request 信息。
-- `README.md` 已声明 Cost Kernel 和大输出压缩方向。
-- RTK 的可借鉴点是：原始输出可恢复、压缩输出进上下文、节省可观测、按命令类型压缩、失败降级。
-
-当前缺口：
-
-- 工具输出治理逻辑分散在 bash、outputCapture、modelProjection 和 context compression。
-- 没有统一的 Tool Output Kernel。
-- bash 输出主要是通用截断，不会按命令类型形成结构化证据。
-- 没有统一记录原始字符数、模型投影字符数、节省比例、治理模式和输出路径。
-- status 看不到最近工具输出治理事实。
-
-未知点：
-
-- 不同 provider 对工具消息 token 的实际计费只能通过 usage 间接确认；本次只做字符/token 估算和事实记录。
+- `src/shell/tui/markdown.ts` 使用 `marked.lexer` 解析 block，但随后把内容压成 `{ kind, text }` 平面行。
+- 行内 Markdown 目前通过 `stripMarkdownInline` 的字符串替换剥离，无法保留 strong / em / code / link 的展示语义。
+- `src/shell/tui/transcriptLayout.ts` 负责角色布局、宽度计算、换行和 Markdown 行样式，但只能给整行设置一种样式。
+- `src/shell/tui/components/Transcript.ts` 只渲染 `row.text`，没有 span 渲染入口。
+- `TuiTranscriptProjection` 已经按 entry id、文本和宽度缓存单条消息布局，没有全历史每帧重排。
+- 当前测试只覆盖标题、列表、代码、引用没有漏出代码围栏；没有覆盖行内样式、链接、代码语言、宽字符表格和 span 渲染。
+- `package.json` 已有 `marked`、`string-width`、`wrap-ansi`、`ink`，不需要为了本轮引入重型 Markdown 依赖。
+- opencode 的成熟经验是把 assistant 内容作为 markdown renderable 处理，不手写剥离成普通文本；Web 端有 parse / sanitize / cache / streaming block。
+- Codex 的成熟经验是保留原始 Markdown，流式阶段按稳定边界提交，最终用 source-backed Markdown cell 重排。
+- Goose 的经验暴露了长会话不能每轮重建全部 Markdown，否则会拖慢甚至 OOM。
 
 ## 3. 失败测试
 
-- bash 长输出应该保存完整输出路径，同时给模型短投影。
-- `npm test` / `npm run build` / `tsc` 类输出应该提取失败、错误、文件和摘要。
-- `rg` / `grep` 类输出应该提取匹配数量、前几条证据和截断提示。
-- `git diff` 类输出应该提取变更文件和关键片段，不把整段 diff 放进模型。
-- 工具输出治理事件应该写入 observability。
-- `kitty status` 应该能显示最近工具输出治理节省事实。
-- context compression 仍应保持 stable prefix 不被工具输出变化污染。
+- 行内 Markdown：`**bold**`、`*em*`、`` `code` ``、`[text](url)` 现在只能变成普通字符串，无法给 TUI 渲染层提供 span。
+- 代码块语言：```ts 的 `ts` 当前丢失，TUI 无法显示语言标签。
+- 表格宽度：当前用 `.length` 计算列宽，中文等宽字符会错位。
+- Transcript 渲染：当前组件无法渲染一行内不同样式。
+- 长会话性能：必须继续证明投影缓存只重排文本或宽度变化的 entry。
+- 滚动一致性：布局行数和实际 Ink 输出行数必须保持一致，不能让 Ink 二次换行制造不可控行。
 
 ## 4. 目标
 
-- 新增 `Tool Output Kernel` 作为工具输出治理主干。
-- bash 运行结果生成 raw capture + kernel projection + governance facts。
-- model projection 复用 kernel，不再单独维护 bash 压缩规则。
-- observability 记录 `tool.output` 事件。
-- runtime status 聚合最近 `tool.output` 事件。
-- CLI status 展示最近工具输出节省情况。
-- README 同步当前事实。
-- 相关测试和 `npm.cmd run verify` 通过。
+- TUI Markdown 主链路改成结构化 render kernel：Markdown source -> block/line/span -> transcript rows -> Ink span rendering。
+- 原始消息文本仍由 transcript 保存，渲染只做投影，不改变事实。
+- 行内样式保留到 `TuiTranscriptLineView`，组件按 span 渲染。
+- 代码块保留语言标签；表格按终端 display width 对齐。
+- 现有 projection cache 保留，长会话不全量重排。
+- 增加自动测试覆盖 Markdown 内核、Transcript 集成和缓存行为。
+- 大改后通过 `npm.cmd run verify`。
 
 ## 5. 不做范围
 
-- 不运行 RTK。
-- 不把 RTK 规则复制成依赖。
-- 不做旧输出格式兼容。
-- 不新增用户不可见的假能力入口。
-- 不做语义重要性机器判断；结构化压缩只处理命令输出里的死事实。
+- 不做 Web Markdown。
+- 不做完整语法高亮引擎。
+- 不引入 opencode/OpenTUI 作为运行依赖。
+- 不做旧 Markdown 平面行兼容分支；当前源码只保留当前实现主干。
+- 不把 Markdown 渲染问题写成提示词规则。
 
 ## 6. 设计
 
 主链路：
 
-用户请求 -> 模型调用工具 -> 工具执行 -> Tool Output Kernel 生成治理结果 -> session 写入模型投影 -> observability 记录治理事实 -> status 展示节省现场。
+用户和模型消息仍进入 `TuiTranscriptEntry.text`。TUI 布局读取 entry，根据角色决定是否走 Markdown render kernel。Markdown kernel 使用 `marked` 解析 block 和 inline token，输出 display line。布局层按角色 frame 计算 body width，再把 line/span 按 display width 切成 transcript row。组件层只按 row frame 和 row spans 渲染。
 
 模块边界：
 
-- `src/tools/outputKernel/types.ts`：治理结果类型。
-- `src/tools/outputKernel/classifier.ts`：根据命令和输出形态做工具输出类型分类。只做机械事实分类，不判断任务语义。
-- `src/tools/outputKernel/projectors.ts`：按输出类型生成短证据。
-- `src/tools/outputKernel/metrics.ts`：估算原始 token、投影 token、节省比例。
-- `src/tools/outputKernel/index.ts`：主入口。
-- `src/tools/outputCapture.ts`：继续只负责捕获和保存原始输出。
-- `src/tools/bash.ts`：调用 kernel，把治理事实放进 result JSON 和 metadata。
-- `src/agent/toolResults/modelProjection.ts`：读取治理投影，作为模型看到的工具结果。
-- `src/agent/turn/toolBatchLifecycle.ts`：记录 `tool.output` observability 事件。
-- `src/runtime/status.ts`：读取最近 `tool.output` 事件。
-- `src/runtime/statusTypes.ts` 和 presenter：展示最近治理事实。
+- `markdown.ts`：Markdown render kernel 门面，负责把 Markdown source 转成 TUI display lines。
+- `markdownInline.ts`：只负责 inline token 到 span，不判断内容重要性。
+- `markdownTable.ts`：只负责表格 display-width 对齐。
+- `transcriptLayout.ts`：只负责角色 frame、Markdown 行到 transcript row、宽度切行和样式映射。
+- `Transcript.ts`：只负责 Ink 呈现，不解析 Markdown，不计算布局事实。
 
 状态归属：
 
-- 原始输出文件归 observability command-output。
-- 单次工具治理事实归 tool result metadata 和 observability event。
-- status 只聚合最近事实，不成为事实源。
+- 原始消息归 transcript。
+- Markdown display model 是可丢弃投影。
+- 行数、滚动和可见窗口继续由 TUI state / projection 主干维护。
 
-错误和降级：
+错误边界：
 
-- 分类失败时使用通用压缩。
-- 输出为空时返回空输出事实。
-- 压缩后为空时回退到通用预览。
-- 原始输出路径存在时始终保留恢复提示。
+- Markdown 解析失败时退化为纯文本 display line，但不丢消息。
+- 宽度过窄时优先保证不越界，长词按 display width 切开。
+- 链接在终端显示为 `text (url)`，但 span 仍标记为 link，便于后续增强。
 
-测试策略：
+测试影响：
 
-- 单测 Tool Output Kernel。
-- 单测 bash 工具输出包含治理事实。
-- 单测 model projection 使用治理投影。
-- 单测 status 聚合 tool output facts。
+- 增加 Markdown kernel 单测。
+- 更新 transcript layout / render 测试验证 span、代码语言、宽字符表格。
+- 保留缓存测试，确认没有全历史重排。
+
+文档影响：
+
+- 本轮是 TUI 内部能力增强，不改变公开命令；README 不需要新增入口。
 
 ## 7. 实施任务
 
-- [x] 新增 Tool Output Kernel 类型、分类、投影、指标和入口。
-- [x] 将 bash 输出接入 Tool Output Kernel。
-- [x] 将工具结果模型投影改为优先使用治理投影。
-- [x] 在 tool batch lifecycle 记录 `tool.output` observability 事件。
-- [x] 在 runtime status 类型和读取逻辑中加入最近工具输出治理事实。
-- [x] 在 CLI status 文本中展示工具输出治理摘要。
-- [x] 增加 Tool Output Kernel、bash、model projection、status 测试。
-- [x] 同步 README 当前事实。
+- [x] 新增 `src/shell/tui/markdownInline.ts`，把 marked inline token 转成 `TuiMarkdownSpan`。
+- [x] 新增 `src/shell/tui/markdownTable.ts`，用 `string-width` 做表格列宽和 padding。
+- [x] 重写 `src/shell/tui/markdown.ts`，输出带 spans 和 code language 的 display lines。
+- [x] 更新 `src/shell/tui/transcriptLayout.ts`，让 transcript row 支持 spans，并由同一宽度模型切行。
+- [x] 更新 `src/shell/tui/components/Transcript.ts`，渲染 row spans，不在组件里解析 Markdown。
+- [x] 增加 `tests/shell/tui-markdown.test.ts` 覆盖行内样式、代码语言、链接、宽字符表格和 fallback。
+- [x] 更新现有 TUI store/render 测试，验证 Markdown 渲染和滚动行数仍一致。
 - [x] 运行局部测试和完整验证。
 - [x] 更新收口记录。
 
 ## 8. 验证计划
 
-- `npm.cmd run test:build`
-- `node --test .test-build/tests/tools/output-kernel.test.js`
-- `node --test .test-build/tests/tools/bash-output-governance.test.js`
-- `node --test .test-build/tests/agent/tool-result-projection.test.js`
-- `node --test .test-build/tests/runtime/status.test.js`
-- `npm.cmd run verify`
-
-手动检查：
-
-- `kitty status` 应显示最近工具输出治理事实。
-- bash 长输出结果包含完整输出路径和治理摘要。
-
-未验证内容：
-
-- 不验证真实 provider 计费，只验证本地估算和记录。
+- 运行 `npm.cmd run test:core -- --test-name-pattern tui` 或等价局部测试，验证 TUI Markdown、布局、组件。
+- 运行 `npm.cmd run verify`，验证类型、构建和全量测试。
+- 手动检查构建产物不引入 CLI/TUI 静态耦合。
+- 文档同步检查：确认 README 无新增命令事实需要更新。
+- 未验证内容：真实终端截图和人工观感需要用户在 TUI 中体验。
 
 ## 9. 收口
 
 目标已完成。
 
-改动事实：
+改动文件：
 
-- 新增 `src/tools/outputKernel/`，作为工具输出治理主干。
-- `bash` 输出接入治理结果，保留原始输出路径、短证据、估算 token 节省和降级事实。
-- 工具结果进入模型前优先使用 `outputGovernance.projection`。
-- `tool.output` observability 事件记录治理事实。
-- `kitty status` 聚合并展示最近工具输出节省现场。
-- `projectors.ts` 已拆成分发层，diagnostic/search/gitDiff/generic/recovery/shared 各自单一职责。
-- README 已同步 Tool Output Kernel 当前事实。
+- `src/shell/tui/markdown.ts`
+- `src/shell/tui/markdownInline.ts`
+- `src/shell/tui/markdownTable.ts`
+- `src/shell/tui/markdownTypes.ts`
+- `src/shell/tui/transcriptLayout.ts`
+- `src/shell/tui/components/Transcript.ts`
+- `src/shell/tui/store.ts`
+- `tests/shell/tui-markdown.test.ts`
+- `tests/shell/tui-store.test.ts`
+- `tests/shell/tui-render.test.ts`
+- `plan.md`
 
-验证事实：
+验证结果：
 
-- `npm.cmd run test:build` 通过。
-- `node --test .test-build/tests/tools/output-kernel.test.js` 通过。
-- `node --test .test-build/tests/tools/bash-output-governance.test.js` 通过。
-- `node --test .test-build/tests/agent/tool-result-projection.test.js` 通过。
-- `node --test .test-build/tests/runtime/status.test.js` 通过。
-- `npm.cmd run verify` 通过，218 个测试全部通过。
+- 局部 TUI 测试：`npm.cmd run test:build; node --test .test-build/tests/shell/tui*.test.js`，39 个测试通过。
+- 完整验证：`npm.cmd run verify`，222 个测试通过。
+
+文档同步：
+
+- 本轮没有新增公开命令或配置项，README 不需要同步。
 
 未验证内容：
 
-- 未验证真实 provider 计费，只验证本地估算、记录、投影和 status 聚合。
+- 未做真实终端截图审阅；需要在 `node dist/cli.js tui` 中人工体验 Markdown 观感。
 
 剩余风险：
 
-- 当前结构化投影覆盖 test/build/typecheck/search/git diff 的常见文本形态；更细的工具专用解析应继续放在各自 projector 内，不应回到单文件堆规则。
+- 本轮未引入完整语法高亮；代码块已保留语言标签和 code span，可后续在同一 render kernel 上增强。
 
 commit / push：
 
-- 用户已要求 commit；提交后以 git 记录为准。push 未要求，本次不执行。
+- 用户本轮未要求 commit 或 push，未执行。

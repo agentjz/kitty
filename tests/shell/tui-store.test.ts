@@ -109,6 +109,7 @@ test("tui transcript keeps markdown structure as display facts", () => {
   assert.equal(rows.some((row) => row.markdownKind === "heading" && row.text === "Title"), true);
   assert.equal(rows.some((row) => row.markdownKind === "list" && row.text === "• first"), true);
   assert.equal(rows.some((row) => row.markdownKind === "code" && row.text === "const ok = true;"), true);
+  assert.equal(rows.some((row) => row.markdownKind === "code" && row.language === "ts" && row.text === " ts "), true);
   assert.equal(rows.some((row) => row.markdownKind === "quote" && row.text === "│ note"), true);
   assert.equal(rows.some((row) => row.text.includes("```")), false);
 });

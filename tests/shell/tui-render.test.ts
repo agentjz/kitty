@@ -297,7 +297,7 @@ test("tui transcript renders assistant markdown without changing stored text", a
     Box: ink.Box,
     Text: ink.Text,
   });
-  const source = "## 标题\n\n- 第一项\n- 第二项\n\n```ts\nconst ok = true;\n```";
+  const source = "## 标题\n\n- 第一项\n- 第二项\n\n**重点** 和 `code`\n\n```ts\nconst ok = true;\n```";
   let state = createInitialTuiState();
   state = appendTranscriptEntry(state, { role: "assistant", text: source }, { width: 80, height: 12 });
 
@@ -312,7 +312,10 @@ test("tui transcript renders assistant markdown without changing stored text", a
   assert.equal(state.transcript[0]?.text, source);
   assert.match(output, /标题/);
   assert.match(output, /• 第一项/);
+  assert.match(output, /重点/);
+  assert.match(output, /code/);
   assert.doesNotMatch(output, /```ts/);
+  assert.doesNotMatch(output, /\*\*重点\*\*/);
   assert.match(output, /const ok = true;/);
 });
 

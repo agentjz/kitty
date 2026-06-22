@@ -6,12 +6,14 @@ import {
   renderTranscriptRows as renderTranscriptLayoutRows,
   type TuiTranscriptEntry,
   type TuiTranscriptLineView,
+  type TuiTranscriptLineSpan,
   type TuiTranscriptRole,
 } from "./transcriptLayout.js";
 
 export type {
   TuiTranscriptEntry,
   TuiTranscriptLineView,
+  TuiTranscriptLineSpan,
   TuiTranscriptRole,
 } from "./transcriptLayout.js";
 
