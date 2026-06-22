@@ -80,3 +80,28 @@ test("tool output kernel projects git diff files and hunks", () => {
   assert.match(governance.projection, /files: src\/a\.ts -> src\/a\.ts, src\/b\.ts -> src\/b\.ts/);
   assert.match(governance.projection, /@@ -1 \+1 @@/);
 });
+
+test("tool output kernel keeps huge generic output model-facing projection bounded", () => {
+  const raw = Array.from({ length: 120_000 }, (_, index) => `line ${index}: ${"x".repeat(60)}`).join("\n");
+
+  const governance = governToolOutput({
+    toolName: "bash",
+    command: "node huge-output.js",
+    status: "completed",
+    exitCode: 0,
+    durationMs: 1000,
+    output: raw,
+    outputPath: ".kitty/observability/command-output/session/huge.txt",
+    truncated: true,
+  });
+
+  assert.equal(governance.kind, "generic");
+  assert.equal(governance.truncated, true);
+  assert.equal(governance.outputPath, ".kitty/observability/command-output/session/huge.txt");
+  assert.match(governance.projection, /\[full output:/);
+  assert.ok(governance.rawChars > 8_000_000);
+  assert.ok(governance.projectedChars < 4_000);
+  assert.ok(governance.savedTokens > 1_000_000);
+  assert.ok(governance.savingsRatio > 0.99);
+  assert.doesNotMatch(governance.projection, /line 119999/);
+});

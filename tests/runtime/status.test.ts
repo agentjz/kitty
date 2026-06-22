@@ -263,6 +263,52 @@ test("runtime status exposes background executions that are running without outp
   assert.match(formatRuntimeStatusText(status), /risk=watch/);
 });
 
+test("runtime status exposes corrupt sessions without hiding readable sessions", async (t) => {
+  const root = await createTempWorkspace("runtime-status-corrupt-session", t);
+  const paths = path.join(root, ".kitty", "sessions");
+  const sessionStore = new SessionStore(paths);
+  const session = await sessionStore.save(await sessionStore.create(root));
+  await fs.writeFile(path.join(paths, "broken.json"), "{not json", "utf8");
+
+  const status = await buildRuntimeStatus(root);
+  const text = formatRuntimeStatusText(status);
+
+  assert.equal(status.sessions.total, 1);
+  assert.equal(status.sessions.latest?.id, session.id);
+  assert.equal(status.sessions.skipped, 1);
+  assert.match(text, /Sessions: 1 total, 1 skipped/);
+});
+
+test("runtime status marks stale background executions as blocked recovery work", async (t) => {
+  const root = await createTempWorkspace("runtime-status-stale-background", t);
+  const ledger = new ControlPlaneLedger(root);
+  try {
+    const execution = ledger.executions.create({
+      kind: "background",
+      status: "running",
+      command: "long task",
+      cwd: root,
+      requestedBy: "lead",
+    });
+    ledger.executions.close(execution.id, {
+      status: "stale",
+      summary: "process disappeared",
+    });
+  } finally {
+    ledger.close();
+  }
+
+  const status = await buildRuntimeStatus(root);
+  const text = formatRuntimeStatusText(status);
+
+  assert.equal(status.scene.headline, "1 execution(s) need attention.");
+  assert.equal(status.scene.background.active, 1);
+  assert.equal(status.scene.background.blocked, 1);
+  assert.equal(status.scene.executions[0]?.risk, "blocked");
+  assert.match(status.scene.executions[0]?.nextAction ?? "", /kitty background stop/);
+  assert.match(text, /risk=blocked/);
+});
+
 test("runtime scene gives a direct starting action when no session exists", async (t) => {
   const root = await createTempWorkspace("runtime-status-empty-scene", t);
 

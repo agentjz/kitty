@@ -23,6 +23,9 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
   lines.push("Current workspace:");
   lines.push(`- Focus: ${status.scene.focus}`);
   lines.push(`- Session: ${readSessionLine(status)}`);
+  if (status.sessions.skipped > 0) {
+    lines.push(`- Sessions: ${status.sessions.total} total, ${status.sessions.skipped} skipped`);
+  }
   lines.push(`- Next: ${status.scene.nextAction}`);
   lines.push(`- Blocked: ${status.scene.blocked}`);
   lines.push(`- Context budget: ${readContextBudgetLine(status)}`);
@@ -161,9 +164,9 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
     }
   }
 
-  if (status.executions.active.length > 0) {
+  if (status.scene.executions.length > 0) {
     lines.push("");
-    lines.push("Active executions:");
+    lines.push("Scene executions:");
     for (const execution of status.scene.executions) {
       lines.push([
         execution.id,

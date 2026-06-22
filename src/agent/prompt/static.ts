@@ -62,6 +62,7 @@ function buildToolBlock(): string {
 function buildCommunicationBlock(): string {
   return [
     "Always reply in Simplified Chinese.",
+    "No Markdown in user-facing conversational replies; prefer plain text whenever possible.",
     "Provide concise progress updates during multi-step work.",
     "Make every sentence carry decision, execution, evidence, or understanding.",
     "Claim changed files, passed commands, and successful tools only when tool evidence supports them.",

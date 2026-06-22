@@ -8,7 +8,7 @@ import type {
 type RuntimeStatusFacts = Omit<RuntimeStatus, "scene">;
 
 export function buildRuntimeScene(status: RuntimeStatusFacts): RuntimeSceneSummary {
-  const executions = status.executions.active.map(buildExecutionScene);
+  const executions = readSceneExecutions(status);
   const blockedExecutions = executions.filter((execution) => execution.risk === "blocked");
   const watchExecutions = executions.filter((execution) => execution.risk === "watch");
   const activeBackground = executions.filter((execution) => execution.kind === "background");
@@ -41,6 +41,20 @@ export function buildRuntimeScene(status: RuntimeStatusFacts): RuntimeSceneSumma
   };
 }
 
+function readSceneExecutions(status: RuntimeStatusFacts): RuntimeExecutionSceneSummary[] {
+  const byId = new Map<string, RuntimeExecutionSceneSummary>();
+  for (const execution of status.executions.active) {
+    byId.set(execution.id, buildExecutionScene(execution));
+  }
+  for (const execution of status.executions.recent) {
+    const scene = buildExecutionScene(execution);
+    if (scene.risk !== "none" && !byId.has(scene.id)) {
+      byId.set(scene.id, scene);
+    }
+  }
+  return [...byId.values()];
+}
+
 export function buildExecutionScene(execution: RuntimeExecutionSummary): RuntimeExecutionSceneSummary {
   const risk = readExecutionRisk(execution);
   return {
@@ -60,9 +74,6 @@ function buildHeadline(
   blockedExecutions: RuntimeExecutionSceneSummary[],
   watchExecutions: RuntimeExecutionSceneSummary[],
 ): string {
-  if (!status.sessions.latest) {
-    return "No active session yet.";
-  }
   if (blockedExecutions.length > 0) {
     return `${blockedExecutions.length} execution(s) need attention.`;
   }
@@ -71,6 +82,9 @@ function buildHeadline(
   }
   if (status.executions.active.length > 0) {
     return `${status.executions.active.length} execution(s) are running.`;
+  }
+  if (!status.sessions.latest) {
+    return "No active session yet.";
   }
   return "Ready to continue the latest session.";
 }

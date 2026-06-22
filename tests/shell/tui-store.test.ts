@@ -16,6 +16,7 @@ import {
 } from "../../src/shell/tui/store.js";
 import { TuiTranscriptProjection } from "../../src/shell/tui/transcriptProjection.js";
 import type { SessionRecord } from "../../src/types.js";
+import type { TuiTranscriptEntry } from "../../src/shell/tui/store.js";
 
 const viewport: TuiViewport = {
   width: 20,
@@ -162,6 +163,43 @@ test("tui transcript projection returns only requested visible rows", () => {
 
   assert.equal(rows.length, 2);
   assert.deepEqual(rows.map((row) => row.text), ["two", "three"]);
+});
+
+test("tui transcript projection keeps long session layout cached across scroll and resize", () => {
+  const entries: TuiTranscriptEntry[] = Array.from({ length: 1_000 }, (_, index) => ({
+    id: `entry-${index}`,
+    role: index % 3 === 0 ? "assistant" : index % 3 === 1 ? "reasoning" : "user",
+    text: [
+      `## Item ${index}`,
+      "",
+      `This is a long row with **bold ${index}** and \`code ${index}\` that should wrap under the same model.`,
+      "",
+      "| 名称 | Value |",
+      "| --- | --- |",
+      `| 猫猫${index} | ${index} |`,
+    ].join("\n"),
+  }));
+  const layouts: string[] = [];
+  const projection = new TuiTranscriptProjection({
+    onEntryLayout(entry, width) {
+      layouts.push(`${entry.id}:${width}`);
+    },
+  });
+
+  const firstVisible = projection.renderVisibleLineViews(entries, { width: 96, height: 12 }, 0);
+  const laterVisible = projection.renderVisibleLineViews(entries, { width: 96, height: 12 }, 400);
+  const measured = projection.measureRows(entries, 96);
+  const repeatVisible = projection.renderVisibleLineViews(entries, { width: 96, height: 12 }, 800);
+
+  assert.equal(firstVisible.length, 12);
+  assert.equal(laterVisible.length, 12);
+  assert.equal(repeatVisible.length, 12);
+  assert.ok(measured > entries.length);
+  assert.equal(layouts.length, entries.length);
+
+  projection.renderVisibleLineViews(entries, { width: 72, height: 12 }, 0);
+  assert.equal(layouts.length, entries.length + 3);
+  assert.deepEqual(layouts.slice(-3), ["entry-0:72", "entry-1:72", "entry-2:72"]);
 });
 
 test("tui parses submitted input echo from session driver", () => {

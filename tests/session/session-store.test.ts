@@ -108,3 +108,20 @@ test("session store projects model-written session memory into a readable asset"
   assert.match(asset, /## User Constraints/);
   assert.match(asset, /txt 纯文本回答/);
 });
+
+test("session store lists readable sessions while exposing corrupt snapshots", async (t) => {
+  const root = await createTempWorkspace("session-corrupt-list", t);
+  const paths = getAppPaths(root);
+  const store = new SessionStore(paths.sessionsDir);
+  const session = await store.save(await store.create(root));
+  await fs.mkdir(paths.sessionsDir, { recursive: true });
+  await fs.writeFile(path.join(paths.sessionsDir, "broken.json"), "{not json", "utf8");
+
+  const readable = await store.listReadable(10);
+
+  assert.equal(readable.sessions.length, 1);
+  assert.equal(readable.sessions[0]?.id, session.id);
+  assert.equal(readable.skipped.length, 1);
+  assert.equal(readable.skipped[0]?.code, "SESSION_CORRUPT");
+  assert.match(readable.skipped[0]?.path ?? "", /broken\.json$/);
+});
