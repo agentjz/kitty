@@ -14,6 +14,7 @@ import {
   scrollTuiTranscriptToBottom,
   type TuiViewport,
 } from "../../src/shell/tui/store.js";
+import { TuiTranscriptProjection } from "../../src/shell/tui/transcriptProjection.js";
 import type { SessionRecord } from "../../src/types.js";
 
 const viewport: TuiViewport = {
@@ -110,6 +111,56 @@ test("tui transcript keeps markdown structure as display facts", () => {
   assert.equal(rows.some((row) => row.markdownKind === "code" && row.text === "const ok = true;"), true);
   assert.equal(rows.some((row) => row.markdownKind === "quote" && row.text === "│ note"), true);
   assert.equal(rows.some((row) => row.text.includes("```")), false);
+});
+
+test("tui transcript projection caches stable entry layout by id text and width", () => {
+  const entries = [{
+    id: "entry-1",
+    role: "assistant" as const,
+    text: "## Title\n\nA long answer that wraps.",
+  }, {
+    id: "entry-2",
+    role: "assistant" as const,
+    text: "Stable second answer.",
+  }];
+  const layouts: string[] = [];
+  const projection = new TuiTranscriptProjection({
+    onEntryLayout(entry, width) {
+      layouts.push(`${entry.id}:${width}:${entry.text.length}`);
+    },
+  });
+
+  const first = projection.renderLineViews(entries, 40);
+  const second = projection.renderLineViews(entries, 40);
+
+  assert.notEqual(first, second);
+  assert.equal(first[0], second[0]);
+  assert.equal(first.at(-1), second.at(-1));
+  assert.deepEqual(layouts, ["entry-1:40:35", "entry-2:40:21"]);
+
+  projection.renderLineViews([{ ...entries[0]!, text: `${entries[0]!.text}!` }, entries[1]!], 40);
+  assert.deepEqual(layouts, ["entry-1:40:35", "entry-2:40:21", "entry-1:40:36"]);
+
+  projection.renderLineViews(entries, 30);
+  assert.deepEqual(layouts, [
+    "entry-1:40:35",
+    "entry-2:40:21",
+    "entry-1:40:36",
+    "entry-1:30:35",
+    "entry-2:30:21",
+  ]);
+});
+
+test("tui transcript projection returns only requested visible rows", () => {
+  const projection = new TuiTranscriptProjection();
+  const rows = projection.renderVisibleLineViews([{
+    id: "entry-1",
+    role: "assistant",
+    text: "one\ntwo\nthree\nfour\nfive",
+  }], { width: 80, height: 2 }, 2);
+
+  assert.equal(rows.length, 2);
+  assert.deepEqual(rows.map((row) => row.text), ["two", "three"]);
 });
 
 test("tui parses submitted input echo from session driver", () => {

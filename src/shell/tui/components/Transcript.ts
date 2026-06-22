@@ -4,6 +4,7 @@ import {
   type TuiTranscriptLineView,
   type TuiViewport,
 } from "../store.js";
+import type { TuiController } from "../controller.js";
 import { TUI_COLORS } from "../theme.js";
 import { TRANSCRIPT_OUTER_PADDING_X } from "../transcriptLayout.js";
 import type { InkRuntime } from "./kit.js";
@@ -11,11 +12,14 @@ import type { InkRuntime } from "./kit.js";
 export function createTranscriptComponent(kit: Pick<InkRuntime, "React" | "Box" | "Text">) {
   const { React, Box, Text } = kit;
   return function Transcript(props: {
+    controller?: TuiController;
     state: TuiState;
     viewport: TuiViewport;
   }): React.ReactNode {
-    const rows = renderTranscriptLineViews(props.state.transcript, props.viewport.width)
-      .slice(props.state.scroll.offset, props.state.scroll.offset + props.viewport.height);
+    const rows = props.controller
+      ? props.controller.getVisibleTranscriptLineViews(props.viewport)
+      : renderTranscriptLineViews(props.state.transcript, props.viewport.width)
+        .slice(props.state.scroll.offset, props.state.scroll.offset + props.viewport.height);
     return React.createElement(
       Box,
       {

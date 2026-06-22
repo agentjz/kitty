@@ -69,7 +69,7 @@ export function createTuiAppComponent(kit: InkRuntime) {
     return React.createElement(
       Box,
       { flexDirection: "column", width, height },
-      React.createElement(Transcript, { state, viewport: transcriptViewport }),
+      React.createElement(Transcript, { controller: props.controller, state, viewport: transcriptViewport }),
       React.createElement(
         Box,
         {

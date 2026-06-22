@@ -47,6 +47,15 @@ export interface TuiViewport {
   height: number;
 }
 
+export interface TuiTranscriptProjectionLike {
+  measureRows(entries: readonly TuiTranscriptEntry[], width: number): number;
+  renderLineViews(entries: readonly TuiTranscriptEntry[], width: number): TuiTranscriptLineView[];
+}
+
+interface TuiProjectionOptions {
+  readonly projection?: TuiTranscriptProjectionLike;
+}
+
 const DEFAULT_DOCK: TuiRuntimeDockState = {
   work: {
     active: false,
@@ -81,12 +90,13 @@ export function appendTranscriptEntry(
   state: TuiState,
   entry: Omit<TuiTranscriptEntry, "id">,
   viewport: TuiViewport,
+  options: TuiProjectionOptions = {},
 ): TuiState {
   const next = {
     ...state,
     transcript: [...state.transcript, { ...entry, id: createEntryId(state.transcript.length) }],
   };
-  return applyContentChange(next, viewport);
+  return applyContentChange(next, viewport, options);
 }
 
 export function appendTranscriptText(
@@ -94,6 +104,7 @@ export function appendTranscriptText(
   role: TuiTranscriptRole,
   text: string,
   viewport: TuiViewport,
+  options: TuiProjectionOptions = {},
 ): TuiState {
   const last = state.transcript[state.transcript.length - 1];
   if (last && last.role === role && (role === "assistant" || role === "reasoning")) {
@@ -102,9 +113,9 @@ export function appendTranscriptText(
       ...state,
       transcript: [...transcript, { ...last, text: `${last.text}${text}` }],
     };
-    return applyContentChange(next, viewport);
+    return applyContentChange(next, viewport, options);
   }
-  return appendTranscriptEntry(state, { role, text }, viewport);
+  return appendTranscriptEntry(state, { role, text }, viewport, options);
 }
 
 export function updateRuntimeDock(state: TuiState, dock: Partial<TuiRuntimeDockState>): TuiState {
@@ -134,8 +145,13 @@ export function updateComposerState(
   };
 }
 
-export function scrollTuiTranscript(state: TuiState, viewport: TuiViewport, delta: number): TuiState {
-  const maxOffset = getMaxScrollOffset(state, viewport);
+export function scrollTuiTranscript(
+  state: TuiState,
+  viewport: TuiViewport,
+  delta: number,
+  options: TuiProjectionOptions = {},
+): TuiState {
+  const maxOffset = getMaxScrollOffset(state, viewport, options);
   const offset = clamp(state.scroll.offset + delta, 0, maxOffset);
   return {
     ...state,
@@ -158,36 +174,58 @@ export function scrollTuiTranscriptToTop(state: TuiState): TuiState {
   };
 }
 
-export function scrollTuiTranscriptToBottom(state: TuiState, viewport: TuiViewport): TuiState {
+export function scrollTuiTranscriptToBottom(
+  state: TuiState,
+  viewport: TuiViewport,
+  options: TuiProjectionOptions = {},
+): TuiState {
   return {
     ...state,
     scroll: {
-      offset: getMaxScrollOffset(state, viewport),
+      offset: getMaxScrollOffset(state, viewport, options),
       stickToBottom: true,
       newContentPending: false,
     },
   };
 }
 
-export function applyViewportResize(state: TuiState, viewport: TuiViewport): TuiState {
+export function applyViewportResize(
+  state: TuiState,
+  viewport: TuiViewport,
+  options: TuiProjectionOptions = {},
+): TuiState {
   if (state.scroll.stickToBottom) {
-    return scrollTuiTranscriptToBottom(state, viewport);
+    return scrollTuiTranscriptToBottom(state, viewport, options);
   }
   return {
     ...state,
     scroll: {
       ...state.scroll,
-      offset: clamp(state.scroll.offset, 0, getMaxScrollOffset(state, viewport)),
+      offset: clamp(state.scroll.offset, 0, getMaxScrollOffset(state, viewport, options)),
     },
   };
 }
 
-export function getMaxScrollOffset(state: Pick<TuiState, "transcript">, viewport: TuiViewport): number {
-  return Math.max(0, measureTranscriptRows(state.transcript, viewport.width) - viewport.height);
+export function getMaxScrollOffset(
+  state: Pick<TuiState, "transcript">,
+  viewport: TuiViewport,
+  options: TuiProjectionOptions = {},
+): number {
+  const rows = options.projection
+    ? options.projection.measureRows(state.transcript, viewport.width)
+    : measureTranscriptRows(state.transcript, viewport.width);
+  return Math.max(0, rows - viewport.height);
 }
 
-export function getVisibleTranscriptRows(state: TuiState, viewport: TuiViewport): string[] {
-  return renderTranscriptLineViews(state.transcript, viewport.width)
+export function getVisibleTranscriptRows(
+  state: TuiState,
+  viewport: TuiViewport,
+  options: TuiProjectionOptions = {},
+): string[] {
+  const rows = options.projection
+    ? options.projection.renderLineViews(state.transcript, viewport.width)
+    : renderTranscriptLineViews(state.transcript, viewport.width);
+  return rows
     .slice(state.scroll.offset, state.scroll.offset + viewport.height)
     .map((line) => line.text);
 }
@@ -216,9 +254,13 @@ export function formatContextBudget(session: SessionRecord | undefined): string 
   return `${budget.estimatedChars}/${budget.limitChars} chars (${percent}%)`;
 }
 
-function applyContentChange(state: TuiState, viewport: TuiViewport): TuiState {
+function applyContentChange(
+  state: TuiState,
+  viewport: TuiViewport,
+  options: TuiProjectionOptions,
+): TuiState {
   if (state.scroll.stickToBottom) {
-    return scrollTuiTranscriptToBottom(state, viewport);
+    return scrollTuiTranscriptToBottom(state, viewport, options);
   }
   return {
     ...state,

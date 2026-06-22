@@ -36,6 +36,7 @@ test("tui turn display keeps tool calls in runtime dock", () => {
   display.callbacks.onAssistantDelta?.("hello");
   display.callbacks.onToolCall?.("background_run", "{}");
   display.callbacks.onToolResult?.("background_run", "done");
+  display.flush();
 
   const state = controller.getState();
   assert.equal(state.transcript.map((entry) => entry.text).join(""), "hello");
@@ -54,4 +55,20 @@ test("tui shell interrupt forwards to session driver handler", () => {
   controller.interrupt();
 
   assert.equal(interrupted, true);
+});
+
+test("tui controller projects every streaming delta through the same path", () => {
+  const controller = new TuiController();
+  let updates = 0;
+  const unsubscribe = controller.subscribe(() => {
+    updates += 1;
+  });
+
+  controller.appendStreaming("assistant", "hel");
+  controller.appendStreaming("assistant", "lo");
+
+  assert.equal(controller.getState().transcript.length, 1);
+  unsubscribe();
+  assert.equal(controller.getState().transcript[0]?.text, "hello");
+  assert.equal(updates, 3);
 });

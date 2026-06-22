@@ -66,7 +66,7 @@ export function renderTranscriptLineViews(
   viewportWidth: number,
   theme: TuiTranscriptTheme,
 ): TuiTranscriptLineView[] {
-  return entries.flatMap((entry) => renderEntryLineViews(entry, viewportWidth, theme));
+  return entries.flatMap((entry) => renderTranscriptEntryLineViews(entry, viewportWidth, theme));
 }
 
 export function renderTranscriptRows(
@@ -85,7 +85,7 @@ export function measureTranscriptRows(
   return renderTranscriptLineViews(entries, viewportWidth, theme).length;
 }
 
-function renderEntryLineViews(
+export function renderTranscriptEntryLineViews(
   entry: TuiTranscriptEntry,
   viewportWidth: number,
   theme: TuiTranscriptTheme,
