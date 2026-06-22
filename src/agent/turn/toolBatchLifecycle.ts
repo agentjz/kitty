@@ -103,6 +103,31 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
         changedPathCount: metadata?.changedPaths?.length ?? 0,
       },
     });
+    if (metadata?.outputGovernance) {
+      await recordObservabilityEvent(projectContext.stateRootDir, {
+        event: "tool.output",
+        status: result.ok ? "completed" : "failed",
+        sessionId: session.id,
+        identityKind: identity.kind,
+        identityName: identity.name,
+        toolName: toolCall.function.name,
+        durationMs,
+        details: {
+          kind: metadata.outputGovernance.kind,
+          mode: metadata.outputGovernance.mode,
+          rawChars: metadata.outputGovernance.rawChars,
+          projectedChars: metadata.outputGovernance.projectedChars,
+          rawTokens: metadata.outputGovernance.rawTokens,
+          projectedTokens: metadata.outputGovernance.projectedTokens,
+          savedTokens: metadata.outputGovernance.savedTokens,
+          savingsRatio: metadata.outputGovernance.savingsRatio,
+          truncated: metadata.outputGovernance.truncated,
+          outputPath: metadata.outputGovernance.outputPath,
+          degraded: metadata.outputGovernance.degraded,
+          reason: metadata.outputGovernance.reason,
+        },
+      });
+    }
     if (result.ok) {
       options.callbacks?.onToolResult?.(toolCall.function.name, result.output);
     } else {

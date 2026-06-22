@@ -190,6 +190,51 @@ test("runtime status surfaces recent model request cache facts", async (t) => {
   assert.match(text, /cacheRead=900/);
 });
 
+test("runtime status surfaces recent tool output governance facts", async (t) => {
+  const root = await createTempWorkspace("runtime-status-tool-output", t);
+  await initGitRepo(root);
+  const paths = path.join(root, ".kitty", "observability", "events");
+  await fs.mkdir(paths, { recursive: true });
+  await fs.writeFile(
+    path.join(paths, "2026-06-22.jsonl"),
+    JSON.stringify({
+      version: 1,
+      timestamp: "2026-06-22T00:00:00.000Z",
+      event: "tool.output",
+      status: "completed",
+      toolName: "bash",
+      details: {
+        kind: "test",
+        mode: "structured",
+        rawChars: 12000,
+        projectedChars: 800,
+        rawTokens: 3000,
+        projectedTokens: 200,
+        savedTokens: 2800,
+        savingsRatio: 0.9333,
+        truncated: true,
+        outputPath: "observability/command-output/session/output.txt",
+        degraded: false,
+        reason: "structured_projection",
+      },
+    }) + "\n",
+    "utf8",
+  );
+
+  const status = await buildRuntimeStatus(root);
+  const text = formatRuntimeStatusText(status);
+
+  assert.equal(status.toolOutputs.recent.length, 1);
+  assert.match(status.scene.toolOutputs, /1 recent/);
+  assert.match(status.scene.toolOutputs, /2800 tokens saved est\./);
+  assert.match(status.scene.toolOutputs, /1 recoverable/);
+  assert.match(text, /Tool output: 1 recent; 2800 tokens saved est\.; 1 recoverable; top=bash:test/);
+  assert.match(text, /Recent tool output:/);
+  assert.match(text, /bash  kind=test  mode=structured  raw=3000  projected=200  saved=2800/);
+  assert.match(text, /savedRatio=93%/);
+  assert.match(text, /recoverable=yes/);
+});
+
 test("runtime status exposes background executions that are running without output", async (t) => {
   const root = await createTempWorkspace("runtime-status-background-health", t);
   const ledger = new ControlPlaneLedger(root);

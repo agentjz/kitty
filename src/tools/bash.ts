@@ -4,6 +4,7 @@ import { getShellRuntimeInfo } from "../utils/commandRunner/shellRuntime.js";
 import { resolveUserPath, truncateText } from "../utils/fs.js";
 import { clampNumber, okResult, parseArgs, readString } from "../tools/core/shared.js";
 import type { RegisteredTool } from "../tools/core/types.js";
+import { governToolOutput } from "./outputKernel/index.js";
 
 const SHELL_RUNTIME = getShellRuntimeInfo();
 
@@ -63,6 +64,18 @@ export const bashToolDefinition: RegisteredTool = {
           : result.exitCode === 0
             ? "completed"
             : "failed";
+    const outputGovernance = governToolOutput({
+      toolName: "bash",
+      command,
+      status,
+      exitCode: result.exitCode,
+      durationMs: result.durationMs,
+      output: result.output,
+      outputPath: result.outputPath,
+      truncated: result.truncated,
+      outputChars: result.outputChars,
+      outputBytes: result.outputBytes,
+    });
     const metadata: ToolExecutionMetadata = {
       runtime: {
         status,
@@ -76,6 +89,7 @@ export const bashToolDefinition: RegisteredTool = {
         outputPath: result.outputPath,
         outputPreview: result.output,
       },
+      outputGovernance,
     };
 
     return okResult(
@@ -91,6 +105,7 @@ export const bashToolDefinition: RegisteredTool = {
           outputPath: result.outputPath,
           outputChars: result.outputChars,
           outputBytes: result.outputBytes,
+          outputGovernance,
           output: truncateText(result.output, 4_000),
           ...(status === "completed"
             ? {}

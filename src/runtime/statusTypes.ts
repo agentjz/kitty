@@ -20,6 +20,9 @@ export interface RuntimeStatus {
   modelRequests: {
     recent: RuntimeModelRequestSummary[];
   };
+  toolOutputs: {
+    recent: RuntimeToolOutputSummary[];
+  };
   taskLifecycle?: RuntimeTaskLifecycleSummary;
   executions: {
     total: number;
@@ -37,6 +40,7 @@ export interface RuntimeSceneSummary {
   nextAction: string;
   blocked: string;
   cost: string;
+  toolOutputs: string;
   recovery: string;
   skills: {
     ready: number;
@@ -150,6 +154,23 @@ export interface RuntimeModelRequestSummary {
     cacheMissTokens?: number;
     cacheHitRate?: number;
   };
+}
+
+export interface RuntimeToolOutputSummary {
+  timestamp: string;
+  toolName?: string;
+  kind?: string;
+  mode?: string;
+  rawChars?: number;
+  projectedChars?: number;
+  rawTokens?: number;
+  projectedTokens?: number;
+  savedTokens?: number;
+  savingsRatio?: number;
+  truncated: boolean;
+  outputPath?: string;
+  degraded: boolean;
+  reason?: string;
 }
 
 export interface RuntimeMemoryAssetSummary {

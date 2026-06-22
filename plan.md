@@ -1,237 +1,202 @@
-# TUI 长会话性能 Plan
+# 工具输出治理系统 Plan
 
 ## 1. 需求文档
 
-用户已经能舒服地使用 Kitty TUI。现在要解决的是长会话变多后卡顿的问题。
+用户要解决的是省 token 和保持上下文干净。
 
-使用者是长期把 Kitty 当生产工具的人。用户在一个 session 里连续聊天、看历史、滚动、等待流式回复时，TUI 应该保持顺滑，不因为历史消息变多就明显卡住。
+Kitty 执行命令、搜索、测试、构建、后台任务时，经常会产生很长输出。成熟体验不是把这些输出直接塞给模型，也不是简单截断后丢失证据，而是：
 
-用户体验上要做到：
+- 用户和模型先看到短、准、可行动的结果。
+- 完整原始输出仍然可恢复。
+- 上下文只承载当前推理需要的证据。
+- 状态里能看到哪些工具输出最费 token、压缩是否有效。
 
-- 长会话打开后可以继续滚动和输入。
-- 模型流式回复时，界面稳定刷新，不因为每个小片段都全屏重算而卡顿。
-- 旧消息已经稳定后不反复解析和换行。
-- 当前屏幕只渲染当前需要看的行。
-- 滚动、窗口 resize、底部状态刷新不应该触发整段历史的重复 markdown 解析。
+使用者是日常用 Kitty 做开发、测试、搜索、调试和长任务的人。
 
-当前范围包含 TUI transcript 的投影缓存和可见窗口渲染。
+完成后的体验：
 
-当前范围不包含换 TUI 框架、不重写 agent/session/provider 主链路、不做 Web/TUI 统一 UI 框架、不做复杂虚拟列表库。
+- 命令输出很长时，模型不会被日志淹没。
+- 失败测试、构建错误、搜索结果会更像“证据摘要”，不是原始日志。
+- 需要完整输出时，能看到保存路径。
+- `kitty status` 能看到最近工具输出治理情况和节省比例。
 
-业务上完成的标准：长会话性能主因从“每次全量重算”变成“稳定消息复用缓存，活跃消息局部更新，可见窗口渲染”。
+当前范围包含：
+
+- bash 工具输出治理。
+- 工具结果进入模型前的统一投影。
+- 原始输出保存、压缩输出、节省事实和降级事实。
+- status/observability 暴露最近工具输出治理事实。
+- 针对常见命令的轻量结构化压缩：test/build/typecheck/search/git diff。
+
+当前范围不包含：
+
+- 不接入 RTK 作为运行时依赖。
+- 不做外部命令自动改写。
+- 不做向量检索或长期记忆改造。
+- 不做 provider 价格计算。
+
+业务完成标准：
+
+- 工具输出进入模型前经过同一治理主干。
+- 长输出可恢复，短证据可用。
+- 节省事实可见。
+- 测试覆盖真实用户路径。
 
 ## 2. 当前事实
 
-当前代码事实：
-
-- `src/shell/tui/store.ts` 的 `TuiState.transcript` 保存当前 session 的可见消息投影。
-- `createInitialTuiState(session)` 会把 session messages 转成 TUI transcript entries。
-- `appendTranscriptText()` 对 streaming assistant/reasoning 会更新最后一条 entry 的 text。
-- `src/shell/tui/components/Transcript.ts` 每次渲染调用 `renderTranscriptLineViews(state.transcript, width).slice(...)`。
-- `renderTranscriptLineViews()` 当前会遍历全部 entries。
-- `src/shell/tui/transcriptLayout.ts` 对 assistant/reasoning 调用 `renderMarkdownLines()`，内部使用 `marked.lexer()`。
-- 每次测量行数 `measureTranscriptRows()` 也会重新调用完整 layout。
-- 滚动函数 `getMaxScrollOffset()` 通过 `measureTranscriptRows()` 计算最大 offset。
-- dock 状态更新会更新 TUI state；如果 Transcript 组件重新渲染，当前实现没有显式 projection cache。
-- 当前 TUI 已有滚动、markdown、宽字符、光标、mouse wheel、runtime dock、session picker 测试。
-
-当前测试事实：
-
-- `tests/shell/tui-store.test.ts` 覆盖滚动、streaming 合并、换行、markdown 行视图。
-- `tests/shell/tui-render.test.ts` 覆盖 Transcript 渲染、markdown 输出、长文本 wrap、光标坐标。
-- 目前没有测试保护“稳定消息不重复 markdown 解析”。
-- 目前没有测试保护“Transcript 只渲染 visible rows”以外的 projection 缓存行为。
-
-外部参考事实：
-
-- opencode 把 session message、part、tool、reasoning、text delta 拆成有 id 的结构，流式更新时只更新对应 part。
-- opencode 的 TUI 用真实 scroll container 管 children 和 scrollTop，不靠每次全量字符串 slice 作为核心模型。
-- kilocode 的 markdown stream 相关实现体现了 stable block 思路：稳定块缓存，流式末尾局部更新。
-- Textual 的成熟结构是 ScrollView、RichLog、Markdown widget 分层，各自负责滚动、追加和渲染。
-- Ink 本身不会自动给长列表做虚拟化；基于 Ink 的长会话需要项目自己控制投影缓存和刷新频率。
+- `src/tools/outputCapture.ts` 已经能保存 bash 大输出，并返回 `outputPath`、`truncated`、`outputChars`、`outputBytes`。
+- `src/tools/bash.ts` 把 bash 运行结果序列化为 JSON，并把输出截断到 4000 字符。
+- `src/agent/toolResults/modelProjection.ts` 是工具结果进入模型前的投影层。
+- `src/agent/turn/toolBatchLifecycle.ts` 是工具调用结果写入 session 和 observability 的主链路。
+- `src/context/runtime/compression/builder.ts` 会在上下文超预算时压缩旧消息。
+- `src/provider/usageNormalizer.ts` 已有 provider cache usage 归一化。
+- `src/runtime/status.ts` 和 `src/cli/commands/runtimeStatusPresenter.ts` 已显示 context/cache/model request 信息。
+- `README.md` 已声明 Cost Kernel 和大输出压缩方向。
+- RTK 的可借鉴点是：原始输出可恢复、压缩输出进上下文、节省可观测、按命令类型压缩、失败降级。
 
 当前缺口：
 
-- 没有 transcript projection cache。
-- 没有按 entry id / width / text signature 复用 markdown+wrap 结果。
-- 滚动最大 offset 计算仍可能全量重算。
-- TUI state 同时承担事实投影和渲染入口，缺少独立 projection 层。
+- 工具输出治理逻辑分散在 bash、outputCapture、modelProjection 和 context compression。
+- 没有统一的 Tool Output Kernel。
+- bash 输出主要是通用截断，不会按命令类型形成结构化证据。
+- 没有统一记录原始字符数、模型投影字符数、节省比例、治理模式和输出路径。
+- status 看不到最近工具输出治理事实。
 
-当前未知点：
+未知点：
 
-- 真实长会话下的具体帧耗时没有内置 profiler；本轮用结构性测试保护主要性能路径。
-- Ink 内部 diff/render 成本仍存在，本轮只减少 Kitty 自己的重复 projection 成本。
+- 不同 provider 对工具消息 token 的实际计费只能通过 usage 间接确认；本次只做字符/token 估算和事实记录。
 
 ## 3. 失败测试
 
-自动失败测试：
-
-- 如果同一批 transcript 在同一宽度下连续渲染两次，稳定 entry 的 markdown/layout 被重复计算，应失败。
-- 如果只追加一个 streaming delta，旧 entry 的 cached rows 被重新生成，应失败。
-- 如果 dock 更新导致 state 变化，但 transcript 引用和宽度不变时，Transcript 重新全量 projection，应失败。
-- 如果滚动读取 visible rows 需要重新解析全部 markdown，应失败。
-- 如果 viewport 只需要 8 行，但 Transcript 实际渲染超过 visible rows，应失败。
-- 如果宽度变化后缓存没有按宽度失效，应失败。
-- 如果 streaming delta 走两套不同更新路径，应失败。
-
-命令验证：
-
-- `npm.cmd run test:build`
-- `node --test .test-build\tests\shell\tui-*.test.js`
-- `npm.cmd run verify`
-
-手动检查：
-
-- 打开长 session，滚动历史、等待流式回复、调整窗口大小，观察卡顿是否明显降低。
+- bash 长输出应该保存完整输出路径，同时给模型短投影。
+- `npm test` / `npm run build` / `tsc` 类输出应该提取失败、错误、文件和摘要。
+- `rg` / `grep` 类输出应该提取匹配数量、前几条证据和截断提示。
+- `git diff` 类输出应该提取变更文件和关键片段，不把整段 diff 放进模型。
+- 工具输出治理事件应该写入 observability。
+- `kitty status` 应该能显示最近工具输出治理节省事实。
+- context compression 仍应保持 stable prefix 不被工具输出变化污染。
 
 ## 4. 目标
 
-- 新增 TUI transcript projection 层。
-- 稳定消息按 entry id、role、text、width 缓存 markdown 和 wrap 后的 line views。
-- Transcript 组件通过 projection 层拿 visible rows，不再自己全量 layout 后 slice。
-- Store/Controller 的滚动最大 offset 使用 projection row count，不重复跑纯 layout。
-- 流式输出继续立即进入 TUI controller；性能优化不靠首帧/后续帧特判。
-- 保持当前 TUI 用户体验、视觉和测试行为不变。
-- 增加性能结构测试，防止未来退回全量重算模型。
+- 新增 `Tool Output Kernel` 作为工具输出治理主干。
+- bash 运行结果生成 raw capture + kernel projection + governance facts。
+- model projection 复用 kernel，不再单独维护 bash 压缩规则。
+- observability 记录 `tool.output` 事件。
+- runtime status 聚合最近 `tool.output` 事件。
+- CLI status 展示最近工具输出节省情况。
+- README 同步当前事实。
+- 相关测试和 `npm.cmd run verify` 通过。
 
 ## 5. 不做范围
 
-- 不替换 Ink。
-- 不引入 OpenTUI、Bun 或独立 TUI 框架。
-- 不做完整虚拟 DOM 引擎。
-- 不改变 session 事实存储。
-- 不改变模型上下文管理。
-- 不改变用户可见消息内容。
-- 不删除当前 markdown 渲染能力。
-- 不用“隐藏历史”解决卡顿。
+- 不运行 RTK。
+- 不把 RTK 规则复制成依赖。
+- 不做旧输出格式兼容。
+- 不新增用户不可见的假能力入口。
+- 不做语义重要性机器判断；结构化压缩只处理命令输出里的死事实。
 
 ## 6. 设计
 
 主链路：
 
-`session/messages/events -> TuiState.transcript -> TranscriptProjectionCache -> visible line views -> Ink Transcript render`
+用户请求 -> 模型调用工具 -> 工具执行 -> Tool Output Kernel 生成治理结果 -> session 写入模型投影 -> observability 记录治理事实 -> status 展示节省现场。
 
 模块边界：
 
-- `transcriptLayout.ts`：保留单条 entry 到 line views 的纯布局能力，不持有缓存。
-- `transcriptProjection.ts`：新增 projection cache，负责缓存、失效、visible slice、row count。
-- `store.ts`：保留 TUI state reducer 和兼容纯函数；需要 row count 时可接收 projection。
-- `controller.ts`：持有 TUI 运行期 projection cache。
-- `components/Transcript.ts`：只渲染 projection 给出的 visible rows。
-- `turnDisplay.ts`：继续只把 agent callbacks 投给 controller，不直接处理缓存。
+- `src/tools/outputKernel/types.ts`：治理结果类型。
+- `src/tools/outputKernel/classifier.ts`：根据命令和输出形态做工具输出类型分类。只做机械事实分类，不判断任务语义。
+- `src/tools/outputKernel/projectors.ts`：按输出类型生成短证据。
+- `src/tools/outputKernel/metrics.ts`：估算原始 token、投影 token、节省比例。
+- `src/tools/outputKernel/index.ts`：主入口。
+- `src/tools/outputCapture.ts`：继续只负责捕获和保存原始输出。
+- `src/tools/bash.ts`：调用 kernel，把治理事实放进 result JSON 和 metadata。
+- `src/agent/toolResults/modelProjection.ts`：读取治理投影，作为模型看到的工具结果。
+- `src/agent/turn/toolBatchLifecycle.ts`：记录 `tool.output` observability 事件。
+- `src/runtime/status.ts`：读取最近 `tool.output` 事件。
+- `src/runtime/statusTypes.ts` 和 presenter：展示最近治理事实。
 
 状态归属：
 
-- session record 仍是会话事实源。
-- TUI transcript 仍是屏幕投影源。
-- projection cache 是运行时派生缓存，不写入 session，不进入 memory，不作为业务事实。
-- scroll offset 仍在 TUI state。
+- 原始输出文件归 observability command-output。
+- 单次工具治理事实归 tool result metadata 和 observability event。
+- status 只聚合最近事实，不成为事实源。
 
-缓存规则：
+错误和降级：
 
-- cache key：`entry.id + width`。
-- cache signature：`entry.role + entry.text`。
-- 同 id、同 width、同 signature 复用 line views。
-- text 或 role 变化只失效该 entry 对应 width 的缓存。
-- width 变化只重算当前 width；其他 width 可保留或按需清理。
-- entries 删除或替换后 purge 不在当前 transcript 的 id。
+- 分类失败时使用通用压缩。
+- 输出为空时返回空输出事实。
+- 压缩后为空时回退到通用预览。
+- 原始输出路径存在时始终保留恢复提示。
 
-流式刷新：
+测试策略：
 
-- 每个 delta 走同一条 `appendStreaming()` 路径。
-- 不做首个 delta、后续 delta、首次回答、再次回答之类的策略分叉。
-- 流式手感保持立即可见；性能主因交给 projection cache 和 visible rows。
-
-错误和恢复：
-
-- projection cache 失败不能吞掉消息；纯 layout 函数仍可作为 fallback。
-- dispose 后不能继续通知 listener。
-
-测试边界：
-
-- 用 instrumentation 计数证明 cached projection 不重复 layout 稳定 entry。
-- 用 controller 测试证明多个 streaming delta 走同一条更新路径。
-- 保留现有 render tests，证明视觉输出不变。
+- 单测 Tool Output Kernel。
+- 单测 bash 工具输出包含治理事实。
+- 单测 model projection 使用治理投影。
+- 单测 status 聚合 tool output facts。
 
 ## 7. 实施任务
 
-- [x] 新增 `transcriptProjection.ts`，封装 projection cache、row count、visible slice。
-- [x] 调整 `transcriptLayout.ts`，导出单 entry layout 能力并支持测试计数注入。
-- [x] 调整 `store.ts`，让 visible rows / max offset 可使用 projection cache，同时保留纯函数兼容。
-- [x] 调整 `controller.ts`，持有 projection cache，并把 scroll/resize/content append 接到缓存 row count。
-- [x] 调整 `components/Transcript.ts`，使用 controller/projection 提供的 visible line views，避免组件内全量 layout。
-- [x] 删除 streaming 首 delta/后续 delta 特判，保留统一立即更新路径。
-- [x] 增加 TUI projection/cache/streaming 同路径测试。
-- [x] 跑 TUI 局部测试。
-- [x] 跑完整验证。
+- [x] 新增 Tool Output Kernel 类型、分类、投影、指标和入口。
+- [x] 将 bash 输出接入 Tool Output Kernel。
+- [x] 将工具结果模型投影改为优先使用治理投影。
+- [x] 在 tool batch lifecycle 记录 `tool.output` observability 事件。
+- [x] 在 runtime status 类型和读取逻辑中加入最近工具输出治理事实。
+- [x] 在 CLI status 文本中展示工具输出治理摘要。
+- [x] 增加 Tool Output Kernel、bash、model projection、status 测试。
+- [x] 同步 README 当前事实。
+- [x] 运行局部测试和完整验证。
 - [x] 更新收口记录。
 
 ## 8. 验证计划
 
-局部验证：
+- `npm.cmd run test:build`
+- `node --test .test-build/tests/tools/output-kernel.test.js`
+- `node --test .test-build/tests/tools/bash-output-governance.test.js`
+- `node --test .test-build/tests/agent/tool-result-projection.test.js`
+- `node --test .test-build/tests/runtime/status.test.js`
+- `npm.cmd run verify`
 
-```bash
-npm.cmd run test:build
-node --test .test-build\tests\shell\tui-*.test.js
-```
+手动检查：
 
-完整验证：
-
-```bash
-npm.cmd run verify
-```
-
-手动验收：
-
-```bash
-node dist/cli.js tui
-```
-
-手动检查长 session：
-
-- 打开历史较长的 session。
-- 滚动到顶部和底部。
-- 发送一条会产生长回复的消息。
-- 观察 streaming 期间输入区、滚动区、底部状态是否顺滑。
-- 调整终端宽度，确认换行正确且不丢消息。
+- `kitty status` 应显示最近工具输出治理事实。
+- bash 长输出结果包含完整输出路径和治理摘要。
 
 未验证内容：
 
-- 自动测试不能完全测出真实终端渲染帧率；需要真实长 session 体验确认。
-
-剩余风险：
-
-- Ink 自身的 React tree diff 和终端输出仍有成本；本轮只解决 Kitty 自身重复 projection 的主因。
-- 极端超长单条消息仍然需要重算该条 active message；后续可进一步做 markdown stable block。
+- 不验证真实 provider 计费，只验证本地估算和记录。
 
 ## 9. 收口
 
-已完成。
+目标已完成。
 
-完成事实：
+改动事实：
 
-- 新增 [transcriptProjection.ts](C:/Users/Administrator/Desktop/kitty/src/shell/tui/transcriptProjection.ts)，把 transcript projection cache 独立成运行时派生层。
-- `transcriptLayout.ts` 导出单条 entry 的纯布局函数，继续只负责布局，不持有缓存。
-- `store.ts` 的 scroll、visible rows、max offset 计算可以接收 projection cache；默认纯函数路径仍保留。
-- `TuiController` 持有 projection cache，滚动、resize、append 都走同一缓存边界。
-- `Transcript` 主路径改为从 controller 获取可见行，不再在组件里每次全量 layout 后 slice。
-- streaming 继续统一立即进入 transcript，不做首 delta/后续 delta 策略分叉；性能优化由 projection cache 承担。
-- 新增测试保护稳定 entry 缓存、宽度失效、可见窗口和 streaming 同路径更新。
+- 新增 `src/tools/outputKernel/`，作为工具输出治理主干。
+- `bash` 输出接入治理结果，保留原始输出路径、短证据、估算 token 节省和降级事实。
+- 工具结果进入模型前优先使用 `outputGovernance.projection`。
+- `tool.output` observability 事件记录治理事实。
+- `kitty status` 聚合并展示最近工具输出节省现场。
+- `projectors.ts` 已拆成分发层，diagnostic/search/gitDiff/generic/recovery/shared 各自单一职责。
+- README 已同步 Tool Output Kernel 当前事实。
 
 验证事实：
 
-- `npm.cmd run test:build; node --test .test-build\tests\shell\tui-*.test.js` 通过，35 个 TUI 测试全绿。
-- `npm.cmd run verify` 通过，214 个测试全绿。
+- `npm.cmd run test:build` 通过。
+- `node --test .test-build/tests/tools/output-kernel.test.js` 通过。
+- `node --test .test-build/tests/tools/bash-output-governance.test.js` 通过。
+- `node --test .test-build/tests/agent/tool-result-projection.test.js` 通过。
+- `node --test .test-build/tests/runtime/status.test.js` 通过。
+- `npm.cmd run verify` 通过，218 个测试全部通过。
 
 未验证内容：
 
-- 未在真实交互 TTY 中打开超长 session 手动感受帧率；自动测试只能证明结构性重复计算被移除。
+- 未验证真实 provider 计费，只验证本地估算、记录、投影和 status 聚合。
 
 剩余风险：
 
-- 极端超长单条 active assistant message 仍需要重算该条消息；后续如果还卡，应做 markdown stable block，而不是回到全量重算。
-- Ink 自身的 React diff 和终端输出成本仍存在，本轮只解决 Kitty 自己重复 projection 的主因。
+- 当前结构化投影覆盖 test/build/typecheck/search/git diff 的常见文本形态；更细的工具专用解析应继续放在各自 projector 内，不应回到单文件堆规则。
 
 commit / push：
 
-- 用户未明确要求，本轮未 commit、未 push。
+- 用户已要求 commit；提交后以 git 记录为准。push 未要求，本次不执行。

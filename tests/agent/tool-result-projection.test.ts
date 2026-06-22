@@ -2,55 +2,37 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { projectToolResultForModel } from "../../src/agent/toolResults/modelProjection.js";
+import type { ToolExecutionResult } from "../../src/types.js";
 
-test("background check projection exposes execution identity and output facts", () => {
-  const output = projectToolResultForModel({
-    toolName: "background_check",
-    result: {
-      ok: true,
-      output: JSON.stringify({
-        total: 1,
-        active: [],
-        recent: [
-          {
-            id: "exec-1",
-            kind: "background",
-            status: "completed",
-            summary: "background-ok",
-            outputPreview: "background-ok",
-          },
-        ],
-      }),
+test("tool result projection uses output governance as the model-facing evidence", () => {
+  const result: ToolExecutionResult = {
+    ok: true,
+    output: JSON.stringify({
+      output: "RAW OUTPUT SHOULD NOT BE USED",
+      outputGovernance: {
+        projection: "governed projection from payload",
+      },
+    }),
+    metadata: {
+      outputGovernance: {
+        version: 1,
+        kind: "test",
+        mode: "structured",
+        projection: "governed projection from metadata",
+        rawChars: 10_000,
+        projectedChars: 32,
+        rawTokens: 2500,
+        projectedTokens: 8,
+        savedTokens: 2492,
+        savingsRatio: 0.9968,
+        truncated: true,
+        outputPath: ".kitty/observability/command-output/session/output.txt",
+        recoveryHint: "[full output: .kitty/observability/command-output/session/output.txt]",
+        degraded: false,
+        reason: "structured_projection",
+      },
     },
-  });
+  };
 
-  assert.match(output, /total: 1/);
-  assert.match(output, /exec-1/);
-  assert.match(output, /completed/);
-  assert.match(output, /background-ok/);
-});
-
-test("subagent check projection exposes worker result facts", () => {
-  const output = projectToolResultForModel({
-    toolName: "subagent_check",
-    result: {
-      ok: true,
-      output: JSON.stringify({
-        total: 1,
-        active: [],
-        recent: [
-          {
-            id: "exec-worker",
-            kind: "subagent",
-            status: "completed",
-            summary: "worker-ok",
-          },
-        ],
-      }),
-    },
-  });
-
-  assert.match(output, /exec-worker/);
-  assert.match(output, /subagent/);
-  assert.match(output, /worker-ok/);
+  assert.equal(projectToolResultForModel({ toolName: "bash", result }), "governed projection from metadata");
 });

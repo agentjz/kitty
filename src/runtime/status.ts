@@ -21,6 +21,7 @@ import type {
   RuntimeSessionSummary,
   RuntimeStatus,
   RuntimeTaskLifecycleSummary,
+  RuntimeToolOutputSummary,
   RuntimeWakeSignalSummary,
 } from "./statusTypes.js";
 
@@ -34,13 +35,14 @@ export async function buildRuntimeStatus(rootDir: string): Promise<RuntimeStatus
     memorySessionsDir: paths.sessionMemoryDir,
   });
 
-  const [sessionRead, memoryAssets, control, projectMap, projectContext, modelRequests] = await Promise.all([
+  const [sessionRead, memoryAssets, control, projectMap, projectContext, modelRequests, toolOutputs] = await Promise.all([
     sessionStore.listReadable?.(DEFAULT_RECENT_LIMIT) ?? sessionStore.list(DEFAULT_RECENT_LIMIT).then((sessions) => ({ sessions, skipped: [] })),
     listRuntimeMemoryAssets(paths.rootDir),
     readControlPlaneStatus(paths.rootDir),
     buildProjectMap(paths.rootDir),
     loadProjectContext(paths.rootDir, { projectDocMaxBytes: 24_576 }),
     readRecentModelRequests(paths.observabilityEventsDir),
+    readRecentToolOutputs(paths.observabilityEventsDir),
   ]);
 
   const sessions = sessionRead.sessions.map(summarizeSession);
@@ -62,6 +64,9 @@ export async function buildRuntimeStatus(rootDir: string): Promise<RuntimeStatus
     projectMap: summarizeProjectMap(projectMap),
     modelRequests: {
       recent: modelRequests,
+    },
+    toolOutputs: {
+      recent: toolOutputs,
     },
     taskLifecycle,
     executions: control.executions,
@@ -147,6 +152,31 @@ async function readRecentModelRequests(eventsDir: string): Promise<RuntimeModelR
   return records.slice(-DEFAULT_RECENT_LIMIT).reverse();
 }
 
+async function readRecentToolOutputs(eventsDir: string): Promise<RuntimeToolOutputSummary[]> {
+  const files = await fs.readdir(eventsDir).catch(() => []);
+  const jsonlFiles = files
+    .filter((file) => file.endsWith(".jsonl"))
+    .sort()
+    .slice(-3);
+  const records: RuntimeToolOutputSummary[] = [];
+
+  for (const file of jsonlFiles) {
+    const content = await fs.readFile(path.join(eventsDir, file), "utf8").catch(() => "");
+    for (const line of content.split(/\r?\n/)) {
+      if (!line.trim()) {
+        continue;
+      }
+      const record = parseObservabilityRecord(line);
+      if (!record || record.event !== "tool.output") {
+        continue;
+      }
+      records.push(summarizeToolOutput(record));
+    }
+  }
+
+  return records.slice(-DEFAULT_RECENT_LIMIT).reverse();
+}
+
 function parseObservabilityRecord(line: string): ObservabilityEventRecord | undefined {
   try {
     const parsed = JSON.parse(line) as ObservabilityEventRecord;
@@ -166,6 +196,26 @@ function summarizeModelRequest(record: ObservabilityEventRecord): RuntimeModelRe
     durationMs: record.durationMs,
     usageAvailable: typeof details.usageAvailable === "boolean" ? details.usageAvailable : Boolean(usage),
     usage,
+  };
+}
+
+function summarizeToolOutput(record: ObservabilityEventRecord): RuntimeToolOutputSummary {
+  const details = record.details ?? {};
+  return {
+    timestamp: record.timestamp,
+    toolName: record.toolName,
+    kind: readString(details.kind),
+    mode: readString(details.mode),
+    rawChars: readNumber(details.rawChars),
+    projectedChars: readNumber(details.projectedChars),
+    rawTokens: readNumber(details.rawTokens),
+    projectedTokens: readNumber(details.projectedTokens),
+    savedTokens: readNumber(details.savedTokens),
+    savingsRatio: readNumber(details.savingsRatio),
+    truncated: details.truncated === true,
+    outputPath: readString(details.outputPath),
+    degraded: details.degraded === true,
+    reason: readString(details.reason),
   };
 }
 
@@ -190,6 +240,10 @@ function readUsageSummary(value: unknown): RuntimeModelRequestSummary["usage"] |
 
 function readNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 function summarizeSkills(skills: Awaited<ReturnType<typeof loadProjectContext>>["skills"]): RuntimeStatus["skills"] {

@@ -17,6 +17,7 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
   lines.push(`- Skills: ${status.scene.skills.ready}/${status.scene.skills.total} ready; ${status.scene.skills.nextAction}`);
   lines.push(`- Memory: ${status.scene.memory.assets} asset(s), session=${status.scene.memory.latestSessionMemory ? "yes" : "no"}; ${status.scene.memory.nextAction}`);
   lines.push(`- Cost: ${status.scene.cost}`);
+  lines.push(`- Tool output: ${status.scene.toolOutputs}`);
   lines.push(`- Recovery: ${status.scene.recovery}`);
   lines.push("");
   lines.push("Current workspace:");
@@ -137,6 +138,25 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
         request.provider ? `provider=${request.provider}` : undefined,
         request.durationMs === undefined ? undefined : `duration=${request.durationMs}ms`,
         request.usage ? formatUsage(request.usage) : "usage=unavailable",
+      ].filter(Boolean).join("  "));
+    }
+  }
+
+  if (status.toolOutputs.recent.length > 0) {
+    lines.push("");
+    lines.push("Recent tool output:");
+    for (const output of status.toolOutputs.recent.slice(0, 5)) {
+      lines.push([
+        output.toolName ?? "tool",
+        output.kind ? `kind=${output.kind}` : undefined,
+        output.mode ? `mode=${output.mode}` : undefined,
+        output.rawTokens === undefined ? undefined : `raw=${output.rawTokens}`,
+        output.projectedTokens === undefined ? undefined : `projected=${output.projectedTokens}`,
+        output.savedTokens === undefined ? undefined : `saved=${output.savedTokens}`,
+        output.savingsRatio === undefined ? undefined : `savedRatio=${Math.round(output.savingsRatio * 100)}%`,
+        output.truncated ? "recoverable=yes" : undefined,
+        output.degraded ? "degraded=yes" : undefined,
+        output.outputPath ? `full=${truncateCliValue(output.outputPath, 80)}` : undefined,
       ].filter(Boolean).join("  "));
     }
   }

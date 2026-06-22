@@ -20,6 +20,7 @@ export function buildRuntimeScene(status: RuntimeStatusFacts): RuntimeSceneSumma
     nextAction: readNextAction(status, blockedExecutions, watchExecutions),
     blocked: readBlocked(blockedExecutions),
     cost: readCost(status),
+    toolOutputs: readToolOutputs(status),
     recovery: readRecovery(status, executions),
     skills: {
       ready: status.skills.ready,
@@ -130,6 +131,28 @@ function readCost(status: RuntimeStatusFacts): string {
       ? "provider usage unavailable"
       : "no model request yet";
   return `${budgetText}; ${layoutText}; ${usageText}`;
+}
+
+function readToolOutputs(status: RuntimeStatusFacts): string {
+  const recent = status.toolOutputs.recent;
+  if (recent.length === 0) {
+    return "no tool output governance yet";
+  }
+
+  const saved = recent.reduce((total, item) => total + (item.savedTokens ?? 0), 0);
+  const truncated = recent.filter((item) => item.truncated).length;
+  const degraded = recent.filter((item) => item.degraded).length;
+  const best = recent
+    .filter((item) => typeof item.savedTokens === "number")
+    .sort((a, b) => (b.savedTokens ?? 0) - (a.savedTokens ?? 0))[0];
+
+  return [
+    `${recent.length} recent`,
+    `${saved} tokens saved est.`,
+    truncated > 0 ? `${truncated} recoverable` : undefined,
+    degraded > 0 ? `${degraded} degraded` : undefined,
+    best ? `top=${best.toolName ?? "tool"}:${best.kind ?? "output"}` : undefined,
+  ].filter(Boolean).join("; ");
 }
 
 function readStableRatio(stableChars: number, volatileChars: number): string {

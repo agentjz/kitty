@@ -10,6 +10,10 @@ export function projectToolResultForModel(input: {
   toolName: string;
   result: ToolExecutionResult;
 }): string {
+  if (input.result.metadata?.outputGovernance) {
+    return input.result.metadata.outputGovernance.projection;
+  }
+
   const parsed = parseObject(input.result.output);
   if (!input.result.ok) {
     return projectFailure(input.toolName, input.result.output, parsed);
@@ -127,6 +131,12 @@ function projectWrite(payload: Record<string, unknown>): string {
 }
 
 function projectBash(payload: Record<string, unknown>): string {
+  const governance = readObject(payload.outputGovernance);
+  const projection = readString(governance?.projection);
+  if (projection) {
+    return projection;
+  }
+
   const exitCode = readNumber(payload.exitCode);
   const durationMs = readNumber(payload.durationMs);
   const status = readString(payload.status);

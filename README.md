@@ -27,7 +27,7 @@
 
 - 本地执行内核：聊天只是入口，session、workset、execution、events、memory 和 status 才是任务现场。
 - 生产现场：`kitty status` 把当前目标、下一步、阻塞、后台、成本、恢复、skill 和 memory 汇成一眼可读的现场。
-- Cost Kernel：即使只用一个模型，也通过稳定前缀、易变尾部、大内容压缩、按需 skill 和 cache usage 审阅来省 token。
+- Cost Kernel：即使只用一个模型，也通过稳定前缀、易变尾部、工具输出治理、按需 skill 和 cache usage 审阅来省 token。
 - 产品级验收合同：`kitty eval` 验证真实用户路径，而不是只证明模块能 import。
 
 ## ✨ 为什么是小猫智能体
@@ -49,7 +49,7 @@
 | 💾 Session | 会话记录、checkpoint、todo、工作集、恢复现场、结构化可审阅 memory assets |
 | 🗺️ Project Map | 目录、入口、脚本、测试、仓库文档和 git 事实进入短项目地图 |
 | 🔌 Provider | OpenAI-compatible provider、请求恢复、连接诊断 |
-| ❄️ Cost Kernel | 稳定前缀和易变尾部分离，大输出压缩，skill 默认只给索引，读取 provider usage 里的 cache hit / miss / read / write，status 显示稳定比例和最近请求命中状态 |
+| ❄️ Cost Kernel | 稳定前缀和易变尾部分离，Tool Output Kernel 保存原始输出并给模型短证据，skill 默认只给索引，读取 provider usage 里的 cache hit / miss / read / write，status 显示稳定比例、工具输出节省和最近请求命中状态 |
 | 🛠️ Core tools | `read`、`edit`、`write`、`bash` |
 | 🧩 Extensions | `todo`、`worktree`、`network`、`background`、`subagent`、`skills` |
 | 🧾 Control plane | SQLite 账本记录 task lifecycle、execution、deadline、输出健康、wait policy、pid、状态和 wake 事实；host 负责等待和恢复 lead |
@@ -168,9 +168,9 @@ Runtime skills 放在项目 `SKILL.md`、`.skills/**/SKILL.md` 或 `skills/**/SK
 
 Provider 请求优先携带同 session 的近场可见对话。短会话不靠账本拼上下文；长会话超预算时摘要旧对话，保留最近对话 tail。Session memory 由模型在 turn 收口时按固定 Markdown 区块写出：`Current Focus`、`User Constraints`、`Decisions`、`Open Threads`、`Verification Facts`、`Reusable Lessons`。机器只维护格式和保存边界，不替模型判断事实重要性。
 
-Cost Kernel 的边界很硬：省钱不靠模型路由，不靠把能力关掉，而靠上下文结构。稳定内容放在前缀，易变事实放在尾部；大段工具输出和旧历史进入压缩摘要或证据资产；skill 正文、resources、examples 不默认注入，模型需要时再加载。
+Cost Kernel 的边界很硬：省钱不靠模型路由，不靠把能力关掉，而靠上下文结构。稳定内容放在前缀，易变事实放在尾部；Tool Output Kernel 把原始工具输出保存成可恢复证据，把测试、构建、typecheck、搜索和 git diff 输出投影成短证据，再记录估算节省；skill 正文、resources、examples 不默认注入，模型需要时再加载。
 
-Provider usage 会归一化缓存事实：DeepSeek 的 `prompt_cache_hit_tokens` / `prompt_cache_miss_tokens`，OpenAI 的 `prompt_tokens_details.cached_tokens`，Anthropic 的 `cache_read_input_tokens` / `cache_creation_input_tokens`，以及 Gemini cached content tokens。`model.request` observability 事件会记录这些字段，`kitty status` 会显示最近模型请求的缓存命中和 context cache layout。OpenAI 请求会使用同 session 稳定 `prompt_cache_key`；DeepSeek 不写无效 `cache_control`，优先保持稳定前缀和命中观测。
+Provider usage 会归一化缓存事实：DeepSeek 的 `prompt_cache_hit_tokens` / `prompt_cache_miss_tokens`，OpenAI 的 `prompt_tokens_details.cached_tokens`，Anthropic 的 `cache_read_input_tokens` / `cache_creation_input_tokens`，以及 Gemini cached content tokens。`model.request` observability 事件会记录这些字段，`tool.output` observability 事件会记录工具输出原始 token 估算、投影 token 估算、节省比例、是否截断和完整输出路径。`kitty status` 会显示最近模型请求的缓存命中、context cache layout 和工具输出治理现场。OpenAI 请求会使用同 session 稳定 `prompt_cache_key`；DeepSeek 不写无效 `cache_control`，优先保持稳定前缀和命中观测。
 
 `kitty eval` 是产品验收合同：每个场景都说明用户路径和机器证据。`kitty eval --run` 包含生产现场、恢复演练、远程入口、cache economy、skill/memory readiness 和失败边界检查。usage 字段解析、provider cache policy、stable prefix fingerprint、volatile tail、skill index boundary 和大输出压缩都必须能机器验证。真实省钱仍取决于 provider 是否返回 usage，以及同一 session 的前缀是否真的被上游缓存命中。
 
