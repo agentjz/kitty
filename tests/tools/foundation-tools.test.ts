@@ -53,6 +53,25 @@ test("read write edit bash complete the coding loop", async (t) => {
   assert.equal(parseToolJson(bash.output).exitCode, 0);
 });
 
+test("bash reports missing commands as failed machine facts", async (t) => {
+  const root = await createTempWorkspace("foundation-bash-missing", t);
+  const context = createToolContext(root);
+  const registry = await createDefaultAgentToolRegistry(context.config);
+
+  const result = await registry.execute("bash", JSON.stringify({
+    command: "kitty_missing_command_for_bash_fact --version",
+    cwd: ".",
+    timeout_ms: 30_000,
+  }), context);
+  const payload = parseToolJson(result.output);
+
+  assert.equal(result.ok, true);
+  assert.equal(payload.command, "kitty_missing_command_for_bash_fact --version");
+  assert.equal(payload.status, "failed");
+  assert.notEqual(payload.exitCode, 0);
+  assert.doesNotMatch(String(payload.output), /#< CLIXML|<Objs\b/);
+});
+
 test("send_file returns error when host does not support file delivery", async (t) => {
   const root = await createTempWorkspace("send-file-nohost", t);
   const context = createToolContext(root);

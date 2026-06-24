@@ -66,7 +66,7 @@ export const bashToolDefinition: RegisteredTool = {
             : "failed";
     const outputGovernance = governToolOutput({
       toolName: "bash",
-      command,
+      command: result.command,
       status,
       exitCode: result.exitCode,
       durationMs: result.durationMs,
@@ -95,7 +95,7 @@ export const bashToolDefinition: RegisteredTool = {
     return okResult(
       JSON.stringify(
         {
-          command,
+          command: result.command,
           cwd: resolvedCwd,
           exitCode: result.exitCode,
           status,

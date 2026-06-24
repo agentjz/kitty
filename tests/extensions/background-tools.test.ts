@@ -61,6 +61,31 @@ test("background run preserves streamed output after process close", async (t) =
   assert.match(String(job?.summary), /background-smoke/);
 });
 
+test("background run records missing commands as failed executions", async (t) => {
+  const root = await createTempWorkspace("background-tool-missing", t);
+  const tools = createBackgroundTools();
+  const context = createToolContext(root);
+  const run = tools.find((tool) => tool.definition.function.name === "background_run");
+  const check = tools.find((tool) => tool.definition.function.name === "background_check");
+  assert.ok(run);
+  assert.ok(check);
+
+  const result = await run.execute(JSON.stringify({
+    command: "kitty_missing_command_for_background_fact --version",
+    cwd: root,
+    timeout_ms: 20_000,
+  }), context);
+  const payload = parseToolJson(result.output);
+  await waitForRegisteredBackgroundProcess(String(payload.id), 20_000);
+
+  const checked = parseToolJson((await check.execute("{}", context)).output);
+  const job = (checked.recent as Array<Record<string, unknown>>).find((item) => item.id === payload.id);
+  assert.equal(payload.command, "kitty_missing_command_for_background_fact --version");
+  assert.equal(job?.status, "failed");
+  assert.notEqual(job?.exitCode, 0);
+  assert.doesNotMatch(String(job?.outputPreview), /#< CLIXML|<Objs\b/);
+});
+
 test("background wait returns settled execution facts", async (t) => {
   const root = await createTempWorkspace("background-tool-wait", t);
   const store = new BackgroundExecutionStore(root);

@@ -1,139 +1,123 @@
-# TUI Live Facts Plan
+# Raw Command Fact Integrity Plan
 
 ## 1. 需求文档
 
-用户使用 TUI 时，只需要看到当前正在发生的真实事情。
+Kitty 执行命令时，要保持原汁原味。
 
-底部最多两行。没有事情发生时，不显示“空闲”“上一轮完成”“无任务”这类废信息。
+用户或模型给出的命令是什么，Kitty 就交给当前 shell 执行什么。Kitty 不替用户翻译命令，不把类 Unix 命令改成 PowerShell cmdlet，不把 package manager 命令改成 `.cmd`，不改写 `&&`。如果命令在当前 shell 下失败，那就是应暴露的真实环境事实。
 
-工具调用和结果应该像对话现场的一部分自然出现。`todo_write` 是工具事件，应该按工具结果显示，不做常驻 todo 面板。
+用户需要可信结果：成功就是成功，失败就是失败。不能出现命令不存在却显示 completed。
 
-后台任务和 subagent 只有在活着或刚发生失败时才显示。用户需要知道它们是否还活着、正在跑什么；不需要看到“后台空”“子代理空”。
+本次完成标准：
 
-当前命令必须尽量显示原文。不要把命令改写成泛泛的人话。
-
-CLI、TUI、Web 的体验必须来自同一套运行事实。它们只是不同外壳，不是三套产品逻辑。工具摘要、todo 预览、命令原文、失败事实、后台/subagent 事实都应由共享主干产生，各 UI 只负责按自己的形态呈现。
-
-业务完成标准：
-
-- TUI 不再常驻空状态。
-- 当前执行动作显示真实工具名、命令或必要事实。
-- `todo_write` 结果进入 transcript，而不是被 dock 吃掉。
-- background / subagent 只在有真实活动时出现在底部。
-- 不新增快捷键面板、本地状态命令或展开层。
+- 删除命令转换主线。
+- 删除 requested command / actual command 这类由转换制造出的双事实。
+- PowerShell 错误必须返回非 0。
+- PowerShell CLIXML 错误不原样喷给用户。
+- `bash` 和 `background_run` 都记录原始 command 和真实执行状态。
 
 ## 2. 当前事实
 
-- `src/shell/tui/store.ts` 的 dock 默认值包含“空闲”“没有后台任务或子代理正在执行”。
-- `src/shell/tui/components/RuntimeDock.ts` 固定渲染工作、后台任务、子代理、上下文。
-- `src/shell/tui/turnDisplay.ts` 在模型等待结束、工具完成、flush、dispose 时写入“空闲”“完成”类状态。
-- `src/shell/tui/turnDisplay.ts` 只按工具名包含 `background` / `subagent` 判断 lane。
-- CLI runtime-ui 已有 `buildToolCallDisplay` / `buildToolResultDisplay`，其中 `bash` call 会保留原始 command。
-- `todo_write` 工具结果包含 `preview: formatTodoBlock(items)`。
-- CLI/Telegram 已经通过 runtime-ui 共享部分工具展示逻辑；TUI 当前没有充分复用这条主干。
-- TUI 现有测试保护“工具结果不进 transcript”，这和本次目标冲突。
-- 当前工作区已有独立的版本同步改动：`package.json` 和 `package-lock.json` 从 `0.0.12` 到 `0.0.13`。本计划不处理它。
+- 现有未提交改动曾加入 `.cmd` 归一化和 requested/actual command 字段。
+- 用户已经明确否定这类转换：原汁原味比替用户修命令更重要。
+- `platformTransforms.ts` 曾把 `ls`、`cat`、`rm`、`cp`、`mv`、`touch`、`mkdir` 翻译成 PowerShell cmdlet，并已暴露 wildcard 语义破坏。
+- `platform.ts` 当前仍会把 `npm`、`npx`、`pnpm`、`yarn` 改成 `.cmd`，并把 `&&` 改成 PowerShell `if ($?)`。
+- `launch.ts` 当前是唯一真正启动 shell 的入口。
+- `bash.ts` 和 `backgroundRun.ts` 都依赖 commandRunner 或 launch。
+- 已确认 session 中出现过 `yarn.cmd` 不存在但 `exit=0 status=completed`，这是机器事实错误。
+- 参考 Continue CLI：terminal command 选择 shell 后直接 spawn 原始 command，后台 job 按 child close 的 exitCode 写 `completed` 或 `failed`。
+- 参考 Codex app-server/TUI 文档和测试：command execution 事实主干是 command、status、exitCode、output delta，最终 completed item 是权威结果。
 
 ## 3. 失败测试
 
-- TUI 初始 dock 渲染不应出现“空闲”“无任务”“上一轮完成”。
-- `background_run` 调用时底部显示该工具正在运行；完成后不继续显示“完成”占位。
-- `subagent_launch` 调用时底部显示该工具正在运行；完成后不继续显示“完成”占位。
-- `bash` 工具调用时底部显示原始 command。
-- `todo_write` 工具结果的 preview 进入 transcript。
-- 普通工具结果不因为本次改动全部刷进 transcript。
+- Windows 命令准备不应再存在；`npm --version`、`ls foo*`、`cmd1 && cmd2` 都不应被 Kitty 改写。
+- 不存在命令通过 command runner 执行时，exit code 必须非 0。
+- 不存在命令输出不应包含原始 `#< CLIXML`。
+- `bash` 工具执行不存在命令时，payload status 必须是 `failed`。
+- `background_run` 执行不存在命令后，后台 execution 必须落成 `failed`。
 
 ## 4. 目标
 
-- 重构 TUI dock state，使它表达“当前活动事实”，而不是默认状态表。
-- 复用 runtime-ui 的工具展示能力生成当前动作和工具结果文本，避免 TUI 自己重复维护命令、todo、失败展示逻辑。
-- 保留 background / subagent 活动事实，但不显示空状态。
-- 让 `todo_write` 作为工具结果进入 transcript。
-- 更新测试，使它们保护当前产品体验。
+- commandRunner 不做命令翻译，只做 shell 启动、超时、stall、输出捕获和事实记录。
+- PowerShell wrapper 把 PowerShell 错误和 native exit code 转成真实 exit code。
+- `bash` payload、metadata 和 `background_run` ledger 都讲同一个事实。
+- 相关测试和完整验证通过。
 
 ## 5. 不做范围
 
-- 不做完整 todo 常驻列表。
-- 不做 `Ctrl+T`、`Ctrl+B`、`Ctrl+E`。
-- 不做 `/todo`、`/status`、`/events` 的 TUI 本地命令。
-- 不做工具状态的人话归类系统。
-- 不做三层 dock。
-- 不做“空闲”“无任务”“上一轮完成”这类占位文案。
-- 不处理版本号同步改动的提交。
+- 不做 `.cmd` 自动替换。
+- 不做 `&&` 自动兼容。
+- 不做 Unix 命令到 PowerShell cmdlet 的翻译。
+- 不新增提示词提醒用户用什么 shell 语法。
+- 不处理 taskState 的 `exit unknown`，本次只修执行事实主链路。
 
 ## 6. 设计
 
 主链路：
 
-1. Agent callback 产生模型、工具、状态事件。
-2. TUI turn display 把事件投影成：
-   - 当前动作：只在模型等待或工具运行时存在。
-   - 活跃执行：只记录 background / subagent 活着或失败的事实。
-   - transcript：用户、模型、reasoning、必要工具结果。
-3. RuntimeDock 只渲染存在的事实：
-   - 第一行：当前动作。
-   - 第二行：background / subagent / context 中存在的事实。
-4. 事件结束后清掉当前动作，不写“完成”占位。
+1. 工具收到原始 command。
+2. `launchCommand` 把原始 command 放入当前 shell wrapper。
+3. PowerShell wrapper 负责把错误转成非 0 exit code。
+4. commandRunner 捕获输出并清理 CLIXML 展示噪音。
+5. `bash` payload 和 metadata 使用原始 command。
+6. `background_run` ledger 使用原始 command，并在进程关闭时记录真实 status/exitCode/output。
 
 模块边界：
 
-- `store.ts` 维护 TUI 状态结构和状态更新。
-- `turnDisplay.ts` 负责把 agent callbacks 转成 TUI 状态变化。
-- `RuntimeDock.ts` 只负责渲染已有 dock facts，不决定事实。
-- runtime-ui tool display 维护跨 CLI/TUI/Web 可复用的工具事实投影：工具调用摘要、todo 预览、失败细节、命令原文。
-- CLI、TUI、Web 可以有不同视觉形态，但不能各自重新发明工具语义。
+- 删除 `platform.ts`、`platformArgs.ts`、`platformTransforms.ts` 这条转换主线。
+- `launch.ts` 只负责启动 shell 和 PowerShell wrapper。
+- `output.ts` 只负责 shell 输出清理。
+- `run.ts` 只负责同步命令生命周期。
+- `backgroundRun.ts` 只负责后台生命周期，不维护命令转换事实。
 
 ## 7. 实施任务
 
-- [x] 修改 `TuiRuntimeDockState`：删除 `work.active/label/detail`、`background`、`subagent` 的空字符串默认语义，改为可选当前动作和可选 live facts。
-- [x] 修改 `RuntimeDock.ts`：只渲染存在的行；没有事实时只显示上下文或不显示占位废话。
-- [x] 修改 `turnDisplay.ts`：工具调用用 runtime-ui 共享投影生成当前动作，`bash` 显示原始命令；工具完成清掉当前动作。
-- [x] 修改 `turnDisplay.ts`：background / subagent 只在工具调用、失败或仍需显示活跃事实时更新，不写“空闲”。
-- [x] 修改 `turnDisplay.ts`：`todo_write` 工具结果复用 runtime-ui 共享投影追加到 transcript。
-- [x] 检查 CLI/TUI/Web 工具显示边界，确认本次不制造 TUI 私有工具语义。
-- [x] 更新 TUI shell/render 测试，覆盖上述失败测试。
-- [x] 运行相关 TUI 测试。
-- [x] 运行完整验证。
+- [x] 删除 commandRunner 平台命令转换文件。
+- [x] 从 `launchCommand` 返回值中删除 actual/requested command 分叉。
+- [x] 从 `runCommandWithPolicy` 返回值中删除 requestedCommand。
+- [x] 从 `bash` payload 中删除 requestedCommand，保留原始 command。
+- [x] 从 `background_run` 中删除 command prepare 和 requestedCommand。
+- [x] 修 PowerShell wrapper，让错误稳定返回非 0。
+- [x] 增加 PowerShell CLIXML 输出清理。
+- [x] 补 command runner、bash、background 失败事实测试。
+- [x] 跑相关测试。
+- [x] 跑完整验证。
 
 ## 8. 验证计划
 
-- `npm.cmd test -- tests/shell/tui-shell.test.ts tests/shell/tui-render.test.ts`
+- `npm.cmd run test:build; node --test .test-build/tests/utils/command-runner.test.js .test-build/tests/tools/foundation-tools.test.js .test-build/tests/extensions/background-tools.test.js`
 - `npm.cmd run verify`
-- 手动检查 `node dist/cli.js tui` 的底部不出现空闲占位。
+- 检查 `git status --short`
 
 ## 9. 收口
 
-已完成实现、定向测试和完整验证。
+已完成。
 
-已改文件：
+交付事实：
 
-- `src/shell/tui/store.ts`
-- `src/shell/tui/components/RuntimeDock.ts`
-- `src/shell/tui/shell.ts`
-- `src/shell/tui/turnDisplay.ts`
-- `src/shell/tui/toolFacts.ts`
-- `tests/shell/tui-render.test.ts`
-- `tests/shell/tui-shell.test.ts`
-- `plan.md`
+- 删除 `platform.ts`、`platformArgs.ts`、`platformTransforms.ts`，命令执行层不再翻译用户命令。
+- `launchCommand` 不再返回 requested/actual command 分叉，只启动原始 command。
+- `runCommandWithPolicy` 返回原始 command 和真实执行结果。
+- `bash` payload 保留原始 command，删除 `requestedCommand`。
+- `background_run` ledger 和 payload 保留原始 command，删除 command prepare 和 `requestedCommand`。
+- PowerShell wrapper 使用 `ErrorActionPreference = Stop`，catch 后写 stderr 并退出 1。
+- 新增 command output 清理，PowerShell CLIXML 不再原样进入用户可见输出。
+- 新增缺失命令失败测试，覆盖 command runner、bash、background。
 
-验证已通过：
+参考事实：
 
-- `npm.cmd run typecheck`
-- `npm.cmd run test:build; node --test .test-build/tests/shell/tui-shell.test.js .test-build/tests/shell/tui-render.test.js`
-- `npm.cmd run verify`
+- Continue CLI 的 terminal command 选择 shell 后直接 spawn 原始 command。
+- Continue background job 按 child close 的 exitCode 写 completed/failed。
+- Codex commandExecution 的权威事实是 command、status、exitCode、output。
 
-目标完成：
+验证结果：
 
-- TUI dock 不再制造“空闲”“无任务”“上一轮完成”占位。
-- 当前动作从共享 runtime-ui 工具投影生成，`bash` 保留原始命令。
-- `todo_write` preview 进入 transcript。
-- background / subagent 只在有真实工具事实时显示，且无关工具不会清掉活跃事实。
-- CLI/TUI/Web 边界已核对：本次没有新增 TUI 私有工具语义，TUI 复用 runtime-ui 工具展示主干。
-
-未验证：
-
-- 手动打开 `node dist/cli.js tui` 检查真实终端底部观感。
+- 定向验证通过：`npm.cmd run test:build; node --test .test-build/tests/utils/command-runner.test.js .test-build/tests/tools/foundation-tools.test.js .test-build/tests/extensions/background-tools.test.js`
+- 完整验证通过：`npm.cmd run verify`
+- 完整验证结果：234 tests passed。
 
 剩余风险：
 
-- `background_run` 的真实长期运行状态仍来自 execution/control plane；本次只改 TUI 当前回调事件投影，不新增轮询或后台账本读取。
+- `taskState` 里 `exit unknown` 仍是后续机器事实治理线索，本次未改。
+
+未执行 commit / push；用户未明确要求。

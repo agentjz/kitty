@@ -49,14 +49,21 @@ export async function launchCommand(
 function encodePowerShellCommand(command: string): string {
   const wrapped = [
     "$ProgressPreference = 'SilentlyContinue'",
+    "$ErrorActionPreference = 'Stop'",
     "[Console]::InputEncoding = [System.Text.Encoding]::UTF8",
     "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8",
     "$OutputEncoding = [System.Text.Encoding]::UTF8",
     "try { chcp 65001 > $null } catch { }",
+    "$code = 0",
+    "try {",
     `& { ${command} }`,
     "$code = if ($null -ne $LASTEXITCODE) { [int]$LASTEXITCODE } elseif ($?) { 0 } else { 1 }",
+    "} catch {",
+    "[Console]::Error.WriteLine($_.Exception.Message)",
+    "$code = 1",
+    "}",
     "exit $code",
-  ].join("; ");
+  ].join("\n");
   return Buffer.from(wrapped, "utf16le").toString("base64");
 }
 

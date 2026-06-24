@@ -1,7 +1,7 @@
 import { isAbortError } from "../abort.js";
 import { createBashOutputCapture } from "../../tools/outputCapture.js";
 import { launchCommand } from "./launch.js";
-import { normalizeCommandForPlatform } from "./platform.js";
+import { normalizeCommandOutput } from "./output.js";
 
 export interface CommandRunOptions {
   command: string;
@@ -17,6 +17,7 @@ export interface CommandRunOptions {
 }
 
 export interface CommandRunResult {
+  command: string;
   exitCode: number | null;
   output: string;
   outputPath?: string;
@@ -33,11 +34,7 @@ export interface CommandRunResult {
 const STALL_KILL_TIMEOUT_MS = 5_000;
 
 export async function runCommandWithPolicy(options: CommandRunOptions): Promise<CommandRunResult> {
-  const normalizedCommand = normalizeCommandForPlatform(options.command);
-  return runCommandOnce({
-    ...options,
-    command: normalizedCommand,
-  });
+  return runCommandOnce(options);
 }
 
 async function runCommandOnce(options: CommandRunOptions): Promise<CommandRunResult> {
@@ -46,7 +43,8 @@ async function runCommandOnce(options: CommandRunOptions): Promise<CommandRunRes
   let stallTimer: NodeJS.Timeout | null = null;
   let forceKillTimer: NodeJS.Timeout | null = null;
 
-  const { subprocess } = await launchCommand(options.command, options.cwd, options.timeoutMs, options.abortSignal);
+  const launched = await launchCommand(options.command, options.cwd, options.timeoutMs, options.abortSignal);
+  const { subprocess } = launched;
   const outputCapture = await createBashOutputCapture(options.outputCapture ?? {});
 
   const clearTimers = () => {
@@ -108,10 +106,12 @@ async function runCommandOnce(options: CommandRunOptions): Promise<CommandRunRes
     const result = await subprocess;
     clearTimers();
     const shellOutput = await outputCapture.finalize();
+    const output = normalizeCommandOutput(shellOutput.outputPreview);
 
     return {
+      command: options.command,
       exitCode: typeof result.exitCode === "number" ? result.exitCode : null,
-      output: shellOutput.outputPreview,
+      output,
       outputPath: shellOutput.outputPath,
       truncated: shellOutput.truncated,
       outputChars: shellOutput.outputChars,
@@ -126,10 +126,13 @@ async function runCommandOnce(options: CommandRunOptions): Promise<CommandRunRes
     const timedOut = isTimedOutError(error);
     clearTimers();
     const shellOutput = await outputCapture.finalize();
+    const fallbackOutput = shellOutput.outputChars > 0 ? shellOutput.outputPreview : readProcessOutput(error);
+    const output = normalizeCommandOutput(fallbackOutput);
 
     return {
+      command: options.command,
       exitCode: readExitCode(error),
-      output: shellOutput.outputChars > 0 ? shellOutput.outputPreview : readProcessOutput(error),
+      output,
       outputPath: shellOutput.outputPath,
       truncated: shellOutput.truncated,
       outputChars: shellOutput.outputChars,

@@ -1,4 +1,5 @@
 import { launchCommand } from "../../../../utils/commandRunner/launch.js";
+import { normalizeCommandOutput } from "../../../../utils/commandRunner/output.js";
 import { resolveUserPath } from "../../../../utils/fs.js";
 import { clampNumber, okResult, parseArgs, readString } from "../../../../tools/core/shared.js";
 import { BackgroundExecutionStore, registerBackgroundProcess } from "../../../../execution/background.js";
@@ -39,9 +40,10 @@ export const backgroundRunTool: RegisteredTool = {
     registerBackgroundProcess(job.id, subprocess);
     store.markRunning(job.id, { pid: subprocess.pid ?? 0 });
     const outputTracker = createBackgroundOutputTracker((output) => {
+      const normalizedOutput = normalizeCommandOutput(output);
       store.updateRunningOutput(job.id, {
-        output,
-        summary: summarizeBackgroundOutput(output),
+        output: normalizedOutput,
+        summary: summarizeBackgroundOutput(normalizedOutput),
         lastOutputAt: new Date().toISOString(),
       });
     });
@@ -52,7 +54,7 @@ export const backgroundRunTool: RegisteredTool = {
     void subprocess.then(async (result) => {
       outputTracker.flush();
       const running = store.load(job.id);
-      const resultOutput = typeof result.all === "string" ? result.all : "";
+      const resultOutput = normalizeCommandOutput(typeof result.all === "string" ? result.all : "");
       const output = resultOutput || running?.output || "";
       store.close(job.id, {
         status: result.exitCode === 0 ? "completed" : "failed",
@@ -64,7 +66,7 @@ export const backgroundRunTool: RegisteredTool = {
     }, async (error) => {
       outputTracker.flush();
       const running = store.load(job.id);
-      const errorOutput = typeof (error as { all?: unknown }).all === "string" ? (error as { all: string }).all : "";
+      const errorOutput = normalizeCommandOutput(typeof (error as { all?: unknown }).all === "string" ? (error as { all: string }).all : "");
       const output = errorOutput || running?.output || String((error as Error).message);
       store.close(job.id, {
         status: "failed",
