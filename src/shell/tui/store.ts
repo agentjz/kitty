@@ -18,13 +18,9 @@ export type {
 } from "./transcriptLayout.js";
 
 export interface TuiRuntimeDockState {
-  work: {
-    active: boolean;
-    label: string;
-    detail: string;
-  };
-  background: string;
-  subagent: string;
+  current?: string;
+  background?: string;
+  subagent?: string;
   context: string;
 }
 
@@ -59,13 +55,6 @@ interface TuiProjectionOptions {
 }
 
 const DEFAULT_DOCK: TuiRuntimeDockState = {
-  work: {
-    active: false,
-    label: "空闲",
-    detail: "没有后台任务或子代理正在执行",
-  },
-  background: "空闲",
-  subagent: "空闲",
   context: "0 chars (0%)",
 };
 
@@ -126,10 +115,6 @@ export function updateRuntimeDock(state: TuiState, dock: Partial<TuiRuntimeDockS
     dock: {
       ...state.dock,
       ...dock,
-      work: {
-        ...state.dock.work,
-        ...dock.work,
-      },
     },
   };
 }

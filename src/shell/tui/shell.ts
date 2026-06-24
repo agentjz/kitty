@@ -50,23 +50,9 @@ function createTuiOutputPort(controller: TuiController): ShellOutputPort {
     },
     warn(text) {
       controller.appendOutput(text, "system");
-      controller.updateDock({
-        work: {
-          active: false,
-          label: "提醒",
-          detail: text,
-        },
-      });
     },
     error(text) {
       controller.appendOutput(text, "system");
-      controller.updateDock({
-        work: {
-          active: false,
-          label: "错误",
-          detail: text,
-        },
-      });
     },
     dim(text) {
       controller.appendOutput(text, "system");
@@ -76,13 +62,6 @@ function createTuiOutputPort(controller: TuiController): ShellOutputPort {
     },
     interrupt(text) {
       controller.appendOutput(text, "system");
-      controller.updateDock({
-        work: {
-          active: false,
-          label: "中断",
-          detail: text,
-        },
-      });
     },
   };
 }

@@ -28,21 +28,39 @@ test("tui runtime dock renders the current scene facts", async () => {
     Text: ink.Text,
   });
   const dock: TuiRuntimeDockState = {
-    work: {
-      active: true,
-      label: "执行工具",
-      detail: "background_run",
-    },
+    current: "bash npm.cmd run verify",
     background: "background_run 运行中",
-    subagent: "空闲",
     context: "100/1000 chars (10%)",
   };
 
   const output = ink.renderToString(React.default.createElement(RuntimeDock, { dock }), { columns: 80 });
 
-  assert.match(output, /后台任务/);
+  assert.match(output, /bash npm\.cmd run verify/);
+  assert.match(output, /后台/);
   assert.match(output, /background_run 运行中/);
-  assert.match(output, /子代理/);
+  assert.doesNotMatch(output, /子代理/);
+  assert.doesNotMatch(output, /空闲/);
+  assert.match(output, /上下文/);
+});
+
+test("tui runtime dock keeps a stable idle row without inventing execution facts", async () => {
+  const React = await import("react");
+  const ink = await import("ink");
+  const { createRuntimeDockComponent } = await import("../../src/shell/tui/components/RuntimeDock.js");
+  const RuntimeDock = createRuntimeDockComponent({
+    React: React.default,
+    Box: ink.Box,
+    Text: ink.Text,
+  });
+
+  const output = ink.renderToString(
+    React.default.createElement(RuntimeDock, { dock: { context: "0 chars (0%)" } satisfies TuiRuntimeDockState }),
+    { columns: 80 },
+  );
+
+  assert.match(output, /空闲中/);
+  assert.doesNotMatch(output, /后台/);
+  assert.doesNotMatch(output, /子代理/);
   assert.match(output, /上下文/);
 });
 

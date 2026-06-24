@@ -1,6 +1,8 @@
 import type { AgentCallbacks } from "../../agent/types.js";
 import type { InteractionTurnDisplay } from "../../interaction/shell.js";
 import type { TuiController } from "./controller.js";
+import type { TuiRuntimeDockState } from "./store.js";
+import { projectTuiToolCallFact, projectTuiToolErrorFact, projectTuiToolResultFact } from "./toolFacts.js";
 
 export function createTuiTurnDisplay(options: {
   controller: TuiController;
@@ -9,29 +11,25 @@ export function createTuiTurnDisplay(options: {
 }): InteractionTurnDisplay {
   let aborted = false;
   const isAborted = (): boolean => aborted || options.abortSignal.aborted;
-  const updateWork = (active: boolean, label: string, detail: string): void => {
+  const updateCurrent = (current: string | undefined): void => {
     if (!isAborted()) {
       options.controller.updateDock({
-        work: {
-          active,
-          label,
-          detail,
-        },
+        current,
       });
     }
   };
 
   options.abortSignal.addEventListener("abort", () => {
     aborted = true;
-    updateWork(false, "已中断", "当前轮已中断");
+    updateCurrent(undefined);
   });
 
   const callbacks: AgentCallbacks = {
     onModelWaitStart() {
-      updateWork(true, "思考中", "等待模型回复");
+      updateCurrent("思考中");
     },
     onModelWaitStop() {
-      updateWork(false, "空闲", "模型等待结束");
+      updateCurrent(undefined);
     },
     onReasoningDelta(delta) {
       if (options.config.showReasoning && !isAborted()) {
@@ -59,49 +57,31 @@ export function createTuiTurnDisplay(options: {
       }
     },
     onAssistantDone() {
-      updateWork(false, "空闲", "回复完成");
+      updateCurrent(undefined);
     },
-    onToolCall(name) {
+    onToolCall(name, args) {
       if (isAborted()) {
         return;
       }
-      const lane = classifyToolLane(name);
-      options.controller.updateDock({
-        work: {
-          active: true,
-          label: "执行工具",
-          detail: name,
-        },
-        ...lane,
-      });
+      const fact = projectTuiToolCallFact(name, args);
+      options.controller.updateDock(toDockPatch(fact));
     },
-    onToolResult(name) {
+    onToolResult(name, output) {
       if (isAborted()) {
         return;
       }
-      const lane = classifyToolLane(name, "完成");
-      options.controller.updateDock({
-        work: {
-          active: false,
-          label: "工具完成",
-          detail: name,
-        },
-        ...lane,
-      });
+      const fact = projectTuiToolResultFact(name, output);
+      options.controller.updateDock(toDockPatch(fact));
+      if (fact.transcript) {
+        options.controller.append("system", fact.transcript);
+      }
     },
     onToolError(name, error) {
       if (isAborted()) {
         return;
       }
-      const lane = classifyToolLane(name, "失败");
-      options.controller.updateDock({
-        work: {
-          active: false,
-          label: "工具失败",
-          detail: `${name}: ${shorten(error)}`,
-        },
-        ...lane,
-      });
+      const fact = projectTuiToolErrorFact(name, error);
+      options.controller.updateDock(toDockPatch(fact));
       options.controller.append("system", `工具失败：${name}`);
     },
     onStatus(text) {
@@ -109,11 +89,7 @@ export function createTuiTurnDisplay(options: {
         return;
       }
       options.controller.updateDock({
-        work: {
-          active: text.trim().length > 0,
-          label: text.trim() ? "状态" : "空闲",
-          detail: text.trim() || "空闲",
-        },
+        current: text.trim() || undefined,
       });
     },
   };
@@ -122,43 +98,30 @@ export function createTuiTurnDisplay(options: {
     callbacks,
     flush() {
       options.controller.updateDock({
-        work: {
-          active: false,
-          label: "空闲",
-          detail: "当前轮已收口",
-        },
+        current: undefined,
       });
     },
     dispose() {
       options.controller.updateDock({
-        work: {
-          active: false,
-          label: "空闲",
-          detail: "没有任务正在执行",
-        },
+        current: undefined,
       });
     },
   };
 }
 
-function classifyToolLane(
-  name: string,
-  suffix = "运行中",
-): Partial<Parameters<TuiController["updateDock"]>[0]> {
-  const normalized = name.toLowerCase();
-  if (normalized.includes("background")) {
-    return { background: `${name} ${suffix}` };
+function toDockPatch(fact: {
+  current?: string;
+  background?: string;
+  subagent?: string;
+}): Partial<TuiRuntimeDockState> {
+  const patch: Partial<TuiRuntimeDockState> = {
+    current: fact.current,
+  };
+  if ("background" in fact) {
+    patch.background = fact.background;
   }
-  if (normalized.includes("subagent")) {
-    return { subagent: `${name} ${suffix}` };
+  if ("subagent" in fact) {
+    patch.subagent = fact.subagent;
   }
-  return {};
-}
-
-function shorten(value: string): string {
-  const normalized = value.replace(/\s+/g, " ").trim();
-  if (normalized.length <= 80) {
-    return normalized;
-  }
-  return `${normalized.slice(0, 77)}...`;
+  return patch;
 }
