@@ -91,6 +91,9 @@ export function formatSessionEventsForCli(result: { sessionId: string | null; ev
 }
 
 export function formatSessionEventForCli(event: SessionEventRecord): string {
+  if (isToolEvent(event)) {
+    return formatToolEventForCli(event);
+  }
   const parts = [
     event.createdAt,
     event.type,
@@ -101,7 +104,40 @@ export function formatSessionEventForCli(event: SessionEventRecord): string {
   return parts.filter(Boolean).join("  ");
 }
 
+function formatToolEventForCli(event: SessionEventRecord): string {
+  const details = event.details ?? {};
+  const toolName = readString(details.toolName);
+  const toolCallId = readString(details.toolCallId);
+  const durationMs = readNumber(details.durationMs);
+  const changedPathCount = readNumber(details.changedPathCount);
+  const error = readString(details.error);
+  const parts = [
+    event.createdAt,
+    event.type,
+    toolName ? `tool=${toolName}` : undefined,
+    toolCallId ? `call=${toolCallId}` : undefined,
+    durationMs === undefined ? undefined : `duration=${durationMs}ms`,
+    changedPathCount === undefined ? undefined : `changed=${changedPathCount}`,
+    error ? `error=${formatInline(error)}` : undefined,
+    event.host ? `host=${event.host}` : undefined,
+    event.message ? `message=${formatInline(event.message)}` : undefined,
+  ];
+  return parts.filter(Boolean).join("  ");
+}
+
+function isToolEvent(event: SessionEventRecord): boolean {
+  return event.type === "tool.started" || event.type === "tool.completed" || event.type === "tool.failed";
+}
+
 function formatInline(value: string): string {
   const normalized = value.replace(/\s+/g, " ").trim();
   return normalized.length > 120 ? `${normalized.slice(0, 117)}...` : normalized;
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function readNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }

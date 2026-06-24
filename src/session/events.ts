@@ -6,7 +6,10 @@ export type SessionEventType =
   | "turn.started"
   | "turn.completed"
   | "turn.failed"
-  | "turn.aborted";
+  | "turn.aborted"
+  | "tool.started"
+  | "tool.completed"
+  | "tool.failed";
 
 export interface SessionEventRecord {
   id: string;

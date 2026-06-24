@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { buildCliProgram } from "../../src/cli/program.js";
-import { readSessionEventsForCli } from "../../src/cli/commands/events.js";
+import { formatSessionEventForCli, readSessionEventsForCli } from "../../src/cli/commands/events.js";
 import { formatCliSetupError } from "../../src/cli/userFacingErrors.js";
 import { getAppPaths } from "../../src/config/paths.js";
 import { PROJECT_STATE_DIR_NAME, PROJECT_STATE_ENV_EXAMPLE_FILE_NAME, PROJECT_STATE_ENV_FILE_NAME, PROJECT_STATE_IGNORE_FILE_NAME } from "../../src/project/statePaths.js";
@@ -159,6 +159,31 @@ test("events command reads latest session event facts", async () => {
   assert.equal(result.sessionId, session.id);
   assert.equal(result.events[0]?.type, "turn.completed");
   assert.equal(result.events[0]?.host, "test");
+});
+
+test("events command formats tool lifecycle facts directly", () => {
+  const formatted = formatSessionEventForCli({
+    id: "event-1",
+    type: "tool.failed",
+    sessionId: "session-1",
+    createdAt: "2026-06-24T00:00:00.000Z",
+    cwd: "C:\\repo",
+    details: {
+      toolName: "bash",
+      toolCallId: "call-1",
+      durationMs: 42,
+      changedPathCount: 0,
+      error: "COMMAND_FAILED: command failed",
+    },
+  });
+
+  assert.match(formatted, /tool\.failed/);
+  assert.match(formatted, /tool=bash/);
+  assert.match(formatted, /call=call-1/);
+  assert.match(formatted, /duration=42ms/);
+  assert.match(formatted, /changed=0/);
+  assert.match(formatted, /error=COMMAND_FAILED: command failed/);
+  assert.doesNotMatch(formatted, /details=/);
 });
 
 test("cli setup errors explain the bootstrap path", () => {

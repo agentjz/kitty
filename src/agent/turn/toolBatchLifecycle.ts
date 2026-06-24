@@ -7,10 +7,12 @@ import { buildRunTurnResult, createExecutionWaitYieldTransition } from "../runti
 import { persistToolBatchCheckpoint } from "./persistence.js";
 import { executeToolBatch } from "./toolBatch.js";
 import { recordObservabilityEvent } from "../../observability/writer.js";
+import { SessionEventStore, type SessionEventRecord } from "../../session/events.js";
 import { throwIfAborted } from "../../utils/abort.js";
 import type { ToolBatchEvidence } from "./toolLoopProgress.js";
 import type { ChangeStore } from "../changes/store.js";
 import type { ProjectContext, SessionRecord, StoredMessage, ToolExecutionResult } from "../../types.js";
+import type { ToolCallRecord } from "../../types.js";
 import type { ToolRegistry } from "../../tools/core/types.js";
 import type { AgentIdentity, AssistantResponse, RunTurnOptions, RunTurnResult } from "../types.js";
 import { readToolFailureError } from "./toolFailure.js";
@@ -51,11 +53,18 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
   const batchToolMessages: StoredMessage[] = [];
   const batchModelOutputs: string[] = [];
   const batchChangedPaths = new Set<string>();
+  const sessionEvents = new SessionEventStore(options.config.paths.eventsDir);
   const leadWaitExecutionsBefore = identity.kind === "lead"
     ? listLeadWaitExecutions(projectContext.stateRootDir)
     : [];
   for (const toolCall of response.toolCalls) {
     throwIfAborted(options.abortSignal, "Turn aborted by user.");
+    await sessionEvents.append({
+      type: "tool.started",
+      sessionId: session.id,
+      cwd: options.cwd,
+      details: buildToolStartedEventDetails(toolCall, identity),
+    });
     options.callbacks?.onToolCall?.(toolCall.function.name, toolCall.function.arguments);
     await recordObservabilityEvent(projectContext.stateRootDir, {
       event: "tool.execution",
@@ -90,6 +99,7 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
     } else if (metadata?.sessionDiff) {
       session = await options.sessionStore.save(noteSessionDiff(session, metadata.sessionDiff));
     }
+    const failureError = result.ok ? undefined : readToolFailureError(result.output);
     await recordObservabilityEvent(projectContext.stateRootDir, {
       event: "tool.execution",
       status: result.ok ? "completed" : "failed",
@@ -98,10 +108,22 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
       identityName: identity.name,
       toolName: toolCall.function.name,
       durationMs,
-      error: result.ok ? undefined : readToolFailureError(result.output),
+      error: failureError,
       details: {
         changedPathCount: metadata?.changedPaths?.length ?? 0,
       },
+    });
+    await sessionEvents.append({
+      type: result.ok ? "tool.completed" : "tool.failed",
+      sessionId: session.id,
+      cwd: options.cwd,
+      details: buildToolFinishedEventDetails({
+        toolCall,
+        identity,
+        durationMs,
+        changedPathCount: metadata?.changedPaths?.length ?? 0,
+        error: failureError ? formatToolFailureError(failureError) : undefined,
+      }),
     });
     if (metadata?.outputGovernance) {
       await recordObservabilityEvent(projectContext.stateRootDir, {
@@ -198,4 +220,44 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
       changedPaths: [...batchChangedPaths],
     },
   };
+}
+
+function buildToolStartedEventDetails(
+  toolCall: ToolCallRecord,
+  identity: AgentIdentity,
+): SessionEventRecord["details"] {
+  return {
+    toolName: toolCall.function.name,
+    toolCallId: toolCall.id,
+    identityKind: identity.kind,
+    identityName: identity.name,
+    argumentsPreview: previewToolArguments(toolCall.function.arguments),
+  };
+}
+
+function buildToolFinishedEventDetails(input: {
+  toolCall: ToolCallRecord;
+  identity: AgentIdentity;
+  durationMs: number;
+  changedPathCount: number;
+  error?: string;
+}): SessionEventRecord["details"] {
+  return {
+    toolName: input.toolCall.function.name,
+    toolCallId: input.toolCall.id,
+    identityKind: input.identity.kind,
+    identityName: input.identity.name,
+    durationMs: input.durationMs,
+    changedPathCount: input.changedPathCount,
+    error: input.error,
+  };
+}
+
+function previewToolArguments(rawArgs: string): string {
+  const normalized = rawArgs.replace(/\s+/g, " ").trim();
+  return normalized.length > 240 ? `${normalized.slice(0, 237)}...` : normalized;
+}
+
+function formatToolFailureError(error: ReturnType<typeof readToolFailureError>): string {
+  return error.code ? `${error.code}: ${error.message}` : error.message;
 }
