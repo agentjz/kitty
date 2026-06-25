@@ -1,6 +1,6 @@
 # Agent 规则
 
-如果正在开发本 agent，先加载 `.codex/skills/kitty-agent-development/SKILL.md`。
+如果正在开发本 agent，先加载 `.codex/skills/kitty-agent-development/SKILL.md`，并以 `spec/` 作为当前事实主干。
 
 每次接手都当作一个新项目。
 

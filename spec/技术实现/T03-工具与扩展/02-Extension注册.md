@@ -42,3 +42,5 @@ Registry：
 - `src/extensions/shared.ts`
 
 Extension 工具返回 JSON 时使用共享结果出口；单个扩展可以保留有语义的薄命名函数，但不重复实现 JSON 输出格式。
+
+当前启用面就是这六个 extension，不再写七个或更少的过期说法。

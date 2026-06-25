@@ -91,6 +91,22 @@ test("tui turn display keeps raw bash command visible while running", () => {
   assert.equal(controller.getState().dock.current, "bash npm.cmd run verify");
 });
 
+test("tui turn display exposes post-answer summary status", () => {
+  const controller = new TuiController();
+  const shell = createTuiInteractionShell(controller);
+  const display = shell.createTurnDisplay({
+    cwd: process.cwd(),
+    config: { showReasoning: true } as never,
+    abortSignal: new AbortController().signal,
+  });
+
+  display.callbacks.onStatus?.("总结中");
+  assert.equal(controller.getState().dock.current, "总结中");
+
+  display.callbacks.onStatus?.("");
+  assert.equal(controller.getState().dock.current, undefined);
+});
+
 test("tui turn display does not let unrelated tools clear live execution facts", () => {
   const controller = new TuiController();
   const shell = createTuiInteractionShell(controller);

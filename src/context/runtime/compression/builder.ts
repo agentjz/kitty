@@ -18,12 +18,15 @@ const MAX_SUMMARY_MESSAGE_COUNT = 48;
 export function buildCompressedContextRequest(
   systemPrompt: string | PromptLayers,
   messages: StoredMessage[],
-  config: Pick<RuntimeConfig, "contextWindowMessages" | "model" | "maxContextChars" | "contextSummaryChars">,
+  config: Pick<RuntimeConfig, "contextWindowMessages" | "model" | "maxContextChars" | "contextSummaryChars"> & {
+    provider?: RuntimeConfig["provider"];
+  },
 ): ContextRuntimeRequest {
   const safeMaxChars = Math.max(8_000, config.maxContextChars);
   const conversation = buildVisibleConversationWindow(messages);
   const conversationMessages = conversation.messages;
-  const fullMessages = composeChatMessages(systemPrompt, conversationMessages, config.model);
+  const provider = config.provider ?? "openai-compatible";
+  const fullMessages = composeChatMessages(systemPrompt, conversationMessages, config.model, provider);
   const initialEstimatedChars = estimateChatMessagesChars(fullMessages);
   const initialPromptMetrics = measureSystemPrompt(systemPrompt);
   const initialSources = buildBudgetSources(systemPrompt, conversationMessages);
@@ -59,7 +62,7 @@ export function buildCompressedContextRequest(
     const summaryPrompt = appendSummary(systemPrompt, summary);
 
     let workingTail = compactTailMessages(tailMessages, "normal");
-    let requestMessages = composeChatMessages(summaryPrompt, workingTail, config.model);
+    let requestMessages = composeChatMessages(summaryPrompt, workingTail, config.model, provider);
     let estimatedChars = estimateChatMessagesChars(requestMessages);
     let promptMetrics = measureSystemPrompt(summaryPrompt);
     let cacheLayout = buildCacheLayoutReport(summaryPrompt, workingTail);
@@ -86,7 +89,7 @@ export function buildCompressedContextRequest(
     }
 
     workingTail = compactTailMessages(tailMessages, "aggressive");
-    requestMessages = composeChatMessages(summaryPrompt, workingTail, config.model);
+    requestMessages = composeChatMessages(summaryPrompt, workingTail, config.model, provider);
     estimatedChars = estimateChatMessagesChars(requestMessages);
     promptMetrics = measureSystemPrompt(summaryPrompt);
     cacheLayout = buildCacheLayoutReport(summaryPrompt, workingTail);
@@ -127,6 +130,7 @@ export function buildCompressedContextRequest(
         hardPrompt,
         compactedHardTail,
         config.model,
+        provider,
       );
       const hardEstimatedChars = estimateChatMessagesChars(hardMessages);
       const hardCacheLayout = buildCacheLayoutReport(hardPrompt, compactedHardTail);
@@ -168,6 +172,7 @@ function composeChatMessages(
   systemPrompt: string | PromptLayers,
   messages: StoredMessage[],
   model: string,
+  provider: string,
 ): ProviderMessage[] {
   return [
     {
@@ -180,7 +185,7 @@ function composeChatMessages(
       name: message.name,
       toolCallId: message.tool_call_id,
       toolCalls: message.tool_calls,
-      reasoningContent: shouldIncludeStoredAssistantReasoning(messages, index, model)
+      reasoningContent: shouldIncludeStoredAssistantReasoning(messages, index, model, provider)
         ? message.reasoningContent
         : undefined,
     })),

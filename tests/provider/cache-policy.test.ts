@@ -27,10 +27,10 @@ test("DeepSeek cache policy keeps automatic prefix cache without request-only ke
   assert.equal(policy.promptCacheKey, undefined);
 });
 
-test("unknown providers do not receive request cache controls", () => {
+test("openai-compatible providers do not receive request cache controls", () => {
   const policy = resolveProviderCachePolicy({
-    provider: "anthropic",
-    model: "claude-sonnet-4",
+    provider: "openai-compatible",
+    model: "generic-model",
     sessionId: "session-1",
   });
 

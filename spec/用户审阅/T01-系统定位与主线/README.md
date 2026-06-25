@@ -2,7 +2,7 @@
 
 Kitty 是本地 agent 编程工作台。
 
-当前只有一个主体验：用户把任务交给 agent，agent 读取上下文、调用模型、执行工具、保存 session，并在需要时继续同一任务现场。
+当前只有一个主体验：用户把任务交给 agent，agent 读取上下文、调用模型、执行工具、保存 session，并在需要时继续同一任务现场。主线包含 provider/model catalog、turn 生命周期、session memory 和可审阅的运行现场。
 
 核心体验：
 

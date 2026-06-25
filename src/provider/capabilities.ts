@@ -1,3 +1,5 @@
+import { resolveModelProfile } from "./catalog.js";
+
 export interface ProviderCapabilities {
   provider: string;
   model: string;
@@ -14,58 +16,16 @@ interface ProviderProfileInput {
   model: string;
 }
 
-const DEFAULT_PROVIDER = "openai-compatible";
-const DEFAULT_REQUEST_TIMEOUT_MS = 10 * 60 * 1000;
-const DEFAULT_DOCTOR_PROBE_TIMEOUT_MS = 10_000;
-const RELAY_REQUEST_TIMEOUT_MS = 15 * 60 * 1000;
-const RELAY_DOCTOR_PROBE_TIMEOUT_MS = 45_000;
-
 export function resolveProviderCapabilities(input: ProviderProfileInput): ProviderCapabilities {
-  const provider = normalizeProviderName(input.provider);
-  const model = normalizeModelName(input.model);
-
-  if (provider === "deepseek" || model.startsWith("deepseek-")) {
-    return {
-      provider: "deepseek",
-      model,
-      wireApi: "chat.completions",
-      supportsReasoningContent: true,
-      defaultReasoningEnabled: true,
-      defaultReasoningEffort: "high",
-      requestTimeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
-      doctorProbeTimeoutMs: DEFAULT_DOCTOR_PROBE_TIMEOUT_MS,
-    };
-  }
-
-  if (provider === "openai" || model === "gpt-5.4") {
-    return {
-      provider: "openai",
-      model,
-      wireApi: "responses",
-      supportsReasoningContent: false,
-      defaultReasoningEnabled: true,
-      defaultReasoningEffort: "xhigh",
-      requestTimeoutMs: RELAY_REQUEST_TIMEOUT_MS,
-      doctorProbeTimeoutMs: RELAY_DOCTOR_PROBE_TIMEOUT_MS,
-    };
-  }
-
+  const profile = resolveModelProfile(input);
   return {
-    provider,
-    model,
-    wireApi: "chat.completions",
-    supportsReasoningContent: false,
-    defaultReasoningEnabled: false,
-    requestTimeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
-    doctorProbeTimeoutMs: DEFAULT_DOCTOR_PROBE_TIMEOUT_MS,
+    provider: profile.provider.id,
+    model: profile.model.id,
+    wireApi: profile.model.wireApi,
+    supportsReasoningContent: profile.model.capabilities.reasoningContentReplay !== "never",
+    defaultReasoningEnabled: profile.model.capabilities.reasoning,
+    defaultReasoningEffort: profile.model.request.reasoningEffortDefault,
+    requestTimeoutMs: profile.provider.requestTimeoutMs,
+    doctorProbeTimeoutMs: profile.provider.doctorProbeTimeoutMs,
   };
-}
-
-function normalizeProviderName(value: string | undefined): string {
-  const normalized = String(value ?? "").trim().toLowerCase();
-  return normalized || DEFAULT_PROVIDER;
-}
-
-function normalizeModelName(value: string): string {
-  return String(value ?? "").trim();
 }

@@ -221,6 +221,10 @@ export function buildResponsesRequestBody(request: ProviderAdapterRequest): Reco
 function normalizeResponsesReasoningEffort(
   effort: "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | undefined,
 ): "minimal" | "low" | "medium" | "high" | "xhigh" | undefined {
+  if (effort === "xhigh") {
+    return "xhigh";
+  }
+
   return effort === "max" ? undefined : effort;
 }
 

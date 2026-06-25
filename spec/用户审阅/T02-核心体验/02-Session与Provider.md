@@ -12,4 +12,4 @@ Session memory 不是工具。它是每轮完成后的固定生命周期行为�
 
 Session workset 是当前现场索引。文件被读取或变更后进入 workset，记录路径、读取次数、变更次数、最后工具和 change id。它让模型和用户知道当前任务真正碰过哪些文件，但不替模型判断哪些文件重要。
 
-Provider / Config 负责模型连接、provider 差异、请求恢复、环境变量和运行配置。
+Provider / Config 负责 provider/model catalog、模型连接、provider 差异、请求恢复、环境变量和运行配置。DeepSeek thinking + tool call 的 reasoning_content 回传属于 provider/model 的事实，不是 session 的随手补丁。

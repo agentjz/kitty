@@ -28,7 +28,7 @@ test("OpenAI responses request keeps default reasoning when thinking is not disa
   });
 
   assert.deepEqual(body.reasoning, {
-    effort: "xhigh",
+    effort: "high",
     summary: "detailed",
   });
 });

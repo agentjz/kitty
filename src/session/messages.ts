@@ -1,6 +1,7 @@
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
-import { resolveProviderCapabilities } from "../provider/index.js";
+import { listModelInfos } from "../provider/catalog.js";
+import { resolveProviderCapabilities } from "../provider/capabilities.js";
 import type { StoredMessage, ToolCallRecord } from "../types.js";
 
 export function buildChatMessages(
@@ -8,6 +9,7 @@ export function buildChatMessages(
   messages: StoredMessage[],
   contextWindowMessages: number,
   model: string,
+  provider?: string,
 ): ChatCompletionMessageParam[] {
   const recentMessages = messages.slice(-contextWindowMessages);
 
@@ -18,7 +20,8 @@ export function buildChatMessages(
     },
     ...recentMessages.map((message, index) =>
       toChatMessage(message, {
-        includeReasoning: shouldIncludeStoredAssistantReasoning(recentMessages, index, model),
+        includeReasoning: shouldIncludeStoredAssistantReasoning(recentMessages, index, model, provider),
+        provider,
       }),
     ),
   ];
@@ -84,7 +87,7 @@ export function collapseContentParts(content: unknown): string | null {
 
 export function toChatMessage(
   message: StoredMessage,
-  options: { includeReasoning: boolean },
+  options: { includeReasoning: boolean; provider?: string },
 ): ChatCompletionMessageParam {
   if (message.role === "tool") {
     return {
@@ -144,8 +147,13 @@ export function expandStartToToolBoundary<T extends { role: string; tool_calls?:
   return index;
 }
 
-export function modelUsesReasoningContent(model: string): boolean {
-  return resolveProviderCapabilities({ model }).supportsReasoningContent;
+export function modelUsesReasoningContent(model: string, provider?: string): boolean {
+  if (provider) {
+    return resolveProviderCapabilities({ provider, model }).supportsReasoningContent;
+  }
+
+  return listModelInfos().some((item) =>
+    item.id === model && item.capabilities.reasoningContentReplay !== "never");
 }
 
 export function isAssistantMessageInLatestTurn<T extends { role: string }>(
@@ -159,7 +167,8 @@ export function shouldIncludeStoredAssistantReasoning(
   messages: StoredMessage[],
   index: number,
   model: string,
+  provider?: string,
 ): boolean {
-  return modelUsesReasoningContent(model) &&
+  return resolveProviderCapabilities({ provider, model }).supportsReasoningContent &&
     messages[index]?.role === "assistant";
 }

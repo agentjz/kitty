@@ -71,7 +71,11 @@ function resolveDeepSeekThinking(
     return "disabled";
   }
 
-  return hasUnreplayableAssistantReasoning(messages) ? "disabled" : "enabled";
+  if (hasUnreplayableAssistantReasoning(messages)) {
+    throw new Error("DeepSeek thinking tool-call replay requires stored reasoning_content. Start a new turn or disable KITTY_THINKING.");
+  }
+
+  return "enabled";
 }
 
 function hasUnreplayableAssistantReasoning(messages: ProviderMessage[]): boolean {

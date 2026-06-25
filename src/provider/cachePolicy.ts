@@ -1,4 +1,4 @@
-import { resolveProviderCapabilities } from "./capabilities.js";
+import { resolveModelProfile } from "./catalog.js";
 
 export interface ProviderCachePolicyInput {
   provider?: string;
@@ -14,9 +14,9 @@ export interface ProviderCachePolicy {
 }
 
 export function resolveProviderCachePolicy(input: ProviderCachePolicyInput): ProviderCachePolicy {
-  const capabilities = resolveProviderCapabilities(input);
+  const profile = resolveModelProfile(input);
 
-  if (capabilities.provider === "openai") {
+  if (profile.model.capabilities.cache === "prompt-cache-key") {
     return {
       provider: "openai",
       automaticPrefixCache: true,
@@ -24,9 +24,9 @@ export function resolveProviderCachePolicy(input: ProviderCachePolicyInput): Pro
     };
   }
 
-  if (capabilities.provider === "deepseek") {
+  if (profile.model.capabilities.cache === "provider-automatic") {
     return {
-      provider: "deepseek",
+      provider: profile.provider.id === "deepseek" ? "deepseek" : "generic",
       automaticPrefixCache: true,
     };
   }

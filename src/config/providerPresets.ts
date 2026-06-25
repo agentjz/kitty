@@ -12,17 +12,26 @@ export interface ProviderPreset {
 
 export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
   {
+    label: "YLS Codex + GPT-5.5",
+    provider: "yls",
+    baseUrl: "https://code.ylsagi.com/codex",
+    model: "gpt-5.5",
+    thinking: "enabled",
+    reasoningEffort: "high",
+    activeByDefault: false,
+  },
+  {
     label: "YLS Codex + GPT-5.4",
-    provider: "openai",
+    provider: "yls",
     baseUrl: "https://code.ylsagi.com/codex",
     model: "gpt-5.4",
-    thinking: "disabled",
+    thinking: "enabled",
     reasoningEffort: "xhigh",
     activeByDefault: false,
   },
   {
     label: "TTAPI + GPT-5.4",
-    provider: "openai",
+    provider: "ttapi",
     baseUrl: "https://w.ciykj.cn",
     model: "gpt-5.4",
     thinking: "disabled",

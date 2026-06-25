@@ -2,6 +2,7 @@ import type { Command } from "commander";
 import path from "node:path";
 
 import { probeProviderConnection } from "../../provider/connection.js";
+import { resolveModelProfile } from "../../provider/catalog.js";
 import { formatConfigPreflightReport, inspectConfigPreflight } from "../../config/preflight.js";
 import type { CliOverrides, RuntimeConfig } from "../../types.js";
 import { ui } from "../../utils/console.js";
@@ -42,6 +43,16 @@ export function registerDoctorCommand(
       ui.info(`provider: ${runtime.config.provider}`);
       ui.info(`model: ${runtime.config.model}`);
       ui.info(`baseUrl: ${runtime.config.baseUrl}`);
+      const profile = resolveModelProfile({
+        provider: runtime.config.provider,
+        model: runtime.config.model,
+      });
+      ui.info(`provider profile: ${profile.provider.label}`);
+      ui.info(`model profile: ${profile.model.label}`);
+      ui.info(`wire API: ${profile.model.wireApi}`);
+      ui.info(`reasoning replay: ${profile.model.capabilities.reasoningContentReplay}`);
+      ui.info(`context limit: ${profile.model.limit.context}`);
+      ui.info(`output limit: ${profile.model.limit.output}`);
 
       if (!runtime.config.apiKey.trim()) {
         throw new Error(

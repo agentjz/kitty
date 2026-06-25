@@ -69,6 +69,7 @@ export async function updateSessionMemoryAfterTurn(
     identityName: input.identity.name,
     model: input.requestModel,
   });
+  input.options.callbacks?.onStatus?.("总结中");
 
   try {
     const memoryResponse = input.options.fetchSessionMemoryResponse
@@ -123,6 +124,8 @@ export async function updateSessionMemoryAfterTurn(
       error,
     });
     return input.session;
+  } finally {
+    input.options.callbacks?.onStatus?.("");
   }
 }
 
@@ -175,6 +178,7 @@ export async function updateSessionTitleAfterTurn(
     identityName: input.identity.name,
     model: input.requestModel,
   });
+  input.options.callbacks?.onStatus?.("标题生成中");
 
   try {
     const titleResponse = input.options.fetchSessionTitleResponse
@@ -230,5 +234,7 @@ export async function updateSessionTitleAfterTurn(
       error,
     });
     return input.session;
+  } finally {
+    input.options.callbacks?.onStatus?.("");
   }
 }

@@ -1,6 +1,6 @@
 # Core 工具
 
-Core 工具固定为：
+Core 工具固定为当前四个：
 
 - `read`
 - `edit`

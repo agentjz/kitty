@@ -4,6 +4,7 @@ import path from "node:path";
 import dotenv from "dotenv";
 import { KITTY_BASE_ENV, KITTY_ENV } from "./envKeys.js";
 import { PROVIDER_PRESETS } from "./providerPresets.js";
+import { resolveModelProfile } from "../provider/catalog.js";
 import {
   PROJECT_STATE_DIR_NAME,
   PROJECT_STATE_ENV_EXAMPLE_FILE_NAME,
@@ -19,6 +20,10 @@ export interface ConfigPreflightReport {
     activeKeys: string[];
     missingKeys: string[];
     providerPreset?: string;
+    providerProfile?: string;
+    modelProfile?: string;
+    wireApi?: string;
+    catalogError?: string;
     provider: string;
     model: string;
     baseUrl: string;
@@ -51,8 +56,9 @@ export async function inspectConfigPreflight(rootDir: string): Promise<ConfigPre
   const model = parsedEnv[KITTY_ENV.model] ?? "";
   const baseUrl = parsedEnv[KITTY_ENV.baseUrl] ?? "";
   const providerPreset = readProviderPresetLabel({ provider, model, baseUrl });
+  const catalog = readCatalogProfile({ provider, model });
 
-  const ready = files.every((file) => file.exists) && missingKeys.length === 0;
+  const ready = files.every((file) => file.exists) && missingKeys.length === 0 && !catalog.error;
   return {
     rootDir: normalizedRoot,
     kittyDir,
@@ -61,6 +67,10 @@ export async function inspectConfigPreflight(rootDir: string): Promise<ConfigPre
       activeKeys,
       missingKeys,
       providerPreset,
+      providerProfile: catalog.providerProfile,
+      modelProfile: catalog.modelProfile,
+      wireApi: catalog.wireApi,
+      catalogError: catalog.error,
       provider,
       model,
       baseUrl,
@@ -87,6 +97,10 @@ export function formatConfigPreflightReport(report: ConfigPreflightReport): stri
     `model: ${report.env.model || "(missing)"}`,
     `baseUrl: ${report.env.baseUrl || "(missing)"}`,
     `provider preset: ${formatProviderPresetFact(report)}`,
+    `provider profile: ${report.env.providerProfile ?? "(unresolved)"}`,
+    `model profile: ${report.env.modelProfile ?? "(unresolved)"}`,
+    `wire API: ${report.env.wireApi ?? "(unresolved)"}`,
+    report.env.catalogError ? `catalog: ${report.env.catalogError}` : "catalog: ok",
     `api key: ${report.env.apiKeyPresent ? "present" : "missing"}`,
     `preflight: ${report.ready ? "ready" : "not_ready"}`,
     "next:",
@@ -150,6 +164,33 @@ function readProviderPresetLabel(input: {
     preset.model === input.model &&
     preset.baseUrl === input.baseUrl,
   )?.label;
+}
+
+function readCatalogProfile(input: {
+  provider: string;
+  model: string;
+}): {
+  providerProfile?: string;
+  modelProfile?: string;
+  wireApi?: string;
+  error?: string;
+} {
+  if (!input.provider || !input.model) {
+    return {};
+  }
+
+  try {
+    const profile = resolveModelProfile(input);
+    return {
+      providerProfile: profile.provider.label,
+      modelProfile: profile.model.label,
+      wireApi: profile.model.wireApi,
+    };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 function formatProviderPresetFact(report: ConfigPreflightReport): string {

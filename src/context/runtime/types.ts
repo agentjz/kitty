@@ -51,7 +51,9 @@ export interface BuildContextRuntimePromptLayersInput {
 export interface ContextRuntimeRequestInput {
   prompt: string | PromptLayers;
   session: Pick<SessionRecord, "messages">;
-  config: Pick<RuntimeConfig, "contextWindowMessages" | "model" | "maxContextChars" | "contextSummaryChars">;
+  config: Pick<RuntimeConfig, "contextWindowMessages" | "model" | "maxContextChars" | "contextSummaryChars"> & {
+    provider?: RuntimeConfig["provider"];
+  };
 }
 
 export interface ContextRuntimeRequest {
