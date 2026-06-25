@@ -167,7 +167,7 @@ export const responsesAdapter: ProviderWireAdapter = {
   },
 };
 
-function buildResponsesRequestBody(request: ProviderAdapterRequest): Record<string, unknown> {
+export function buildResponsesRequestBody(request: ProviderAdapterRequest): Record<string, unknown> {
   const capabilities = resolveProviderCapabilities({
     provider: request.provider,
     model: request.model,
@@ -200,10 +200,15 @@ function buildResponsesRequestBody(request: ProviderAdapterRequest): Record<stri
     body.prompt_cache_key = cachePolicy.promptCacheKey;
   }
 
-  const reasoningEffort = normalizeResponsesReasoningEffort(
-    request.reasoningEffort ?? capabilities.defaultReasoningEffort,
-  );
-  if (request.forceReasoning || capabilities.defaultReasoningEnabled || reasoningEffort) {
+  const reasoningEffort = request.thinking === "disabled"
+    ? undefined
+    : normalizeResponsesReasoningEffort(
+      request.reasoningEffort ?? capabilities.defaultReasoningEffort,
+    );
+  if (
+    request.thinking !== "disabled" &&
+    (request.forceReasoning || capabilities.defaultReasoningEnabled || request.thinking === "enabled" || reasoningEffort)
+  ) {
     body.reasoning = {
       effort: reasoningEffort ?? "high",
       summary: "detailed",

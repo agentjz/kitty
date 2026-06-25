@@ -40,6 +40,7 @@ export class TuiController {
   private readonly projection = new TuiTranscriptProjection();
   private listeners = new Set<TuiStateListener>();
   private pendingInput: PendingInput | null = null;
+  private queuedInputs: string[] = [];
   private interruptHandler: (() => void) | undefined;
   private disposed = false;
 
@@ -74,8 +75,12 @@ export class TuiController {
   }
 
   submitInput(value: string): void {
+    if (this.disposed) {
+      return;
+    }
     const pending = this.pendingInput;
-    if (!pending || this.disposed) {
+    if (!pending) {
+      this.queuedInputs.push(value);
       return;
     }
     this.pendingInput = null;
@@ -178,6 +183,7 @@ export class TuiController {
 
   dispose(): void {
     this.disposed = true;
+    this.queuedInputs = [];
     this.closeInput();
     this.listeners.clear();
   }
@@ -190,6 +196,10 @@ export class TuiController {
     this.setState(updateComposerState(this.state, {
       promptLabel,
     }));
+    const queued = this.queuedInputs.shift();
+    if (queued !== undefined) {
+      return Promise.resolve({ kind: "submit", value: queued });
+    }
     return new Promise((resolve) => {
       this.pendingInput = {
         resolve,

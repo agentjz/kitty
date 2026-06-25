@@ -14,6 +14,15 @@ test("tui shell input queue resolves submitted input", async () => {
   assert.deepEqual(await pending, { kind: "submit", value: "hello" });
 });
 
+test("tui shell keeps submitted input until the session driver is ready to read", async () => {
+  const controller = new TuiController();
+  const shell = createTuiInteractionShell(controller);
+
+  controller.submitInput("second message");
+
+  assert.deepEqual(await shell.input.readInput("> "), { kind: "submit", value: "second message" });
+});
+
 test("tui shell output projects submitted input as user transcript", () => {
   const controller = new TuiController();
   const shell = createTuiInteractionShell(controller);
