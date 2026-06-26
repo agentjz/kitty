@@ -107,8 +107,10 @@ kitty "检查这个仓库并修复失败测试"
 | `kitty undo [changeId]` | 撤销最近一次或指定变更 |
 | `kitty diff [path]` | 查看当前 git diff |
 | `kitty doctor` | 检查 `.kitty` 文件、env contract、provider preset、runtime、provider 连接和下一步 |
-| `kitty eval` | 查看产品验收场景；`kitty eval --run` 运行本地机器验收，覆盖现场、缓存、工具输出治理、host turn、远程入口和恢复演练 |
+| `kitty eval` | 查看产品验收场景；`kitty eval --run-local` 运行本地机器验收；`kitty eval --run-production` 显式运行生产路径验收 |
 | `kitty telegram serve` | 启动 Telegram 私聊服务 |
+
+`npm.cmd test` 只跑日常确定性测试，不跑 eval。产品验收独立运行：`npm.cmd run test:eval` 验证 eval harness，`npm.cmd run eval:local` 跑本地验收，`npm.cmd run eval:production` 使用当前 `.kitty/.env` 显式跑生产路径验收。
 
 查看配置：
 

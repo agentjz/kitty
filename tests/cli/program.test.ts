@@ -129,14 +129,6 @@ test("doctor does not report ready when local project template is incomplete", a
   );
 });
 
-test("eval command can run local checks", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "kitty-eval-run-"));
-  const program = buildCliProgram();
-
-  program.exitOverride();
-  await program.parseAsync(["-C", root, "eval", "--run"], { from: "user" });
-});
-
 test("events command reads latest session event facts", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "kitty-events-"));
   const paths = getAppPaths(root);

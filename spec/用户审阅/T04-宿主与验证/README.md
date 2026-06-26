@@ -21,6 +21,9 @@
 
 - `npm.cmd run verify`
 - `kitty eval`
-- `kitty eval --run`
+- `kitty eval --run-local`
+- `kitty eval --run-production`
 
-`kitty eval --run` 会运行本地机器检查，也会用假 provider 跑真实 host turn golden 场景，验证 session、工具、workset 和 event 边界。
+`kitty eval --run-local` 会运行本地机器检查，也会用假 provider 跑真实 host turn golden 场景，验证 session、工具、workset 和 event 边界。
+
+`kitty eval --run-production` 是显式生产路径验收入口，独立于普通 `npm test`，允许使用当前项目真实配置和更长链路。

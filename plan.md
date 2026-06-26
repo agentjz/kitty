@@ -1,286 +1,368 @@
-# Kitty 生产级封顶验收 Plan
+# Kitty 开源级架构封顶验收 Plan
 
 ## 1. 需求文档
 
-用户要的不是“继续优化 Kitty”，而是把 Kitty 做到可以长期作为主力本地 agent 使用的顶尖标准。
+用户要解决的不是某个局部 bug，而是确认 Kitty 是否具备优秀开源 agent 项目应有的维护方式，并把不足一次性收成可执行交付。
 
-最终体验必须是：
+这次交付面向两类人：
 
-- 用户启动 Kitty 后，能清楚进入会话、继续任务、看到当前现场。
-- 长任务不会因为上下文、后台任务、subagent、provider 差异或 TUI 展示而断片。
-- 工具输出不会浪费大量 token，也不会因为压缩丢失关键证据。
-- provider、中转、模型能力、reasoning、usage、cache 都有清楚边界。
-- CLI、TUI、Web 只是不同外壳，底层 session、event、status、provider、tool 事实一致。
-- 命名朴素、准确、可维护；不用 `kernel`、`engine`、`manager` 这类过重词掩盖职责。
+- 日常使用 Kitty 的用户：希望 Kitty 能长期作为主力本地 agent 使用，不卡在上下文、provider、TUI、工具输出、恢复和诊断上。
+- 继续开发 Kitty 的维护者：希望仓库结构、模块边界、spec、测试和配置事实清楚，不靠口头记忆维护。
 
 业务完成标准：
 
-- Kitty 的核心链路达到“可长期使用、可恢复、可诊断、可省 token、可验证”的状态。
-- 不再把同一方向拆成一堆小尾巴反复补。
-- 代码、测试、spec、README 对当前事实讲同一套话。
+- Kitty 的维护方式达到优秀开源项目标准：核心主干清楚、模块职责清楚、配置事实集中、测试能验收真实路径。
+- 把“顶尖标准”翻成可验收的终局，不写成“继续优化”。
+- 把任务定成生产级封顶验收，不写成后续优化或逐步改进。
+- 接到明确问题后，把 research、设计、实现、测试、文档同步和验证收成一个完整交付。
+- 不交半成品。
 
 当前范围包含：
 
-- provider/model/relay 能力边界。
-- context/session/memory/recovery 连续性。
-- tool output 治理与命名重整。
-- cost/cache 可观测事实。
-- CLI/TUI/Web 现场表达一致性。
-- eval 真实场景验收。
-- 全局命名和文件职责审查。
+- 仓库结构和 monorepo 判断。
+- `spec/` 当前事实主干补齐。
+- core harness 主链路：session、turn、context、tool、state、recovery、output。
+- provider/model/transport/relay/request/usage/cache 边界。
+- CLI/TUI/Web/Telegram 作为 UI 壳的事实一致性。
+- eval 从检查集合升级成生产路径验收，并且生产路径验收独立于普通 `npm test`。
+- 大文件职责审查和必要拆分。
+- `.kitty/.env` 动态配置边界审查。
 
 当前范围不包含：
 
 - 企业安全沙箱。
 - team 复活。
-- 远程控制新能力。
-- 新长期记忆大系统。
-- 为了显得高级而引入框架、数据库、协议或抽象。
+- 远程控制新方案。
+- 为了显得专业而机械改 monorepo。
+- 为了减少行数而机械拆文件。
+- 把所有内部常量塞进 `.env`。
 
 ## 2. 当前事实
 
 已确认仓库事实：
 
-- 当前 `plan.md` 不存在。
-- `git status --short` 为空，Kitty 源码当前干净。
-- `spec/` 已经成为事实主干，包含用户审阅和技术实现两棵树。
-- `package.json` 当前版本为 `0.0.15`，构建入口包含 CLI CJS 和 TUI ESM。
-- `src/provider/` 已拆出 `catalog.ts`、`transport.ts`、`responsesAdapter.ts`、`chatCompletionsAdapter.ts`、`usageNormalizer.ts`、`cachePolicy.ts`、`retryPolicy.ts`。
-- `src/tools/outputKernel/` 存在，导出 `governToolOutput` 和 `ToolOutputGovernance`；`rg` 未发现 `kernal` 拼写错误，但 `outputKernel` 命名过重。
-- `tests/tools/output-kernel.test.ts` 仍用 “output kernel” 描述产品行为。
-- 超过 12000 字节的源码文件包括 `src/evaluation/checks.ts`、`src/session/snapshot.ts`、`src/context/runtime/compression/builder.ts`、`src/protocol/manifest.ts`、`src/shell/tui/transcriptLayout.ts`、`src/telegram/service.ts`、`src/agent/turn/run.ts`，需要职责审查。
-- 测试覆盖已经较厚，但生产级验收仍更偏单元和局部行为，真实用户路径 eval 还不够完整。
+- Kitty 当前是单 npm 包，不是 monorepo：根 `package.json` 没有 `workspaces`，包名是 `@jun133/kitty`。
+- 当前源码按模块组织在 `src/agent`、`src/context`、`src/provider`、`src/session`、`src/tools`、`src/shell/tui`、`src/web`、`src/telegram` 等目录。
+- `spec/` 目前只有入口和少量主题文档，技术实现中只看到 `T04-Host边界.md`，覆盖面明显落后于代码主干。
+- `.kitty/.env` 与 `.kitty/.env.example` 都有 33 个 active `KITTY_*` key，key 集合一致。
+- 配置主链路集中在 `src/config/envKeys.ts`、`src/config/projectEnvTemplate.ts`、`src/config/runtime.ts`、`src/config/schema.ts`、`src/config/preflight.ts` 和对应测试。
+- 核心动态参数已经进入 `.env`：provider、model、baseUrl、apiKey、thinking、reasoningEffort、上下文预算、输出 token、read bytes、Telegram、extension switches、show reasoning、command stall timeout。
+- 缺失或非法的核心运行配置会报错，不是静默兜底。
+- 源码仍有内部常量，例如 status recent limit、provider timeout、retry delay、tool output preview、TUI layout rows、memory/session truncation。这些不自动等于 `.env` 缺口。
 
 已确认参考项目事实：
 
-- Codex 最新主线在加厚 `world_state`、`thread/turn`、`context_window`、`exec-server`、`skills/plugins` 和恢复能力。
-- opencode 把 provider、protocol、schema、session-ui、route、transport 拆清楚，强调多端共享事件和会话事实。
-- Goose 把 provider 放到 `goose-providers`，有 canonical model metadata、request log、retry、thinking、usage estimator，并修过 DeepSeek/Kimi thinking tool call 流式边界。
-- LiteLLM 最新主线继续加厚 gateway、router、call lifecycle、cache、cost、provider transformation。
-- RTK 的重点是输出压缩、never-worse guard、token savings analytics；它的命名多用 `compact`、`filter`、`truncate`、`analytics`，不用大词包装普通输出处理。
+- opencode 是 monorepo，拆出 `packages/opencode`、`llm`、`schema`、`protocol`、`session-ui`、`tui`、`web`、`sdk`、`plugin` 等包。
+- Cline 是 monorepo，拆出 `apps/*` 和 `sdk/packages/*`。
+- Codex 是 Rust workspace，拆出 `core`、`protocol`、`tui`、`thread-store`、`model-provider`、`skills`、`plugins`、`exec-server` 等 crate。
+- Goose 是 Rust workspace，拆出 `goose`、`goose-cli`、`goose-providers`、`goose-sdk`、`goose-server`、`goose-test` 等 crate。
+- 这些项目采用 workspace/monorepo 的原因是多产品面、多可复用包、多发布边界，不是因为目录多就更成熟。
+
+已确认结构压力：
+
+- 超过 300 行并需要职责审查的源码文件包括：
+  - `src/evaluation/checks.ts`
+  - `src/shell/tui/transcriptLayout.ts`
+  - `src/context/runtime/compression/builder.ts`
+  - `src/session/snapshot.ts`
+  - `src/provider/responsesAdapter.ts`
+  - `src/host/turn.ts`
+  - `src/protocol/manifest.ts`
+  - `src/telegram/service.ts`
+- 这些文件不一定都要拆，但必须逐个证明职责单一、变化原因一致、内部耦合合理。
 
 当前缺口：
 
-- `outputKernel` 不是错字，但不是最准确的职责名。它实际做的是 tool output 分类、投影、压缩指标和恢复提示，更接近 `toolOutputGovernance` 或 `toolOutputProjection`。
-- provider 已有结构，但还需要一次性收束成 provider/model/transport/relay/request lifecycle 的终局边界。
-- cost/cache 有事实，但还没有形成用户可理解、可追踪、可验收的生产账。
-- CLI/TUI/Web 共享底层逻辑，但现场表达是否完全一致还需要验收。
-- eval 还不能证明“真实生产路径可用”。
-- 大文件中可能存在职责过宽，不应只按行数拆，但必须审查变化原因是否一致。
+- `spec/` 没覆盖 provider、memory、context、tools、TUI、eval、config、protocol 等关键模块设计。
+- Kitty 当前是“单包模块化”，但内部边界还没有完全达到优秀 workspace 项目的清晰程度。
+- eval 已有基础，但还没有把真实生产路径完整封顶；真实 provider 和长链路验收必须显式触发，不能混进日常测试。
+- UI 壳共享底层 runtime 的方向正确，但还需要验收 CLI/TUI/Web/Telegram 是否只呈现同一事实，而不是各自推导状态。
+- provider 层已经明显加强，但仍要审查 relay、Responses、Chat Completions、DeepSeek reasoning replay、usage/cache 是否各在正确位置。
 
 未知点：
 
-- 真实 provider 长时间运行下，context drift、summary 质量、cache 命中、TUI 长输出性能仍需要实战或场景 eval 证明。
-- 当前 spec 是否已经完整覆盖最新 provider relay、TUI 现场、tool output 治理，需要执行时逐项对照。
+- 真实 provider 多日长任务下的漂移、缓存命中稳定性、TUI 长时间滚动性能无法只靠一次本地测试完全证明。
+- 是否需要 monorepo，要等包边界和发布边界完成审查后决定，不能先入为主。
 
 ## 3. 失败测试
 
-执行前必须把以下内容视作失败场景：
+以下任何一条成立，都视为本次封顶验收失败：
 
-- `rg -n "outputKernel|output-kernel|tool output kernel|kernal|Kernal" src tests spec README.md package.json` 仍出现旧命名。
-- `rg -n "legacy|team\\(|team legacy|旧|兼容旧" src tests spec README.md` 出现不属于当前事实主干的残留。
-- provider 中 `catalog`、`transport`、`relay`、`responsesAdapter`、`chatCompletionsAdapter` 的职责边界无法用一句话说明。
-- `node dist/cli.js doctor` 对当前 `.kitty/.env` 的 provider 错误不能给出可执行诊断。
-- `node dist/cli.js status`、TUI 底部现场、Web status 对同一 session 暴露的核心事实不一致。
-- tool output 治理不能证明 raw evidence 可恢复、model-facing projection 有界、token savings 可记录。
-- eval 不能覆盖 init/doctor、长会话压缩、provider 错误、background、subagent、TUI 长输出、cache/cost 事实。
+- `spec/` 仍不能让新维护者理解 Kitty 的核心模块边界。
+- provider/model/transport/relay/request/usage/cache 的职责不能分别用一句话说清。
+- `.env` 缺失用户必须配置的动态参数，或源码里存在用户经常要改却只能改代码的运行参数。
+- `.env` 被内部展示限制、preview 长度、列表行数等产品边界污染。
+- CLI/TUI/Web/Telegram 对同一 session 的现场状态说法不一致。
+- eval 不能覆盖真实产品路径，只剩函数级检查。
+- 真实 provider、长会话、background/subagent 实战验收被塞进普通 `npm test`，导致日常开发测试变慢或消耗真实 API。
+- 大文件职责审查后仍保留明显混杂：状态管理、规则计算、数据读写、渲染展示、外部接线、错误兼容、业务判断混在一起。
+- README、spec、代码、测试讲的不是同一套当前事实。
 - `npm.cmd run verify` 不通过。
 
 ## 4. 目标
 
 本次交付的终局目标：
 
-- 形成一套顶尖标准的 Kitty 本地 agent harness：输入、上下文、工具、状态、恢复、输出、成本事实全部闭环。
-- provider 层按 Provider、Model、Transport、Relay、Request Lifecycle、Usage/Cache Facts 分清职责。
-- tool output 模块命名回到职责本身，删除 `outputKernel` 这种过重表达。
-- context/session/memory/recovery 保持连续性，不把内部状态伪装成用户意图。
-- CLI/TUI/Web 共享 session/event/status 主事实，只做各自呈现。
-- eval 成为真实产品验收，而不是静态检查集合。
-- spec、README、tests 与当前实现同步。
-- 全局命名审查完成，去掉不准确的大词、假抽象和历史残留。
+- 给出并落实 Kitty 当前最合适的维护形态：继续单包模块化，或在证据支持下拆成 workspace；不能凭“monorepo 更高级”行动。
+- 补齐 `spec/` 核心模块事实，让它真正成为仓库级当前事实主干。
+- 把 core harness 主链路写清、验清、必要时拆清：输入 -> turn -> context -> provider/tool -> session/event -> status -> UI。
+- 把 provider 层定型为清楚的能力合同：Provider、Model、Transport、Relay、Request Lifecycle、Usage/Cache Facts。
+- 把 `.env` 定型为用户动态配置入口，不缺用户必须改的参数，也不塞内部产品常量。
+- 把 eval 定型为生产路径验收系统，覆盖 init/doctor、provider、长会话、恢复、background、subagent、TUI、tool output、cost/cache。
+- 把验收分成两层：日常确定性测试随 `npm test` 跑；真实 provider、真实 token 消费和长任务验收只由显式命令触发。
+- 对超过 300 行核心文件完成职责审查；需要拆的拆，不需要拆的写清保留理由。
+- 同步 README、spec、tests，保证它们只描述当前实现，不写旧兼容和假未来。
 
 ## 5. 不做范围
 
-- 不做企业安全审批主线。
-- 不做 team。
-- 不做远程 SSH/Telegram 替代方案。
-- 不做新 UI 大改或 TUI 视觉翻新，除非它阻断现场表达一致性。
-- 不做 provider 自动路由，因为当前用户主要使用单模型或明确配置模型。
-- 不做旧路径兼容层；重命名后源码、测试、文档只保留当前事实。
-- 不为了减少行数机械拆文件。
+- 不为了追随 opencode/Codex 形式而强行 monorepo。
+- 不把 `.env` 变成所有数字常量的收纳箱。
+- 不引入新数据库、新框架、新协议，只为显得高级。
+- 不做安全审批主线。
+- 不做 team 或 legacy。
+- 不重写 TUI 视觉，除非现有结构阻断事实一致性或生产路径验收。
+- 不新增长期记忆大系统；本轮只审查和稳固现有 memory/context 主链路。
 
 ## 6. 设计
 
-### 6.1 总主线
+### 6.1 维护形态
 
-按成熟 harness 主链路收束：
+当前默认设计是“单包发布，内部按 workspace 标准维护”。
 
-输入进入 host。
+判断规则：
+
+- 只有当 core、protocol、provider、TUI、Web、SDK、eval 需要独立版本、独立测试、独立发布或被外部复用时，才拆 monorepo。
+- 否则保留单包，先把内部模块边界、spec 和测试做到足够硬。
+
+### 6.2 Core Harness 主链路
+
+核心链路必须只有一条：
+
+用户输入进入 host。
 host 建立 turn。
-context 组装当前事实。
-provider 执行模型请求。
-tool 执行改变状态。
-session/event 记录事实。
+context 选择当前事实。
+provider 或 tool 执行。
+session/event 记录结果。
 runtime status 暴露现场。
-CLI/TUI/Web 渲染同一事实。
-eval 证明真实路径。
+CLI/TUI/Web/Telegram 呈现同一事实。
+eval 验收真实路径。
 
-### 6.2 Provider 终局边界
+任何 UI 壳不得拥有第二套任务状态。
 
-- `catalog`：只描述 provider/model 能力、限制、成本、cache、reasoning、tool support。
-- `transport`：只负责 HTTP 请求形态、endpoint、headers、stream/non-stream。
-- `relay`：只负责 YLS/TTAPI 这类中转差异，不污染正常 provider。
-- `responsesAdapter` / `chatCompletionsAdapter`：只负责协议消息转换。
-- `request`：只负责编排一次请求生命周期，包括 abort、retry、usage、cache facts、error normalization。
-- `usageNormalizer`：只负责 usage 字段归一，不做请求判断。
+### 6.3 Provider 边界
 
-### 6.3 Tool Output 终局边界
+- `catalog`：provider/model 固有事实，包括能力、限制、成本、cache、reasoning、tool support。
+- `transport`：请求端点、headers、stream/non-stream、doctor probe。
+- `relay`：YLS/TTAPI 等中转差异，不污染标准 provider。
+- `responsesAdapter`：Responses API 消息和事件转换。
+- `chatCompletionsAdapter`：Chat Completions 消息和事件转换。
+- `request`：一次模型请求生命周期，包括 abort、retry、usage、cache facts、错误归一。
+- `usageNormalizer`：usage 字段归一，不做请求判断。
 
-把 `outputKernel` 重命名为职责准确的模块。
+### 6.4 配置边界
 
-候选终局名：
+配置分四类：
 
-- 首选：`src/tools/outputGovernance/`
-- 类型名保留或收束到 `ToolOutputGovernance`。
-- 测试名改为 `tests/tools/output-governance.test.ts`。
+- `.env`：用户必须知道或经常修改的运行参数。
+- provider catalog：provider/model 固有事实。
+- tool args：每次工具调用可能不同的参数。
+- internal constants：产品边界和展示限制，用测试保护，不进 `.env`。
 
-理由：
+如果某个参数缺失会导致用户路径失败，并且用户合理需要修改，就必须进入 `envKeys -> template -> runtime -> schema -> preflight -> tests` 全链路。
 
-- 当前模块不是 OS kernel，也不是运行核心。
-- 它做的是治理：分类、投影、压缩、指标、恢复提示。
-- `governToolOutput` 已经表达了真实职责，目录和测试应该与函数一致。
+### 6.5 Spec 边界
 
-### 6.4 Cost/Cache 终局边界
+`spec/` 必须覆盖核心模块设计，但不写实现流水账。
 
-- provider request 只记录事实，不做夸张估算。
-- cost/cache facts 进入 session/event/status。
-- CLI/TUI/Web 都能看到同一套成本事实。
-- output governance 记录 saved tokens，但不伪造 provider cache hit。
-- stable prefix 变化必须可追踪到输入事实变化。
+最低覆盖：
 
-### 6.5 Context/Session/Recovery 终局边界
+- T01 核心主链路。
+- T02 session/context/memory/recovery。
+- T03 tools/extensions/tool output governance。
+- T04 host/UI shells。
+- T05 provider/model/relay/usage/cache。
+- T06 config/init/doctor。
+- T07 eval/production acceptance。
 
-- session 是运行账本。
-- memory asset 是可审阅投影。
-- working memory 是当前轮模型上下文。
-- internal wake/status 不能进入用户意图。
-- “继续”必须从当前 session facts 恢复，而不是复述历史。
+用户审阅写体验和验收。
+技术实现写模块边界、状态归属、数据流和测试。
 
-### 6.6 UI 外壳一致性
+### 6.6 Eval 边界
 
-- CLI、TUI、Web 不各自推导业务事实。
-- UI 只订阅或读取 session/event/status。
-- TUI 特有布局只做呈现，不拥有任务状态。
-- local commands 不消耗模型 token，不污染 session memory。
+eval 不是口号检查。
 
-### 6.7 Eval 终局边界
+eval 分两层：
 
-eval 必须覆盖真实用户路径：
+- 日常确定性验收：随 `npm test` / `npm.cmd run verify` 运行，不访问真实 provider，不消耗真实 API，不依赖长时间等待。
+- 生产路径验收：独立命令手动触发，允许使用当前 `.kitty/.env` 的真实 provider，允许消耗 token，允许跑更长链路。
 
-- init -> doctor -> 首次对话。
-- provider relay 正常和错误诊断。
+生产路径验收必须覆盖：
+
+- 新项目 init -> doctor -> 首次对话。
+- provider 配置错误 -> 用户可修复诊断。
 - 长会话 -> 压缩 -> 继续。
 - background 启动 -> 卡住 -> status 可见 -> stop 干净。
 - subagent 启动 -> worker 完成 -> lead 接回。
-- tool output 大输出 -> projection 有界 -> raw evidence 可恢复。
-- TUI 长输出 -> 滚动和现场稳定。
-- cost/cache facts -> CLI/TUI/Web 一致。
+- 大工具输出 -> model projection 有界 -> raw evidence 可恢复。
+- TUI 长输出 -> 滚动、输入、现场稳定。
+- cost/cache facts -> status 可见。
 
-### 6.8 命名标准
+### 6.7 文件职责
 
-命名必须遵守：
+超过 300 行触发审查，不自动拆。
 
-- 名字说职责，不说气势。
-- 能用 `projection`、`governance`、`catalog`、`transport`、`adapter`、`store`、`snapshot`、`status`，不用 `kernel`、`engine`、`manager`。
-- `utils` 只保留真正跨域的小函数；一旦承载业务判断，就迁入业务模块。
-- 测试名描述产品行为，不描述内部口号。
-- spec 使用用户能懂的名词，源码使用职责清楚的名词。
+保留条件：
+
+- 一句话能说清职责。
+- 变化原因一致。
+- 内部耦合合理。
+- 拆开会增加错误边界。
+
+拆分条件：
+
+- 状态管理、规则计算、数据读写、渲染展示、外部接线、错误兼容、业务判断混在一起。
+- 测试难以覆盖真实行为。
+- 新能力只能继续往同一个文件硬塞。
 
 ## 7. 实施任务
 
-- [x] 全局命名审查：用 `rg` 扫描 `kernel/kernal/engine/manager/helper/utils/legacy/team`，逐项判断是职责准确、普通工具、还是假抽象。
-- [x] 重命名 tool output 模块：`src/tools/outputKernel` -> `src/tools/outputGovernance`，同步 imports、tests、spec、README。
-- [x] 收束 tool output 文案：测试和文档统一使用 “tool output governance”，不再出现 “output kernel”。
-- [x] 审查大文件职责：逐个检查超过 12000 字节的源码文件，只有变化原因混杂时才拆。
-- [x] Provider 边界验收：检查 `catalog/transport/relay/adapter/request/usage/cache` 是否按 6.2 分工，必要时移动逻辑，不保留旧包装。
-- [x] Relay 终局验收：确认 YLS/TTAPI 中转差异只在 relay 层出现，正常 provider 不被中转特判污染。
-- [x] Reasoning/tool-call 验收：确认 DeepSeek/Kimi reasoning 内容回传、无 thinking 模型、多轮 tool call 都有测试保护。
-- [x] Cost/cache 事实贯通：确认 provider usage、cache policy、stable prefix、tool saved tokens 都进入统一事实，不各端各算。
-- [x] CLI/TUI/Web 现场一致：确认三端读取同一 session/event/status 事实；UI 层不重复业务推导。
-- [x] Recovery 验收：补齐或强化“继续”、background、subagent、TUI 重开后的恢复场景。
-- [x] Eval 真实场景：把 6.7 的用户路径落成可运行 eval 或明确的自动测试。
-- [x] Spec 同步：更新 `spec/用户审阅` 和 `spec/技术实现`，只写当前事实主干。
-- [x] README 同步：README 只写宣传、安装、使用、核心体验，不塞开发细节。
-- [x] 验证：运行局部测试、`npm.cmd run verify`、必要的 `node dist/cli.js doctor/status/eval/tui` 检查。
-- [x] 收口：更新本计划收口，列明完成事实、验证命令、剩余风险。
+- [ ] Research 收束：复查 Kitty、opencode、Cline、Codex、Goose 的结构边界，记录只影响当前设计的证据。
+- [ ] 维护形态决策：判断 Kitty 是否继续单包模块化，或拆 workspace；写出证据和结论。
+- [ ] Spec 补齐：新增或更新 T01-T07 用户审阅与技术实现文档，覆盖核心主链路、provider、context/memory、tools、UI、config、eval。
+- [ ] 大文件职责审查：逐个审查 8 个超过 300 行核心文件，能保留就写清理由，必须拆就按变化原因拆。
+- [ ] Provider 封顶：检查并必要时调整 catalog、transport、relay、adapter、request、usage/cache 的边界和测试。
+- [ ] Config 封顶：审查 `.env`、`.env.example`、template、runtime、schema、preflight、tests，确认用户动态参数无漏项，内部常量不污染 env。
+- [ ] Runtime 事实主干验收：确认 session/event/status 是 CLI/TUI/Web/Telegram 的共同事实源。
+- [x] Eval 封顶：把 eval 拆成日常确定性验收和生产路径验收；普通 `npm test` 不跑 eval，不跑真实 provider，不消耗真实 API。
+- [x] 生产验收入口：提供显式命令运行真实配置、provider probe 和真实项目 status；命令名、输出和风险提示写清。
+- [x] README 同步：README 写清 `npm test`、`test:eval`、`eval:local`、`eval:production` 的边界；开发事实指向 `spec/`。
+- [x] 全局残留扫描：清除旧兼容、假未来、team、legacy、过重命名和文档旧事实；本轮扫描确认 eval 只保留当前 `--run-local` / `--run-production` 两个运行入口。
+- [x] 完整验证：运行局部测试、构建、`npm.cmd run verify`、`npm.cmd run test:eval`、`npm.cmd run eval:local`、`npm.cmd run eval:production`。
+- [x] 收口：更新本 plan 的完成事实、验证结果、未验证内容和剩余风险。
 
 ## 8. 验证计划
 
-局部验证：
+结构检查：
 
 ```bash
-rg -n "outputKernel|output-kernel|tool output kernel|kernal|Kernal" src tests spec README.md package.json
-rg -n "legacy|team\\(|team legacy" src tests spec README.md
+rg -n "legacy|team\\(|team legacy|旧兼容|兼容旧" src tests spec README.md package.json
+rg -n "kernel|kernal|engine|manager" src tests spec README.md package.json
+```
+
+配置检查：
+
+```bash
+node dist/cli.js doctor
+```
+
+测试与构建：
+
+```bash
 npm.cmd run typecheck
 npm.cmd run test:core
-```
-
-产品入口验证：
-
-```bash
 npm.cmd run build
-node dist/cli.js doctor
-node dist/cli.js status
-node dist/cli.js eval
-node dist/cli.js tui
-```
-
-完整验证：
-
-```bash
 npm.cmd run verify
 ```
 
+日常产品路径验收：
+
+```bash
+node dist/cli.js status
+```
+
+产品验收：
+
+```bash
+node dist/cli.js eval --run-local
+node dist/cli.js eval --run-production
+node dist/cli.js tui
+```
+
+要求：
+
+- `npm test` 和 `npm.cmd run verify` 不默认运行真实 provider 生产验收。
+- 生产验收必须由维护者显式执行。
+- 生产验收输出必须说明它会使用当前 `.kitty/.env`，可能消耗真实 API。
+
 手动验收：
 
-- 用当前 `.kitty/.env` 真实 provider 跑一轮普通对话。
-- 用 TUI 跑一轮长输出，确认输入、滚动、现场、markdown 不错位。
-- 触发一次大工具输出，确认模型看到的是有界证据，raw output 可恢复。
-- 触发一次 provider 错误，确认诊断能指导用户修配置。
+- 用当前 `.kitty/.env` 跑一轮真实 provider 对话。
+- 触发一次 provider 配置错误，确认错误能指导用户修复。
+- 跑一轮长输出 TUI，确认滚动、输入、现场不乱。
+- 跑一次大工具输出，确认模型输入有界，原始证据可恢复。
+- 跑一次 background/subagent 路径，确认 status 和接回自然。
 
 未验证内容必须在收口中明确写出。
 
 ## 9. 收口
 
-已完成。
+已完成本轮 eval 独立交付。
 
 完成事实：
 
-- `src/tools/outputKernel/` 已重命名为 `src/tools/outputGovernance/`，源码、测试和类型引用全部同步。
-- `tests/tools/output-kernel.test.ts` 已重命名为 `tests/tools/output-governance.test.ts`，测试描述统一为 tool output governance。
-- `kitty eval --run` 新增 `tool-output-governance-ready` 场景，验收测试失败、搜索输出和超大通用输出的有界投影、恢复路径和 saved tokens。
-- Provider 边界已按当前事实验收：catalog 管 provider/model 能力，transport 管 doctor probe，relay 只通过 provider transport 进入，DeepSeek reasoning tool-call replay 有测试保护。
-- Cost/cache 事实已按当前事实验收：provider usage、cache policy、stable prefix、tool saved tokens 进入 runtime status / scene / eval。
-- CLI/TUI/Web 边界已按当前事实验收：CLI status 和 TUI dock 读取 runtime scene；Web 入口复用 interactive shell / host turn，不另建 agent 主线。
-- `spec/用户审阅/系统核心/核心地图.md`、`spec/技术实现/T03-工具与扩展/01-Core工具.md`、`README.md` 已同步当前事实。
-- `.kitty/.kittyignore` 通过 `node dist/cli.js init` 补齐，`.kitty/` 已被 git ignore，不进入仓库提交。
+- eval 从普通日常测试链路中独立出来。
+- `npm.cmd test` / `npm.cmd run verify` 只运行日常确定性测试，不运行 `tests/evaluation/`。
+- 新增 `scripts/run-core-tests.mjs`，明确排除 `.test-build/tests/evaluation/`。
+- 新增 `npm.cmd run test:eval`，只运行 eval harness 测试。
+- 新增 `npm.cmd run eval:local`，显式运行本地产品验收。
+- 新增 `npm.cmd run eval:production`，显式运行生产路径验收。
+- `kitty eval --run-local` 运行本地验收。
+- `kitty eval --run-production` 运行生产验收，使用当前 `.kitty/.env`，会提示可能消耗真实 provider。
+- 生产验收拆出 `src/evaluation/production.ts`，先检查 config preflight；配置不 ready 时跳过 provider probe，避免无意义触网。
+- eval 失败会设置非零退出码。
+- README、philosophy、spec 已同步 eval 分层事实。
+- 本地 `.kitty/.kittyignore` 已通过 `node dist/cli.js init` 补齐，当前项目 preflight ready。
+
+失败测试结果：
+
+- 普通测试不再跑 eval：已通过 `npm.cmd run verify` 验证，core 测试数为 249。
+- eval 独立测试：`npm.cmd run test:eval` 通过，9 个 eval 测试全绿。
+- 本地产品验收：`npm.cmd run eval:local` 通过。
+- 生产路径验收：`npm.cmd run eval:production` 通过，YLS provider probe 为 responses，resolvedBaseUrl 为 `https://code.ylsagi.com/codex`。
+
+修改文件：
+
+- `package.json`
+- `scripts/run-core-tests.mjs`
+- `src/cli/commands/evaluation.ts`
+- `src/evaluation/checks.ts`
+- `src/evaluation/harness.ts`
+- `src/evaluation/production.ts`
+- `src/evaluation/types.ts`
+- `tests/cli/program.test.ts`
+- `tests/evaluation/harness.test.ts`
+- `README.md`
+- `philosophy.md`
+- `spec/用户审阅/系统核心/核心地图.md`
+- `spec/用户审阅/T04-宿主与验证/README.md`
+- `spec/用户审阅/T04-宿主与验证/01-Eval验收分层.md`
+- `spec/用户审阅/与技术实现映射.md`
+- `spec/技术实现/README.md`
+- `spec/技术实现/T04-Host边界.md`
+- `spec/技术实现/T07-验收分层/README.md`
+- `spec/技术实现/与用户审阅映射.md`
+- `plan.md`
 
 验证命令：
 
-- `rg -n "outputKernel|output-kernel|tool output kernel|kernal|Kernal" src tests spec README.md package.json`：无命中。
-- `rg -n "legacy|team\\(|team legacy" src tests spec README.md package.json`：无命中。
-- `npm.cmd run typecheck`：通过。
-- `node --test .test-build/tests/evaluation/harness.test.js`：通过。
-- `node --test .test-build/tests/tools/output-governance.test.js .test-build/tests/tools/bash-output-governance.test.js`：通过。
-- `npm.cmd run verify`：通过，253 个测试全绿。
-- `node dist/cli.js eval --run`：通过，12 个产品验收场景全绿。
-- `node dist/cli.js status`：通过。
-- `node dist/cli.js doctor`：通过，YLS responses probe ok。
+- `npm.cmd run typecheck`
+- `npm.cmd run test:eval`
+- `npm.cmd run test:core`
+- `npm.cmd run verify`
+- `npm.cmd run eval:local`
+- `npm.cmd run eval:production`
+- `node dist/cli.js doctor`
+- `node dist/cli.js init`
 
 未验证内容：
 
-- 未在真实交互 TTY 中打开 `node dist/cli.js tui`，因为当前工具环境不是交互终端；TUI 构建和自动化测试已由 `npm.cmd run verify` 覆盖。
+- 未在交互 TTY 中打开 `node dist/cli.js tui`，因为当前工具环境不是交互终端。
+- 未做多日真实长任务漂移观察。
 
 剩余风险：
 
-- 真实 provider 的多日长任务漂移、缓存命中稳定性和 TUI 长时间使用性能仍需要实际生产使用观察；本次已把本地可机器验证的封顶验收补齐。
+- 当前生产验收真实触达 provider probe 和 runtime status，但还不是完整多轮真实对话长跑。后续如果要更重的实战验收，应继续放在 `eval:production`，不能回灌到 `npm test`。
+
+commit / push：
+
+- 用户本轮未要求 commit / push，未执行。

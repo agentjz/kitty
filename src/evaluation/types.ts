@@ -12,20 +12,29 @@ export type EvaluationCheckId =
   | "remote-entrypoints-available"
   | "recovery-drills-pass";
 
+export type ProductionEvaluationCheckId =
+  | "production-config-preflight"
+  | "production-provider-probe"
+  | "production-runtime-status";
+
+export type EvaluationSuite = "local" | "production";
+
 export interface EvaluationRunResult {
+  suite: EvaluationSuite;
   status: "passed" | "failed" | "skipped";
   checks: EvaluationCheckResult[];
 }
 
 export interface EvaluationScenario {
-  id: EvaluationCheckId;
+  id: EvaluationCheckId | ProductionEvaluationCheckId;
+  suite: EvaluationSuite;
   title: string;
   userPath: string;
   evidence: string;
 }
 
 export interface EvaluationCheckResult {
-  id: EvaluationCheckId;
+  id: EvaluationCheckId | ProductionEvaluationCheckId;
   status: "passed" | "failed" | "skipped";
   fact: string;
   error?: string;

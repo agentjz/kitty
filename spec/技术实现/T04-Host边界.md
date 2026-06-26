@@ -29,5 +29,10 @@ Host 工具注册边界：
 
 `kitty events` 使用 `src/cli/commands/events.ts` 读取 `src/session/events.ts` 的同一份事件事实。默认读取最新 session，也可以按 session id 读取；CLI presenter 只格式化事件，不判断语义。
 
-`kitty eval` 使用 `src/evaluation/`。`harness.ts` 只负责编排；`checks.ts` 运行本地机器检查。检查结果是 pass/fail/skip 事实，不调用模型评分，也不保留 scenario / golden 层。
+`kitty eval` 使用 `src/evaluation/`。`harness.ts` 只负责编排；`checks.ts` 运行本地机器检查和显式生产验收检查。检查结果是 pass/fail/skip 事实，不调用模型评分。
+
+eval 分两层：
+
+- `kitty eval --run-local`：本地确定性验收，允许进入 eval 自己的测试脚本，但不进入普通 `npm test`。
+- `kitty eval --run-production`：显式生产路径验收，允许使用当前项目真实配置和更长链路，必须由维护者主动执行。
 

@@ -122,7 +122,7 @@ Agent 不能只靠单元测试证明成熟。
 
 小猫智能体用 evaluation harness 暴露真实体验场景：简单问题不疯狂工作、长会话不失忆、旧目标不回灌、项目地图帮助定向、memory 可审阅可追溯、background 可恢复可终止、subagent 能唤醒 lead、plan 能形成可验证执行合同。
 
-`kitty eval` 是产品验收合同。它列出关键用户路径和机器证据；`kitty eval --run` 运行本地可验证检查，也会用假 provider 跑真实 host turn golden 场景，检查工具、session、workset 和 events 的闭环。它不替模型打分，也不把口号写成测试。
+`kitty eval` 是产品验收合同。它列出关键用户路径和机器证据；`kitty eval --run-local` 运行本地可验证检查，也会用假 provider 跑真实 host turn golden 场景，检查工具、session、workset 和 events 的闭环。`kitty eval --run-production` 是显式生产路径验收入口，独立于普通 `npm test`，可以使用当前项目真实配置。它不替模型打分，也不把口号写成测试。
 
 Cost economy 是验收的一等场景。评测必须证明 provider usage 可解析、稳定前缀不被易变事实污染、skill 默认只给索引、大输出会被压缩，status 能把这些事实暴露给用户。
 
