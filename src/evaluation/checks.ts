@@ -14,6 +14,7 @@ export const EVALUATION_CHECK_IDS: readonly EvaluationCheckId[] = [
   "skill-packages-readable",
   "config-preflight-readable",
   "cache-economy-ready",
+  "tool-output-governance-ready",
   "production-scene-ready",
   "host-turn-boundary-runs",
   "remote-entrypoints-available",
@@ -62,6 +63,12 @@ export const EVALUATION_SCENARIOS: readonly EvaluationScenario[] = [
     title: "成本事实可审阅",
     userPath: "用户能看到 provider usage、cache hit/miss、稳定前缀和按需 skill 边界，而不是只看到 token 总数。",
     evidence: "验证 usage 归一化、provider cache policy、stable/volatile prompt fingerprint、skill index boundary 和大输出压缩。",
+  },
+  {
+    id: "tool-output-governance-ready",
+    title: "工具输出治理可验收",
+    userPath: "工具产生大量输出时，模型只看到有界证据，完整输出仍可恢复，节省 token 的事实能进入现场。",
+    evidence: "构造测试失败、搜索输出和超大通用输出，确认投影有界、raw output 可恢复、saved tokens 可记录。",
   },
   {
     id: "production-scene-ready",
@@ -133,6 +140,9 @@ export async function runEvaluationCheck(id: EvaluationCheckId, rootDir: string)
       case "cache-economy-ready": {
         return await runCacheEconomyCheck(id);
       }
+      case "tool-output-governance-ready": {
+        return await runToolOutputGovernanceCheck(id);
+      }
       case "production-scene-ready": {
         return await runProductionSceneCheck(id, rootDir);
       }
@@ -154,6 +164,64 @@ export async function runEvaluationCheck(id: EvaluationCheckId, rootDir: string)
       error: error instanceof Error ? error.message : String(error),
     };
   }
+}
+
+async function runToolOutputGovernanceCheck(id: EvaluationCheckId): Promise<EvaluationCheckResult> {
+  const { governToolOutput } = await import("../tools/outputGovernance/index.js");
+  const testOutput = governToolOutput({
+    toolName: "bash",
+    command: "npm test",
+    status: "failed",
+    exitCode: 1,
+    output: [
+      "FAIL tests/provider/deepseek-replay.test.ts",
+      "Expected reasoning_content to be present.",
+      "Tests: 1 failed, 24 passed, 25 total",
+      "x".repeat(10_000),
+    ].join("\n"),
+    outputPath: ".kitty/observability/command-output/eval/test.txt",
+    truncated: true,
+  });
+  const searchOutput = governToolOutput({
+    toolName: "bash",
+    command: "rg provider src",
+    status: "completed",
+    exitCode: 0,
+    output: Array.from({ length: 80 }, (_, index) => `src/provider/file${index}.ts:${index + 1}:provider`).join("\n"),
+  });
+  const hugeOutput = governToolOutput({
+    toolName: "bash",
+    command: "node huge-output.js",
+    status: "completed",
+    exitCode: 0,
+    output: Array.from({ length: 40_000 }, (_, index) => `line ${index}: ${"x".repeat(80)}`).join("\n"),
+    outputPath: ".kitty/observability/command-output/eval/huge.txt",
+    truncated: true,
+  });
+
+  const ready =
+    testOutput.kind === "test" &&
+    testOutput.projection.includes("FAIL tests/provider/deepseek-replay.test.ts") &&
+    testOutput.projection.includes("[full output:") &&
+    searchOutput.kind === "search" &&
+    searchOutput.projection.includes("matches shown:") &&
+    hugeOutput.kind === "generic" &&
+    hugeOutput.projectedChars < 4_000 &&
+    hugeOutput.savedTokens > 100_000 &&
+    hugeOutput.outputPath === ".kitty/observability/command-output/eval/huge.txt";
+
+  if (!ready) {
+    return {
+      id,
+      status: "failed",
+      fact: `tool output governance incomplete: test=${testOutput.kind}/${testOutput.savedTokens}, search=${searchOutput.kind}/${searchOutput.savedTokens}, huge=${hugeOutput.projectedChars}/${hugeOutput.savedTokens}`,
+    };
+  }
+
+  return passed(
+    id,
+    `tool output governance ready: testSaved=${testOutput.savedTokens}, searchSaved=${searchOutput.savedTokens}, hugeProjected=${hugeOutput.projectedChars}, hugeSaved=${hugeOutput.savedTokens}`,
+  );
 }
 
 async function runCacheEconomyCheck(id: EvaluationCheckId): Promise<EvaluationCheckResult> {

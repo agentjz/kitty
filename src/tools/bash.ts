@@ -4,7 +4,7 @@ import { getShellRuntimeInfo } from "../utils/commandRunner/shellRuntime.js";
 import { resolveUserPath, truncateText } from "../utils/fs.js";
 import { clampNumber, okResult, parseArgs, readString } from "../tools/core/shared.js";
 import type { RegisteredTool } from "../tools/core/types.js";
-import { governToolOutput } from "./outputKernel/index.js";
+import { governToolOutput } from "./outputGovernance/index.js";
 
 const SHELL_RUNTIME = getShellRuntimeInfo();
 

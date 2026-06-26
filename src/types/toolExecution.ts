@@ -1,6 +1,6 @@
 import type { SessionDiffChange } from "./session.js";
 import type { ToolDiagnosticsReport } from "./diagnostics.js";
-import type { ToolOutputGovernance } from "../tools/outputKernel/index.js";
+import type { ToolOutputGovernance } from "../tools/outputGovernance/index.js";
 
 export interface ToolExecutionMetadata {
   changedPaths?: string[];

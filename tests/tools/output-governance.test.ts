@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { governToolOutput } from "../../src/tools/outputKernel/index.js";
+import { governToolOutput } from "../../src/tools/outputGovernance/index.js";
 
-test("tool output kernel projects test failures into compact evidence", () => {
+test("tool output governance projects test failures into compact evidence", () => {
   const raw = [
     "npm test",
     "PASS tests/a.test.ts",
@@ -39,7 +39,7 @@ test("tool output kernel projects test failures into compact evidence", () => {
   assert.ok(governance.savingsRatio > 0);
 });
 
-test("tool output kernel projects search output with match counts", () => {
+test("tool output governance projects search output with match counts", () => {
   const raw = Array.from({ length: 40 }, (_, index) => `src/file${index}.ts:${index + 1}:needle match`).join("\n");
 
   const governance = governToolOutput({
@@ -56,7 +56,7 @@ test("tool output kernel projects search output with match counts", () => {
   assert.doesNotMatch(governance.projection, /src\/file39\.ts/);
 });
 
-test("tool output kernel projects git diff files and hunks", () => {
+test("tool output governance projects git diff files and hunks", () => {
   const raw = [
     "diff --git a/src/a.ts b/src/a.ts",
     "--- a/src/a.ts",
@@ -81,7 +81,7 @@ test("tool output kernel projects git diff files and hunks", () => {
   assert.match(governance.projection, /@@ -1 \+1 @@/);
 });
 
-test("tool output kernel keeps huge generic output model-facing projection bounded", () => {
+test("tool output governance keeps huge generic output model-facing projection bounded", () => {
   const raw = Array.from({ length: 120_000 }, (_, index) => `line ${index}: ${"x".repeat(60)}`).join("\n");
 
   const governance = governToolOutput({

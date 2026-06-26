@@ -6,6 +6,7 @@ export type EvaluationCheckId =
   | "skill-packages-readable"
   | "config-preflight-readable"
   | "cache-economy-ready"
+  | "tool-output-governance-ready"
   | "production-scene-ready"
   | "host-turn-boundary-runs"
   | "remote-entrypoints-available"

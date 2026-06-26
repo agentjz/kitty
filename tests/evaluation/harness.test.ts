@@ -13,6 +13,7 @@ test("evaluation harness defines current local acceptance checks", () => {
     "skill-packages-readable",
     "config-preflight-readable",
     "cache-economy-ready",
+    "tool-output-governance-ready",
     "production-scene-ready",
     "host-turn-boundary-runs",
     "remote-entrypoints-available",
@@ -42,6 +43,7 @@ test("evaluation harness runs local machine-verifiable checks", async (t) => {
   assert.ok(result.checks.every((check) => check.status === "passed"));
   assert.ok(result.checks.some((check) => check.id === "runtime-status-builds"));
   assert.ok(result.checks.some((check) => check.id === "cache-economy-ready"));
+  assert.ok(result.checks.some((check) => check.id === "tool-output-governance-ready"));
   assert.ok(result.checks.some((check) => check.id === "production-scene-ready"));
   assert.ok(result.checks.some((check) => check.id === "host-turn-boundary-runs"));
   assert.ok(result.checks.some((check) => check.id === "remote-entrypoints-available"));
