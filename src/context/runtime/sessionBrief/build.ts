@@ -41,29 +41,29 @@ export function buildSessionConversationBriefBlock(
     return undefined;
   }
 
-  return buildFieldBlock("Internal continuity state", [
+  return buildFieldBlock("Conversation continuity evidence", [
     {
       label: "Purpose",
       value: "Use these facts as private continuity state. Answer the current request directly. Quote prior turns only when the user asks.",
     },
     brief.modelSummary
       ? {
-          label: "Session memory",
+          label: "Model-written session memory",
           value: brief.modelSummary,
         }
-      : { label: "Session memory", value: undefined },
+      : { label: "Model-written session memory", value: undefined },
     brief.modelSummaryUpdatedAt
       ? {
-          label: "Memory updated at",
+          label: "Updated",
           value: brief.modelSummaryUpdatedAt,
         }
-      : { label: "Memory updated at", value: undefined },
+      : { label: "Updated", value: undefined },
     {
-      label: "Visible turns",
+      label: "Near-field visible turns",
       value: `${brief.userTurnCount} user turn(s) with current input / ${brief.assistantTurnCount} assistant response(s)`,
     },
     {
-      label: "Tool activity",
+      label: "Recent tool activity",
       value: formatSignals(brief.toolActivity),
     },
   ]);

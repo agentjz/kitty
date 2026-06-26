@@ -3,16 +3,13 @@ import { runAgentTurn } from "../agent/turn.js";
 import { ControlPlaneLedger } from "../control/ledger.js";
 import { resolveProjectRoots } from "../context/repoRoots.js";
 import { buildLeadWakeFacts, waitForLeadWaitExecutions } from "../execution/leadWait.js";
+import { completeExactDelegatedCloseout } from "./delegatedCloseout.js";
 import { enterCrashContext } from "../observability/crashRecorder.js";
 import { recordHostTurnFinished, recordHostTurnStarted } from "../observability/hostEvents.js";
 import { SessionEventStore } from "../session/events.js";
-import { createMessage } from "../session/messages.js";
 import { isAbortError } from "../utils/abort.js";
 import { createHostToolRegistry } from "./toolRegistry.js";
 import type { HostTurnDependencies, HostTurnOptions, HostTurnOutcome } from "./types.js";
-import { buildRunTurnResult, createFinalizeTransition } from "../agent/runtimeTransition.js";
-import { noteCheckpointCompleted } from "../session/checkpoint.js";
-import type { AgentCallbacks, RunTurnResult } from "../agent/types.js";
 import type { ToolRegistry } from "../tools/core/types.js";
 
 const DEFAULT_IDENTITY = {
@@ -243,60 +240,6 @@ export async function runHostTurn(
     releaseCrashContext();
     await toolRegistry?.close?.().catch(() => undefined);
   }
-}
-
-async function completeExactDelegatedCloseout(input: {
-  session: HostTurnOptions["session"];
-  sessionStore: HostTurnOptions["sessionStore"];
-  stateRootDir: string;
-  callbacks?: AgentCallbacks;
-  executions: Awaited<ReturnType<typeof waitForLeadWaitExecutions>>;
-}): Promise<RunTurnResult | undefined> {
-  const answer = resolveExactDelegatedAnswer(input.executions);
-  if (!answer) {
-    return undefined;
-  }
-
-  const transition = createFinalizeTransition({
-    changedPaths: [],
-  });
-  const sessionWithAnswer = await input.sessionStore.appendMessages(input.session, [
-    createMessage("assistant", answer),
-  ]);
-  const session = await input.sessionStore.save(noteCheckpointCompleted(sessionWithAnswer, transition));
-  const ledger = new ControlPlaneLedger(input.stateRootDir);
-  try {
-    ledger.taskLifecycle.complete({
-      sessionId: session.id,
-      reason: "finalize.delegated_exact_output",
-      completionFacts: [answer],
-    });
-  } finally {
-    ledger.close();
-  }
-  input.callbacks?.onAssistantText?.(answer);
-  input.callbacks?.onAssistantDone?.(answer);
-  return buildRunTurnResult({
-    session,
-    changedPaths: [],
-    transition,
-  });
-}
-
-function resolveExactDelegatedAnswer(executions: readonly { assignment?: { expectedOutput?: string }; output?: string; status: string }[]): string | undefined {
-  if (executions.length !== 1) {
-    return undefined;
-  }
-  const [execution] = executions;
-  if (!execution || execution.status !== "completed") {
-    return undefined;
-  }
-  const expected = execution.assignment?.expectedOutput?.trim();
-  const output = execution.output?.trim();
-  if (!expected || !output || expected !== output) {
-    return undefined;
-  }
-  return output;
 }
 
 function createToollessRegistry(registry: ToolRegistry): ToolRegistry {

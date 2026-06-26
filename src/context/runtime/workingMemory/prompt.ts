@@ -96,7 +96,7 @@ function buildHistoryBoundaryBlock(memory: AgentWorkingMemory): string | undefin
   return buildFieldBlock("History boundary", [
     {
       label: "Policy",
-      value: "Raw session history stays out of the current request. Internal continuity state and current workset are automatic facts for judgment, not text to narrate.",
+      value: "Raw session history stays out of the current request. Conversation continuity evidence and current workset are automatic facts for judgment, not text to narrate.",
     },
   ]);
 }

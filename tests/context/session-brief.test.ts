@@ -180,10 +180,11 @@ test("session brief injects model-written session memory without machine semanti
     timestamp: "2026-05-21T20:01:01.000Z",
   }));
 
-  assert.match(block ?? "", /Session memory/);
+  assert.match(block ?? "", /Conversation continuity evidence/);
+  assert.match(block ?? "", /Model-written session memory/);
   assert.match(block ?? "", /用户要求本 session 用 txt 纯文本回答/);
   assert.match(block ?? "", /agentjz\/777f/);
-  assert.match(block ?? "", /Memory updated at: 2026-05-21T20:00:00\.000Z/);
-  assert.match(block ?? "", /Visible turns: 1 user turn/);
+  assert.match(block ?? "", /Updated: 2026-05-21T20:00:00\.000Z/);
+  assert.match(block ?? "", /Near-field visible turns: 1 user turn/);
   assert.doesNotMatch(block ?? "", /Recent user inputs/);
 });

@@ -1,199 +1,151 @@
-# Kitty 生产级硬化收口 Plan
+# Kitty 现场表达与上下文自然性封顶 Plan
 
 ## 1. 需求文档
 
-用户要的不是继续堆功能，而是把当前已经成型的 Kitty 收成能长期当主力工具使用的硬软件。
+用户要解决的实际问题是：Kitty 已经能记录 session、memory、execution、events、cost、context budget，但这些事实呈现给模型和用户时有时像账本摘要，不像一个一直在当前对话现场里的 agent。
 
-这轮要解决四个实际问题：
+这轮要把“现场表达”做成生产级终局：
 
-- 生产验收不能只探测 provider，要能跑真实用户路径。
-- eval 和 build 不能互相抢 `dist`，脚本要经得起维护者并行误用。
-- `spec/` 要覆盖核心模块事实，新维护者能按 spec 理解系统。
-- 超过 300 行的核心文件要完成职责审查，需要拆的拆，不需要拆的写清理由。
+- 模型看到的是当前任务现场、近场连续性和必要证据，不是数据库字段清单。
+- 用户看 `kitty status` 时先看到现在在做什么、下一步是什么、有没有卡住，再看详细事实。
+- CLI、TUI、Web、Telegram 仍复用同一条 agent 主链路，不各自维护第二套状态。
+- 结构化事实不丢；自然表达只负责投影，不替模型判断用户意图。
 
-完成标准：
+业务完成标准：
 
-- 日常测试仍然快、确定、不花真实 API。
-- 生产验收显式运行，允许消耗真实 provider，并覆盖真实多轮对话路径。
-- 构建脚本不会因为两个 eval 并行运行抢同一个输出目录。
-- spec、README、代码、测试讲同一套当前事实。
-- 对超重文件给出当前事实结论，不靠行数机械拆。
+- Kitty 保留完整机器事实，同时第一屏和当前轮上下文不再被 `execution(s)`、`asset(s)`、`unknown`、`none` 这类账本语言主导。
+- 内部 wake、execution、runtime facts 不会被伪装成用户新要求。
+- 当前现场能回答：现在是什么状态、焦点是什么、卡在哪里、后台/子代理是否还活着、上下文和成本是否正常。
 
 ## 2. 当前事实
 
 仓库事实：
 
-- 当前分支 `master` 与 `origin/master` 同步，工作区干净。
-- `npm test` 走 `npm run check && npm run test:core`。
-- `test:core` 用 `scripts/run-core-tests.mjs` 排除 `tests/evaluation/`。
-- `test:eval` 只跑 `tests/evaluation/**/*.test.js`。
-- 修改前，`eval:local` 和 `eval:production` 都会先执行 `npm run build`。
-- 修改前，两个 eval 脚本并行执行时，两个 build 会同时清理 `dist`，已经复现过 `tsup` unlink race。
-- `src/evaluation/production.ts` 目前只有 config preflight、provider probe、runtime status 三个 production checks。
-- `src/evaluation/checks.ts` 同时维护 local scenario 清单、check runner、大量 fixture 和具体检查逻辑，当前 729 行。
-- 超过 300 行的源码文件有 8 个：
-  - `src/evaluation/checks.ts`
-  - `src/shell/tui/transcriptLayout.ts`
-  - `src/context/runtime/compression/builder.ts`
-  - `src/session/snapshot.ts`
-  - `src/provider/responsesAdapter.ts`
-  - `src/host/turn.ts`
-  - `src/protocol/manifest.ts`
-  - `src/telegram/service.ts`
-- `spec/` 已有 T01/T02/T03/T04/T07，但 provider/config/TUI/runtime UI 的技术事实仍不完整。
+- `RuntimeStatus` 是结构化事实主干，位于 `src/runtime/statusTypes.ts` 和 `src/runtime/status.ts`。
+- `src/runtime/scene.ts` 已经负责把结构化 status 投影为 `scene`，但当前输出仍包含 `execution(s)`、`asset(s)`、`context unknown`、`cache layout unknown`、`no recovery action needed` 等机器口吻。
+- `src/cli/commands/runtimeStatusPresenter.ts` 第一屏先打印 `Scene:`，随后又打印 `Current workspace:`，信息重复，并把自然现场和账本详情混在一起。
+- `src/context/runtime/sessionBrief/` 只在有模型写出的 session memory 时注入 continuity，避免从旧对话机器生成用户锚点，这是正确边界。
+- `src/context/runtime/prompt.ts` 仍把 `Task lifecycle`、`Project map` 直接作为字段块注入模型。它们是机器事实，但标题和字段口吻偏账本。
+- `src/shell/tui/store.ts` 和 `RuntimeDock.ts` 已有底部现场，显示后台、子代理、上下文；TUI 不应另建第二套任务状态。
+- `spec/用户审阅/系统核心/核心地图.md` 已写明 runtime facts 留在证据层，当前轮直接携带同 session 近场可见对话。
 
 参考项目事实：
 
-- Codex、opencode、Goose 这类成熟 agent 项目都把日常确定性测试和真实 provider/真实长链路验收分开。
-- 成熟项目的生产验收不是函数清单，而是可复现用户路径：配置、会话、模型请求、状态、恢复。
-- workspace/monorepo 不是成熟本身；当前 Kitty 仍适合单包发布、内部按清晰模块边界维护。
+- Codex 把 thread、turn、items、status、token usage 分开。API 暴露完整事实，客户端按当前 thread/turn 投影，不把所有账本字段塞进主对话。
+- Codex thread store 记录 preview、first user message、token usage、turn status 等事实；这些事实用于恢复和列表，不自动替代当前用户意图。
+- opencode 的 timeline projection 按 user message 聚合 assistant parts、thinking、error、diff summary；UI 显示当前活动 message，而不是直接展示底层 message/event 表。
+- opencode 的 todo dock 只把当前 todo 进度作为底部现场，不把 todo 明细常驻污染主对话。
+- Goose 的 task execution display 把执行状态投影为进度和最近输出；底层事件仍是结构化通知。
 
 当前缺口：
 
-- production eval 缺真实多轮对话路径。
-- eval 脚本 build 步骤有并发清理风险。
-- spec 对 provider/config/TUI 的事实覆盖不够硬。
-- 超重文件职责审查还没落成仓库事实。
+- Kitty 已有事实层，但自然现场投影不够硬，测试还在保护账本式文案。
+- `kitty status` 第一屏不是产品现场，而像 status 表和 scene 表叠加。
+- 模型 prompt 里的运行事实块标题偏机器账本，不够像“当前现场证据”。
+- TUI 的现场状态和 CLI status 使用的表达来源还不够统一。
 
 ## 3. 失败测试
 
 以下情况视为失败：
 
-- 并行运行 `npm.cmd run eval:local` 与 `npm.cmd run eval:production` 仍会因为 `dist` 清理互相失败。
-- `npm.cmd run verify` 触发真实 provider 或运行 `tests/evaluation/`。
-- `npm.cmd run eval:production` 不包含真实多轮 agent turn 验收。
-- production eval 在配置缺失时仍无意义触网。
-- `spec/` 仍无法说明 provider/model/relay/usage/cache、config/init/doctor、TUI/runtime UI 的当前边界。
-- 8 个超过 300 行的文件没有职责结论。
-- README/package/spec/plan 与实际命令不一致。
+- runtime scene 的第一屏文案仍出现 `execution(s)`、`asset(s)`、`context unknown`、`cache layout unknown`、`no recovery action needed`。
+- 没有 session 时，用户看到的是 `none` 或 `unknown`，而不是明确可行动的当前现场。
+- 有 subagent/background 正在运行时，scene 只说 execution 数量，不说是什么工作还活着。
+- `kitty status` 第一屏仍把自然现场和账本详情混排，无法一眼看出 Now/Focus/Next/Blocked/Background/Cost。
+- context prompt 仍以 `Task lifecycle` 这类账本标题作为主表达，而不是说明这是当前任务现场证据。
+- 测试只保护字符串口号，没有覆盖真实产品行为：空项目、运行中 execution、卡住 background、session memory、cache/tool output facts。
 
 ## 4. 目标
 
-本轮交付目标：
+本轮最终交付：
 
-- 修掉 eval 脚本的 build 并发风险。
-- 给 production eval 增加真实多轮对话验收，使用当前真实 provider，写入隔离的临时工作区，不污染用户当前 session。
-- production eval 保持显式触发，普通 test/verify 不运行。
-- 补齐 spec：T05 Provider、T06 Config、T08 TUI/Runtime UI。
-- 新增核心文件职责审查文档，逐个说明 8 个超重文件当前是否保留、为何保留、后续什么条件才拆。
-- 同步 README/package/plan，跑完整验证。
+- `RuntimeSceneSummary` 继续作为统一自然现场投影，所有结构化事实仍留在 `RuntimeStatus`。
+- `scene` 输出变成自然产品语言：当前状态、焦点、下一步、阻塞、后台、记忆、技能、成本、恢复。
+- `kitty status` 第一屏先展示自然现场，详细事实放到后续 `Runtime facts`、`Recent...` 等章节。
+- context prompt 的 session continuity、task state、project map 变成更明确的“证据块”，避免让模型把内部事实当用户命令。
+- TUI 底部现场复用同一套语义表达函数，保持 CLI/TUI 表达一致但展示形式不同。
+- 更新测试和 spec，确保事实层和呈现层边界被保护。
 
 ## 5. 不做范围
 
-- 不做多日真实长跑。
-- 不引入新数据库、新框架、新 UI。
-- 不拆 monorepo。
-- 不做 team、legacy、旧兼容。
-- 不把内部展示常量塞进 `.env`。
-- 不为降低行数机械拆文件。
+- 不重写 session/event/control-plane 存储。
+- 不新增长期记忆系统或向量库。
+- 不做 TUI 大布局重构。
+- 不做 Web/Telegram UI 重写。
+- 不删除结构化事实字段。
+- 不写 legacy、不做旧兼容、不保留不存在的能力入口。
 
 ## 6. 设计
 
-### 6.1 Eval 构建边界
+### 6.1 主链路
 
-`build` 仍负责清理并生成 `dist`。
+输入进入 session 后，context runtime 构建当前轮上下文。近场可见对话仍是自然连续性的主干；session memory 只在模型写出后进入 continuity；runtime facts 只作为证据块。
 
-eval 脚本不再各自触发 `build`。新增 eval preflight 脚本，只检查 `dist/cli.js` 是否存在；不存在就报错提示先运行 `npm.cmd run build`。
+工具、background、subagent 改变 control-plane 状态。`buildRuntimeStatus` 读取机器事实。`buildRuntimeScene` 把这些事实投影为自然现场。CLI/TUI/未来 UI 读取 scene 呈现，不直接重新判断底层 execution 语义。
 
-这样可以避免两个 eval 同时抢 `dist`。日常完整验证仍由 `npm test` 的 `check` 阶段构建。
+### 6.2 模块边界
 
-### 6.2 Production Eval 多轮对话
+- `src/runtime/status.ts`：读取事实，不写自然文案。
+- `src/runtime/scene.ts`：唯一自然现场投影层，负责把机器事实翻译成 Now/Focus/Next/Blocked/Cost/Recovery。
+- `src/cli/commands/runtimeStatusPresenter.ts`：只负责排版，不重新计算现场。
+- `src/context/runtime/sessionBrief/`：只注入模型写出的连续性，不从旧对话推断用户意图。
+- `src/context/runtime/prompt.ts`：把 task/project facts 包装成当前证据，不让字段标题变成命令。
+- `src/shell/tui/*`：只做 TUI 展示，不另建状态事实源。
 
-新增 production check：
+### 6.3 状态归属
 
-- `production-real-turn`
+结构化状态仍归 session、control-plane、observability、runtime status。
 
-执行方式：
+自然表达归 scene。scene 不落盘，不成为第二事实源。它可以被 CLI/TUI/Web/Telegram 读取，也可以被测试保护。
 
-- 先通过 config preflight。
-- 创建 `.kitty/eval-production/<timestamp-or-stable-id>` 隔离工作区。
-- 使用当前 `.kitty/.env` 解析出的真实 provider config。
-- 创建 session。
-- 调用 `runHostTurn` 两次，输入短英文问题，使用真实 provider，但禁用工具面，避免文件系统副作用。
-- 验收 session 有用户消息和 assistant 消息，events 有 turn started/completed，runtime status 可读。
+### 6.4 错误和恢复边界
 
-边界：
+没有事实时，用户可见表达写“还没有测量/还没有会话/没有后台工作”，不写 `unknown`。机器内部解析函数仍可使用 `unknown` 类型和值，不能为了文案清理破坏数据校验。
 
-- 它是真实 provider 验收，所以只在 `eval:production` 中运行。
-- 配置不 ready 时跳过 provider probe 和 real turn。
-- real turn 失败必须让 production eval 失败。
-
-### 6.3 Spec 补齐
-
-新增技术实现文档：
-
-- `spec/技术实现/T05-Provider与模型/README.md`
-- `spec/技术实现/T06-配置初始化诊断/README.md`
-- `spec/技术实现/T08-TUI与RuntimeUI/README.md`
-- `spec/技术实现/职责审查/README.md`
-
-更新映射文档，让用户审阅和技术实现能互相指向。
-
-### 6.4 超重文件职责审查
-
-职责审查只写当前事实：
-
-- 文件负责什么。
-- 不负责什么。
-- 当前是否拆。
-- 如果不拆，为什么不拆。
-- 未来触发拆分的具体信号。
-
-不在源码里写假注释，不为了文档而重排代码。
+卡住、无输出、stale、deadline passed 必须在 scene 里明确暴露为需要处理的现场，不隐藏。
 
 ## 7. 实施任务
 
-- [x] 更新 package scripts：eval 脚本改为检查 dist 后运行，不再自行 build。
-- [x] 新增 eval dist preflight 脚本，缺 dist 时给出明确修复命令。
-- [x] 更新 production eval 类型、scenario、runner，加入 `production-real-turn`。
-- [x] 为 production real turn 写测试，覆盖配置缺失跳过、production check 清单和 CLI 分层边界。
-- [x] 补齐 provider/config/TUI 技术 spec 和映射。
-- [x] 新增 8 个超重文件职责审查文档。
-- [x] 更新 README 与 plan 命令事实。
-- [x] 运行扫描、`npm.cmd run test:eval`、`npm.cmd run verify`、`npm.cmd run build`、`npm.cmd run eval:local`、`npm.cmd run eval:production`。
-- [x] 收口 plan，写明完成事实、验证结果和剩余风险。
+- [x] 重写 `plan.md`，把当前任务从上一轮 eval 收口切换为现场表达封顶计划。
+- [x] 重构 `src/runtime/scene.ts` 的自然文案，去掉第一屏账本味，并保留全部机器事实来源。
+- [x] 更新 `RuntimeSceneSummary` 必要字段或辅助函数，使 CLI/TUI 能共享现场表达。
+- [x] 重排 `formatRuntimeStatusText` 第一屏，明确区分自然现场和详细 runtime facts。
+- [x] 调整 context prompt 的 block 标题和说明，让模型把 runtime facts 当证据，不当用户输入。
+- [x] TUI 保持当前底部现场语义，不新建第二事实源；初始上下文显示保持用户已确认的 `0%`。
+- [x] 更新 runtime/context/TUI/CLI 测试，覆盖空现场、运行中、卡住、成本、记忆和 prompt 证据边界。
+- [x] 更新 `spec/` 与 README 中关于现场、status、context 的当前事实。
+- [x] 运行局部测试、完整验证、build、local eval、production eval。
+- [x] 完成超过 300 行文件职责审查，并拆分确实混职责的大文件。
+- [x] 更新收口记录。
 
 ## 8. 验证计划
-
-命令事实扫描：
-
-```bash
-rg -n "eval:local|eval:production|run-production|run-local|npm run build && node dist/cli.js eval" package.json README.md spec src tests
-```
 
 局部验证：
 
 ```bash
-npm.cmd run test:eval
+npm.cmd run typecheck
+node --test dist/tests/runtime/status.test.js
+node --test dist/tests/context/session-brief.test.js
+node --test dist/tests/context/project-map-context.test.js
+node --test dist/tests/shell/tui-store.test.js
 ```
 
 完整验证：
 
 ```bash
 npm.cmd run verify
-```
-
-构建与显式 eval：
-
-```bash
 npm.cmd run build
 npm.cmd run eval:local
 npm.cmd run eval:production
 ```
 
-并发验证：
+文档和字符串检查：
 
 ```bash
-Start-Job { Set-Location "C:\Users\Administrator\Desktop\kitty"; npm.cmd run eval:local }
-Start-Job { Set-Location "C:\Users\Administrator\Desktop\kitty"; npm.cmd run eval:production }
-Get-Job | Receive-Job -Wait
+rg -n "execution\\(s\\)|asset\\(s\\)|context unknown|cache layout unknown|no recovery action needed|Task lifecycle|Current workspace|Scene:" src tests spec README.md
 ```
 
-要求：
-
-- 并发 eval 不再发生 `dist` unlink race。
-- `verify` 不运行 eval tests。
-- `eval:production` 明确包含真实 provider real turn。
+允许 `unknown` 出现在 TypeScript 类型、解析函数、错误兼容和机器事实字段中；不允许它作为普通用户现场的默认文案。
 
 ## 9. 收口
 
@@ -201,33 +153,35 @@ Get-Job | Receive-Job -Wait
 
 完成事实：
 
-- `eval:local` / `eval:production` 不再主动执行 `npm run build`，改为 `scripts/ensure-dist-built.mjs` 检查 `dist/cli.js`。
-- 新增 `scripts/ensure-dist-built.mjs`，缺少 `dist/cli.js` 时明确提示先运行 `npm.cmd run build`。
-- production eval 新增 `production-real-turn`，显式使用当前 `.kitty/.env` 的真实 provider 跑隔离 session 两轮真实 host turn。
-- production eval 配置不 ready 时跳过 provider probe 和 real turn，避免无意义触网。
-- 新增 eval preflight 测试，`test:eval` 现在覆盖 11 个 eval 测试。
-- 补齐技术 spec：Provider 与模型、配置初始化诊断、TUI 与 Runtime UI、职责审查。
-- 职责审查记录了 8 个超过 300 行核心文件的当前职责、保留理由和拆分触发条件。
-- README 和 T07 eval spec 已同步：运行 eval 前先 build，eval 不进入日常测试。
+- `src/runtime/scene.ts` 继续作为自然现场投影层；结构化事实仍留在 runtime status、session、control-plane、observability。
+- `kitty status` 第一屏改为 `Current scene`，详细机器事实下沉到 `Runtime facts`。
+- context prompt/session brief/working memory 的运行事实标题改为 evidence 语义，避免把内部状态伪装成用户要求。
+- TUI 初始上下文保持 `0%`，不再用 `unknown` 做默认用户现场。
+- README 与 `spec/` 已同步当前事实。
+
+大文件职责审查：
+
+- 已拆 `src/evaluation/checks.ts`：场景清单、成本/输出验收、现场验收、host/remote/recovery 验收、workspace helper 分离。
+- 已拆 `src/shell/tui/transcriptLayout.ts`：公开编排入口、类型、frame/style、span wrapping 分离。
+- 已拆 `src/provider/responsesAdapter.ts`：Responses 请求体、响应解析、传输 adapter 分离。
+- 已拆 `src/host/turn.ts`：delegated exact closeout 从 host turn 生命周期中分离。
+- 保留 `src/context/runtime/compression/builder.ts`：职责是构建压缩后的 provider 请求和预算报告。
+- 保留 `src/session/snapshot.ts`：职责是 session snapshot schema 的严格读写和归一化入口。
+- 保留 `src/protocol/manifest.ts`：职责是 capability manifest 的解析与转换。
+- 保留 `src/telegram/service.ts`：职责是 Telegram service 生命周期、轮询、队列和 turn 接线。
 
 验证结果：
 
-- `npm.cmd run typecheck`：通过。
-- `npm.cmd run test:eval`：通过，11 个测试全绿。
-- `npm.cmd run verify`：通过，249 个 core tests 全绿，不运行 eval tests。
-- `npm.cmd run eval:local`：通过。
-- `npm.cmd run eval:production`：通过，YLS provider probe 成功，`production-real-turn` 完成 2 个 user messages、2 个 assistant messages、2 个 completed turns。
-- 并发运行 `eval:local` 与 `eval:production`：两个 PowerShell jobs 均 Completed，没有 `dist` unlink race。Job 输出中的中文乱码来自 PowerShell job 编码显示，不影响命令结果。
-
-未验证内容：
-
-- 未做多日真实长任务漂移观察。
-- 未在交互 TTY 中手动打开 `node dist/cli.js tui`。
+- `npm.cmd run typecheck` 通过。
+- `npm.cmd run build` 通过。
+- `node --test .test-build/tests/evaluation/**/*.test.js` 通过。
+- `node --test .test-build/tests/shell/tui-store.test.js .test-build/tests/shell/tui-markdown.test.js .test-build/tests/shell/tui-render.test.js` 通过。
+- `npm.cmd run verify` 通过，249 个 core tests 全绿。
+- `npm.cmd run eval:local` 通过。
+- `npm.cmd run eval:production` 通过，真实 yls provider、Responses probe、两轮真实 turn、runtime status 均通过。
+- 旧账本文案扫描无命中：`Scene:`、`Current workspace`、`Task lifecycle`、`Project map`、`Internal continuity state`、`execution(s)`、`asset(s)`、`context unknown`、`cache layout unknown`、`no recovery action needed` 没有回到用户/模型主路径。
 
 剩余风险：
 
-- `src/evaluation/checks.ts` 已确认职责过宽，当前用职责审查记录为后续拆分触发点；本轮没有拆它，因为生产验收主线和 build race 是更直接的生产硬伤。
-
-commit / push：
-
-- 用户本轮未要求 commit / push，未执行。
+- 真实长时间使用仍需要靠连续生产任务观察模型漂移、memory 自然性和 provider 稳定性。
+- 本轮没有重写 session/event/control-plane 存储，也没有新增长期记忆或 UI 大布局。

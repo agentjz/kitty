@@ -34,8 +34,8 @@ test("tui state projects external session messages without internal facts", () =
 });
 
 test("tui context budget defaults to zero before runtime facts arrive", () => {
-  assert.equal(createInitialTuiState().dock.context, "0 chars (0%)");
-  assert.equal(formatContextBudget(undefined), "0 chars (0%)");
+  assert.equal(createInitialTuiState().dock.context, "0%");
+  assert.equal(formatContextBudget(undefined), "0%");
 });
 
 test("tui transcript sticks to bottom unless user scrolls history", () => {

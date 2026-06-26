@@ -179,7 +179,7 @@ test("runtime prompt carries same-session memory while raw request keeps near-fi
   );
   const rawMessages = request.messages.slice(1).map((message) => String(message.content ?? "")).join("\n");
 
-  assert.match(prompt, /Internal continuity state/);
+  assert.match(prompt, /Conversation continuity evidence/);
   assert.match(prompt, /不要 Markdown，用 txt 格式/);
   assert.match(prompt, /agentjz\/777f/);
   assert.match(prompt, /agentjz\/ohmyflight/);

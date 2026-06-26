@@ -146,7 +146,7 @@ async function resolveLocalStateRootDir(context: Pick<LocalCommandContext, "cwd"
 
 function formatSkillsForLocalCommand(status: Awaited<ReturnType<typeof buildRuntimeStatus>>): string {
   if (status.skills.total === 0) {
-    return "No runtime skills discovered.";
+    return status.scene.skills.nextAction;
   }
   return [
     `skills: ${status.skills.ready}/${status.skills.total} ready`,

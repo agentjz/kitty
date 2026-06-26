@@ -5,7 +5,7 @@
 官网：https://agentjz.github.io/kitty/
 
 <p align="center">
-  <strong>🐾 一个本地 agent 编程工作台：搜得到，看得懂，改得准，跑得通，记得住，能继续。</strong>
+  <strong>🐾 一个 agent 编程工作台：搜得到，看得懂，改得准，跑得通，记得住，能继续。</strong>
 </p>
 
 <p align="center">
@@ -101,7 +101,7 @@ kitty "检查这个仓库并修复失败测试"
 | `kitty events [sessionId]` | 查看最近会话或指定会话的机器事件 |
 | `kitty config show` | 查看从 `.kitty/.env` 解析出的当前运行配置 |
 | `kitty config path` | 查看当前项目 `.kitty/.env` 路径 |
-| `kitty status` | 查看当前项目现场：当前目标、下一步、阻塞、后台、恢复、成本、session、context budget、memory、skills、project map、execution、wake |
+| `kitty status` | 查看当前项目现场：先显示 Current scene，再显示 session、context budget、memory files、skills、project orientation、execution、wake 等 Runtime facts |
 | `kitty memory` | 创建、查看、读取、搜索、删除 runtime memory assets，或把 memory 沉淀到 skill references |
 | `kitty changes` | 查看记录的文件变更 |
 | `kitty undo [changeId]` | 撤销最近一次或指定变更 |

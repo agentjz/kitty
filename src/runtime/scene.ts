@@ -75,18 +75,24 @@ function buildHeadline(
   watchExecutions: RuntimeExecutionSceneSummary[],
 ): string {
   if (blockedExecutions.length > 0) {
-    return `${blockedExecutions.length} execution(s) need attention.`;
+    return blockedExecutions.length === 1
+      ? "One delegated task needs attention."
+      : `${blockedExecutions.length} delegated tasks need attention.`;
   }
   if (watchExecutions.length > 0) {
-    return `${watchExecutions.length} execution(s) should be watched.`;
+    return watchExecutions.length === 1
+      ? "One delegated task is running without output yet."
+      : `${watchExecutions.length} delegated tasks are running without output yet.`;
   }
   if (status.executions.active.length > 0) {
-    return `${status.executions.active.length} execution(s) are running.`;
+    return status.executions.active.length === 1
+      ? "One delegated task is running."
+      : `${status.executions.active.length} delegated tasks are running.`;
   }
   if (!status.sessions.latest) {
-    return "No active session yet.";
+    return "No session has started yet.";
   }
-  return "Ready to continue the latest session.";
+  return "Latest session is ready.";
 }
 
 function readFocus(status: RuntimeStatusFacts): string {
@@ -98,7 +104,7 @@ function readFocus(status: RuntimeStatusFacts): string {
   if (title) {
     return truncateText(title, 120);
   }
-  return "none";
+  return "No current focus yet.";
 }
 
 function readNextAction(
@@ -111,21 +117,21 @@ function readNextAction(
     return urgent.nextAction;
   }
   if (status.executions.active.length > 0) {
-    return "Let active work finish, or inspect it with `kitty status` / `kitty background`.";
+    return "Wait for the active task, or inspect it with `kitty status` / `kitty background`.";
   }
   if (!status.sessions.latest) {
     return "Start a session with `kitty`.";
   }
-  return "Continue from the current session focus.";
+  return "Continue from the latest session.";
 }
 
 function readBlocked(blockedExecutions: RuntimeExecutionSceneSummary[]): string {
   if (blockedExecutions.length === 0) {
-    return "no";
+    return "No blockers visible.";
   }
   return blockedExecutions
     .slice(0, 3)
-    .map((execution) => `${execution.kind} ${execution.id}: ${execution.health}`)
+    .map((execution) => `${readExecutionKindLabel(execution.kind)} ${execution.id}: ${execution.health}`)
     .join(" | ");
 }
 
@@ -134,23 +140,23 @@ function readCost(status: RuntimeStatusFacts): string {
   const latest = status.modelRequests.recent[0];
   const budgetText = budget
     ? `${Math.round(budget.usageRatio * 100)}% context${budget.compressed ? ", compressed" : ""}`
-    : "context unknown";
+    : "Context has not been measured yet";
   const layout = budget?.cacheLayout;
   const layoutText = layout
     ? `stable ${readStableRatio(layout.stablePrefixChars, layout.volatileTailChars)}`
-    : "cache layout unknown";
+    : undefined;
   const usageText = latest?.usage
     ? readUsageCost(latest.usage)
     : latest
       ? "provider usage unavailable"
-      : "no model request yet";
-  return `${budgetText}; ${layoutText}; ${usageText}`;
+      : "No model request recorded yet";
+  return [budgetText, layoutText, usageText].filter(Boolean).join("; ");
 }
 
 function readToolOutputs(status: RuntimeStatusFacts): string {
   const recent = status.toolOutputs.recent;
   if (recent.length === 0) {
-    return "no tool output governance yet";
+    return "Tool output has not needed projection yet";
   }
 
   const saved = recent.reduce((total, item) => total + (item.savedTokens ?? 0), 0);
@@ -171,7 +177,7 @@ function readToolOutputs(status: RuntimeStatusFacts): string {
 
 function readStableRatio(stableChars: number, volatileChars: number): string {
   const total = stableChars + volatileChars;
-  return total > 0 ? `${Math.round((stableChars / total) * 100)}%` : "unknown";
+  return total > 0 ? `${Math.round((stableChars / total) * 100)}%` : "not measured";
 }
 
 function readUsageCost(usage: NonNullable<RuntimeStatus["modelRequests"]["recent"][number]["usage"]>): string {
@@ -187,17 +193,21 @@ function readUsageCost(usage: NonNullable<RuntimeStatus["modelRequests"]["recent
 function readRecovery(status: RuntimeStatusFacts, executions: RuntimeExecutionSceneSummary[]): string {
   const risky = executions.filter((execution) => execution.risk !== "none").length;
   if (risky > 0) {
-    return `${risky} execution(s) need recovery attention.`;
+    return risky === 1
+      ? "One delegated task needs recovery attention."
+      : `${risky} delegated tasks need recovery attention.`;
   }
   if (status.wakeSignals.recent.length > 0) {
-    return `${status.wakeSignals.recent.length} wake signal(s) recorded.`;
+    return status.wakeSignals.recent.length === 1
+      ? "One wake signal is recorded."
+      : `${status.wakeSignals.recent.length} wake signals are recorded.`;
   }
-  return "no recovery action needed";
+  return "Recovery is clear.";
 }
 
 function readSkillsNextAction(status: RuntimeStatusFacts): string {
   if (status.skills.total === 0) {
-    return "No runtime skills discovered.";
+    return "No runtime skills are discovered in this project.";
   }
   if (status.skills.needsAttention.length > 0) {
     return "Inspect skill issues before relying on those skills.";
@@ -207,7 +217,7 @@ function readSkillsNextAction(status: RuntimeStatusFacts): string {
 
 function readMemoryNextAction(status: RuntimeStatusFacts): string {
   if (!status.sessions.latest) {
-    return "No session memory yet.";
+    return "Memory will appear after a session produces useful continuity.";
   }
   if (!status.sessions.latest.hasMemory && status.memory.assets.length === 0) {
     return "Continue the session until useful memory is saved.";
@@ -220,7 +230,7 @@ function readMemoryNextAction(status: RuntimeStatusFacts): string {
 
 function readBackgroundNextAction(backgrounds: RuntimeExecutionSceneSummary[]): string {
   if (backgrounds.length === 0) {
-    return "No active background work.";
+    return "No background work is running.";
   }
   const blocked = backgrounds.find((execution) => execution.risk === "blocked");
   if (blocked) {
@@ -257,7 +267,7 @@ function readExecutionSummary(execution: RuntimeExecutionSummary): string {
   if (execution.command) {
     return truncateText(execution.command, 120);
   }
-  return `${execution.kind} execution`;
+  return `${readExecutionKindLabel(execution.kind)} task`;
 }
 
 function readExecutionNextAction(
@@ -274,15 +284,26 @@ function readExecutionNextAction(
     return `Inspect with \`kitty background wait ${execution.id}\` if you need the result now.`;
   }
   if (risk === "blocked") {
-    return `Inspect execution ${execution.id} in status before continuing.`;
+    return `Inspect ${readExecutionKindLabel(execution.kind)} ${execution.id} before continuing.`;
   }
   if (risk === "watch") {
-    return `Watch execution ${execution.id} for output or deadline.`;
+    return `Watch ${readExecutionKindLabel(execution.kind)} ${execution.id} for output or deadline.`;
   }
   if (execution.waitPolicy === "block_lead_until_complete") {
-    return "Lead should wait for this execution to finish.";
+    return "Lead should wait for this task to finish.";
   }
-  return "Execution is active.";
+  return "Task is active.";
+}
+
+function readExecutionKindLabel(kind: string): string {
+  switch (kind) {
+    case "background":
+      return "background";
+    case "subagent":
+      return "subagent";
+    default:
+      return "delegated";
+  }
 }
 
 function truncateText(value: string, maxChars: number): string {

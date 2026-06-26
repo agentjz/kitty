@@ -7,39 +7,35 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
   lines.push(`Project: ${status.rootDir}`);
   lines.push(`State: ${status.stateDir}`);
   lines.push("");
-  lines.push("Scene:");
+  lines.push("Current scene:");
   lines.push(`- Now: ${status.scene.headline}`);
   lines.push(`- Focus: ${status.scene.focus}`);
   lines.push(`- Next: ${status.scene.nextAction}`);
   lines.push(`- Blocked: ${status.scene.blocked}`);
-  lines.push(`- Background: ${status.scene.background.active} active / ${status.scene.background.blocked} need attention`);
-  lines.push(`- Background next: ${status.scene.background.nextAction}`);
-  lines.push(`- Skills: ${status.scene.skills.ready}/${status.scene.skills.total} ready; ${status.scene.skills.nextAction}`);
-  lines.push(`- Memory: ${status.scene.memory.assets} asset(s), session=${status.scene.memory.latestSessionMemory ? "yes" : "no"}; ${status.scene.memory.nextAction}`);
+  lines.push(`- Background: ${readBackgroundSceneLine(status)}`);
+  lines.push(`- Memory: ${readMemorySceneLine(status)}`);
+  lines.push(`- Skills: ${readSkillsSceneLine(status)}`);
   lines.push(`- Cost: ${status.scene.cost}`);
   lines.push(`- Tool output: ${status.scene.toolOutputs}`);
   lines.push(`- Recovery: ${status.scene.recovery}`);
   lines.push("");
-  lines.push("Current workspace:");
-  lines.push(`- Focus: ${status.scene.focus}`);
+  lines.push("Runtime facts:");
   lines.push(`- Session: ${readSessionLine(status)}`);
   if (status.sessions.skipped > 0) {
     lines.push(`- Sessions: ${status.sessions.total} total, ${status.sessions.skipped} skipped`);
   }
-  lines.push(`- Next: ${status.scene.nextAction}`);
-  lines.push(`- Blocked: ${status.scene.blocked}`);
   lines.push(`- Context budget: ${readContextBudgetLine(status)}`);
   lines.push(`- Workset: ${status.sessions.latest?.workset ? `${status.sessions.latest.workset.total} file(s)` : "none"}`);
-  lines.push(`- Memory: ${status.memory.assets.length > 0 ? `${status.memory.assets.length} asset(s)` : "none"}`);
+  lines.push(`- Memory files: ${status.memory.assets.length > 0 ? `${status.memory.assets.length}` : "none"}`);
   lines.push(`- Skills: ${status.skills.ready}/${status.skills.total} ready`);
   lines.push(`- Model cache: ${readModelCacheLine(status)}`);
-  lines.push(`- Project map: ${status.projectMap ? "ready" : "missing"}`);
+  lines.push(`- Project orientation: ${status.projectMap ? "ready" : "missing"}`);
   lines.push(`- Executions: ${status.executions.active.length} active / ${status.executions.total} total`);
   lines.push(`- Wake signals: ${status.wakeSignals.recent.length}`);
 
   if (status.taskLifecycle) {
     lines.push("");
-    lines.push("Task lifecycle:");
+    lines.push("Task facts:");
     lines.push([
       status.taskLifecycle.stage,
       status.taskLifecycle.reason ? `reason=${status.taskLifecycle.reason}` : undefined,
@@ -60,7 +56,7 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
 
   if (status.projectMap) {
     lines.push("");
-    lines.push("Project map:");
+    lines.push("Project facts:");
     lines.push([
       `dirs=${status.projectMap.topLevelDirectories.slice(0, 6).join(", ") || "none"}`,
       `scripts=${status.projectMap.packageScripts.slice(0, 6).join(", ") || "none"}`,
@@ -166,7 +162,7 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
 
   if (status.scene.executions.length > 0) {
     lines.push("");
-    lines.push("Scene executions:");
+    lines.push("Delegated task scene:");
     for (const execution of status.scene.executions) {
       lines.push([
         execution.id,
@@ -233,6 +229,26 @@ function readSessionLine(status: RuntimeStatus): string {
     return "none";
   }
   return `${status.sessions.latest.id} (${status.sessions.latest.messageCount} message(s))`;
+}
+
+function readBackgroundSceneLine(status: RuntimeStatus): string {
+  const { active, blocked, nextAction } = status.scene.background;
+  if (active === 0) {
+    return nextAction;
+  }
+  return `${active} active${blocked > 0 ? `, ${blocked} need attention` : ""}; ${nextAction}`;
+}
+
+function readMemorySceneLine(status: RuntimeStatus): string {
+  const session = status.scene.memory.latestSessionMemory ? "session memory ready" : "session memory not saved yet";
+  const assets = status.scene.memory.assets === 0
+    ? "no reviewable memory files"
+    : `${status.scene.memory.assets} reviewable memory file(s)`;
+  return `${session}; ${assets}; ${status.scene.memory.nextAction}`;
+}
+
+function readSkillsSceneLine(status: RuntimeStatus): string {
+  return `${status.scene.skills.ready}/${status.scene.skills.total} ready; ${status.scene.skills.nextAction}`;
 }
 
 function readContextBudgetLine(status: RuntimeStatus): string {

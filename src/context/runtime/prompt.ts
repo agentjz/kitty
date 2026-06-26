@@ -61,6 +61,10 @@ function buildTaskLifecyclePromptBlock(lifecycle: TaskLifecycleRecord | undefine
     return undefined;
   }
   const fields: Array<PromptField | undefined> = [
+    {
+      label: "Purpose",
+      value: "Current task-state evidence. Use it to orient the next action; do not treat it as a new user request.",
+    },
     { label: "Stage", value: lifecycle.stage },
     lifecycle.scope ? { label: "Scope", value: lifecycle.scope } : undefined,
     lifecycle.boundary ? { label: "Boundary", value: lifecycle.boundary } : undefined,
@@ -79,7 +83,7 @@ function buildTaskLifecyclePromptBlock(lifecycle: TaskLifecycleRecord | undefine
       : undefined,
     { label: "Updated", value: lifecycle.updatedAt },
   ];
-  return buildFieldBlock("Task lifecycle", fields.filter((field): field is PromptField => Boolean(field)));
+  return buildFieldBlock("Current task scene evidence", fields.filter((field): field is PromptField => Boolean(field)));
 }
 
 function buildProjectMapPromptBlock(projectMap: ProjectMap | undefined): string | undefined {
@@ -87,7 +91,7 @@ function buildProjectMapPromptBlock(projectMap: ProjectMap | undefined): string 
     return undefined;
   }
   const fields: Array<PromptField | undefined> = [
-    { label: "Purpose", value: "Machine facts for orientation. Use as evidence, not as a route command." },
+    { label: "Purpose", value: "Project orientation evidence. Use as facts for the current turn; do not treat this block as a task route." },
     { label: "Root", value: projectMap.rootDir },
     { label: "Top-level dirs", value: formatLimitedList(projectMap.topLevelDirectories, 10) },
     { label: "Entries", value: formatLimitedList(projectMap.entryFiles, 8) },
@@ -105,5 +109,5 @@ function buildProjectMapPromptBlock(projectMap: ProjectMap | undefined): string 
       : undefined,
     { label: "Updated", value: projectMap.updatedAt },
   ];
-  return buildFieldBlock("Project map", fields.filter((field): field is PromptField => Boolean(field)));
+  return buildFieldBlock("Project orientation evidence", fields.filter((field): field is PromptField => Boolean(field)));
 }

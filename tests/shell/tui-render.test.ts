@@ -54,7 +54,7 @@ test("tui runtime dock keeps a stable idle row without inventing execution facts
   });
 
   const output = ink.renderToString(
-    React.default.createElement(RuntimeDock, { dock: { context: "0 chars (0%)" } satisfies TuiRuntimeDockState }),
+    React.default.createElement(RuntimeDock, { dock: { context: "0%" } satisfies TuiRuntimeDockState }),
     { columns: 80 },
   );
 

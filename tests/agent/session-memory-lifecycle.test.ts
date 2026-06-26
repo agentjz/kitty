@@ -347,7 +347,7 @@ test("next turn injects model-written session memory while raw provider messages
   const prompt = renderPromptLayers(promptLayers);
   const rawMessages = request.messages.slice(1).map((message) => String(message.content ?? "")).join("\n");
 
-  assert.match(prompt, /Session memory/);
+  assert.match(prompt, /Model-written session memory/);
   assert.match(prompt, /txt 纯文本回答/);
   assert.match(prompt, /agentjz\/777f/);
   assert.match(prompt, /agentjz\/ohmyflight/);

@@ -55,7 +55,7 @@ interface TuiProjectionOptions {
 }
 
 const DEFAULT_DOCK: TuiRuntimeDockState = {
-  context: "0 chars (0%)",
+  context: "0%",
 };
 
 export function createInitialTuiState(session?: SessionRecord): TuiState {
@@ -235,7 +235,7 @@ export function renderTranscriptLineViews(
 export function formatContextBudget(session: SessionRecord | undefined): string {
   const budget = session?.contextBudget;
   if (!budget) {
-    return "0 chars (0%)";
+    return "0%";
   }
   const percent = Math.round(budget.usageRatio * 100);
   return `${budget.estimatedChars}/${budget.limitChars} chars (${percent}%)`;

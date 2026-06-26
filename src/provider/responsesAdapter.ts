@@ -1,11 +1,17 @@
 import type OpenAI from "openai";
 
-import { resolveProviderCapabilities } from "./capabilities.js";
 import type { ProviderUsageSnapshot } from "./metrics.js";
-import type { ProviderAdapterRequest, ProviderMessage, ProviderWireAdapter } from "./contract.js";
-import { resolveProviderCachePolicy } from "./cachePolicy.js";
+import type { ProviderAdapterRequest, ProviderWireAdapter } from "./contract.js";
 import { normalizeProviderUsage } from "./usageNormalizer.js";
 import { createAbortError, throwIfAborted } from "../utils/abort.js";
+import { buildResponsesRequestBody } from "./responsesRequest.js";
+import {
+  normalizeResponsesOutputText,
+  readResponsesReasoning,
+  readResponsesToolCalls,
+} from "./responsesResponse.js";
+
+export { buildResponsesRequestBody } from "./responsesRequest.js";
 
 export const responsesAdapter: ProviderWireAdapter = {
   wireApi: "responses",
@@ -152,11 +158,11 @@ export const responsesAdapter: ProviderWireAdapter = {
       usage = normalizeProviderUsage((response as { usage?: unknown }).usage);
 
       return {
-        content: normalizeOutputText(response),
-        reasoningContent: readResponseReasoning(response),
+        content: normalizeResponsesOutputText(response),
+        reasoningContent: readResponsesReasoning(response),
         streamedAssistantContent: false,
         streamedReasoningContent: false,
-        toolCalls: readResponseToolCalls(response),
+        toolCalls: readResponsesToolCalls(response),
       };
     } finally {
       request.onRequestMetric?.({
@@ -166,200 +172,6 @@ export const responsesAdapter: ProviderWireAdapter = {
     }
   },
 };
-
-export function buildResponsesRequestBody(request: ProviderAdapterRequest): Record<string, unknown> {
-  const capabilities = resolveProviderCapabilities({
-    provider: request.provider,
-    model: request.model,
-  });
-
-  const body: Record<string, unknown> = {
-    model: request.model,
-    input: toResponsesInput(request.messages),
-    tools: request.tools?.map((tool) => ({
-      type: "function",
-      name: tool.function.name,
-      description: tool.function.description,
-      parameters: tool.function.parameters ?? null,
-      strict: false,
-    })),
-    tool_choice: request.tools?.length ? "auto" : undefined,
-  };
-
-  if (typeof request.maxOutputTokens === "number" && Number.isFinite(request.maxOutputTokens)) {
-    body.max_output_tokens = Math.max(1, Math.trunc(request.maxOutputTokens));
-  }
-
-  const cachePolicy = resolveProviderCachePolicy({
-    provider: request.provider,
-    model: request.model,
-    sessionId: request.sessionId,
-    projectRoot: request.projectRoot,
-  });
-  if (cachePolicy.promptCacheKey) {
-    body.prompt_cache_key = cachePolicy.promptCacheKey;
-  }
-
-  const reasoningEffort = request.thinking === "disabled"
-    ? undefined
-    : normalizeResponsesReasoningEffort(
-      request.reasoningEffort ?? capabilities.defaultReasoningEffort,
-    );
-  if (
-    request.thinking !== "disabled" &&
-    (request.forceReasoning || capabilities.defaultReasoningEnabled || request.thinking === "enabled" || reasoningEffort)
-  ) {
-    body.reasoning = {
-      effort: reasoningEffort ?? "high",
-      summary: "detailed",
-    };
-  }
-
-  return body;
-}
-
-function normalizeResponsesReasoningEffort(
-  effort: "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | undefined,
-): "minimal" | "low" | "medium" | "high" | "xhigh" | undefined {
-  if (effort === "xhigh") {
-    return "xhigh";
-  }
-
-  return effort === "max" ? undefined : effort;
-}
-
-function toResponsesInput(messages: ProviderMessage[]): Array<Record<string, unknown>> {
-  const items: Array<Record<string, unknown>> = [];
-
-  for (const message of messages) {
-    if (message.role === "tool") {
-      items.push({
-        type: "function_call_output",
-        call_id: message.toolCallId ?? "",
-        output: message.content ?? "",
-      });
-      continue;
-    }
-
-    if (message.role === "assistant" && message.toolCalls?.length) {
-      if (typeof message.content === "string" && message.content.trim().length > 0) {
-        items.push({
-          type: "message",
-          role: "assistant",
-          content: message.content,
-        });
-      }
-
-      for (const toolCall of message.toolCalls) {
-        items.push({
-          type: "function_call",
-          call_id: toolCall.id,
-          name: toolCall.function.name,
-          arguments: toolCall.function.arguments,
-        });
-      }
-      continue;
-    }
-
-    items.push({
-      type: "message",
-      role: message.role,
-      content: message.content ?? "",
-    });
-  }
-
-  return items;
-}
-
-function normalizeOutputText(response: unknown): string | null {
-  const outputText = (response as { output_text?: unknown }).output_text;
-  if (typeof outputText === "string" && outputText.trim().length > 0) {
-    return outputText;
-  }
-
-  const output = (response as { output?: unknown }).output;
-  if (!Array.isArray(output)) {
-    return null;
-  }
-
-  const fragments = output.flatMap((item) => {
-    if (!item || typeof item !== "object" || (item as { type?: unknown }).type !== "message") {
-      return [];
-    }
-
-    const content = (item as { content?: unknown }).content;
-    if (!Array.isArray(content)) {
-      return [];
-    }
-
-    return content.flatMap((part) => {
-      if (!part || typeof part !== "object" || (part as { type?: unknown }).type !== "output_text") {
-        return [];
-      }
-
-      return typeof (part as { text?: unknown }).text === "string"
-        ? [(part as { text: string }).text]
-        : [];
-    });
-  });
-
-  return fragments.length > 0 ? fragments.join("") : null;
-}
-
-function readResponseToolCalls(response: unknown) {
-  const output = (response as { output?: unknown }).output;
-  if (!Array.isArray(output)) {
-    return [];
-  }
-
-  return output
-    .filter((item): item is {
-      id?: string;
-      type: "function_call";
-      call_id?: string;
-      name?: string;
-      arguments?: string;
-    } => Boolean(item) && typeof item === "object" && (item as { type?: unknown }).type === "function_call")
-    .map((item) => ({
-      id: item.call_id ?? item.id ?? crypto.randomUUID(),
-      type: "function" as const,
-      function: {
-        name: item.name ?? "",
-        arguments: item.arguments ?? "",
-      },
-    }));
-}
-
-function readResponseReasoning(response: unknown): string | undefined {
-  const output = (response as { output?: unknown }).output;
-  if (!Array.isArray(output)) {
-    return undefined;
-  }
-
-  const fragments = output.flatMap((item) => {
-    if (!item || typeof item !== "object" || (item as { type?: unknown }).type !== "reasoning") {
-      return [];
-    }
-
-    const reasoningItem = item as {
-      summary?: Array<{ text?: unknown }>;
-      content?: Array<{ text?: unknown }>;
-    };
-    const summary = Array.isArray(reasoningItem.summary)
-      ? reasoningItem.summary
-        .map((entry) => (typeof entry?.text === "string" ? entry.text : ""))
-        .filter(Boolean)
-      : [];
-    const content = Array.isArray(reasoningItem.content)
-      ? reasoningItem.content
-        .map((entry) => (typeof entry?.text === "string" ? entry.text : ""))
-        .filter(Boolean)
-      : [];
-    return [...content, ...summary];
-  });
-
-  return fragments.length > 0 ? fragments.join("") : undefined;
-}
 
 function abortStream(stream: { controller?: AbortController } | undefined): void {
   try {

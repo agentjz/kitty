@@ -111,25 +111,25 @@ test("runtime status projects the current project runtime facts", async (t) => {
   assert.equal(status.executions.active[0]?.assignment?.objective, "Inspect runtime visibility");
   assert.equal(status.executions.active[0]?.health?.state, "running");
   assert.equal(status.wakeSignals.recent.length, 1);
-  assert.equal(status.scene.headline, "1 execution(s) are running.");
-  assert.equal(status.scene.nextAction, "Let active work finish, or inspect it with `kitty status` / `kitty background`.");
+  assert.equal(status.scene.headline, "One delegated task is running.");
+  assert.equal(status.scene.nextAction, "Wait for the active task, or inspect it with `kitty status` / `kitty background`.");
   assert.match(status.scene.cost, /5% context/);
   assert.match(status.scene.cost, /stable 67%/);
-  assert.equal(status.scene.recovery, "1 wake signal(s) recorded.");
-  assert.equal(status.scene.skills.nextAction, "No runtime skills discovered.");
+  assert.equal(status.scene.recovery, "One wake signal is recorded.");
+  assert.equal(status.scene.skills.nextAction, "No runtime skills are discovered in this project.");
   assert.equal(status.scene.memory.latestSessionMemory, true);
   assert.equal(status.scene.memory.nextAction, "Session memory is available; use assets only when needed.");
 
   const text = formatRuntimeStatusText(status);
-  assert.match(text, /Scene:/);
-  assert.match(text, /Now: 1 execution\(s\) are running\./);
-  assert.match(text, /Skills: 0\/0 ready; No runtime skills discovered\./);
-  assert.match(text, /Memory: 1 asset\(s\), session=yes; Session memory is available; use assets only when needed\./);
-  assert.match(text, /Cost: 5% context; stable 67%; no model request yet/);
-  assert.match(text, /Current workspace:/);
+  assert.match(text, /Current scene:/);
+  assert.match(text, /Now: One delegated task is running\./);
+  assert.match(text, /Skills: 0\/0 ready; No runtime skills are discovered in this project\./);
+  assert.match(text, /Memory: session memory ready; 1 reviewable memory file\(s\); Session memory is available; use assets only when needed\./);
+  assert.match(text, /Cost: 5% context; stable 67%; No model request recorded yet/);
+  assert.match(text, /Runtime facts:/);
   assert.match(text, /Focus: Investigate runtime/);
-  assert.match(text, /Next: Let active work finish, or inspect it with `kitty status` \/ `kitty background`\./);
-  assert.match(text, /Blocked: no/);
+  assert.match(text, /Next: Wait for the active task, or inspect it with `kitty status` \/ `kitty background`\./);
+  assert.match(text, /Blocked: No blockers visible\./);
   assert.match(text, /Skills: 0\/0 ready/);
   assert.match(text, /Executions: 1 active \/ 1 total/);
   assert.match(text, /Context budget: 45000\/900000 chars/);
@@ -144,7 +144,7 @@ test("runtime status projects the current project runtime facts", async (t) => {
   assert.match(text, /stableRatio=67%/);
   assert.match(text, /stableSources=staticPrompt,profilePersona/);
   assert.match(text, /Model cache: none/);
-  assert.match(text, /Task lifecycle:/);
+  assert.match(text, /Task facts:/);
 });
 
 test("runtime status surfaces recent model request cache facts", async (t) => {
@@ -301,7 +301,7 @@ test("runtime status marks stale background executions as blocked recovery work"
   const status = await buildRuntimeStatus(root);
   const text = formatRuntimeStatusText(status);
 
-  assert.equal(status.scene.headline, "1 execution(s) need attention.");
+  assert.equal(status.scene.headline, "One delegated task needs attention.");
   assert.equal(status.scene.background.active, 1);
   assert.equal(status.scene.background.blocked, 1);
   assert.equal(status.scene.executions[0]?.risk, "blocked");
@@ -314,8 +314,8 @@ test("runtime scene gives a direct starting action when no session exists", asyn
 
   const status = await buildRuntimeStatus(root);
 
-  assert.equal(status.scene.headline, "No active session yet.");
+  assert.equal(status.scene.headline, "No session has started yet.");
   assert.equal(status.scene.nextAction, "Start a session with `kitty`.");
-  assert.equal(status.scene.blocked, "no");
-  assert.match(formatRuntimeStatusText(status), /Now: No active session yet\./);
+  assert.equal(status.scene.blocked, "No blockers visible.");
+  assert.match(formatRuntimeStatusText(status), /Now: No session has started yet\./);
 });

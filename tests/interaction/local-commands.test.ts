@@ -110,7 +110,7 @@ test("runtime slash commands are handled locally", async (t) => {
   assert.match(plain, /Project:/);
   assert.match(plain, /slash-background/);
   assert.match(plain, /No runtime memory assets yet|memory/i);
-  assert.match(plain, /No runtime skills discovered|skills:/i);
+  assert.match(plain, /No runtime skills are discovered in this project|skills:/i);
   assert.match(plain, /turn\.completed/);
   assert.match(plain, /preflight:/);
   assert.match(plain, /session-local-command/);

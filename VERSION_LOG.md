@@ -1,5 +1,38 @@
 # 版本记录
 
+## 2026-06-26 - 现场表达与上下文自然性满意基线
+
+状态：满意版本。
+
+基线代码锚点：发布后以本次 `0.0.16` 提交为准。
+
+包版本：`@jun133/kitty@0.0.16`。
+
+计划标记：`Kitty 现场表达与上下文自然性封顶 Plan`。
+
+验证结果：
+
+- `npm.cmd run typecheck`
+- `npm.cmd run build`
+- `npm.cmd run verify`
+- `npm.cmd run eval:local`
+- `npm.cmd run eval:production`
+
+这个版本重要的原因：
+
+- 现场表达从账本摘要改成自然现场：用户先看当前状态、焦点、下一步、后台、成本和记忆，再看详细机器事实。
+- runtime status、session、control-plane、observability 继续保留完整结构化事实，`scene` 只做投影，不落盘，不成为第二事实源。
+- context prompt/session brief/working memory 明确把运行事实作为 evidence，不把内部 wake、execution、runtime facts 伪装成用户新要求。
+- TUI、CLI、README 和 spec 讲同一套当前事实。
+- 超过 300 行文件做了职责审查；只拆混职责文件，不为行数硬拆。
+
+设计基线：
+
+- 主干维护事实，边缘负责呈现。
+- 模型看到的是近场连续性、当前现场和必要证据；机器账本留在可审阅事实层。
+- eval、TUI transcript、Responses adapter、host delegated closeout 已拆清变化原因。
+- 版本将发布到 npm，并同步推送到 GitHub。
+
 ## 2026-06-18 - TUI 光标定位初步满意基线
 
 状态：TUI 初步成功版本。

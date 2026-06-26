@@ -8,7 +8,8 @@ TUI 和 Web 都是壳。它们不拥有第二套 agent 状态，只呈现 sessio
 - `src/runtime-ui/`：跨宿主复用的运行时展示事实。负责 todo、工具状态、turn display 的文本投影。
 - `src/host/`：所有宿主进入 agent 的共同 turn 边界。
 - `src/session/`：对话和事件事实。
-- `src/runtime/status.ts` / `src/runtime/scene.ts`：当前现场事实。
+- `src/runtime/status.ts`：读取结构化运行事实。
+- `src/runtime/scene.ts`：统一自然现场投影。CLI、TUI 和未来 UI 读取它，不各自重算 execution、memory、skill、cost 的语义。
 - `src/web/`：Web 壳，复用 host 主链路和 runtime events。
 
 ## TUI 职责
