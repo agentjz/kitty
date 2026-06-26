@@ -35,6 +35,7 @@ test("evaluation harness defines explicit production acceptance checks", () => {
   assert.deepEqual(listProductionEvaluationChecks(), [
     "production-config-preflight",
     "production-provider-probe",
+    "production-real-turn",
     "production-runtime-status",
   ]);
 });

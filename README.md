@@ -110,7 +110,7 @@ kitty "检查这个仓库并修复失败测试"
 | `kitty eval` | 查看产品验收场景；`kitty eval --run-local` 运行本地机器验收；`kitty eval --run-production` 显式运行生产路径验收 |
 | `kitty telegram serve` | 启动 Telegram 私聊服务 |
 
-`npm.cmd test` 只跑日常确定性测试，不跑 eval。产品验收独立运行：`npm.cmd run test:eval` 验证 eval harness，`npm.cmd run eval:local` 跑本地验收，`npm.cmd run eval:production` 使用当前 `.kitty/.env` 显式跑生产路径验收。
+`npm.cmd test` 只跑日常确定性测试，不跑 eval。产品验收独立运行：`npm.cmd run test:eval` 验证 eval harness，`npm.cmd run eval:local` 跑本地验收，`npm.cmd run eval:production` 使用当前 `.kitty/.env` 显式跑生产路径验收。运行 eval 前先执行 `npm.cmd run build`。
 
 查看配置：
 

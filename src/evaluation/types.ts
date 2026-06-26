@@ -15,6 +15,7 @@ export type EvaluationCheckId =
 export type ProductionEvaluationCheckId =
   | "production-config-preflight"
   | "production-provider-probe"
+  | "production-real-turn"
   | "production-runtime-status";
 
 export type EvaluationSuite = "local" | "production";

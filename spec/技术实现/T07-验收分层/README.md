@@ -48,6 +48,7 @@ Kitty 的测试和产品验收分两层。
 - 跑本地可验证产品场景。
 - 使用 fixture、假 provider 或本地状态构造机器证据。
 - 验证 runtime status、project map、memory、extension、skill、config、cache economy、tool output governance、host turn、remote entrypoints 和 recovery drills。
+- npm 脚本只检查 `dist/cli.js` 是否存在，不主动 build，避免并行 eval 抢同一个 `dist`。
 
 ## 生产路径验收
 
@@ -62,6 +63,7 @@ Kitty 的测试和产品验收分两层。
 - 使用当前项目 `.kitty/.env`。
 - 可以访问真实 provider。
 - 可以消耗真实 API。
-- 验收当前配置、provider probe 和真实项目 runtime status。
+- 验收当前配置、provider probe、隔离 session 真实多轮 turn 和真实项目 runtime status。
+- npm 脚本只检查 `dist/cli.js` 是否存在，不主动 build，避免并行 eval 抢同一个 `dist`。
 
 生产验收不能进入 `npm test` 或 `npm.cmd run verify`。

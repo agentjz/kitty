@@ -1,0 +1,56 @@
+# T05 Provider 与模型
+
+Provider 层负责把 Kitty 的模型请求变成当前 provider 能接受的 wire request，并把返回、usage、cache、错误恢复成统一事实。
+
+## 当前模块边界
+
+- `src/provider/catalog.ts`：provider/model 固有事实。包括 provider id、label、transport、API kind、超时、model wire API、context/output 限制、reasoning、tool、cache 能力。
+- `src/provider/capabilities.ts`：把 catalog 事实投影成请求期能力，不读取 `.env`。
+- `src/provider/transport.ts`：根据 provider transport 和 base URL 生成 endpoint、headers 和 probe 入口。
+- `src/provider/connection.ts`：doctor / production eval 的连接探测。它报告 provider、model、base URL 组合是否可用，不替用户猜配置。
+- `src/provider/request.ts`：一次 provider 请求生命周期。它处理 stream/non-stream、abort、usage、cache facts 和错误归一。
+- `src/provider/responsesAdapter.ts`：OpenAI Responses wire API 转换。
+- `src/provider/chatCompletionsAdapter.ts`：Chat Completions wire API 转换。
+- `src/provider/chatRequestBody.ts`：Chat Completions 请求体，包含 DeepSeek reasoning replay 这类 wire 要求。
+- `src/provider/usageNormalizer.ts`：把 provider usage 字段归一成 runtime 可读事实。
+- `src/provider/cachePolicy.ts`：把 provider/model cache 能力转成请求事实和 status 事实。
+
+## Provider 与 Model 分离
+
+Provider 管入口、认证、transport 和 API 风格。
+
+Model 管 wire API、上下文限制、输出限制、reasoning、tool、cache 能力。
+
+`resolveModelProfile` 必须同时解析 provider 和 model。未知 provider 或 provider 下没有该 model，直接报错，不做默认猜测。
+
+## Relay 边界
+
+YLS、TTAPI 这类中转站是 provider transport 的特殊事实，不污染标准 provider。
+
+Relay provider 可以使用 Responses probe，而不是默认 `/models`。404 诊断必须提示同时检查 `KITTY_PROVIDER`、`KITTY_MODEL` 和 `KITTY_BASE_URL`，不能只怪 base URL。
+
+## Reasoning Replay
+
+DeepSeek thinking tool call 后续请求必须回传 `reasoning_content`。这个是 provider wire contract，不是 prompt 规则。
+
+当前事实位置：
+
+- `src/session/messages.ts` 决定哪些 assistant reasoning content 能进入后续请求。
+- `src/provider/chatRequestBody.ts` 负责按 provider/model capabilities 生成请求体。
+- `tests/provider/deepseek-replay.test.ts` 保护这个行为。
+
+## Usage 与 Cache
+
+Provider usage 进入 observability 和 runtime status。
+
+OpenAI cached tokens、DeepSeek cache hit/miss、stable prefix fingerprint 都是机器事实。它们只用于展示和验收，不替模型判断任务价值。
+
+## 验收
+
+- `tests/provider/model-catalog.test.ts`
+- `tests/provider/connection.test.ts`
+- `tests/provider/deepseek-replay.test.ts`
+- `tests/provider/request-body-cache.test.ts`
+- `tests/provider/usage-normalizer.test.ts`
+- `tests/provider/cache-policy.test.ts`
+- `kitty eval --run-production`
