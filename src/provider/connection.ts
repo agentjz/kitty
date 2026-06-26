@@ -1,4 +1,5 @@
-import { resolveProviderCapabilities } from "./capabilities.js";
+import { resolveModelProfile } from "./catalog.js";
+import { buildProviderProbeRequest, resolveProviderProbeKind, type ProviderProbeKind } from "./transport.js";
 
 export interface ProviderConnectionProbeInput {
   provider?: string;
@@ -11,7 +12,8 @@ export interface ProviderConnectionProbeInput {
 export type ProviderConnectionProbeResult =
   | {
       kind: "ok";
-      models: number;
+      probe: ProviderProbeKind;
+      models?: number;
       resolvedBaseUrl: string;
       probeTimeoutMs: number;
     }
@@ -24,26 +26,31 @@ export type ProviderConnectionProbeResult =
 export async function probeProviderConnection(
   input: ProviderConnectionProbeInput,
 ): Promise<ProviderConnectionProbeResult> {
-  const capabilities = resolveProviderCapabilities({
+  const profile = resolveModelProfile({
     provider: input.provider,
     model: input.model,
   });
+  const probe = resolveProviderProbeKind(profile);
   const fetchImpl = input.fetchImpl ?? fetch;
-  const probeTimeoutMs = capabilities.doctorProbeTimeoutMs;
+  const probeTimeoutMs = profile.provider.doctorProbeTimeoutMs;
   let lastFailure:
     | Exclude<ProviderConnectionProbeResult, { kind: "ok" }>
     | undefined;
 
   for (const candidateBaseUrl of buildProviderBaseUrlCandidates(input.baseUrl)) {
-    const endpoint = buildModelsEndpoint(candidateBaseUrl);
+    const request = buildProviderProbeRequest({
+      baseUrl: candidateBaseUrl,
+      apiKey: input.apiKey,
+      model: profile.model.id,
+      probe,
+    });
     let response: Response;
 
     try {
-      response = await fetchImpl(endpoint, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${input.apiKey}`,
-        },
+      response = await fetchImpl(request.endpoint, {
+        method: request.method,
+        headers: request.headers,
+        body: request.body,
         signal: AbortSignal.timeout(probeTimeoutMs),
       });
     } catch (error) {
@@ -58,7 +65,7 @@ export async function probeProviderConnection(
     if (response.status === 404) {
       lastFailure = {
         kind: "user",
-        message: `User-fixable error: ${endpoint} returned 404. Check whether \`KITTY_BASE_URL\` is the correct OpenAI-compatible API base URL.`,
+        message: `User-fixable error: provider endpoint returned 404 at ${request.endpoint}. Check \`KITTY_PROVIDER\`, \`KITTY_MODEL\`, and \`KITTY_BASE_URL\` together; this provider uses ${profile.model.wireApi}.`,
         probeTimeoutMs,
       };
       continue;
@@ -88,10 +95,29 @@ export async function probeProviderConnection(
       };
     }
 
+    if (probe === "responses") {
+      return {
+        kind: "ok",
+        probe: "responses",
+        resolvedBaseUrl: candidateBaseUrl,
+        probeTimeoutMs,
+      };
+    }
+
+    if (probe === "chat.completions") {
+      return {
+        kind: "ok",
+        probe: "chat.completions",
+        resolvedBaseUrl: candidateBaseUrl,
+        probeTimeoutMs,
+      };
+    }
+
     const payload = await response.json().catch(() => null) as { data?: unknown } | null;
     const models = Array.isArray(payload?.data) ? payload.data.length : 0;
     return {
       kind: "ok",
+      probe: "models",
       models,
       resolvedBaseUrl: candidateBaseUrl,
       probeTimeoutMs,
@@ -123,16 +149,6 @@ export function buildProviderBaseUrlCandidates(baseUrl: string): string[] {
   }
 
   return [...new Set(candidates)];
-}
-
-export function buildModelsEndpoint(baseUrl: string): string {
-  try {
-    return new URL("models", ensureTrailingSlash(baseUrl)).toString();
-  } catch {
-    throw new Error(
-      `User-fixable error: \`KITTY_BASE_URL\` is not a valid URL: ${baseUrl}. Fix it and rerun \`kitty doctor\`.`,
-    );
-  }
 }
 
 function ensureTrailingSlash(baseUrl: string): string {

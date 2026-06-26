@@ -12,4 +12,8 @@ Session memory 不是工具。它是每轮完成后的固定生命周期行为�
 
 Session workset 是当前现场索引。文件被读取或变更后进入 workset，记录路径、读取次数、变更次数、最后工具和 change id。它让模型和用户知道当前任务真正碰过哪些文件，但不替模型判断哪些文件重要。
 
-Provider / Config 负责 provider/model catalog、模型连接、provider 差异、请求恢复、环境变量和运行配置。DeepSeek thinking + tool call 的 reasoning_content 回传属于 provider/model 的事实，不是 session 的随手补丁。
+Provider / Config 负责 provider/model catalog、模型连接、provider 差异、请求恢复、环境变量和运行配置。
+
+Provider 和 Model 分开维护事实。Provider 负责入口、认证、transport、超时和连接探测；Model 负责 wire API、工具能力、reasoning、cache、上下文上限、输出上限和请求参数。正常 provider 走标准探测；中转 provider 作为 `relay` transport 统一管理，连接探测按当前模型的 wire API 走真实请求入口，而不是默认假设 `/models` 一定存在。
+
+YLS 和 TTAPI 是当前内置 relay provider。它们不是普通 OpenAI-compatible provider，也不靠 CLI/TUI 特判；catalog 声明 provider transport，request / doctor 从 catalog 推导行为。DeepSeek 是标准 provider，thinking + tool call 的 reasoning_content 回传属于 provider/model 的事实，不是 session 的随手补丁。

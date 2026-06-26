@@ -108,6 +108,7 @@ test("doctor does not report ready when local project template is incomplete", a
   const program = buildCliProgram({
     probeProviderConnection: async () => ({
       kind: "ok",
+      probe: "models",
       models: 1,
       resolvedBaseUrl: "https://api.deepseek.com",
       probeTimeoutMs: 1000,

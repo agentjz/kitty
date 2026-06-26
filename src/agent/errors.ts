@@ -46,7 +46,7 @@ export function getErrorMessage(error: unknown): string {
   }
 
   if (status === 404 || lower.includes("returned 404")) {
-    return "User-fixable error: provider returned 404. Check whether `KITTY_BASE_URL` is the correct OpenAI-compatible API base URL.";
+    return "User-fixable error: provider endpoint returned 404. Check `KITTY_PROVIDER`, `KITTY_MODEL`, and `KITTY_BASE_URL` as one provider profile; the selected provider may use Responses instead of Chat Completions.";
   }
 
   if (typeof status === "number" && status >= 500) {

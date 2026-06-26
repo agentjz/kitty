@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import path from "node:path";
 
-import { probeProviderConnection } from "../../provider/connection.js";
+import { probeProviderConnection, type ProviderConnectionProbeResult } from "../../provider/connection.js";
 import { resolveModelProfile } from "../../provider/catalog.js";
 import { formatConfigPreflightReport, inspectConfigPreflight } from "../../config/preflight.js";
 import type { CliOverrides, RuntimeConfig } from "../../types.js";
@@ -68,7 +68,7 @@ export function registerDoctorCommand(
         apiKey: runtime.config.apiKey,
       });
       if (diagnosis.kind === "ok") {
-        ui.success(`Provider reachable. models=${diagnosis.models}`);
+        ui.success(formatProviderProbeSuccess(diagnosis));
         if (diagnosis.resolvedBaseUrl !== runtime.config.baseUrl) {
           ui.info(`resolvedBaseUrl: ${diagnosis.resolvedBaseUrl}`);
         }
@@ -81,5 +81,15 @@ export function registerDoctorCommand(
 
       throw new Error(diagnosis.message);
     });
+}
+
+function formatProviderProbeSuccess(
+  diagnosis: Extract<ProviderConnectionProbeResult, { kind: "ok" }>,
+): string {
+  if (diagnosis.probe === "responses") {
+    return "Provider reachable. responses probe ok";
+  }
+
+  return `Provider reachable. models=${diagnosis.models ?? 0}`;
 }
 

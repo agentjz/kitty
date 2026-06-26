@@ -2,6 +2,7 @@ import type { ModelReasoningEffort, ModelThinkingMode } from "../types.js";
 
 export type ProviderWireApi = "responses" | "chat.completions";
 export type ProviderApiKind = "openai-sdk" | "openai-compatible" | "deepseek-openai-compatible";
+export type ProviderTransport = "standard" | "relay";
 export type ReasoningContentReplayPolicy = "never" | "tool-call-required";
 export type ModelCacheMode = "prompt-cache-key" | "provider-automatic" | "none";
 
@@ -9,6 +10,7 @@ export interface ProviderInfo {
   id: string;
   label: string;
   apiKind: ProviderApiKind;
+  transport: ProviderTransport;
   defaultBaseUrl: string;
   requestTimeoutMs: number;
   doctorProbeTimeoutMs: number;
@@ -61,6 +63,7 @@ export const PROVIDER_CATALOG: readonly ProviderInfo[] = [
     id: "deepseek",
     label: "DeepSeek official",
     apiKind: "deepseek-openai-compatible",
+    transport: "standard",
     defaultBaseUrl: "https://api.deepseek.com",
     requestTimeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
     doctorProbeTimeoutMs: DEFAULT_DOCTOR_PROBE_TIMEOUT_MS,
@@ -69,6 +72,7 @@ export const PROVIDER_CATALOG: readonly ProviderInfo[] = [
     id: "yls",
     label: "YLS Codex",
     apiKind: "openai-sdk",
+    transport: "relay",
     defaultBaseUrl: "https://code.ylsagi.com/codex",
     requestTimeoutMs: RELAY_REQUEST_TIMEOUT_MS,
     doctorProbeTimeoutMs: RELAY_DOCTOR_PROBE_TIMEOUT_MS,
@@ -77,6 +81,7 @@ export const PROVIDER_CATALOG: readonly ProviderInfo[] = [
     id: "ttapi",
     label: "TTAPI",
     apiKind: "openai-sdk",
+    transport: "relay",
     defaultBaseUrl: "https://w.ciykj.cn",
     requestTimeoutMs: RELAY_REQUEST_TIMEOUT_MS,
     doctorProbeTimeoutMs: RELAY_DOCTOR_PROBE_TIMEOUT_MS,
@@ -85,6 +90,7 @@ export const PROVIDER_CATALOG: readonly ProviderInfo[] = [
     id: "openai",
     label: "OpenAI official",
     apiKind: "openai-sdk",
+    transport: "standard",
     defaultBaseUrl: "https://api.openai.com/v1",
     requestTimeoutMs: RELAY_REQUEST_TIMEOUT_MS,
     doctorProbeTimeoutMs: RELAY_DOCTOR_PROBE_TIMEOUT_MS,
@@ -93,6 +99,7 @@ export const PROVIDER_CATALOG: readonly ProviderInfo[] = [
     id: "openai-compatible",
     label: "OpenAI-compatible",
     apiKind: "openai-compatible",
+    transport: "standard",
     defaultBaseUrl: "",
     requestTimeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
     doctorProbeTimeoutMs: DEFAULT_DOCTOR_PROBE_TIMEOUT_MS,
