@@ -104,6 +104,7 @@ export function buildCliProgram(dependencies: CliProgramDependencies = {}): Comm
   registerTuiCommand(program, {
     getCliOverrides,
     resolveRuntime,
+    cliDependencies: dependencies,
   });
   return program;
 }

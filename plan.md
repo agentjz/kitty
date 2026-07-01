@@ -1,94 +1,80 @@
-# DeepSeek 工具调用 400 修复 Plan
+# Kitty 默认 TUI 与展示收敛 Plan
 
 ## 1. 需求文档
 
-用户要解决的实际问题是：使用 DeepSeek 模型时，只要模型走工具调用，后续请求就可能返回 400，导致 Kitty 无法完成真实任务。
+用户要解决的实际问题是：TUI 已经成为更好的使用入口，裸 `kitty` 继续启动文字版交互不符合当前产品体验。同时官网刚加的副标题和示例横幅过度表达，偏离当前克制风格。
 
-用户需要的体验：
+本轮要完成的体验：
 
-- DeepSeek 能正常完成“模型决定调用工具 -> 工具返回结果 -> 模型继续回答”的完整回合。
-- 如果 provider 返回 DeepSeek wire contract 错误，Kitty 暴露清楚原因，不把消息吞掉。
-- 修完后必须用当前 `.kitty/.env` 的真实 DeepSeek 配置实测工具调用链路。
-
-完成标准：
-
-- 自动测试覆盖 DeepSeek 工具调用后续请求必须携带 `reasoning_content`。
-- 真实 DeepSeek provider 工具调用验收通过。
-- 普通 verify 仍通过。
+- `kitty` 裸启动进入 TUI。
+- `kitty "..."` 仍然支持一次性任务。
+- `kitty agent` 保留文字版交互。
+- `kitty tui` 作为显式 TUI 命令保留。
+- README、官网、postinstall 和 spec 与入口事实一致。
+- 官网不新增英文标语、副标题、小横幅。
 
 ## 2. 当前事实
 
-已确认事实：
-
-- 当前 `.kitty/.env` 是 `KITTY_PROVIDER=deepseek`、`KITTY_MODEL=deepseek-v4-flash`、`KITTY_BASE_URL=https://api.deepseek.com`。
-- `src/provider/catalog.ts` 已声明 DeepSeek 使用 `chat.completions`，`reasoningContentReplay=tool-call-required`。
-- `src/provider/chatRequestBody.ts` 对 DeepSeek 会发送 `thinking`，并在 assistant tool call message 缺 `reasoningContent` 时抛错。
-- `tests/provider/deepseek-replay.test.ts` 只测试了“已有 reasoningContent 会进入请求体”和“缺失会抛错”。
-- 现有测试没有覆盖真实 agent turn 中“第一轮 provider 返回 tool_calls + reasoning_content，工具执行后第二轮请求必须回传同一 reasoning_content”的完整链路。
-- DeepSeek 官方文档要求：thinking 模式下，若某轮发生工具调用，后续请求必须完整回传该轮 assistant message 的 `reasoning_content`，否则 API 会 400。
-
-已收束事实：
-
-- 真实 DeepSeek 流式工具调用返回的 `reasoning_content` 会被当前 `chatCompletionsAdapter` 收集到 assistant response。
-- 工具执行后的第二次 provider 请求原先可能因为 request config 缺 provider 或 hard compression 删除 reasoningContent 而丢失 replay 必需字段。
-- 当前 400 的根因是 DeepSeek thinking + tool call 的 `reasoning_content` replay 没有在所有后续请求路径里被当成 provider wire contract 保住。
+- `src/cli/commands/session.ts` 当前负责裸 `kitty` 和 `kitty "prompt"`。
+- `src/cli/commands/tui.ts` 当前负责 `kitty tui`。
+- `src/shell/tui/start.ts` 已有 session picker、输入、滚动、runtime dock 和生命周期清理。
+- `README.md` 当前写 `kitty` 启动交互式 agent，`kitty tui` 启动 TUI。
+- `scripts/postinstall.cjs` 当前写 `kitty` 启动 TUI 前仍需同步。
+- `site/index.html` 已恢复到原来的“找得准，改得对”表达，只保留 npm 安装命令模块。
 
 ## 3. 失败测试
 
 以下情况视为失败：
 
-- 构造一轮 assistant tool call + reasoningContent + tool result 后，DeepSeek 请求体没有把 `reasoning_content` 放回 assistant tool call message。
-- agent turn 测试里，第二次 provider 请求看不到第一轮 tool call assistant 的 `reasoningContent`。
-- 真实 DeepSeek 工具调用验收返回 400。
-- 修复后 `npm.cmd run verify` 不通过。
+- 裸 `kitty` 仍进入文字版交互。
+- `kitty "prompt"` 被误改成 TUI。
+- `kitty agent` 无法进入文字版交互。
+- `kitty tui` 和裸 `kitty` 走两套启动逻辑。
+- README / spec / postinstall 仍描述旧入口事实。
+- 官网出现多余副标题、示例横幅或英文宣传语。
 
 ## 4. 目标
 
-本轮交付目标：
-
-- 把 DeepSeek 工具调用 replay 作为 provider wire contract 固化到测试。
-- 若发现请求体或上下文压缩丢 `reasoning_content`，修到主链路。
-- 增加显式真实验收方式，能用当前 `.kitty/.env` 实测 DeepSeek 工具调用。
-- 更新 spec，说明 DeepSeek 工具调用 replay 的当前事实。
+- 默认入口现代化：裸 `kitty` 进入 TUI。
+- 入口边界清楚：一次性 prompt 继续一次性执行，文字版交互显式用 `kitty agent`。
+- TUI 启动逻辑只有一份，避免 `kitty` 和 `kitty tui` 分叉。
+- 展示文案收敛，只保留主句、正文、安装命令和能力卡片。
 
 ## 5. 不做范围
 
-- 不改 YLS/TTAPI relay 逻辑。
-- 不引入新 provider 框架。
-- 不改 TUI/Web/Telegram UI。
-- 不做旧兼容，不写 legacy 分支。
-- 不用关键词或正则判断语义。
+- 不升版本。
+- 不 commit。
+- 不 push。
+- 不 publish。
+- 不重做 TUI UI。
+- 不全局汉化。
 
 ## 6. 设计
 
-主链路：
+CLI 分发规则：
 
-用户输入进入 session。provider 返回 assistant tool call。agent 保存 assistant message，其中必须包含 `toolCalls` 和 DeepSeek 返回的 `reasoningContent`。工具执行后保存 tool message。下一轮构建 context request 时，assistant tool call 和 tool message 必须在同一工具边界里保留，并在发给 DeepSeek 的 Chat Completions request 中带上 `reasoning_content`。
+- `kitty`：无 prompt 时进入 TUI。
+- `kitty "prompt"`：创建 session 并运行一次性 prompt。
+- `kitty agent`：无 prompt 时进入文字版交互；带 prompt 时运行一次性 prompt。
+- `kitty tui`：显式进入 TUI。
 
-模块边界：
+实现边界：
 
-- `chatCompletionsAdapter`：只负责 DeepSeek/OpenAI-compatible streaming/non-streaming wire parse，不做 session 判断。
-- `chatRequestBody`：负责把 ProviderMessage 转成 Chat Completions request body，并执行 DeepSeek wire contract 校验。
-- `context/runtime/compression`：负责保留工具调用边界，不得在 DeepSeek replay 必需消息上删除 reasoningContent。
-- `agent/turn`：负责保存 provider 返回的 assistant reasoning/tool call/tool result 事实。
-- `evaluation` 或脚本：负责真实 provider 验收，不混进日常测试。
-
-错误边界：
-
-- 如果真实 provider 没返回 reasoningContent 却返回 tool_calls，Kitty 应在下一次请求前报出本地 wire contract 错误，而不是发送必然 400 的请求。
-- 如果 provider 直接返回 400，错误信息必须保留 provider 原始事实，方便判断是请求体还是服务端限制。
+- 新增共享 `startTuiMode`，让 `kitty` 和 `kitty tui` 使用同一套启动逻辑。
+- 不把 TUI 启动逻辑复制到多个 command。
+- 不改变 session driver、provider、tools 和 runtime。
 
 ## 7. 实施任务
 
-- [x] 加测试覆盖 agent turn 第二次 provider 请求携带 DeepSeek `reasoningContent`。
-- [x] 加测试覆盖 compression 不会在 DeepSeek 工具 replay 场景丢 `reasoningContent`。
-- [x] 按测试结果修 provider/context/session 主链路。
-- [x] 增加真实 DeepSeek 工具调用验收入口或脚本。
-- [x] 用当前 `.kitty/.env` 运行真实 DeepSeek 工具调用验收。
-- [x] 运行 provider/context/agent 局部测试。
-- [x] 运行 `npm.cmd run verify`。
-- [x] 更新 spec/provider 当前事实。
-- [x] 更新收口记录。
+- [x] 新增共享 TUI 启动函数。
+- [x] 让 `kitty tui` 调用共享 TUI 启动函数。
+- [x] 让裸 `kitty` 调用共享 TUI 启动函数。
+- [x] 保持 `kitty "prompt"` 一次性执行。
+- [x] 保持 `kitty agent` 文字版交互。
+- [x] 恢复官网原有 hero、卡片和宣传文案，只保留 npm 安装命令模块。
+- [x] 更新 README、postinstall、spec。
+- [x] 更新 CLI 测试。
+- [x] 运行相关验证。
 
 ## 8. 验证计划
 
@@ -96,66 +82,57 @@
 
 ```bash
 npm.cmd run test:build
-node --test .test-build/tests/provider/deepseek-replay.test.js
-node --test .test-build/tests/context/compression.test.js
+node --test .test-build/tests/cli/program.test.js
 ```
 
-真实验收：
+轻量包验证：
 
 ```bash
-node dist/cli.js eval --run-production
-```
-
-如果新增独立 DeepSeek probe，则运行该 probe，并要求真实工具调用链路完成。
-
-完整验证：
-
-```bash
-npm.cmd run verify
+node scripts/postinstall.cjs
 ```
 
 ## 9. 收口
 
-目标状态：已完成代码修复、局部测试、真实 DeepSeek production tool turn、spec 同步和完整 verify。
-
-根因：
-
-- recovery/context request 原先只携带 model，没携带 provider。DeepSeek replay 判断必须知道 provider，不能只靠 model 猜。
-- hard compression 原先把 assistant `reasoningContent` 全删。普通 reasoning 可以删，带 tool call 的 assistant reasoning 是 DeepSeek 后续请求必需 wire 字段，不能删。
+已完成。
 
 改动文件：
 
-- `src/provider/retryPolicy.ts`
-- `src/context/runtime/compression/builder.ts`
-- `src/evaluation/types.ts`
-- `src/evaluation/production.ts`
-- `tests/provider/deepseek-replay.test.ts`
-- `tests/evaluation/harness.test.ts`
-- `spec/技术实现/T05-Provider与模型/README.md`
-- `spec/技术实现/T07-验收分层/README.md`
-- `spec/用户审阅/T02-核心体验/02-Session与Provider.md`
+- `src/cli/commands/session.ts`
+- `src/cli/commands/tui.ts`
+- `src/cli/commands/tuiMode.ts`
+- `src/cli/dependencies.ts`
+- `src/cli/program.ts`
+- `tests/cli/program.test.ts`
+- `README.md`
+- `scripts/postinstall.cjs`
+- `site/index.html`
+- `site/style.css`
+- `site/script.js`
+- `spec/技术实现/T06-配置初始化诊断/README.md`
+- `spec/技术实现/T08-TUI与RuntimeUI/README.md`
+- `spec/用户审阅/系统核心/核心地图.md`
 - `plan.md`
+
+完成事实：
+
+- 裸 `kitty` 默认进入 TUI。
+- `kitty "prompt"` 仍走一次性任务。
+- `kitty agent` 保留文字版交互。
+- `kitty tui` 复用同一 TUI 启动边界。
+- 官网恢复到原来的“找得准，改得对”视觉和文案，只新增 npm 安装命令模块。
+- TUI 会话选择页删除重复的小字 `Kitty Agent`，只保留艺术字 banner。
+- 没有升版本。
+- 没有 commit。
+- 没有 push。
+- 没有 publish。
 
 已验证：
 
 ```bash
 npm.cmd run test:build
-node --test .test-build/tests/provider/deepseek-replay.test.js .test-build/tests/evaluation/harness.test.js
+node --test .test-build\tests\cli\program.test.js
+node --test .test-build\tests\shell\tui-render.test.js
+node scripts/postinstall.cjs
 npm.cmd run build
-node dist/cli.js eval --run-production
-npm.cmd run verify
+node dist/cli.js --version
 ```
-
-真实 DeepSeek 生产验收结果：
-
-- provider=`deepseek`
-- model=`deepseek-v4-flash`
-- `production-tool-turn` passed
-- `assistantToolCalls=1`
-- `reasoningReplay=1`
-- `toolMessages=1`
-- final answer contained `deepseek-tool-ok`
-
-剩余风险：
-
-- 真实 provider 长时间运行、更多工具组合和超长上下文仍需要后续生产使用观察；本轮已覆盖导致 400 的核心 wire contract。

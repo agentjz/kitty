@@ -52,6 +52,80 @@ body {
   color: var(--kt-blue);
 }
 
+/* ---------- install command ---------- */
+
+.install-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 800px;
+  padding: 1rem;
+  border: 1px solid var(--kt-line);
+  border-radius: 12px;
+  background: var(--kt-paper);
+  box-shadow: 0 12px 40px rgba(17, 24, 39, 0.06);
+}
+
+.install-label {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--kt-blue);
+  margin-bottom: 0.35rem;
+  text-align: center;
+}
+
+.install-copy {
+  min-width: 0;
+  text-align: center;
+}
+
+.install-command {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: min(100%, 520px);
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  background: #111111;
+  color: #ffffff;
+  text-align: left;
+}
+
+.install-command code {
+  color: #ffffff;
+  font-size: 1rem;
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.copy-install {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.copy-install:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.install-next {
+  color: var(--kt-muted);
+  font-size: 0.95rem;
+  text-align: center;
+  margin: 0;
+}
+
 /* ---------- image wrapper (product & demo) ---------- */
 
 .page-img {
@@ -106,5 +180,19 @@ body {
 @media (max-width: 575.98px) {
   .display-2 {
     font-size: 2.9rem;
+  }
+
+  .install-panel {
+    padding: 0.85rem;
+  }
+
+  .install-command {
+    align-items: stretch;
+  }
+
+  .install-command code {
+    font-size: 0.9rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 }

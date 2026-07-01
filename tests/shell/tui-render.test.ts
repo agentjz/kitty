@@ -238,7 +238,8 @@ test("tui session picker renders banner and numbered sessions", async () => {
     { columns: 120 },
   );
 
-  assert.match(output, /kitty agent/i);
+  assert.match(output, /██/);
+  assert.equal((output.match(/Kitty Agent/g) ?? []).length, 0);
   assert.match(output, /0\. 新建会话/);
   assert.match(output, /1\. 继续改 TUI/);
   assert.match(output, /3 分钟前/);

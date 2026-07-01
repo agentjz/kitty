@@ -11,6 +11,12 @@ export interface CliProgramDependencies {
     session: SessionRecord;
     sessionStore: SessionStore;
   }) => Promise<void>;
+  startTui?: (options: {
+    cwd: string;
+    cwdOverridden?: boolean;
+    config: RuntimeConfig;
+    sessionStore: SessionStore;
+  }) => Promise<void>;
   createTelegramService?: (options: {
     cwd: string;
     config: RuntimeConfig;

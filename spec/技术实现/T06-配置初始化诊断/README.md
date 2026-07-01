@@ -41,7 +41,7 @@ Config 层负责让用户能明确配置 Kitty，并在配置错误时得到可�
 1. `kitty init`
 2. 填 `.kitty/.env`
 3. `kitty doctor`
-4. `kitty` / `kitty tui` / `kitty web`
+4. `kitty` / `kitty agent` / `kitty web`
 
 如果 `.kitty` 不存在，doctor 只报告 bootstrap 路径，不假装 runtime ready。
 

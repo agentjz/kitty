@@ -210,3 +210,86 @@ test("tui command requires an interactive TTY", async () => {
     /requires an interactive TTY/,
   );
 });
+
+test("bare kitty opens the terminal UI", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "kitty-default-tui-"));
+  const config = createTestRuntimeConfig(root);
+  let tuiStarted = false;
+  const program = buildCliProgram({
+    resolveRuntime: async () => ({
+      cwd: root,
+      stateRootDir: root,
+      paths: getAppPaths(root),
+      overrides: { cwd: root },
+      config,
+    }),
+    startTui: async (options) => {
+      tuiStarted = true;
+      assert.equal(options.cwd, root);
+    },
+  });
+
+  program.exitOverride();
+  await program.parseAsync([], { from: "user" });
+
+  assert.equal(tuiStarted, true);
+});
+
+test("bare kitty with prompt still runs one-shot execution", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "kitty-default-oneshot-"));
+  const config = createTestRuntimeConfig(root);
+  let tuiStarted = false;
+  let oneShotPrompt = "";
+  const program = buildCliProgram({
+    resolveRuntime: async () => ({
+      cwd: root,
+      stateRootDir: root,
+      paths: getAppPaths(root),
+      overrides: { cwd: root },
+      config,
+    }),
+    startTui: async () => {
+      tuiStarted = true;
+    },
+    runOneShot: async (options) => {
+      oneShotPrompt = options.prompt;
+      return {
+        closeout: {
+          sessionId: options.session.id,
+          completed: true,
+          terminalTransition: null,
+        },
+        session: options.session,
+      };
+    },
+  });
+
+  program.exitOverride();
+  await program.parseAsync(["build", "an", "exam", "platform"], { from: "user" });
+
+  assert.equal(tuiStarted, false);
+  assert.equal(oneShotPrompt, "build an exam platform");
+});
+
+test("explicit tui command uses the shared terminal UI entrypoint", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "kitty-explicit-tui-"));
+  const config = createTestRuntimeConfig(root);
+  let tuiStarted = false;
+  const program = buildCliProgram({
+    resolveRuntime: async () => ({
+      cwd: root,
+      stateRootDir: root,
+      paths: getAppPaths(root),
+      overrides: { cwd: root },
+      config,
+    }),
+    startTui: async () => {
+      tuiStarted = true;
+    },
+  });
+
+  program.exitOverride();
+  await program.parseAsync(["tui"], { from: "user" });
+
+  assert.equal(tuiStarted, true);
+});

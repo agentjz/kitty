@@ -1,6 +1,6 @@
 {
   "name": "@jun133/kitty",
-  "version": "0.0.16",
+  "version": "0.0.17",
   "description": "Agent",
   "license": "MIT",
   "keywords": [
@@ -15,7 +15,8 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "scripts/postinstall.cjs"
   ],
   "publishConfig": {
     "access": "public"
@@ -34,6 +35,7 @@
     "eval:production": "node scripts/ensure-dist-built.mjs && node dist/cli.js eval --run-production",
     "verify": "npm test",
     "typecheck": "tsc --noEmit",
+    "postinstall": "node scripts/postinstall.cjs",
     "prepublishOnly": "npm run build",
     "test": "npm run check && npm run test:core"
   },

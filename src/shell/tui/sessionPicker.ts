@@ -139,7 +139,6 @@ export function createTuiSessionPickerComponent(
         paddingY: 1,
         backgroundColor: TUI_COLORS.background,
       },
-      React.createElement(Text, { color: TUI_COLORS.user, bold: true }, "Kitty Agent"),
       React.createElement(Text, { color: TUI_COLORS.user, bold: true }, renderKittyBanner()),
       React.createElement(Text, { color: TUI_COLORS.muted }, "选择会话。Enter 进入，↑/↓ 切换，0 新建，Esc 退出。"),
       React.createElement(Box, { marginTop: 1, flexDirection: "column" },

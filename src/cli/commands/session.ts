@@ -6,6 +6,7 @@ import type { CliOverrides, RuntimeConfig, SessionRecord } from "../../types.js"
 import { writeStdoutLine } from "../../utils/stdio.js";
 import { ui } from "../../utils/console.js";
 import { createSessionStore, resolveCliSession, runCliMode } from "./sessionHelpers.js";
+import { startTuiMode } from "./tuiMode.js";
 
 export function registerSessionCommands(
   program: Command,
@@ -21,16 +22,23 @@ export function registerSessionCommands(
   },
 ): void {
   program
-    .argument("[prompt...]", "Start a new session with a one-shot prompt. Without a prompt, opens interactive chat.")
+    .argument("[prompt...]", "Start a one-shot prompt. Without a prompt, opens the terminal UI.")
     .action(async (promptParts: string[]) => {
       const prompt = promptParts.join(" ").trim();
+      if (!prompt) {
+        await startTuiMode({
+          getCliOverrides: options.getCliOverrides,
+          resolveRuntime: options.resolveRuntime,
+          cliDependencies: options.dependencies,
+        });
+        return;
+      }
       const runtime = await options.resolveRuntime(options.getCliOverrides());
       const sessionStore = await createSessionStore(runtime.paths.sessionsDir);
       const selected = await resolveCliSession({
         sessionStore,
         cwd: runtime.cwd,
         cwdOverridden: Boolean(runtime.overrides.cwd),
-        interactive: !prompt,
       });
       if (!selected) {
         return;

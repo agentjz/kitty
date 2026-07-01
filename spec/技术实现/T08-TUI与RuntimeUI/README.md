@@ -2,9 +2,12 @@
 
 TUI 和 Web 都是壳。它们不拥有第二套 agent 状态，只呈现 session、event、runtime status 和 turn display 的同一事实。
 
+`kitty` 裸启动默认进入 TUI。`kitty tui` 是同一入口的显式命令，`kitty agent` 保留文字版交互。
+
 ## 当前模块边界
 
 - `src/shell/tui/`：Ink TUI 壳。负责 session picker、transcript、composer、runtime dock、键盘鼠标输入和清理生命周期。
+- `src/cli/commands/tuiMode.ts`：TUI 启动边界。`kitty` 和 `kitty tui` 共用它，不各自复制启动逻辑。
 - `src/runtime-ui/`：跨宿主复用的运行时展示事实。负责 todo、工具状态、turn display 的文本投影。
 - `src/host/`：所有宿主进入 agent 的共同 turn 边界。
 - `src/session/`：对话和事件事实。
