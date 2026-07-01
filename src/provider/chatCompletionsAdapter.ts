@@ -112,7 +112,12 @@ export const chatCompletionsAdapter: ProviderWireAdapter = {
 
       return {
         content: content.length > 0 ? content : null,
-        reasoningContent: reasoningContent.length > 0 ? reasoningContent : undefined,
+        reasoningContent: resolveDeepSeekToolCallReasoningReplay({
+          provider: request.provider,
+          thinking: request.thinking,
+          reasoningContent,
+          toolCallCount: toolCallParts.size,
+        }),
         streamedAssistantContent: content.length > 0,
         streamedReasoningContent: reasoningContent.length > 0,
         toolCalls: [...toolCallParts.entries()]
@@ -166,7 +171,12 @@ export const chatCompletionsAdapter: ProviderWireAdapter = {
       return {
         content:
           typeof message.content === "string" ? message.content : collapseContentParts(message.content),
-        reasoningContent: readReasoningContent(message),
+        reasoningContent: resolveDeepSeekToolCallReasoningReplay({
+          provider: request.provider,
+          thinking: request.thinking,
+          reasoningContent: readReasoningContent(message),
+          toolCallCount: message.tool_calls?.length ?? 0,
+        }),
         streamedAssistantContent: false,
         streamedReasoningContent: false,
         toolCalls: (message.tool_calls ?? [])
@@ -188,6 +198,25 @@ export const chatCompletionsAdapter: ProviderWireAdapter = {
     }
   },
 };
+
+function resolveDeepSeekToolCallReasoningReplay(input: {
+  provider: string;
+  thinking?: "enabled" | "disabled";
+  reasoningContent: string | undefined;
+  toolCallCount: number;
+}): string | undefined {
+  if (
+    input.provider === "deepseek" &&
+    input.thinking !== "disabled" &&
+    input.toolCallCount > 0
+  ) {
+    return input.reasoningContent ?? "";
+  }
+
+  return input.reasoningContent && input.reasoningContent.length > 0
+    ? input.reasoningContent
+    : undefined;
+}
 
 function abortStream(stream: { controller?: AbortController } | undefined): void {
   try {

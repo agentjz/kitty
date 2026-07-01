@@ -1,4 +1,4 @@
-import { expandStartToToolBoundary, shouldIncludeStoredAssistantReasoning } from "../../../session/messages.js";
+import { expandStartToToolBoundary, findLatestUserIndex, shouldIncludeStoredAssistantReasoning } from "../../../session/messages.js";
 import { joinBlocks, renderPromptLayers } from "../../../agent/prompt/format.js";
 import { measurePromptLayers } from "../../../agent/prompt/metrics.js";
 import { isInternalMessage } from "../../../session/turnFrame.js";
@@ -174,22 +174,104 @@ function composeChatMessages(
   model: string,
   provider: string,
 ): ProviderMessage[] {
+  const replayableMessages = normalizeProviderReplayMessages(messages, model, provider);
   return [
     {
       role: "system",
       content: renderSystemPrompt(systemPrompt),
     },
-    ...messages.map((message, index) => ({
+    ...replayableMessages.map((message, index) => ({
       role: message.role,
       content: message.content,
       name: message.name,
       toolCallId: message.tool_call_id,
       toolCalls: message.tool_calls,
-      reasoningContent: shouldIncludeStoredAssistantReasoning(messages, index, model, provider)
+      reasoningContent: shouldIncludeStoredAssistantReasoning(replayableMessages, index, model, provider)
         ? message.reasoningContent
         : undefined,
     })),
   ];
+}
+
+function normalizeProviderReplayMessages(
+  messages: StoredMessage[],
+  model: string,
+  provider: string,
+): StoredMessage[] {
+  if (!resolveProviderNeedsReasoningReplay(model, provider)) {
+    return messages;
+  }
+
+  const normalized: StoredMessage[] = [];
+  const latestUserIndex = findLatestUserIndex(messages);
+  for (let index = 0; index < messages.length; index += 1) {
+    const message = messages[index]!;
+    if (index >= latestUserIndex || !isUnreplayableToolCallAssistant(message)) {
+      normalized.push(message);
+      continue;
+    }
+
+    const toolCallIds = new Set(message.tool_calls!.map((toolCall) => toolCall.id));
+    const toolMessages: StoredMessage[] = [];
+    let cursor = index + 1;
+    while (cursor < messages.length) {
+      const candidate = messages[cursor]!;
+      if (candidate.role !== "tool" || !candidate.tool_call_id || !toolCallIds.has(candidate.tool_call_id)) {
+        break;
+      }
+      toolMessages.push(candidate);
+      cursor += 1;
+    }
+
+    normalized.push({
+      ...message,
+      content: summarizeUnreplayableToolBatch(message, toolMessages),
+      tool_calls: undefined,
+      reasoningContent: undefined,
+    });
+    index = Math.max(index, cursor - 1);
+  }
+
+  return normalized;
+}
+
+function resolveProviderNeedsReasoningReplay(model: string, provider: string): boolean {
+  return shouldIncludeStoredAssistantReasoning([
+    {
+      role: "assistant",
+      content: "",
+      reasoningContent: "probe",
+      createdAt: "1970-01-01T00:00:00.000Z",
+    },
+  ], 0, model, provider);
+}
+
+function isUnreplayableToolCallAssistant(message: StoredMessage): boolean {
+  return message.role === "assistant" &&
+    Array.isArray(message.tool_calls) &&
+    message.tool_calls.length > 0 &&
+    message.reasoningContent === undefined;
+}
+
+function summarizeUnreplayableToolBatch(
+  assistant: StoredMessage,
+  toolMessages: StoredMessage[],
+): string {
+  const toolNames = (assistant.tool_calls ?? [])
+    .map((toolCall) => toolCall.function.name)
+    .filter(Boolean)
+    .join(", ");
+  const assistantText = oneLine(assistant.content ?? "");
+  const toolFacts = toolMessages
+    .map((message) => `Tool ${message.name ?? message.tool_call_id ?? "unknown"} returned: ${truncate(oneLine(message.content ?? ""), 360)}`)
+    .join("\n");
+
+  return [
+    "Previous tool batch summary.",
+    toolNames ? `Tools: ${toolNames}.` : undefined,
+    assistantText ? `Assistant note: ${truncate(assistantText, 360)}` : undefined,
+    toolFacts || "Tool result was not available in the replayable context.",
+  ].filter(Boolean).join("\n");
 }
 
 function compactTailMessages(messages: StoredMessage[], mode: "normal" | "aggressive" | "hard"): StoredMessage[] {

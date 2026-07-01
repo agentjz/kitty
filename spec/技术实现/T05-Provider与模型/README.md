@@ -37,11 +37,14 @@ DeepSeek thinking tool call 后续请求必须回传 `reasoning_content`。这�
 
 - `src/session/messages.ts` 决定哪些 assistant reasoning content 能进入后续请求。
 - `src/provider/chatRequestBody.ts` 负责按 provider/model capabilities 生成请求体。
+- `src/provider/chatCompletionsAdapter.ts` 负责保存 DeepSeek thinking tool call 的 replay 字段；如果本次 tool call 的 reasoning token 为 0，也必须保存空字符串，不能折叠成字段缺失。
 - `src/context/runtime/compression/builder.ts` 构建 provider request 时必须携带 provider；只靠 model 无法判断 DeepSeek replay 规则。
 - hard compression 可以删除普通 assistant reasoning content；不能删除带 tool call 的 assistant `reasoningContent`，否则下一轮 DeepSeek 请求会缺必需字段。
 - `tests/provider/deepseek-replay.test.ts` 保护这个行为。
 
-如果 DeepSeek assistant message 同时包含 tool call 和 thinking reasoning，后续所有请求都必须保留同一条 assistant message 的 `reasoning_content`。如果本地已发现这条 message 缺失 `reasoningContent`，应在构建请求体前失败，不能发送一个必然 400 的请求。
+如果 DeepSeek assistant message 同时包含 tool call 和 thinking reasoning，后续所有请求都必须保留同一条 assistant message 的 `reasoning_content`。这个字段可以是空字符串；空字符串表示本次 tool call 没有可见 reasoning token，但 wire 字段仍然存在。
+
+如果当前轮本地已发现 tool-call assistant message 缺失 `reasoningContent`，应在构建请求体前失败，不能发送一个必然 400 的请求。已经保存在 session 历史里的不可回放 tool batch 不能伪造 reasoning；context 层把它投影成普通 assistant 历史事实，并跳过对应 tool message，避免一条坏历史永久卡死后续对话。
 
 ## Usage 与 Cache
 
