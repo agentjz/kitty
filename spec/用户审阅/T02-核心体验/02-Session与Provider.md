@@ -17,3 +17,5 @@ Provider / Config 负责 provider/model catalog、模型连接、provider 差异
 Provider 和 Model 分开维护事实。Provider 负责入口、认证、transport、超时和连接探测；Model 负责 wire API、工具能力、reasoning、cache、上下文上限、输出上限和请求参数。正常 provider 走标准探测；中转 provider 作为 `relay` transport 统一管理，连接探测按当前模型的 wire API 走真实请求入口，而不是默认假设 `/models` 一定存在。
 
 YLS 和 TTAPI 是当前内置 relay provider。它们不是普通 OpenAI-compatible provider，也不靠 CLI/TUI 特判；catalog 声明 provider transport，request / doctor 从 catalog 推导行为。DeepSeek 是标准 provider，thinking + tool call 的 reasoning_content 回传属于 provider/model 的事实，不是 session 的随手补丁。
+
+DeepSeek 工具调用链路的用户体验要求是：模型调用工具后，工具结果能回到同一轮现场，模型继续完成回答。内部必须完整保留 DeepSeek 要求回传的 thinking `reasoning_content`；压缩上下文和请求恢复不能把它当成普通可删摘要。这个字段不展示成用户内容，也不写成用户意图，只作为 provider 后续请求的 wire 事实。

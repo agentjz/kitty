@@ -63,7 +63,9 @@ Kitty 的测试和产品验收分两层。
 - 使用当前项目 `.kitty/.env`。
 - 可以访问真实 provider。
 - 可以消耗真实 API。
-- 验收当前配置、provider probe、隔离 session 真实多轮 turn 和真实项目 runtime status。
+- 验收当前配置、provider probe、隔离 session 真实多轮 turn、真实工具调用 turn 和真实项目 runtime status。
 - npm 脚本只检查 `dist/cli.js` 是否存在，不主动 build，避免并行 eval 抢同一个 `dist`。
 
 生产验收不能进入 `npm test` 或 `npm.cmd run verify`。
+
+真实工具调用 turn 使用一个隔离 eval 工具验证 provider tool call、tool result 回传、最终 assistant answer 和 turn events。它用于发现 DeepSeek thinking tool call 这类只会在真实 provider wire contract 下暴露的问题。

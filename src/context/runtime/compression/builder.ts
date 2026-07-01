@@ -212,7 +212,7 @@ function compactTailMessages(messages: StoredMessage[], mode: "normal" | "aggres
       return {
         ...message,
         content: truncate(message.content ?? "", mode === "hard" ? 120 : mode === "aggressive" ? 300 : 700),
-        reasoningContent: mode === "hard" ? undefined : message.reasoningContent,
+        reasoningContent: mode === "hard" && !message.tool_calls?.length ? undefined : message.reasoningContent,
       };
     }
 

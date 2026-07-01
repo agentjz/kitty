@@ -4,7 +4,7 @@ import type { RuntimeConfig, RuntimeRecoverTransition } from "../types.js";
 
 export type RecoveryRequestConfig = Pick<
   RuntimeConfig,
-  "contextWindowMessages" | "model" | "maxContextChars" | "contextSummaryChars"
+  "contextWindowMessages" | "model" | "provider" | "maxContextChars" | "contextSummaryChars"
 >;
 
 export function isRecoverableTurnError(error: unknown): boolean {
@@ -40,6 +40,7 @@ export function buildRecoveryRequestConfig(
   _consecutiveFailures: number,
 ): RecoveryRequestConfig {
   return {
+    provider: config.provider,
     model,
     contextWindowMessages: config.contextWindowMessages,
     maxContextChars: config.maxContextChars,

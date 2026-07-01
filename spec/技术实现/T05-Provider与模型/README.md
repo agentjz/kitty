@@ -37,7 +37,11 @@ DeepSeek thinking tool call 后续请求必须回传 `reasoning_content`。这�
 
 - `src/session/messages.ts` 决定哪些 assistant reasoning content 能进入后续请求。
 - `src/provider/chatRequestBody.ts` 负责按 provider/model capabilities 生成请求体。
+- `src/context/runtime/compression/builder.ts` 构建 provider request 时必须携带 provider；只靠 model 无法判断 DeepSeek replay 规则。
+- hard compression 可以删除普通 assistant reasoning content；不能删除带 tool call 的 assistant `reasoningContent`，否则下一轮 DeepSeek 请求会缺必需字段。
 - `tests/provider/deepseek-replay.test.ts` 保护这个行为。
+
+如果 DeepSeek assistant message 同时包含 tool call 和 thinking reasoning，后续所有请求都必须保留同一条 assistant message 的 `reasoning_content`。如果本地已发现这条 message 缺失 `reasoningContent`，应在构建请求体前失败，不能发送一个必然 400 的请求。
 
 ## Usage 与 Cache
 
@@ -53,4 +57,4 @@ OpenAI cached tokens、DeepSeek cache hit/miss、stable prefix fingerprint 都�
 - `tests/provider/request-body-cache.test.ts`
 - `tests/provider/usage-normalizer.test.ts`
 - `tests/provider/cache-policy.test.ts`
-- `kitty eval --run-production`
+- `kitty eval --run-production`，其中 `production-tool-turn` 使用真实 provider 跑一次工具调用闭环。

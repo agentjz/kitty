@@ -2,6 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { buildProviderRequestBody } from "../../src/provider/chatRequestBody.js";
+import { buildCompressedContextRequest } from "../../src/context/runtime/compression/builder.js";
+import { runAgentTurn } from "../../src/agent/turn/run.js";
+import { InProcessSessionStore } from "../../src/session/store.js";
+import { createToolRegistry } from "../../src/tools/core/registry.js";
+import { createTestRuntimeConfig, createTempWorkspace } from "../helpers.js";
+import type { AssistantResponse, ModelRequestInput } from "../../src/agent/types.js";
+import type { RegisteredTool } from "../../src/tools/core/types.js";
 
 const toolCall = {
   id: "call-1",
@@ -67,3 +74,119 @@ test("deepseek thinking tool-call replay rejects missing reasoning_content", () 
     /requires stored reasoning_content/,
   );
 });
+
+test("agent tool loop replays deepseek reasoning_content into the follow-up request", async (t) => {
+  const root = await createTempWorkspace("deepseek-agent-replay", t);
+  const config = {
+    ...createTestRuntimeConfig(root),
+    provider: "deepseek",
+    baseUrl: "https://api.deepseek.com",
+    model: "deepseek-v4-flash",
+    thinking: "enabled" as const,
+  };
+  const sessionStore = new InProcessSessionStore();
+  const session = await sessionStore.create(root);
+  const requests: ModelRequestInput[] = [];
+
+  await runAgentTurn({
+    input: "Read the package metadata and answer with the package name.",
+    cwd: root,
+    config,
+    session,
+    sessionStore,
+    toolRegistry: createToolRegistry({
+      onlyNames: ["read_package_name"],
+      sources: [{
+        kind: "host",
+        id: "test:deepseek-replay",
+        tools: [createReadPackageNameTool()],
+      }],
+    }),
+    fetchAssistantResponse: async (request): Promise<AssistantResponse> => {
+      requests.push(request);
+      if (requests.length === 1) {
+        return {
+          content: "",
+          reasoningContent: "Need to inspect package metadata before answering.",
+          toolCalls: [toolCall],
+        };
+      }
+      return {
+        content: "The package name is kitty.",
+        toolCalls: [],
+      };
+    },
+    fetchSessionTitleResponse: async (): Promise<AssistantResponse> => ({ content: "DeepSeek replay", toolCalls: [] }),
+    fetchSessionMemoryResponse: async (): Promise<AssistantResponse> => ({ content: "## Current Focus\nNone", toolCalls: [] }),
+  });
+
+  assert.equal(requests.length, 2);
+  const replayedAssistant = requests[1]!.messages.find((message) => message.role === "assistant" && message.toolCalls?.length);
+  assert.equal(replayedAssistant?.reasoningContent, "Need to inspect package metadata before answering.");
+
+  const body = buildProviderRequestBody({
+    provider: "deepseek",
+    model: "deepseek-v4-flash",
+    messages: requests[1]!.messages,
+    tools: requests[1]!.tools,
+    stream: true,
+    forceReasoning: false,
+    thinking: "enabled",
+  });
+  const assistantMessage = (body.messages as Array<Record<string, unknown>>).find((message) => Array.isArray(message.tool_calls));
+  assert.equal(assistantMessage?.reasoning_content, "Need to inspect package metadata before answering.");
+});
+
+test("context compression keeps deepseek tool-call reasoning_content under hard compaction", () => {
+  const request = buildCompressedContextRequest(
+    "You are Kitty.",
+    [
+      { role: "user", content: `old ${"x".repeat(20_000)}`, createdAt: "2026-07-01T00:00:00.000Z" },
+      {
+        role: "assistant",
+        content: "",
+        tool_calls: [toolCall],
+        reasoningContent: "Need to inspect package metadata.",
+        createdAt: "2026-07-01T00:00:01.000Z",
+      },
+      {
+        role: "tool",
+        name: "read",
+        tool_call_id: "call-1",
+        content: `{"name":"kitty","padding":"${"y".repeat(20_000)}"}`,
+        createdAt: "2026-07-01T00:00:02.000Z",
+      },
+    ],
+    {
+      contextWindowMessages: 3,
+      model: "deepseek-v4-flash",
+      provider: "deepseek",
+      maxContextChars: 8_000,
+      contextSummaryChars: 600,
+    },
+  );
+
+  const assistant = request.messages.find((message) => message.role === "assistant" && message.toolCalls?.length);
+  assert.equal(assistant?.reasoningContent, "Need to inspect package metadata.");
+});
+
+function createReadPackageNameTool(): RegisteredTool {
+  return {
+    definition: {
+      type: "function",
+      function: {
+        name: "read_package_name",
+        description: "Return package metadata.",
+        parameters: {
+          type: "object",
+          additionalProperties: false,
+          properties: {},
+        },
+      },
+    },
+    execute: async () => ({
+      ok: true,
+      output: "{\"name\":\"kitty\"}",
+    }),
+  };
+}
