@@ -28,6 +28,10 @@ jobs:
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
+      - name: Copy history into site
+        shell: bash
+        run: cp history.md site/history.md
+
       - name: Upload static site
         uses: actions/upload-pages-artifact@v4
         with:

@@ -6,7 +6,6 @@ import type { InteractionShell } from "../../interaction/shell.js";
 import {
   createTerminalLogWriter,
   mirrorInteractionShellToTerminalLog,
-  mirrorProcessOutputToTerminalLog,
 } from "../../observability/terminalLog.js";
 import { writeCliInteractiveIntro } from "./intro.js";
 import {
@@ -44,7 +43,6 @@ export async function startInteractiveChat(
     projectDocMaxBytes: options.config.projectDocMaxBytes,
   });
   const terminalLogWriter = createTerminalLogWriter(projectContext.stateRootDir, options.session.id);
-  const disposeTerminalOutputMirror = mirrorProcessOutputToTerminalLog(terminalLogWriter);
   const terminalShell = mirrorInteractionShellToTerminalLog(
     shell,
     terminalLogWriter,
@@ -75,7 +73,6 @@ export async function startInteractiveChat(
   try {
     await driver.run();
   } finally {
-    disposeTerminalOutputMirror();
     terminalShell.dispose?.();
   }
 }

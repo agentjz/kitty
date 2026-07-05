@@ -87,6 +87,10 @@ export function mirrorInteractionShellToTerminalLog(
 function mirrorOutput(output: ShellOutputPort, writer: TerminalLogWriter): ShellOutputPort {
   return {
     plain(text) {
+      if (isSubmittedInputEcho(text)) {
+        forwardOutputOnly(() => output.plain(text));
+        return;
+      }
       writeOutputAndForward(writer, `${text}\n`, () => output.plain(text));
     },
     info(text) {
@@ -110,6 +114,15 @@ function mirrorOutput(output: ShellOutputPort, writer: TerminalLogWriter): Shell
   };
 }
 
+function forwardOutputOnly(forward: () => void): void {
+  outputMirrorSuppressDepth += 1;
+  try {
+    forward();
+  } finally {
+    outputMirrorSuppressDepth -= 1;
+  }
+}
+
 function writeOutputAndForward(writer: TerminalLogWriter, text: string, forward: () => void): void {
   outputMirrorWriteCount += 1;
   writer.write(text);
@@ -122,28 +135,68 @@ function writeOutputAndForward(writer: TerminalLogWriter, text: string, forward:
 }
 
 function mirrorTurnDisplay(display: InteractionTurnDisplay, writer: TerminalLogWriter): InteractionTurnDisplay {
+  let assistantBuffer = "";
+  let reasoningBuffer = "";
+  let lastAssistantBlock = "";
+
+  const flushReasoning = (): void => {
+    const text = reasoningBuffer.trimEnd();
+    reasoningBuffer = "";
+    if (text.length > 0) {
+      writer.write(`\n[reasoning]\n${text}\n`);
+    }
+  };
+
+  const flushAssistant = (): void => {
+    flushReasoning();
+    const text = assistantBuffer.trimEnd();
+    assistantBuffer = "";
+    if (text.length > 0) {
+      lastAssistantBlock = text;
+      writer.write(`\n${text}\n`);
+    }
+  };
+
+  const flushTextBuffers = (): void => {
+    flushAssistant();
+  };
+
   return {
     callbacks: {
       ...display.callbacks,
+      onAssistantStage(text) {
+        assistantBuffer += text;
+        display.callbacks.onAssistantStage?.(text);
+      },
       onAssistantDelta(delta) {
-        forwardWithFallback(writer, () => display.callbacks.onAssistantDelta?.(delta), delta);
+        assistantBuffer += delta;
+        display.callbacks.onAssistantDelta?.(delta);
       },
       onAssistantText(text) {
-        forwardWithFallback(writer, () => display.callbacks.onAssistantText?.(text), text);
+        assistantBuffer += text;
+        display.callbacks.onAssistantText?.(text);
       },
       onAssistantDone(text) {
+        if (assistantBuffer.length === 0 && text.trimEnd() !== lastAssistantBlock) {
+          assistantBuffer = text;
+        }
+        flushAssistant();
         display.callbacks.onAssistantDone?.(text);
       },
       onReasoningDelta(delta) {
-        forwardWithFallback(writer, () => display.callbacks.onReasoningDelta?.(delta), delta);
+        reasoningBuffer += delta;
+        display.callbacks.onReasoningDelta?.(delta);
       },
       onReasoning(text) {
-        forwardWithFallback(writer, () => display.callbacks.onReasoning?.(text), text);
+        reasoningBuffer += text;
+        display.callbacks.onReasoning?.(text);
       },
       onStatus(message) {
+        flushTextBuffers();
         forwardWithFallback(writer, () => display.callbacks.onStatus?.(message), `${message}\n`);
       },
       onToolCall(name, args) {
+        flushTextBuffers();
         forwardWithFallback(writer, () => display.callbacks.onToolCall?.(name, args), formatRuntimeUiEventLine(createRuntimeUiEvent({
           channel: "lead",
           kind: "tool_call",
@@ -151,6 +204,7 @@ function mirrorTurnDisplay(display: InteractionTurnDisplay, writer: TerminalLogW
         })));
       },
       onToolResult(name, output) {
+        flushTextBuffers();
         forwardWithFallback(writer, () => display.callbacks.onToolResult?.(name, output), formatRuntimeUiEventLine(createRuntimeUiEvent({
           channel: "lead",
           kind: "tool_result",
@@ -158,6 +212,7 @@ function mirrorTurnDisplay(display: InteractionTurnDisplay, writer: TerminalLogW
         })));
       },
       onToolError(name, error) {
+        flushTextBuffers();
         forwardWithFallback(writer, () => display.callbacks.onToolError?.(name, error), formatRuntimeUiEventLine(createRuntimeUiEvent({
           channel: "lead",
           kind: "tool_error",
@@ -166,9 +221,11 @@ function mirrorTurnDisplay(display: InteractionTurnDisplay, writer: TerminalLogW
       },
     },
     flush() {
+      flushTextBuffers();
       display.flush();
     },
     dispose() {
+      flushTextBuffers();
       display.dispose();
     },
   };
@@ -224,4 +281,12 @@ function isTransientTerminalFrame(text: string): boolean {
 
 function stripAnsi(value: string): string {
   return value.replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, "");
+}
+
+function isSubmittedInputEcho(text: string): boolean {
+  const lines = text.split(/\r?\n/);
+  if (!lines[0]?.startsWith("> ")) {
+    return false;
+  }
+  return lines.slice(1).every((line) => line.startsWith("… "));
 }

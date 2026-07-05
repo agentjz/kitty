@@ -139,6 +139,160 @@ body {
   padding: 0.5rem;
 }
 
+/* ---------- history ---------- */
+
+.history-panel {
+  max-width: 800px;
+  border: 1px solid var(--kt-line);
+  border-radius: 14px;
+  background: var(--kt-paper);
+  text-align: left;
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(17, 24, 39, 0.04);
+}
+
+.history-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 1.25rem;
+  border-bottom: 1px solid var(--kt-line);
+  background: #fbfcfe;
+}
+
+.history-head h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 850;
+}
+
+.history-head p {
+  margin: 0.35rem 0 0;
+  color: var(--kt-muted);
+  font-size: 0.95rem;
+}
+
+.history-toggle {
+  flex: 0 0 auto;
+  border: 1px solid var(--kt-line);
+  border-radius: 999px;
+  background: var(--kt-paper);
+  color: var(--kt-black);
+  padding: 0.45rem 0.8rem;
+  font-size: 0.92rem;
+  font-weight: 750;
+}
+
+.history-toggle:hover {
+  border-color: var(--kt-blue);
+  color: var(--kt-blue);
+}
+
+.history-preview {
+  padding: 1.15rem 1.25rem;
+  color: var(--kt-muted);
+  font-size: 1rem;
+  line-height: 1.8;
+}
+
+.history-content {
+  padding: 1.2rem 1.35rem 1.45rem;
+  max-height: 68vh;
+  overflow: auto;
+  color: var(--kt-black);
+  font-size: 0.96rem;
+  line-height: 1.75;
+  border-top: 1px solid #edf0f2;
+}
+
+.history-content h2,
+.history-content h3,
+.history-content h4,
+.history-content h5,
+.history-content h6 {
+  margin: 1.6rem 0 0.7rem;
+  line-height: 1.35;
+  font-weight: 850;
+}
+
+.history-content h2:first-child,
+.history-content h3:first-child {
+  margin-top: 0;
+}
+
+.history-content h2 {
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid #edf0f2;
+  font-size: 1.35rem;
+}
+
+.history-content h3 {
+  font-size: 1.12rem;
+}
+
+.history-content p {
+  margin: 0 0 0.85rem;
+}
+
+.history-content ul,
+.history-content ol {
+  margin: 0 0 1rem;
+  padding-left: 1.25rem;
+}
+
+.history-content li + li {
+  margin-top: 0.28rem;
+}
+
+.history-content code {
+  padding: 0.12rem 0.32rem;
+  border-radius: 0.32rem;
+  background: #f1f3f5;
+  color: #7c2d12;
+  font-size: 0.92em;
+}
+
+.history-content pre {
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid #e9ecef;
+  border-radius: 0.65rem;
+  background: #f8f9fa;
+  overflow: auto;
+}
+
+.history-content pre code {
+  padding: 0;
+  background: transparent;
+  color: var(--kt-black);
+}
+
+.history-table-wrap {
+  margin: 0 0 1rem;
+  overflow-x: auto;
+  border: 1px solid #e9ecef;
+  border-radius: 0.65rem;
+}
+
+.history-table-wrap table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
+}
+
+.history-table-wrap th,
+.history-table-wrap td {
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid #edf0f2;
+  vertical-align: top;
+}
+
+.history-table-wrap th {
+  background: #f8f9fa;
+  font-weight: 800;
+}
+
 /* ---------- capability cards ---------- */
 
 .cap-card {
@@ -194,5 +348,18 @@ body {
     font-size: 0.9rem;
     white-space: normal;
     overflow-wrap: anywhere;
+  }
+
+  .history-head {
+    flex-direction: column;
+  }
+
+  .history-toggle {
+    width: 100%;
+  }
+
+  .history-content {
+    max-height: 72vh;
+    padding: 1rem;
   }
 }
