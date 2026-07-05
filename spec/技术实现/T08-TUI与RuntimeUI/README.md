@@ -13,6 +13,7 @@ TUI 和 Web 都是壳。它们不拥有第二套 agent 状态，只呈现 sessio
 - `src/session/`：对话和事件事实。
 - `src/runtime/status.ts`：读取结构化运行事实。
 - `src/runtime/scene.ts`：统一自然现场投影。CLI、TUI 和未来 UI 读取它，不各自重算 execution、memory、skill、cost 的语义。
+- `src/observability/terminalLog.ts`：terminal log 投影。它记录用户提交、assistant/reasoning 可读块、status、tool call/result/error 边界；fallback 渲染必须携带工具参数，不能把 `read/edit/write` 这类工具退化成 `(missing path)`。
 - `src/web/`：Web 壳，复用 host 主链路和 runtime events。
 
 ## TUI 职责
@@ -21,6 +22,7 @@ TUI 负责：
 
 - 启动时选择 session 或新建 session。
 - 展示用户、assistant、reasoning、tool fact。
+- 把 terminal log 写成可审阅现场，而不是一字符一字符的 stream delta。
 - 处理滚动、resize、输入、鼠标滚轮。
 - 显示当前后台、subagent、context、工具运行现场。
 - 在退出和中断时释放输入、渲染和 turn 生命周期资源。

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { InteractionShell, InteractionTurnDisplay, ShellInputPort, ShellOutputPort } from "../interaction/shell.js";
+import type { RuntimeConfig } from "../types.js";
 import { getProjectStatePaths } from "../project/statePaths.js";
 import { createRuntimeUiEvent } from "../runtime-ui/events.js";
 import { formatRuntimeUiEventLine } from "../runtime-ui/terminalRenderer.js";
@@ -76,7 +77,7 @@ export function mirrorInteractionShellToTerminalLog(
     input: mirrorInput(shell.input, writer),
     output: mirrorOutput(shell.output, writer),
     createTurnDisplay(options) {
-      return mirrorTurnDisplay(shell.createTurnDisplay(options), writer);
+      return mirrorTurnDisplay(shell.createTurnDisplay(options), writer, options);
     },
     dispose() {
       shell.dispose?.();
@@ -134,7 +135,14 @@ function writeOutputAndForward(writer: TerminalLogWriter, text: string, forward:
   }
 }
 
-function mirrorTurnDisplay(display: InteractionTurnDisplay, writer: TerminalLogWriter): InteractionTurnDisplay {
+function mirrorTurnDisplay(
+  display: InteractionTurnDisplay,
+  writer: TerminalLogWriter,
+  options: {
+    cwd: string;
+    config: RuntimeConfig;
+  },
+): InteractionTurnDisplay {
   let assistantBuffer = "";
   let reasoningBuffer = "";
   let lastAssistantBlock = "";
@@ -201,7 +209,8 @@ function mirrorTurnDisplay(display: InteractionTurnDisplay, writer: TerminalLogW
           channel: "lead",
           kind: "tool_call",
           toolName: name,
-        })));
+          payload: args,
+        }), { cwd: options.cwd }));
       },
       onToolResult(name, output) {
         flushTextBuffers();
@@ -209,7 +218,8 @@ function mirrorTurnDisplay(display: InteractionTurnDisplay, writer: TerminalLogW
           channel: "lead",
           kind: "tool_result",
           toolName: name,
-        })));
+          payload: output,
+        }), { cwd: options.cwd }));
       },
       onToolError(name, error) {
         flushTextBuffers();
@@ -217,7 +227,8 @@ function mirrorTurnDisplay(display: InteractionTurnDisplay, writer: TerminalLogW
           channel: "lead",
           kind: "tool_error",
           toolName: name,
-        })));
+          payload: error,
+        }), { cwd: options.cwd }));
       },
     },
     flush() {

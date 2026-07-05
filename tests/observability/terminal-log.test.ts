@@ -83,6 +83,22 @@ test("terminal log records submitted input once and skips shell echo", async () 
   assert.equal(countOccurrences(chunks.join(""), "> 请问你是什么模型"), 1);
 });
 
+test("terminal log fallback keeps tool call arguments reviewable", () => {
+  const chunks: string[] = [];
+  const shell = mirrorInteractionShellToTerminalLog(createSilentShell(), createMemoryWriter(chunks));
+  const display = shell.createTurnDisplay({
+    cwd: process.cwd(),
+    config: createTestRuntimeConfig(process.cwd()),
+    abortSignal: new AbortController().signal,
+  });
+
+  display.callbacks.onToolCall?.("read", JSON.stringify({ path: "src/example.ts", offset: 2, limit: 3 }));
+
+  const log = chunks.join("");
+  assert.match(log, /\[tool\] read src[\\/]example\.ts:2-4/);
+  assert.doesNotMatch(log, /\(missing path\)/);
+});
+
 function createStdoutWritingClosedShell(): InteractionShell {
   const write = (text: string): void => {
     process.stdout.write(`${text}\n`);

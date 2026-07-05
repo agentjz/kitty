@@ -1,5 +1,27 @@
 # 版本记录
 
+## 2026-07-05 - 真实生产路径验收与 0.0.19 发布
+
+状态：发布版本。
+
+包版本：`@jun133/kitty@0.0.19`。
+
+验证结果：
+
+- `node dist/cli.js doctor`
+- 真实 GPT/YLS provider 下 42 个隔离工具准确性修复任务
+- `cmd /c npm test` in `C:\Users\Administrator\Desktop\kitty-tool-accuracy-workspace`
+- `npm.cmd run test:build`
+- `node --test .test-build\tests\observability\terminal-log.test.js`
+- `npm.cmd run build`
+
+这个记录重要的原因：
+
+- 生产级验收重点从继续堆功能转为真实工具使用链路：读准、改准、跑测试、失败后继续修。
+- 有效工具准确性任务 42 个，最终全部通过；198 次工具开始、197 次工具完成、1 次工具失败。
+- 发现并修复 terminal log fallback 丢工具参数的问题，避免工具审阅里出现 `[tool] read (missing path)`。
+- 发现 resume 旧 session 时模型可能被旧事实带偏；明确读取当前文件和运行当前测试后可以纠偏。该风险保留为后续 status/memory closeout 硬化方向。
+
 ## 2026-06-26 - 现场表达与上下文自然性满意基线
 
 状态：满意版本。

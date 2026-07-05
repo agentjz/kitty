@@ -2,9 +2,9 @@
 
 更新时间：2026-07-05
 
-当前代码锚点：`6c55e25 Release 0.0.18`
+当前代码锚点：本次 `0.0.19` 发布提交
 
-当前包版本：`@jun133/kitty@0.0.18`
+当前包版本：`@jun133/kitty@0.0.19`
 
 用途：给后续窗口继续理解 Kitty。它不是 `spec/`，不是 README，也不是产品宣传。它记录从前身项目到当前版本的开发轨迹：做了什么，没做什么，试过什么，删过什么，失败在哪里，最后证明什么是对的。
 
@@ -54,6 +54,7 @@ hajimi -> DeepSeek CLI / deepseekcli -> Universe -> camera -> Athlete -> Deadmou
 | 12 | 2026-07-01 | DeepSeek replay | 空 `reasoningContent` 也必须保存和回放 |
 | 13 | 2026-07-01 | 发布体验 | 0.0.18 发布、postinstall/site/README 微调、默认 TUI |
 | 14 | 2026-07-05 | 历史文档 | `history.md` 接住从前身项目到 Kitty 的开发轨迹 |
+| 15 | 2026-07-05 | 真实生产路径验收 | GPT/YLS 真实 provider 下验证 core 工具准确性、resume、events/status/memory/terminal log |
 
 ## 阶段 00：前身谱系，Kitty 不是凭空开始的
 
@@ -1133,6 +1134,72 @@ reasoningContent.length > 0 ? reasoningContent : undefined
 - 如果要继续开发，先确认当前事实主干，不要按历史旧能力直接恢复。
 - 如果要理解为什么某条规则存在，就回到对应历史阶段看它是从哪个失败里来的。
 - 如果用户要求更新历史，按阶段追加，不要把整份文档改成宣传稿。
+
+## 阶段 15：真实生产路径验收，先打硬工具使用链路
+
+时间：2026-07-05
+
+当前任务：
+
+用户要求不要继续堆新功能，而是用当前构建产物和真实 provider 验证 Kitty 是否能投入日常生产使用。重点不是让模型写超大项目，而是看它能不能准确读文件、改文件、跑测试、根据失败定位并修到通过。
+
+本轮真实环境：
+
+- provider：`yls`
+- model：`gpt-5.5`
+- wire API：Responses
+- 构建产物：`node dist/cli.js`
+- 主验收工作区：`C:\Users\Administrator\Desktop\kitty-real-eval-workspace`
+- 工具准确性工作区：`C:\Users\Administrator\Desktop\kitty-tool-accuracy-workspace`
+
+已验证路径：
+
+- `doctor` 真实 provider probe。
+- CLI/TUI/interactive 真实对话。
+- 真实 core 工具 `read/edit/bash` 创建、修改和验证文件。
+- 42 个隔离小模块修复任务，最终全量 `cmd /c npm test` 通过。
+- `sessions/events/status/memory` 可读。
+- `resume` 能继续中断 session。
+- terminal log 从不可读 stream delta 收束为可读块。
+
+工具准确性事实：
+
+42 个有效修复 session 里，一共 198 次工具开始、197 次工具完成、1 次工具失败。工具分布是 read=94、edit=45、write=1、bash=58。唯一工具失败是模型第一次调用 `edit` 时漏传 `edits`，harness 正确拒绝并让同轮恢复。
+
+最有价值的失败：
+
+1. `customer` 任务中模型改了测试而不是实现。
+   这是模型任务解释问题，不是 harness。它说明测试任务提示要尽量明确“不要改测试”，但不能为某个模型特判。
+
+2. `ledger` 任务需要三轮 edit/test 才通过。
+   这是模型实现判断迭代。harness 的价值是把失败测试准确回灌，让它能继续修。
+
+3. 第一次 `csvSummary` eval 夹具本身不一致。
+   数据按 `quantity * unitPrice` 合计是 622.5，但测试写成 682.5。模型因此长时间寻找缺失规则。这不是 Kitty 失败，而是 eval 夹具失败。后来修正夹具并重跑，Kitty 一轮通过。
+
+4. 中断后 resume 第一轮回答被旧 session 事实带偏。
+   它没有检查当前文件，却断言测试仍失败。第二轮用户明确要求读当前测试并运行命令后，模型能纠偏。结论：resume 链路可用，但旧 near-field 事实会影响模型判断；status/title/memory 还可能留下旧 focus 文案。
+
+5. terminal log fallback 丢工具参数。
+   真实日志出现 `[tool] read (missing path)`，但 events 里有完整参数。根因在 `src/observability/terminalLog.ts` fallback 创建 runtime UI event 时没带 payload。已修复并加 `tests/observability/terminal-log.test.ts` 覆盖。
+
+6. `rangeMerge` 第一次把相邻区间也合并。
+   测试失败后模型根据报错改成只合并重叠区间，并同轮通过。这说明失败测试能有效回灌给模型，不需要 harness 特判。
+
+7. `csvJoin` 用 `write` 重写小文件。
+   结果正确，测试通过，但工具选择比 `edit` 粗。当前不作为 harness 问题处理，因为被改文件很小、边界明确、没有越界改动。
+
+本轮判断：
+
+Kitty 当前可以作为日常本地编程 agent 使用，尤其适合隔离工作区里的读、改、跑、修闭环。它还不适合完全无人值守地恢复旧 session 后立刻相信模型对当前现场的判断；恢复后最好要求模型重新读取关键文件或运行关键测试。
+
+这阶段留下的实践：
+
+- 生产级验收要跑真实 provider 和真实文件，不只跑 mock。
+- 工具准确性比新增工具数量重要。
+- 失败要先分层：模型行为、夹具问题、provider wire、session replay、memory closeout、observability。
+- terminal log 不是越多越好，必须能看懂 turn、tool 和 final answer。
+- 不做 Windows/PowerShell 命令翻译特判；命令失败也是事实。
 
 ## 当前结论
 
