@@ -33,6 +33,12 @@
 
 ## ⚡ 快速开始
 
+全局安装：
+
+```bash
+npm install -g @jun133/kitty
+```
+
 安装依赖并构建：
 
 ```bash
