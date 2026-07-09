@@ -49,7 +49,7 @@ test("session brief relies on model-written memory for semantic continuity", () 
     },
     {
       role: "user",
-      content: "https://github.com/agentjz/777f 和 https://github.com/agentjz/ohmyflight，请把这两个项目 clone 到桌面，也对比这两个项目。",
+      content: "https://github.com/luckymaomi/777f 和 https://github.com/luckymaomi/ohmyflight，请把这两个项目 clone 到桌面，也对比这两个项目。",
       createdAt: "2026-05-21T19:56:10.000Z",
     },
     {
@@ -62,7 +62,7 @@ test("session brief relies on model-written memory for semantic continuity", () 
           type: "function",
           function: {
             name: "bash",
-            arguments: "{\"command\":\"git clone https://github.com/agentjz/777f\"}",
+            arguments: "{\"command\":\"git clone https://github.com/luckymaomi/777f\"}",
           },
         },
       ],
@@ -83,7 +83,7 @@ test("session brief relies on model-written memory for semantic continuity", () 
 
   const block = buildSessionConversationBriefBlock(buildSessionConversationBrief({
     sessionMemory: createSessionMemoryState(
-      "用户要求本 session 用 txt 纯文本回答；当前任务是 clone 并对比 agentjz/777f 和 agentjz/ohmyflight。",
+      "用户要求本 session 用 txt 纯文本回答；当前任务是 clone 并对比 luckymaomi/777f 和 luckymaomi/ohmyflight。",
       "2026-05-21T20:00:00.000Z",
     ),
     messages,
@@ -91,10 +91,10 @@ test("session brief relies on model-written memory for semantic continuity", () 
   }));
 
   assert.match(block ?? "", /txt 纯文本/);
-  assert.match(block ?? "", /agentjz\/777f/);
-  assert.match(block ?? "", /agentjz\/ohmyflight/);
+  assert.match(block ?? "", /luckymaomi\/777f/);
+  assert.match(block ?? "", /luckymaomi\/ohmyflight/);
   assert.match(block ?? "", /clone 并对比/);
-  assert.match(block ?? "", /并对比 agentjz\/777f 和 agentjz\/ohmyflight/);
+  assert.match(block ?? "", /并对比 luckymaomi\/777f 和 luckymaomi\/ohmyflight/);
   assert.doesNotMatch(block ?? "", /我会把两个仓库 clone 到桌面/);
   assert.doesNotMatch(block ?? "", /Recent user inputs/);
   assert.doesNotMatch(block ?? "", /User anchors/);
@@ -102,7 +102,7 @@ test("session brief relies on model-written memory for semantic continuity", () 
 
 test("session brief does not create head and tail excerpts from long old turns", () => {
   const longText = [
-    "请记住这个关键任务：比较 https://github.com/agentjz/777f 和 https://github.com/agentjz/ohmyflight。",
+    "请记住这个关键任务：比较 https://github.com/luckymaomi/777f 和 https://github.com/luckymaomi/ohmyflight。",
     "中间有很多解释文字。",
     "x".repeat(1_200),
     "最终要求：输出 txt，不要 markdown。",
@@ -141,7 +141,7 @@ test("session brief does not synthesize older anchors outside model memory", () 
     },
     {
       role: "user",
-      content: "比较 https://github.com/agentjz/777f 和 https://github.com/agentjz/ohmyflight。",
+      content: "比较 https://github.com/luckymaomi/777f 和 https://github.com/luckymaomi/ohmyflight。",
       createdAt: "2026-05-21T19:56:10.000Z",
     },
     ...Array.from({ length: 20 }, (_, index): StoredMessage => ({
@@ -167,7 +167,7 @@ test("session brief does not synthesize older anchors outside model memory", () 
 test("session brief injects model-written session memory without machine semantic compression", () => {
   const block = buildSessionConversationBriefBlock(buildSessionConversationBrief({
     sessionMemory: createSessionMemoryState(
-      "用户要求本 session 用 txt 纯文本回答；当前正在比较 agentjz/777f 和 agentjz/ohmyflight。",
+      "用户要求本 session 用 txt 纯文本回答；当前正在比较 luckymaomi/777f 和 luckymaomi/ohmyflight。",
       "2026-05-21T20:00:00.000Z",
     ),
     messages: [
@@ -183,7 +183,7 @@ test("session brief injects model-written session memory without machine semanti
   assert.match(block ?? "", /Conversation continuity evidence/);
   assert.match(block ?? "", /Model-written session memory/);
   assert.match(block ?? "", /用户要求本 session 用 txt 纯文本回答/);
-  assert.match(block ?? "", /agentjz\/777f/);
+  assert.match(block ?? "", /luckymaomi\/777f/);
   assert.match(block ?? "", /Updated: 2026-05-21T20:00:00\.000Z/);
   assert.match(block ?? "", /Near-field visible turns: 1 user turn/);
   assert.doesNotMatch(block ?? "", /Recent user inputs/);

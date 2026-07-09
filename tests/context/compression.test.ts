@@ -138,7 +138,7 @@ test("runtime prompt carries same-session memory while raw request keeps near-fi
     },
     {
       role: "user",
-      content: "https://github.com/agentjz/777f 和 https://github.com/agentjz/ohmyflight，请把这两个项目 clone 到桌面，也对比这两个项目。",
+      content: "https://github.com/luckymaomi/777f 和 https://github.com/luckymaomi/ohmyflight，请把这两个项目 clone 到桌面，也对比这两个项目。",
       createdAt: "2026-05-21T19:56:10.000Z",
     },
     {
@@ -162,7 +162,7 @@ test("runtime prompt carries same-session memory while raw request keeps near-fi
     },
     messages,
     sessionMemory: createSessionMemoryState(
-      "用户要求以后不要 Markdown，用 txt 格式。当前任务是 clone 并对比 agentjz/777f 和 agentjz/ohmyflight。",
+      "用户要求以后不要 Markdown，用 txt 格式。当前任务是 clone 并对比 luckymaomi/777f 和 luckymaomi/ohmyflight。",
       "2026-05-21T20:00:00.000Z",
     ),
   });
@@ -181,12 +181,12 @@ test("runtime prompt carries same-session memory while raw request keeps near-fi
 
   assert.match(prompt, /Conversation continuity evidence/);
   assert.match(prompt, /不要 Markdown，用 txt 格式/);
-  assert.match(prompt, /agentjz\/777f/);
-  assert.match(prompt, /agentjz\/ohmyflight/);
+  assert.match(prompt, /luckymaomi\/777f/);
+  assert.match(prompt, /luckymaomi\/ohmyflight/);
   assert.doesNotMatch(prompt, /我会用 txt 纯文本格式回答/);
   assert.match(rawMessages, /请以后不要 Markdown，用 txt 格式/);
   assert.match(rawMessages, /我会用 txt 纯文本格式回答/);
-  assert.match(rawMessages, /agentjz\/777f/);
+  assert.match(rawMessages, /luckymaomi\/777f/);
   assert.match(rawMessages, /你还记得刚刚让我做什么吗/);
 });
 

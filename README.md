@@ -1,8 +1,8 @@
-﻿# 小猫智能体 Kitty
+# 小猫智能体 Kitty
 
 ![demo](site/images/product.png)
 
-官网：https://agentjz.github.io/kitty/
+官网：https://luckymaomi.github.io/kitty/
 
 <p align="center">
   <strong>🐾 一个 agent 编程工作台：搜得到，看得懂，改得准，跑得通，记得住，能继续。</strong>

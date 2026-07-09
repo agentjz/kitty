@@ -1,4 +1,4 @@
-﻿import assert from "node:assert/strict";
+import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
@@ -24,7 +24,7 @@ test("agent turn writes same-session memory as a fixed lifecycle behavior", asyn
   const memoryRequests: ModelRequestInput[] = [];
 
   const result = await runAgentTurn({
-    input: "请以后用 txt 纯文本回答，并记住现在要比较 agentjz/777f 和 agentjz/ohmyflight。",
+    input: "请以后用 txt 纯文本回答，并记住现在要比较 luckymaomi/777f 和 luckymaomi/ohmyflight。",
     cwd: root,
     config,
     session,
@@ -43,7 +43,7 @@ test("agent turn writes same-session memory as a fixed lifecycle behavior", asyn
       return {
         content: [
           "## Current Focus",
-          "比较 agentjz/777f 和 agentjz/ohmyflight。",
+          "比较 luckymaomi/777f 和 luckymaomi/ohmyflight。",
           "",
           "## User Constraints",
           "用户要求本 session 用 txt 纯文本回答。",
@@ -76,13 +76,13 @@ test("agent turn writes same-session memory as a fixed lifecycle behavior", asyn
   assert.match(result.session.sessionMemory?.summary ?? "", /## Current Focus/);
   assert.match(result.session.sessionMemory?.summary ?? "", /## User Constraints/);
   assert.match(result.session.sessionMemory?.summary ?? "", /txt 纯文本回答/);
-  assert.match(result.session.sessionMemory?.summary ?? "", /agentjz\/777f/);
-  assert.match(result.session.sessionMemory?.summary ?? "", /agentjz\/ohmyflight/);
+  assert.match(result.session.sessionMemory?.summary ?? "", /luckymaomi\/777f/);
+  assert.match(result.session.sessionMemory?.summary ?? "", /luckymaomi\/ohmyflight/);
   const ledger = new ControlPlaneLedger(root);
   const lifecycle = ledger.taskLifecycle.loadCurrent(result.session.id);
   ledger.close();
   assert.equal(lifecycle?.stage, "completed");
-  assert.equal(result.session.taskState?.focus, "比较 agentjz/777f 和 agentjz/ohmyflight。");
+  assert.equal(result.session.taskState?.focus, "比较 luckymaomi/777f 和 luckymaomi/ohmyflight。");
 });
 
 test("agent turn generates a model-written session title once", async (t) => {
@@ -251,7 +251,7 @@ test("model-written session memory focus becomes working memory focus", async (t
     fetchSessionMemoryResponse: async (): Promise<AssistantResponse> => ({
       content: [
         "## Current Focus",
-        "比较 agentjz/777f 和 agentjz/ohmyflight。",
+        "比较 luckymaomi/777f 和 luckymaomi/ohmyflight。",
         "",
         "## User Constraints",
         "None",
@@ -272,7 +272,7 @@ test("model-written session memory focus becomes working memory focus", async (t
     }),
   });
 
-  assert.equal(result.session.taskState?.focus, "比较 agentjz/777f 和 agentjz/ohmyflight。");
+  assert.equal(result.session.taskState?.focus, "比较 luckymaomi/777f 和 luckymaomi/ohmyflight。");
 });
 
 test("next turn injects model-written session memory while raw provider messages keep visible conversation", async (t) => {
@@ -284,7 +284,7 @@ test("next turn injects model-written session memory while raw provider messages
     messages: [
       {
         role: "user",
-        content: "请以后用 txt 纯文本回答，并比较 agentjz/777f 和 agentjz/ohmyflight。",
+        content: "请以后用 txt 纯文本回答，并比较 luckymaomi/777f 和 luckymaomi/ohmyflight。",
         createdAt: "2026-05-21T20:00:00.000Z",
       },
       {
@@ -302,7 +302,7 @@ test("next turn injects model-written session memory while raw provider messages
       version: 1,
       summary: [
         "## Current Focus",
-        "比较 agentjz/777f 和 agentjz/ohmyflight。",
+        "比较 luckymaomi/777f 和 luckymaomi/ohmyflight。",
         "",
         "## User Constraints",
         "用户要求本 session 用 txt 纯文本回答。",
@@ -349,8 +349,8 @@ test("next turn injects model-written session memory while raw provider messages
 
   assert.match(prompt, /Model-written session memory/);
   assert.match(prompt, /txt 纯文本回答/);
-  assert.match(prompt, /agentjz\/777f/);
-  assert.match(prompt, /agentjz\/ohmyflight/);
+  assert.match(prompt, /luckymaomi\/777f/);
+  assert.match(prompt, /luckymaomi\/ohmyflight/);
   assert.match(rawMessages, /请以后用 txt 纯文本回答/);
   assert.match(rawMessages, /我会按这个方向继续/);
   assert.match(rawMessages, /你还记得刚刚的要求吗/);
