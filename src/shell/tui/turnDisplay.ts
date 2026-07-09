@@ -4,7 +4,13 @@ import type { RuntimeUiChannel, RuntimeUiEvent } from "../../runtime-ui/events.j
 import { channelLabel } from "../../runtime-ui/theme.js";
 import type { TuiController } from "./controller.js";
 import type { TuiRuntimeDockState } from "./store.js";
-import { projectTuiToolCallFact, projectTuiToolErrorFact, projectTuiToolResultFact } from "./toolFacts.js";
+import { createRunningActivity } from "./activity.js";
+import {
+  projectTuiRuntimeStatusActivity,
+  projectTuiToolCallFact,
+  projectTuiToolErrorFact,
+  projectTuiToolResultFact,
+} from "./toolFacts.js";
 
 export function createTuiTurnDisplay(options: {
   controller: TuiController;
@@ -13,10 +19,10 @@ export function createTuiTurnDisplay(options: {
 }): InteractionTurnDisplay {
   let aborted = false;
   const isAborted = (): boolean => aborted || options.abortSignal.aborted;
-  const updateCurrent = (current: string | undefined): void => {
+  const updateActivity = (activity: TuiRuntimeDockState["activity"]): void => {
     if (!isAborted()) {
       options.controller.updateDock({
-        current,
+        activity,
       });
     }
   };
@@ -31,7 +37,7 @@ export function createTuiTurnDisplay(options: {
 
   options.abortSignal.addEventListener("abort", () => {
     aborted = true;
-    updateCurrent(undefined);
+    updateActivity(undefined);
   });
 
   const callbacks: AgentCallbacks = {
@@ -39,10 +45,10 @@ export function createTuiTurnDisplay(options: {
       renderRuntimeUiEvent(event);
     },
     onModelWaitStart() {
-      updateCurrent("思考中");
+      updateActivity(createRunningActivity({ kind: "model", channel: "lead", summary: "思考中" }));
     },
     onModelWaitStop() {
-      updateCurrent(undefined);
+      updateActivity(undefined);
     },
     onReasoningDelta(delta) {
       if (options.config.showReasoning && !isAborted()) {
@@ -70,7 +76,7 @@ export function createTuiTurnDisplay(options: {
       }
     },
     onAssistantDone() {
-      updateCurrent(undefined);
+      updateActivity(undefined);
     },
     onToolCall(name, args) {
       if (isAborted()) {
@@ -101,8 +107,9 @@ export function createTuiTurnDisplay(options: {
       if (isAborted()) {
         return;
       }
+      const activity = projectTuiRuntimeStatusActivity(text, "system");
       options.controller.updateDock({
-        current: text.trim() || undefined,
+        activity,
       });
     },
   };
@@ -111,12 +118,12 @@ export function createTuiTurnDisplay(options: {
     callbacks,
     flush() {
       options.controller.updateDock({
-        current: undefined,
+        activity: undefined,
       });
     },
     dispose() {
       options.controller.updateDock({
-        current: undefined,
+        activity: undefined,
       });
     },
   };
@@ -129,19 +136,21 @@ export function createTuiTurnDisplay(options: {
     switch (event.kind) {
       case "assistant_text":
         if (event.message) {
-          options.controller.appendStreaming("assistant", event.message);
+          options.controller.appendStreaming(event.channel === "subagent" ? "subagent" : "assistant", event.message);
         }
         return;
       case "reasoning":
         if (options.config.showReasoning && event.message) {
-          options.controller.appendStreaming("reasoning", event.message);
+          options.controller.appendStreaming(event.channel === "subagent" ? "subagent_reasoning" : "reasoning", event.message);
         }
         return;
       case "status":
-        updateCurrent(event.message?.trim() || undefined);
+        options.controller.updateDock({
+          activity: projectTuiRuntimeStatusActivity(event.message ?? "", event.channel),
+        });
         return;
       case "tool_call": {
-        const fact = projectTuiToolCallFact(event.toolName ?? "tool", event.payload ?? "{}");
+        const fact = projectTuiToolCallFact(event.toolName ?? "tool", event.payload ?? "{}", { channel: event.channel });
         options.controller.updateDock(toDockPatch(fact));
         return;
       }
@@ -155,7 +164,12 @@ export function createTuiTurnDisplay(options: {
       }
       case "tool_error": {
         const fact = projectTuiToolErrorFact(event.toolName ?? "tool", event.payload ?? event.message ?? "");
-        options.controller.updateDock(toDockPatch(fact));
+        options.controller.updateDock({
+          ...toDockPatch(fact),
+          activity: fact.activity
+            ? { ...fact.activity, channel: event.channel, blockingLead: event.channel === "subagent" }
+            : undefined,
+        });
         options.controller.append("system", `工具失败：${event.toolName ?? "tool"}`);
         return;
       }
@@ -164,12 +178,12 @@ export function createTuiTurnDisplay(options: {
 }
 
 function toDockPatch(fact: {
-  current?: string;
+  activity: TuiRuntimeDockState["activity"];
   background?: string;
   subagent?: string;
 }): Partial<TuiRuntimeDockState> {
   const patch: Partial<TuiRuntimeDockState> = {
-    current: fact.current,
+    activity: fact.activity,
   };
   if ("background" in fact) {
     patch.background = fact.background;

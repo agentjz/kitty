@@ -118,7 +118,7 @@ export class TuiController {
     this.setState(appendTranscriptEntry(this.state, { role, text }, this.viewport, this.projectionOptions()));
   }
 
-  appendStreaming(role: Extract<TuiTranscriptRole, "assistant" | "reasoning">, text: string): void {
+  appendStreaming(role: Extract<TuiTranscriptRole, "assistant" | "reasoning" | "subagent" | "subagent_reasoning">, text: string): void {
     if (!text) {
       return;
     }

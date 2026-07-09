@@ -30,17 +30,18 @@ export function readTranscriptRoleStyle(role: TuiTranscriptRole, theme: TuiTrans
     case "user":
       return {
         accent: theme.user,
-        background: theme.panelStrong,
+        background: undefined,
         text: theme.text,
         bold: true,
         dim: false,
         italicPrefix: false,
       };
     case "reasoning":
+    case "subagent_reasoning":
       return {
         accent: theme.border,
         background: undefined,
-        text: theme.reasoning,
+        text: role === "subagent_reasoning" ? theme.subagent : theme.reasoning,
         bold: false,
         dim: true,
         italicPrefix: true,
@@ -55,11 +56,12 @@ export function readTranscriptRoleStyle(role: TuiTranscriptRole, theme: TuiTrans
         italicPrefix: false,
       };
     case "assistant":
+    case "subagent":
       return {
-        accent: theme.background,
+        accent: role === "subagent" ? theme.subagent : theme.background,
         background: undefined,
-        text: theme.assistant,
-        bold: false,
+        text: role === "subagent" ? theme.subagent : theme.assistant,
+        bold: role === "subagent",
         dim: false,
         italicPrefix: false,
       };
@@ -107,9 +109,10 @@ function readRoleFrameBase(role: TuiTranscriptRole): Omit<TuiTranscriptLineFrame
   switch (role) {
     case "user":
     case "reasoning":
+    case "subagent_reasoning":
       return {
         gap: 2,
-        gutter: "┃",
+        gutter: role === "subagent_reasoning" ? "┊" : "┃",
         marginLeft: 1,
         paddingLeft: 1,
         paddingRight: 1,
@@ -123,9 +126,10 @@ function readRoleFrameBase(role: TuiTranscriptRole): Omit<TuiTranscriptLineFrame
         paddingRight: 1,
       };
     case "assistant":
+    case "subagent":
       return {
         gap: 2,
-        gutter: " ",
+        gutter: role === "subagent" ? "◇" : " ",
         marginLeft: 2,
         paddingLeft: 1,
         paddingRight: 1,

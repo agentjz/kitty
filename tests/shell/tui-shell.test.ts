@@ -52,7 +52,7 @@ test("tui turn display keeps live tool facts in runtime dock", () => {
   assert.ok(state.dock.background);
   assert.match(state.dock.background, /background_run/);
   assert.match(state.dock.background, /running/);
-  assert.equal(state.dock.current, undefined);
+  assert.equal(state.dock.activity, undefined);
 });
 
 test("tui turn display renders replayed subagent runtime UI in the current transcript", () => {
@@ -91,7 +91,8 @@ test("tui turn display renders replayed subagent runtime UI in the current trans
   const text = state.transcript.map((entry) => entry.text).join("\n");
   assert.match(text, /\[子代理\]/);
   assert.match(text, /worker answer/);
-  assert.equal(state.dock.current, "Lead resumed after delegated execution settled.");
+  assert.equal(state.transcript.some((entry) => entry.role === "subagent" && entry.text === "worker answer"), true);
+  assert.equal(state.dock.activity?.summary, "子代理已完成，切回 lead");
 });
 
 test("tui turn display does not keep subagent read failures as live subagent state", () => {
@@ -107,7 +108,7 @@ test("tui turn display does not keep subagent read failures as live subagent sta
   display.flush();
 
   assert.equal(controller.getState().dock.subagent, undefined);
-  assert.equal(controller.getState().dock.current, undefined);
+  assert.equal(controller.getState().dock.activity, undefined);
 });
 
 test("tui turn display shows todo_write preview as a tool transcript fact", () => {
@@ -129,7 +130,7 @@ test("tui turn display shows todo_write preview as a tool transcript fact", () =
 
   const text = controller.getState().transcript.map((entry) => entry.text).join("\n");
   assert.match(text, /\[>\] #1: 接入 TUI todo/);
-  assert.equal(controller.getState().dock.current, undefined);
+  assert.equal(controller.getState().dock.activity, undefined);
 });
 
 test("tui turn display keeps raw bash command visible while running", () => {
@@ -143,7 +144,31 @@ test("tui turn display keeps raw bash command visible while running", () => {
 
   display.callbacks.onToolCall?.("bash", JSON.stringify({ command: "npm.cmd run verify" }));
 
-  assert.equal(controller.getState().dock.current, "bash npm.cmd run verify");
+  assert.equal(controller.getState().dock.activity?.summary, "bash npm.cmd run verify");
+  assert.equal(controller.getState().dock.activity?.status, "running");
+});
+
+test("tui turn display marks subagent replayed tool calls as blocking lead activity", () => {
+  const controller = new TuiController();
+  const shell = createTuiInteractionShell(controller);
+  const display = shell.createTurnDisplay({
+    cwd: process.cwd(),
+    config: { showReasoning: true } as never,
+    abortSignal: new AbortController().signal,
+  });
+
+  display.callbacks.onRuntimeUiEvent?.({
+    protocol: "kitty.runtime-ui-event",
+    channel: "subagent",
+    kind: "tool_call",
+    toolName: "read",
+    payload: JSON.stringify({ path: "src/index.ts" }),
+    createdAt: "2026-07-09T00:00:00.000Z",
+  });
+
+  assert.equal(controller.getState().dock.activity?.channel, "subagent");
+  assert.equal(controller.getState().dock.activity?.summary, "read src/index.ts");
+  assert.equal(controller.getState().dock.activity?.blockingLead, true);
 });
 
 test("tui turn display exposes post-answer summary status", () => {
@@ -156,10 +181,10 @@ test("tui turn display exposes post-answer summary status", () => {
   });
 
   display.callbacks.onStatus?.("总结中");
-  assert.equal(controller.getState().dock.current, "总结中");
+  assert.equal(controller.getState().dock.activity?.summary, "总结中");
 
   display.callbacks.onStatus?.("");
-  assert.equal(controller.getState().dock.current, undefined);
+  assert.equal(controller.getState().dock.activity, undefined);
 });
 
 test("tui turn display does not let unrelated tools clear live execution facts", () => {
@@ -177,7 +202,7 @@ test("tui turn display does not let unrelated tools clear live execution facts",
   display.callbacks.onToolResult?.("read", JSON.stringify({ ok: true, content: "{}" }));
 
   assert.match(controller.getState().dock.background ?? "", /running/);
-  assert.equal(controller.getState().dock.current, undefined);
+  assert.equal(controller.getState().dock.activity, undefined);
 });
 
 test("tui shell interrupt forwards to session driver handler", () => {

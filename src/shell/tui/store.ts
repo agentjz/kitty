@@ -1,5 +1,6 @@
 import type { SessionRecord, StoredMessage } from "../../types.js";
 import type { RuntimeStatus } from "../../runtime/status.js";
+import type { TuiActivity } from "./activity.js";
 import { TUI_COLORS } from "./theme.js";
 import {
   measureTranscriptRows as measureTranscriptLayoutRows,
@@ -19,7 +20,7 @@ export type {
 } from "./transcriptLayout.js";
 
 export interface TuiRuntimeDockState {
-  current?: string;
+  activity?: TuiActivity;
   background?: string;
   subagent?: string;
   context: string;
@@ -99,7 +100,12 @@ export function appendTranscriptText(
   options: TuiProjectionOptions = {},
 ): TuiState {
   const last = state.transcript[state.transcript.length - 1];
-  if (last && last.role === role && (role === "assistant" || role === "reasoning")) {
+  if (last && last.role === role && (
+    role === "assistant"
+    || role === "reasoning"
+    || role === "subagent"
+    || role === "subagent_reasoning"
+  )) {
     const transcript = state.transcript.slice(0, -1);
     const next = {
       ...state,

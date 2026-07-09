@@ -15,7 +15,10 @@ import type {
   TuiTranscriptRole,
   TuiTranscriptTheme,
 } from "./transcriptTypes.js";
-import { wrapTranscriptEntryRows, type TuiTranscriptSourceRow } from "./transcriptWrap.js";
+import {
+  wrapTranscriptEntryRows,
+  type TuiTranscriptSourceRow,
+} from "./transcriptWrap.js";
 
 export { TRANSCRIPT_OUTER_PADDING_X };
 export type {
@@ -61,10 +64,12 @@ export function renderTranscriptEntryLineViews(
   const style = readTranscriptRoleStyle(entry.role, theme);
   const sourceRows = readEntryDisplayRows(entry);
   const contentRows = wrapTranscriptEntryRows(entry, sourceRows, frame.bodyWidth);
-  const rows = contentRows.length > 0
+  const wrappedRows = contentRows.length > 0
     ? contentRows
     : [{ markdownKind: undefined, language: undefined, prefix: "", text: "", spans: [] }];
+  const rows = wrappedRows;
   const entryId = entry.id;
+  const firstContentIndex = rows.findIndex((row) => row.text.length > 0 || row.spans.length > 0 || row.prefix.length > 0);
   return [
     {
       id: `${entryId}-spacer`,
@@ -90,7 +95,7 @@ export function renderTranscriptEntryLineViews(
       prefix: row.prefix,
       markdownKind: row.markdownKind,
       language: row.language,
-      isFirstContentLine: index === 0,
+      isFirstContentLine: index === Math.max(0, firstContentIndex),
       frame,
       style: applyTranscriptMarkdownStyle(style, row.markdownKind, theme),
     })),
@@ -98,7 +103,7 @@ export function renderTranscriptEntryLineViews(
 }
 
 function readEntryDisplayRows(entry: TuiTranscriptEntry): TuiTranscriptSourceRow[] {
-  if (entry.role === "assistant" || entry.role === "reasoning") {
+  if (entry.role === "assistant" || entry.role === "reasoning" || entry.role === "subagent" || entry.role === "subagent_reasoning") {
     const markdownRows = renderMarkdownLines(entry.text);
     return markdownRows.length > 0
       ? markdownRows.map((row) => ({

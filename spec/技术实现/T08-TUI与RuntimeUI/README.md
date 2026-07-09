@@ -42,14 +42,21 @@ Transcript layout 统一处理 wrapping、markdown display facts、宽字符、�
 
 ## Runtime Dock
 
-底部现场只展示当前正在发生的事：
+底部现场只展示当前正在发生的事。它不新建 execution 状态，只把 runtime-ui event、session event 和 runtime status 投影成 TUI activity。
 
-- 当前工具或命令原文。
+- 当前 activity：工具、命令、subagent、后台等待或模型状态。
+- 当前 activity 的状态、运行时长、是否阻塞 lead。
 - background / subagent 是否在跑。
 - context 占用。
 - 总结中、标题生成中等 turn lifecycle 状态。
 
-没有事实时不制造假状态；需要稳定布局时可以显示短的空闲行。
+中文化只用于少量状态提醒，例如“正在运行”“已运行”“失败”“空闲”“阻塞 lead”。命令、路径、工具名、execution id 保持原文，不翻译。没有 activity 时底栏仍保持两行信息结构。
+
+没有事实时不制造 background/subagent 假状态；需要稳定布局时显示短的 idle 行。运行时长和 running spinner 只在 TUI 组件内按 activity startedAt 或本地 animation frame 派生，不写回 session、control-plane 或 controller 状态。idle 和 waiting 不做点状 pulse 动画。
+
+subagent 阻塞 lead 时，当前输出流必须切到 subagent channel，显示 subagent 的工具、思考和回答；subagent settled 后再切回 lead。旁路 status/CLI 审阅不能替代这个实时可见性。
+
+空 transcript 保持空白第一屏，不显示欢迎文案或快捷键教程；已有 session 继续走 session picker。用户发送后的 transcript 消息保持紧凑，不使用整行深色背景铺满正文宽度。
 
 ## 验收
 

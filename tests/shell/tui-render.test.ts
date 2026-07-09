@@ -28,14 +28,23 @@ test("tui runtime dock renders the current scene facts", async () => {
     Text: ink.Text,
   });
   const dock: TuiRuntimeDockState = {
-    current: "bash npm.cmd run verify",
+    activity: {
+      kind: "tool",
+      channel: "lead",
+      status: "running",
+      summary: "bash npm.cmd run verify",
+      startedAt: 1_000,
+      severity: "info",
+    },
     background: "background_run 运行中",
     context: "100/1000 chars (10%)",
   };
 
-  const output = ink.renderToString(React.default.createElement(RuntimeDock, { dock }), { columns: 80 });
+  const output = ink.renderToString(React.default.createElement(RuntimeDock, { dock, now: 13_000 }), { columns: 80 });
 
+  assert.match(output, /正在运行：/);
   assert.match(output, /bash npm\.cmd run verify/);
+  assert.match(output, /已运行 12s/);
   assert.match(output, /后台/);
   assert.match(output, /background_run 运行中/);
   assert.doesNotMatch(output, /子代理/);
@@ -43,7 +52,7 @@ test("tui runtime dock renders the current scene facts", async () => {
   assert.match(output, /上下文/);
 });
 
-test("tui runtime dock keeps a stable idle row without inventing execution facts", async () => {
+test("tui runtime dock keeps the stable two-line idle structure without inventing execution facts", async () => {
   const React = await import("react");
   const ink = await import("ink");
   const { createRuntimeDockComponent } = await import("../../src/shell/tui/components/RuntimeDock.js");
@@ -58,10 +67,39 @@ test("tui runtime dock keeps a stable idle row without inventing execution facts
     { columns: 80 },
   );
 
-  assert.match(output, /空闲中/);
+  assert.match(output, /空闲/);
   assert.doesNotMatch(output, /后台/);
   assert.doesNotMatch(output, /子代理/);
   assert.match(output, /上下文/);
+});
+
+test("tui runtime dock renders failed activity without parsing message words", async () => {
+  const React = await import("react");
+  const ink = await import("ink");
+  const { createRuntimeDockComponent } = await import("../../src/shell/tui/components/RuntimeDock.js");
+  const RuntimeDock = createRuntimeDockComponent({
+    React: React.default,
+    Box: ink.Box,
+    Text: ink.Text,
+  });
+
+  const output = ink.renderToString(
+    React.default.createElement(RuntimeDock, {
+      dock: {
+        context: "0%",
+        activity: {
+          kind: "tool",
+          channel: "lead",
+          status: "failed",
+          summary: "edit src/index.ts",
+          severity: "error",
+        },
+      } satisfies TuiRuntimeDockState,
+    }),
+    { columns: 80 },
+  );
+
+  assert.match(output, /失败：edit src\/index\.ts/);
 });
 
 test("tui composer renders as the prototype footer input block", async () => {
@@ -240,6 +278,7 @@ test("tui session picker renders banner and numbered sessions", async () => {
 
   assert.match(output, /██/);
   assert.equal((output.match(/Kitty Agent/g) ?? []).length, 0);
+  assert.match(output, /继续会话/);
   assert.match(output, /0\. 新建会话/);
   assert.match(output, /1\. 继续改 TUI/);
   assert.match(output, /3 分钟前/);
@@ -273,9 +312,34 @@ function createFakeDomElement(
   };
 }
 
-test("tui theme uses gold as the primary accent", () => {
-  assert.equal(TUI_COLORS.user, "#d6a84f");
-  assert.equal(TUI_COLORS.warning, "#d6a84f");
+test("tui theme uses sky blue as the primary accent", () => {
+  assert.equal(TUI_COLORS.user, "#5db7ff");
+  assert.equal(TUI_COLORS.warning, "#5db7ff");
+});
+
+test("tui transcript renders an empty first screen without transcript facts", async () => {
+  const React = await import("react");
+  const ink = await import("ink");
+  const { createTranscriptComponent } = await import("../../src/shell/tui/components/Transcript.js");
+  const Transcript = createTranscriptComponent({
+    React: React.default,
+    Box: ink.Box,
+    Text: ink.Text,
+  });
+
+  const output = ink.renderToString(
+    React.default.createElement(Transcript, {
+      state: createInitialTuiState(),
+      viewport: { width: 80, height: 12 },
+    }),
+    { columns: 100 },
+  );
+
+  assert.doesNotMatch(output, /Kitty/);
+  assert.doesNotMatch(output, /新会话已就绪/);
+  assert.doesNotMatch(output, /输入任务后按 Enter 发送/);
+  assert.doesNotMatch(output, /PageUp\/PageDown/);
+  assert.doesNotMatch(output, /选择会话/);
 });
 
 test("tui transcript renders user, reasoning, assistant, and system rows", async () => {
@@ -287,16 +351,18 @@ test("tui transcript renders user, reasoning, assistant, and system rows", async
     Box: ink.Box,
     Text: ink.Text,
   });
+  const viewport = { width: 60, height: 10 };
   let state = createInitialTuiState();
-  state = appendTranscriptEntry(state, { role: "user", text: "hello" }, { width: 60, height: 8 });
-  state = appendTranscriptEntry(state, { role: "reasoning", text: "thinking" }, { width: 60, height: 8 });
-  state = appendTranscriptEntry(state, { role: "assistant", text: "answer" }, { width: 60, height: 8 });
-  state = appendTranscriptEntry(state, { role: "system", text: "notice" }, { width: 60, height: 8 });
+  state = appendTranscriptEntry(state, { role: "user", text: "hello" }, viewport);
+  state = appendTranscriptEntry(state, { role: "reasoning", text: "thinking" }, viewport);
+  state = appendTranscriptEntry(state, { role: "assistant", text: "answer" }, viewport);
+  state = appendTranscriptEntry(state, { role: "subagent", text: "worker answer" }, viewport);
+  state = appendTranscriptEntry(state, { role: "system", text: "notice" }, viewport);
 
   const output = ink.renderToString(
     React.default.createElement(Transcript, {
       state,
-      viewport: { width: 60, height: 8 },
+      viewport,
     }),
     { columns: 80 },
   );
@@ -304,6 +370,7 @@ test("tui transcript renders user, reasoning, assistant, and system rows", async
   assert.match(output, /hello/);
   assert.match(output, /thinking/);
   assert.match(output, /answer/);
+  assert.match(output, /worker answer/);
   assert.match(output, /notice/);
 });
 

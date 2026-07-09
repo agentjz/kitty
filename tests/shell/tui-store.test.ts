@@ -127,6 +127,19 @@ test("tui transcript layout uses terminal display width for wide characters", ()
   assert.equal(rows.every((row) => row.kind === "spacer" || !row.text.includes("你好你好你好你好你好")), true);
 });
 
+test("tui transcript keeps submitted user messages compact without full-width panel fill", () => {
+  const rows = renderTranscriptLineViews([{
+    id: "entry-1",
+    role: "user",
+    text: "hello",
+  }], 80);
+
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0]?.kind, "spacer");
+  assert.equal(rows[1]?.text, "hello");
+  assert.equal(rows[1]?.style.background, undefined);
+});
+
 test("tui transcript keeps markdown structure as display facts", () => {
   const rows = renderTranscriptLineViews([{
     id: "entry-1",
