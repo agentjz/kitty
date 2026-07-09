@@ -1,4 +1,5 @@
 import type { SessionRecord, StoredMessage } from "../../types.js";
+import type { RuntimeStatus } from "../../runtime/status.js";
 import { TUI_COLORS } from "./theme.js";
 import {
   measureTranscriptRows as measureTranscriptLayoutRows,
@@ -241,6 +242,14 @@ export function formatContextBudget(session: SessionRecord | undefined): string 
   return `${budget.estimatedChars}/${budget.limitChars} chars (${percent}%)`;
 }
 
+export function projectRuntimeStatusToDock(status: RuntimeStatus): Partial<TuiRuntimeDockState> {
+  return {
+    background: formatExecutionDockFact(status, "background"),
+    subagent: formatExecutionDockFact(status, "subagent"),
+    context: readRuntimeContextBudget(status),
+  };
+}
+
 function applyContentChange(
   state: TuiState,
   viewport: TuiViewport,
@@ -289,4 +298,32 @@ function createEntryId(index: number): string {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+function formatExecutionDockFact(status: RuntimeStatus, kind: "background" | "subagent"): string | undefined {
+  const executions = status.scene.executions.filter((execution) => execution.kind === kind);
+  if (executions.length === 0) {
+    return undefined;
+  }
+  const attention = executions.filter((execution) => execution.risk !== "none").length;
+  const first = executions[0];
+  return [
+    `${executions.length} ${first?.status ?? "active"}`,
+    attention > 0 ? `${attention} attention` : undefined,
+    first?.summary ? truncateDockFact(first.summary, 48) : undefined,
+  ].filter(Boolean).join("; ");
+}
+
+function readRuntimeContextBudget(status: RuntimeStatus): string {
+  const budget = status.sessions.latest?.contextBudget;
+  if (!budget) {
+    return "0%";
+  }
+  const percent = Math.round(budget.usageRatio * 100);
+  return `${budget.estimatedChars}/${budget.limitChars} chars (${percent}%)`;
+}
+
+function truncateDockFact(value: string, maxChars: number): string {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  return normalized.length <= maxChars ? normalized : `${normalized.slice(0, Math.max(0, maxChars - 3))}...`;
 }

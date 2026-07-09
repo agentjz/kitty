@@ -8,6 +8,7 @@ import { registerConfigCommands } from "./commands/config.js";
 import { registerDoctorCommand } from "./commands/doctor.js";
 import { registerEvaluationCommand } from "./commands/evaluation.js";
 import { registerEventsCommand } from "./commands/events.js";
+import { registerExecutionCommand } from "./commands/execution.js";
 import { registerProjectCommands } from "./commands/project.js";
 import { registerAgentCommand } from "./commands/agent.js";
 import { registerBackgroundCommand } from "./commands/background.js";
@@ -56,6 +57,10 @@ export function buildCliProgram(dependencies: CliProgramDependencies = {}): Comm
     dependencies,
   });
   registerBackgroundCommand(program, {
+    getCliOverrides,
+    resolveRuntime,
+  });
+  registerExecutionCommand(program, {
     getCliOverrides,
     resolveRuntime,
   });

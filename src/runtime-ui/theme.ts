@@ -33,6 +33,8 @@ function colorForChannel(channel: RuntimeUiChannel): (text: string) => string {
   switch (channel) {
     case "system":
       return chalk.gray;
+    case "subagent":
+      return chalk.cyan;
     case "lead":
       return (text: string) => text;
   }
@@ -43,5 +45,7 @@ function channelHeaderColor(channel: RuntimeUiChannel): (text: string) => string
     case "lead":
     case "system":
       return chalk.red.bold;
+    case "subagent":
+      return chalk.cyan.bold;
   }
 }

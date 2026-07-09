@@ -35,14 +35,30 @@ export function projectToolResultForModel(input: {
     case "background_check":
     case "subagent_check":
       return projectExecutionCheck(parsed);
+    case "background_read":
+    case "subagent_read":
+      return projectExecutionRead(parsed);
     case "background_wait":
     case "background_stop":
+    case "subagent_cancel":
       return projectExecutionAction(parsed);
     case "skill_load":
       return projectSkillLoad(parsed);
     default:
       return projectGenericSuccess(parsed, input.result.output);
   }
+}
+
+function projectExecutionRead(payload: Record<string, unknown>): string {
+  return joinLines([
+    readString(payload.id) ?? "execution",
+    readString(payload.kind),
+    readString(payload.status),
+    readString(payload.mode) ? `mode: ${readString(payload.mode)}` : undefined,
+    readNumber(payload.bytes) !== undefined ? `bytes: ${readNumber(payload.bytes)}` : undefined,
+    payload.truncated === true ? "output truncated" : undefined,
+    readString(payload.output) ? truncateText(readString(payload.output) ?? "", OUTPUT_MAX_CHARS) : undefined,
+  ]);
 }
 
 function projectExecutionAction(payload: Record<string, unknown>): string {

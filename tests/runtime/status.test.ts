@@ -112,7 +112,7 @@ test("runtime status projects the current project runtime facts", async (t) => {
   assert.equal(status.executions.active[0]?.health?.state, "running");
   assert.equal(status.wakeSignals.recent.length, 1);
   assert.equal(status.scene.headline, "One delegated task is running.");
-  assert.equal(status.scene.nextAction, "Wait for the active task, or inspect it with `kitty status` / `kitty background`.");
+  assert.equal(status.scene.nextAction, "Wait for the active task, or inspect it with `kitty status` / `kitty execution`.");
   assert.match(status.scene.cost, /5% context/);
   assert.match(status.scene.cost, /stable 67%/);
   assert.equal(status.scene.recovery, "One wake signal is recorded.");
@@ -128,7 +128,7 @@ test("runtime status projects the current project runtime facts", async (t) => {
   assert.match(text, /Cost: 5% context; stable 67%; No model request recorded yet/);
   assert.match(text, /Runtime facts:/);
   assert.match(text, /Focus: Investigate runtime/);
-  assert.match(text, /Next: Wait for the active task, or inspect it with `kitty status` \/ `kitty background`\./);
+  assert.match(text, /Next: Wait for the active task, or inspect it with `kitty status` \/ `kitty execution`\./);
   assert.match(text, /Blocked: No blockers visible\./);
   assert.match(text, /Skills: 0\/0 ready/);
   assert.match(text, /Executions: 1 active \/ 1 total/);
@@ -258,7 +258,7 @@ test("runtime status exposes background executions that are running without outp
   assert.match(status.executions.active[0]?.health?.message ?? "", /has not published output/);
   assert.equal(status.scene.background.active, 1);
   assert.equal(status.scene.background.blocked, 1);
-  assert.match(status.scene.background.nextAction, /kitty background wait/);
+  assert.match(status.scene.background.nextAction, /kitty background read/);
   assert.equal(status.scene.executions[0]?.risk, "watch");
   assert.match(formatRuntimeStatusText(status), /risk=watch/);
 });

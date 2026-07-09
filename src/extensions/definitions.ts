@@ -74,10 +74,11 @@ export const EXTENSION_DEFINITIONS = [
     summary: "Background command execution with durable lifecycle tracking.",
     createTools: createBackgroundTools,
     capability: {
-      description: "Background command execution with control-plane lifecycle tracking and wake facts.",
+      description: "Background command execution with control-plane lifecycle tracking, output read, stop, wait, and wake facts.",
       bestFor: [
         "running long local commands without blocking the current turn",
-        "checking or terminating recorded background executions",
+        "reading, checking, waiting for, or terminating recorded background executions",
+        "watching services, test matrices, or commands that produce output over time",
       ],
       cost: "medium",
     },
@@ -89,10 +90,12 @@ export const EXTENSION_DEFINITIONS = [
     summary: "Focused subagent execution with durable lifecycle tracking.",
     createTools: createSubagentTools,
     capability: {
-      description: "Focused subagent execution recorded in the control plane.",
+      description: "Focused subagent execution recorded in the control plane with output read and cancellation.",
       bestFor: [
-        "delegating bounded investigation or implementation work",
-        "checking subagent execution state",
+        "delegating complex bounded investigation or implementation work that benefits from independent context",
+        "checking, reading, or cancelling subagent execution state",
+        "parallel work only when tasks are independent or share an explicit plan",
+        "keeping dependent tasks sequential until the lead has a shared plan",
       ],
       cost: "medium",
     },

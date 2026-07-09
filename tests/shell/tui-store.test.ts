@@ -8,12 +8,14 @@ import {
   getVisibleTranscriptRows,
   measureTranscriptRows,
   parseSubmittedInputEcho,
+  projectRuntimeStatusToDock,
   renderTranscriptLineViews,
   formatContextBudget,
   scrollTuiTranscript,
   scrollTuiTranscriptToBottom,
   type TuiViewport,
 } from "../../src/shell/tui/store.js";
+import type { RuntimeStatus } from "../../src/runtime/status.js";
 import { TuiTranscriptProjection } from "../../src/shell/tui/transcriptProjection.js";
 import type { SessionRecord } from "../../src/types.js";
 import type { TuiTranscriptEntry } from "../../src/shell/tui/store.js";
@@ -36,6 +38,31 @@ test("tui state projects external session messages without internal facts", () =
 test("tui context budget defaults to zero before runtime facts arrive", () => {
   assert.equal(createInitialTuiState().dock.context, "0%");
   assert.equal(formatContextBudget(undefined), "0%");
+});
+
+test("tui dock projects background and subagent facts from runtime status", () => {
+  const dock = projectRuntimeStatusToDock({
+    sessions: {
+      latest: {
+        contextBudget: {
+          estimatedChars: 250,
+          limitChars: 1000,
+          usageRatio: 0.25,
+        },
+      },
+    },
+    scene: {
+      executions: [
+        { id: "bg", kind: "background", status: "running", risk: "watch", summary: "watch server" },
+        { id: "sub", kind: "subagent", status: "running", risk: "none", summary: "inspect files" },
+      ],
+    },
+  } as RuntimeStatus);
+
+  assert.match(dock.background ?? "", /1 running/);
+  assert.match(dock.background ?? "", /attention/);
+  assert.match(dock.subagent ?? "", /inspect files/);
+  assert.equal(dock.context, "250/1000 chars (25%)");
 });
 
 test("tui transcript sticks to bottom unless user scrolls history", () => {

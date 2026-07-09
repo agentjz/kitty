@@ -9,7 +9,8 @@ export type SessionEventType =
   | "turn.aborted"
   | "tool.started"
   | "tool.completed"
-  | "tool.failed";
+  | "tool.failed"
+  | "runtime.ui";
 
 export interface SessionEventRecord {
   id: string;

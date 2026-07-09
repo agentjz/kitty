@@ -7,7 +7,9 @@ import { InProcessSessionStore } from "../../src/session/store.js";
 import { createToolRegistry } from "../../src/tools/core/registry.js";
 import { ExecutionStore } from "../../src/execution/store.js";
 import { ControlPlaneLedger } from "../../src/control/ledger.js";
-import { buildLeadWakeFacts, hasUnsettledLeadWaitExecutions, pauseExpiredLeadWaitExecutions } from "../../src/execution/leadWait.js";
+import { createRuntimeUiEvent } from "../../src/runtime-ui/events.js";
+import { SessionEventStore } from "../../src/session/events.js";
+import { buildLeadWakeFacts, hasUnsettledLeadWaitExecutions, pauseExpiredLeadWaitExecutions, waitForLeadWaitExecutions } from "../../src/execution/leadWait.js";
 import { createTestRuntimeConfig, createTempWorkspace } from "../helpers.js";
 import type { AssistantResponse } from "../../src/agent/types.js";
 import type { RegisteredTool } from "../../src/tools/core/types.js";
@@ -208,6 +210,159 @@ test("host waits for yielded execution and resumes lead with wake facts", async 
 
   assert.equal(outcome.status, "completed");
   assert.equal(calls, 2);
+});
+
+test("lead wait returns fresh terminal facts after external cancellation", async (t) => {
+  const root = await createTempWorkspace("lead-wait-external-cancel", t);
+  const store = new ExecutionStore(root);
+  const execution = store.create({
+    kind: "subagent",
+    prompt: "finish delegated work",
+    cwd: root,
+    requestedBy: "lead",
+    actorName: "worker",
+  });
+  store.markRunning(execution.id, { pid: process.pid });
+
+  const results = await waitForLeadWaitExecutions({
+    rootDir: root,
+    executionIds: [execution.id],
+    onPoll: () => {
+      store.close(execution.id, {
+        status: "aborted",
+        summary: "Subagent execution cancelled by CLI.",
+        closeReason: "cancelled",
+        terminatedBy: "cli",
+      });
+    },
+  });
+
+  assert.equal(results[0]?.status, "aborted");
+  assert.match(buildLeadWakeFacts(results).promptBlock, /aborted/);
+  assert.match(buildLeadWakeFacts(results).promptBlock, /cancelled by CLI/);
+});
+
+test("host streams subagent runtime UI while lead waits then switches back to lead", async (t) => {
+  const root = await createTempWorkspace("lead-wait-subagent-stream", t);
+  const config = createTestRuntimeConfig(root);
+  const sessionStore = new InProcessSessionStore();
+  const session = await sessionStore.create(root);
+  const workerSession = await sessionStore.create(root);
+  const store = new ExecutionStore(root);
+  const execution = store.create({
+    kind: "subagent",
+    prompt: "inspect delegated work",
+    cwd: root,
+    requestedBy: "lead",
+    actorName: "worker",
+  });
+  store.markRunning(execution.id, { pid: process.pid, sessionId: workerSession.id });
+  const visibleEvents: Array<{ channel: string; kind: string; message?: string; toolName?: string }> = [];
+  let calls = 0;
+
+  const outcome = await runHostTurn({
+    host: "test",
+    input: "delegate work",
+    cwd: root,
+    config,
+    session,
+    sessionStore,
+    callbacks: {
+      onRuntimeUiEvent(event) {
+        visibleEvents.push({
+          channel: event.channel,
+          kind: event.kind,
+          message: event.message,
+          toolName: event.toolName,
+        });
+      },
+    },
+  }, {
+    createToolRegistry: async () => createToolRegistry({ onlyNames: [] }),
+    runTurn: async (options) => {
+      calls += 1;
+      if (calls === 1) {
+        setTimeout(() => {
+          void new SessionEventStore(config.paths.eventsDir).append({
+            type: "runtime.ui",
+            sessionId: workerSession.id,
+            cwd: root,
+            host: "subagent",
+            details: {
+              runtimeUiEvent: createRuntimeUiEvent({
+                channel: "subagent",
+                kind: "tool_call",
+                toolName: "read",
+                payload: JSON.stringify({ path: "src/index.ts" }),
+                actor: "worker",
+                executionId: execution.id,
+              }),
+            },
+          });
+        }, 10);
+        setTimeout(() => {
+          void (async () => {
+            await new SessionEventStore(config.paths.eventsDir).append({
+              type: "runtime.ui",
+              sessionId: workerSession.id,
+              cwd: root,
+              host: "subagent",
+              details: {
+                runtimeUiEvent: createRuntimeUiEvent({
+                  channel: "subagent",
+                  kind: "assistant_text",
+                  message: "worker result visible",
+                  actor: "worker",
+                  executionId: execution.id,
+                }),
+              },
+            });
+            store.close(execution.id, {
+              status: "completed",
+              summary: "worker result visible",
+              resultText: "worker result visible",
+            });
+          })();
+        }, 20);
+        return {
+          session: options.session,
+          changedPaths: [],
+          transition: {
+            action: "yield",
+            reason: {
+              code: "yield.execution_wait",
+              executionIds: [execution.id],
+              toolNames: ["subagent_launch"],
+            },
+            timestamp: new Date().toISOString(),
+          },
+        };
+      }
+
+      return {
+        session: options.session,
+        changedPaths: [],
+        transition: {
+          action: "finalize",
+          reason: {
+            code: "finalize.completed",
+            changedPaths: [],
+          },
+          timestamp: new Date().toISOString(),
+        },
+      };
+    },
+  });
+
+  assert.equal(outcome.status, "completed");
+  assert.deepEqual(
+    visibleEvents.map((event) => [event.channel, event.kind, event.toolName ?? event.message]),
+    [
+      ["subagent", "tool_call", "read"],
+      ["subagent", "assistant_text", "worker result visible"],
+      ["lead", "status", "Lead resumed after delegated execution settled."],
+    ],
+  );
 });
 
 test("host directly closes out delegated exact expected output", async (t) => {

@@ -41,6 +41,9 @@ export function createRuntimeUiAgentCallbacks(input: {
   return {
     flush: renderer.flush,
     callbacks: {
+      onRuntimeUiEvent(event) {
+        render(event);
+      },
       onReasoningDelta(delta) {
         render(createRuntimeUiEvent({ channel: input.channel, kind: "reasoning", message: delta }));
       },

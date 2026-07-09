@@ -1,5 +1,6 @@
 import { ControlPlaneLedger, type ExecutionRecord, type WakeSignalReason } from "../control/ledger.js";
 import { isProcessAlive, terminatePid } from "./process.js";
+import type { ExecutionOutputMode, ExecutionOutputRead } from "./lifecycle.js";
 
 interface BackgroundProcessHandle {
   kill?: (signal?: NodeJS.Signals | number, error?: Error) => unknown;
@@ -184,6 +185,40 @@ export async function waitForBackgroundExecution(input: {
   }
 }
 
+export function readBackgroundExecutionOutput(input: {
+  rootDir: string;
+  id: string;
+  mode?: ExecutionOutputMode;
+  lines?: number;
+  maxChars?: number;
+}): ExecutionOutputRead {
+  const store = new BackgroundExecutionStore(input.rootDir);
+  const execution = store.load(input.id);
+  if (!execution) {
+    throw new Error(`Unknown background execution: ${input.id}`);
+  }
+  const mode = input.mode ?? "tail";
+  const source = mode === "summary"
+    ? (execution.summary ?? execution.output ?? "")
+    : (execution.output ?? execution.summary ?? "");
+  const lines = Math.max(1, Math.trunc(input.lines ?? 80));
+  const maxChars = Math.max(1, Math.trunc(input.maxChars ?? 20_000));
+  const selected = mode === "tail" ? takeTailLines(source, lines) : source;
+  const truncatedOutput = truncateOutput(selected, maxChars);
+  return {
+    id: execution.id,
+    kind: execution.kind,
+    status: execution.status,
+    mode,
+    output: truncatedOutput.output,
+    truncated: truncatedOutput.truncated,
+    lines: mode === "tail" ? lines : undefined,
+    bytes: Buffer.byteLength(source, "utf8"),
+    summary: execution.summary,
+    lastOutputAt: execution.lastOutputAt,
+  };
+}
+
 export function terminateBackgroundExecution(rootDir: string, id: string): ExecutionRecord {
   const store = new BackgroundExecutionStore(rootDir);
   const execution = store.load(id);
@@ -257,4 +292,22 @@ function toWakeReason(status: ExecutionRecord["status"]): WakeSignalReason {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function takeTailLines(value: string, lines: number): string {
+  const normalized = value.replace(/\r\n/g, "\n");
+  const parts = normalized.endsWith("\n")
+    ? normalized.slice(0, -1).split("\n")
+    : normalized.split("\n");
+  return parts.slice(-lines).join("\n");
+}
+
+function truncateOutput(value: string, maxChars: number): { output: string; truncated: boolean } {
+  if (value.length <= maxChars) {
+    return { output: value, truncated: false };
+  }
+  return {
+    output: value.slice(Math.max(0, value.length - maxChars)),
+    truncated: true,
+  };
 }

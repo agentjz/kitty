@@ -10,6 +10,7 @@ import { formatCliSetupError } from "../../src/cli/userFacingErrors.js";
 import { getAppPaths } from "../../src/config/paths.js";
 import { PROJECT_STATE_DIR_NAME, PROJECT_STATE_ENV_EXAMPLE_FILE_NAME, PROJECT_STATE_ENV_FILE_NAME, PROJECT_STATE_IGNORE_FILE_NAME } from "../../src/project/statePaths.js";
 import { BackgroundExecutionStore } from "../../src/execution/background.js";
+import { ExecutionStore } from "../../src/execution/store.js";
 import { SessionEventStore } from "../../src/session/events.js";
 import { SessionStore } from "../../src/session/store.js";
 import { createTestRuntimeConfig } from "../helpers.js";
@@ -18,7 +19,7 @@ test("cli program exposes current top-level commands", () => {
   const program = buildCliProgram();
   const commands = program.commands.map((command) => command.name());
 
-  for (const name of ["agent", "background", "resume", "sessions", "events", "config", "init", "status", "memory", "changes", "undo", "diff", "doctor", "eval", "telegram", "web", "tui", "version", "__worker__"]) {
+  for (const name of ["agent", "background", "execution", "resume", "sessions", "events", "config", "init", "status", "memory", "changes", "undo", "diff", "doctor", "eval", "telegram", "web", "tui", "version", "__worker__"]) {
     assert.equal(commands.includes(name), true, `${name} command should exist`);
   }
   assert.equal(program.helpInformation().includes("__worker__"), false);
@@ -45,7 +46,7 @@ test("init bootstraps project templates without loading runtime config", async (
   assert.match(env, /KITTY_API_KEY/);
 });
 
-test("background command lists, waits, and stops executions", async () => {
+test("background command lists, reads, waits, and stops executions", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "kitty-background-cli-"));
   const config = createTestRuntimeConfig(root);
   const program = buildCliProgram({
@@ -78,8 +79,52 @@ test("background command lists, waits, and stops executions", async () => {
 
   program.exitOverride();
   await program.parseAsync(["-C", root, "background"], { from: "user" });
+  await program.parseAsync(["-C", root, "background", "read", completed.id], { from: "user" });
   await program.parseAsync(["-C", root, "background", "wait", completed.id], { from: "user" });
   await program.parseAsync(["-C", root, "background", "stop", running.id], { from: "user" });
+
+  assert.equal(store.load(running.id)?.status, "aborted");
+});
+
+test("execution command inspects, reads, and cancels delegated executions", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "kitty-execution-cli-"));
+  const config = createTestRuntimeConfig(root);
+  const program = buildCliProgram({
+    resolveRuntime: async () => ({
+      cwd: root,
+      stateRootDir: root,
+      paths: getAppPaths(root),
+      overrides: { cwd: root },
+      config,
+    }),
+  });
+  const store = new ExecutionStore(root);
+  const completed = store.create({
+    kind: "subagent",
+    prompt: "inspect",
+    cwd: root,
+    requestedBy: "lead",
+    actorName: "reader",
+    actorRole: "explorer",
+  });
+  store.close(completed.id, {
+    status: "completed",
+    resultText: "line one\nline two\n",
+    summary: "line two",
+  });
+  const running = store.create({
+    kind: "subagent",
+    prompt: "long",
+    cwd: root,
+    requestedBy: "lead",
+  });
+  store.markRunning(running.id, { pid: process.pid });
+
+  program.exitOverride();
+  await program.parseAsync(["-C", root, "execution", "list"], { from: "user" });
+  await program.parseAsync(["-C", root, "execution", "inspect", completed.id, "--json"], { from: "user" });
+  await program.parseAsync(["-C", root, "execution", "read", completed.id, "--tail", "1"], { from: "user" });
+  await program.parseAsync(["-C", root, "execution", "cancel", running.id], { from: "user" });
 
   assert.equal(store.load(running.id)?.status, "aborted");
 });

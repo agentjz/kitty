@@ -10,7 +10,7 @@ export const backgroundRunTool: RegisteredTool = {
     type: "function",
     function: {
       name: "background_run",
-      description: "Start a background command and record its lifecycle in the local control plane.",
+      description: "Start a long-running local command without blocking the lead turn, and record its lifecycle in the local control plane.",
       parameters: {
         type: "object",
         properties: {

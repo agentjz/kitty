@@ -42,6 +42,7 @@ export async function waitForLeadWaitExecutions(input: {
   abortSignal?: AbortSignal;
   sleep?: (ms: number) => Promise<void>;
   now?: () => number;
+  onPoll?: (executions: readonly ExecutionRecord[]) => void | Promise<void>;
 }): Promise<ExecutionRecord[]> {
   const sleep = input.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   const now = input.now ?? (() => Date.now());
@@ -49,6 +50,8 @@ export async function waitForLeadWaitExecutions(input: {
   for (;;) {
     throwIfAborted(input.abortSignal, "Lead wait was aborted.");
     pauseExpiredLeadWaitExecutions(input.rootDir, input.executionIds, now());
+    const executions = collectLeadWaitExecutionResults(input.rootDir, input.executionIds);
+    await input.onPoll?.(executions);
     if (!hasUnsettledLeadWaitExecutions(input.rootDir, input.executionIds)) {
       return collectLeadWaitExecutionResults(input.rootDir, input.executionIds);
     }

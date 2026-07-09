@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { ControlPlaneLedger, type ExecutionRecord, type WakeSignalRecord } from "../control/ledger.js";
+import { reconcileExecutions } from "../execution/lifecycle.js";
 import type { TaskLifecycleRecord } from "../control/ledger.js";
 import { getProjectStatePaths } from "../project/statePaths.js";
 import { buildProjectMap } from "../project/map.js";
@@ -266,6 +267,7 @@ function readControlPlaneStatus(rootDir: string): {
   executions: RuntimeStatus["executions"];
   wakeSignals: RuntimeStatus["wakeSignals"];
 } {
+  reconcileExecutions(rootDir);
   const ledger = new ControlPlaneLedger(rootDir);
   try {
     const executions = ledger.executions.list();

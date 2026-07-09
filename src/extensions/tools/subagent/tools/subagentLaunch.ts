@@ -7,7 +7,7 @@ export const subagentLaunchTool: RegisteredTool = {
     type: "function",
     function: {
       name: "subagent_launch",
-      description: "Launch a focused subagent execution and record it in the control plane.",
+      description: "Launch a focused subagent for complex bounded work that benefits from independent context. Do not use for simple direct edits the lead can perform or dependent tasks without a shared plan.",
       parameters: {
         type: "object",
         properties: {

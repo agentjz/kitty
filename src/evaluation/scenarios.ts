@@ -11,6 +11,8 @@ export const LOCAL_EVALUATION_CHECK_IDS: readonly EvaluationCheckId[] = [
   "tool-output-governance-ready",
   "production-scene-ready",
   "host-turn-boundary-runs",
+  "background-subagent-lifecycle-ready",
+  "delegation-behavior-boundary-ready",
   "remote-entrypoints-available",
   "recovery-drills-pass",
 ];
@@ -85,6 +87,20 @@ export const EVALUATION_SCENARIOS: readonly EvaluationScenario[] = [
     title: "一次 agent turn 有明确边界",
     userPath: "用户发起一次任务后，host 能记录 turn 开始、完成、失败或中断，不把内部事实写成用户意图。",
     evidence: "用假 turn 跑 host boundary，并确认 session events 闭环。",
+  },
+  {
+    id: "background-subagent-lifecycle-ready",
+    suite: "local",
+    title: "后台和子执行生命周期可见",
+    userPath: "用户把长命令放到后台或派出 subagent 后，可以读取输出、取消执行；lead 等待 subagent 时，当前输出流显示 subagent 正在做什么，完成后切回 lead。",
+    evidence: "构造 background 和 subagent execution，验证 output read、cancel wake、runtime status active/recent 投影；实时流由 host lead-wait 和 TUI 测试覆盖。",
+  },
+  {
+    id: "delegation-behavior-boundary-ready",
+    suite: "local",
+    title: "派工边界不会漂移",
+    userPath: "简单直接任务由 lead 做；长命令进 background；独立研究可派 subagent；有依赖的任务必须先有共享计划。",
+    evidence: "检查模型可见 extension/tool surface 是否保留这些行为边界，防止派工规则只停留在文档里。",
   },
   {
     id: "remote-entrypoints-available",

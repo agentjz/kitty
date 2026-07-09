@@ -12,7 +12,7 @@ test("background extension exposes run, check, wait, stop, and terminate tools",
   const tools = createBackgroundTools();
   const names = tools.map((tool) => tool.definition.function.name).sort();
 
-  assert.deepEqual(names, ["background_check", "background_run", "background_stop", "background_terminate", "background_wait"]);
+  assert.deepEqual(names, ["background_check", "background_read", "background_run", "background_stop", "background_terminate", "background_wait"]);
 
   const context = createToolContext(root);
   const run = tools.find((tool) => tool.definition.function.name === "background_run");
@@ -32,6 +32,47 @@ test("background extension exposes run, check, wait, stop, and terminate tools",
   const terminate = tools.find((tool) => tool.definition.function.name === "background_terminate");
   assert.ok(terminate);
   await terminate.execute(JSON.stringify({ id: payload.id }), context);
+});
+
+test("background read returns summary, tail, and full output from recorded executions", async (t) => {
+  const root = await createTempWorkspace("background-tool-read", t);
+  const store = new BackgroundExecutionStore(root);
+  const job = store.create({
+    command: "stream",
+    cwd: root,
+    requestedBy: "lead",
+  });
+  store.close(job.id, {
+    status: "completed",
+    exitCode: 0,
+    output: "one\ntwo\nthree\nfour\n",
+    summary: "four",
+  });
+  const tools = createBackgroundTools();
+  const context = createToolContext(root);
+  const read = tools.find((tool) => tool.definition.function.name === "background_read");
+  assert.ok(read);
+
+  const summary = parseToolJson((await read.execute(JSON.stringify({
+    id: job.id,
+    mode: "summary",
+  }), context)).output);
+  const tail = parseToolJson((await read.execute(JSON.stringify({
+    id: job.id,
+    mode: "tail",
+    lines: 2,
+  }), context)).output);
+  const full = parseToolJson((await read.execute(JSON.stringify({
+    id: job.id,
+    mode: "full",
+  }), context)).output);
+
+  assert.equal(summary.mode, "summary");
+  assert.equal(summary.output, "four");
+  assert.equal(tail.mode, "tail");
+  assert.equal(tail.output, "three\nfour");
+  assert.equal(full.mode, "full");
+  assert.equal(full.output, "one\ntwo\nthree\nfour\n");
 });
 
 test("background run preserves streamed output after process close", async (t) => {
@@ -150,7 +191,7 @@ test("background CLI format explains risk and next action", async (t) => {
 
   assert.match(formatted, /risk=watch/);
   assert.match(formatted, /has not published output/);
-  assert.match(formatted, /kitty background wait/);
+  assert.match(formatted, /kitty background read/);
   assert.match(formatted, /summary=long-running-without-output/);
 });
 

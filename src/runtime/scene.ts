@@ -117,7 +117,7 @@ function readNextAction(
     return urgent.nextAction;
   }
   if (status.executions.active.length > 0) {
-    return "Wait for the active task, or inspect it with `kitty status` / `kitty background`.";
+    return "Wait for the active task, or inspect it with `kitty status` / `kitty execution`.";
   }
   if (!status.sessions.latest) {
     return "Start a session with `kitty`.";
@@ -276,12 +276,12 @@ function readExecutionNextAction(
 ): string {
   if (execution.kind === "background") {
     if (risk === "blocked") {
-      return `Inspect or stop with \`kitty background stop ${execution.id}\`.`;
+      return `Inspect output with \`kitty background read ${execution.id}\` or stop with \`kitty background stop ${execution.id}\`.`;
     }
     if (risk === "watch") {
-      return `Wait for first output or inspect with \`kitty background wait ${execution.id}\`.`;
+      return `Wait for first output or inspect with \`kitty background read ${execution.id}\`.`;
     }
-    return `Inspect with \`kitty background wait ${execution.id}\` if you need the result now.`;
+    return `Inspect with \`kitty background read ${execution.id}\` or \`kitty background wait ${execution.id}\` if you need the result now.`;
   }
   if (risk === "blocked") {
     return `Inspect ${readExecutionKindLabel(execution.kind)} ${execution.id} before continuing.`;
@@ -289,7 +289,7 @@ function readExecutionNextAction(
   if (risk === "watch") {
     return `Watch ${readExecutionKindLabel(execution.kind)} ${execution.id} for output or deadline.`;
   }
-  if (execution.waitPolicy === "block_lead_until_complete") {
+  if (execution.waitPolicy === "while_execution_active") {
     return "Lead should wait for this task to finish.";
   }
   return "Task is active.";

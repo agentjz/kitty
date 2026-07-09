@@ -4,6 +4,7 @@ import test from "node:test";
 import { AGENT_WORKER_EXECUTION_KINDS } from "../../src/execution/kinds.js";
 import { runExecutionWorker } from "../../src/execution/worker.js";
 import { ExecutionStore } from "../../src/execution/store.js";
+import { SessionEventStore } from "../../src/session/events.js";
 import { createTempWorkspace, createTestRuntimeConfig } from "../helpers.js";
 import type { StoredMessage } from "../../src/types.js";
 
@@ -51,6 +52,71 @@ test("execution store tracks background and subagent as one lifecycle family", a
   assert.equal(store.load(subagent.id)?.sessionId, "sub-session");
   assert.equal(store.list({ kinds: AGENT_WORKER_EXECUTION_KINDS }).length, 1);
   assert.equal(store.listWakeSignals().some((signal) => signal.executionId === subagent.id), true);
+});
+
+test("agent worker records runtime UI events for lead wait replay", async (t) => {
+  const root = await createTempWorkspace("agent-worker-runtime-ui", t);
+  const config = createTestRuntimeConfig(root);
+  const store = new ExecutionStore(root);
+  const execution = store.create({
+    kind: "subagent",
+    prompt: "inspect files",
+    cwd: root,
+    requestedBy: "lead",
+    actorName: "explorer",
+    actorRole: "explorer",
+  });
+
+  await runExecutionWorker({
+    rootDir: root,
+    cwd: root,
+    config,
+    executionId: execution.id,
+    runTurn: async (options) => {
+      options.callbacks?.onToolCall?.("read", JSON.stringify({ path: "src/index.ts" }));
+      options.callbacks?.onToolResult?.("read", "export const value = 1;");
+      options.callbacks?.onAssistantDelta?.("subagent visible answer");
+      const session = {
+        ...options.session,
+        messages: [
+          ...options.session.messages,
+          {
+            role: "assistant",
+            content: "subagent visible answer",
+            createdAt: "2026-05-22T00:00:00.000Z",
+          } satisfies StoredMessage,
+        ],
+      };
+      return {
+        status: "completed",
+        session,
+        result: {
+          session,
+          changedPaths: [],
+          transition: {
+            action: "finalize",
+            reason: {
+              code: "finalize.completed",
+              changedPaths: [],
+            },
+            timestamp: new Date().toISOString(),
+          },
+        },
+      };
+    },
+  });
+
+  const sessionId = store.load(execution.id)?.sessionId;
+  assert.ok(sessionId);
+  const events = await new SessionEventStore(config.paths.eventsDir).list(sessionId, 20);
+  const runtimeEvents = events
+    .filter((event) => event.type === "runtime.ui")
+    .map((event) => event.details?.runtimeUiEvent as { channel?: string; kind?: string; toolName?: string; message?: string });
+
+  assert.deepEqual(runtimeEvents.map((event) => event.channel), ["subagent", "subagent", "subagent"]);
+  assert.deepEqual(runtimeEvents.map((event) => event.kind), ["tool_call", "tool_result", "assistant_text"]);
+  assert.equal(runtimeEvents[0]?.toolName, "read");
+  assert.equal(runtimeEvents[2]?.message, "subagent visible answer");
 });
 
 test("agent worker completion records the worker final answer for lead wake", async (t) => {

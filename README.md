@@ -28,7 +28,7 @@
 - 本地 agent 交互
 - 可恢复的 session 现场
 - CLI、TUI、Telegram 三种入口
-- 当前现场、后台任务、会话事件、memory 和 eval
+- 当前现场、后台任务、子执行、会话事件、memory 和 eval
 - 省 token 的上下文、缓存事实和工具输出治理
 
 ## ⚡ 快速开始
@@ -60,7 +60,7 @@ kitty
 kitty agent
 ```
 
-TUI 复用同一套 session、driver、工具和斜杠命令。主区显示用户输入、thinking 和回复；工具、后台任务、subagent 和上下文占用在底部现场区呈现，不灌进主对话区。按键：`Enter` 发送，`Ctrl+J` 换行，`PageUp` / `PageDown` 滚动，`Home` / `End` 跳到顶部 / 底部，鼠标滚轮滚动，`Ctrl+C` 中断当前轮。
+TUI 复用同一套 session、driver、工具和斜杠命令。主区显示用户输入、thinking 和回复；工具、后台任务、subagent 和上下文占用在底部现场区呈现。lead 因阻塞型 subagent 暂停时，当前输出流会切到 subagent，实时显示它的工具、思考和回答，完成后再切回 lead。按键：`Enter` 发送，`Ctrl+J` 换行，`PageUp` / `PageDown` 滚动，`Home` / `End` 跳到顶部 / 底部，鼠标滚轮滚动，`Ctrl+C` 中断当前轮。
 
 交互模式支持本地斜杠命令。斜杠命令直接读取本地现场，不发送给模型：
 
@@ -96,7 +96,8 @@ kitty "用 Spring Boot 3、MySQL、Redis 和 Vue 3 做一个考试管理平台�
 | `kitty` | 进入 TUI；有历史会话时先选择继续或新建，也可直接接收一次性 prompt |
 | `kitty agent` | 进入文字版 agent 交互 |
 | `kitty tui` | 显式进入 TUI，和 `kitty` 裸启动一致 |
-| `kitty background` | 查看后台任务；`wait <id>` 等待任务；`stop <id>` 停止任务 |
+| `kitty background` | 查看后台任务；`read <id>` 读取输出；`wait <id>` 等待任务；`stop <id>` 停止任务 |
+| `kitty execution` | 统一审阅 background/subagent execution；支持 `list`、`inspect <id>`、`read <id>`、`cancel <id>` |
 | `kitty resume [sessionId]` | 恢复最近会话或指定会话 |
 | `kitty sessions` | 查看最近会话 |
 | `kitty events [sessionId]` | 查看最近会话或指定会话的机器事件 |

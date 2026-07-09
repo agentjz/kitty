@@ -4,6 +4,7 @@ import type { RuntimeConfig, RuntimeTerminalTransition, SessionRecord, ToolCallR
 import type { FunctionToolDefinition } from "../tools/index.js";
 import type { ProviderMessage } from "../provider/contract.js";
 import type { PromptRuntimeState } from "./prompt/types.js";
+import type { RuntimeUiEvent } from "../runtime-ui/events.js";
 
 export interface AgentIdentity {
   kind: "lead" | "subagent";
@@ -24,6 +25,7 @@ export interface AgentCallbacks {
   onToolCall?: (name: string, args: string) => void;
   onToolResult?: (name: string, output: string) => void;
   onToolError?: (name: string, error: string) => void;
+  onRuntimeUiEvent?: (event: RuntimeUiEvent) => void;
 
   /** Optional host callback to send a file back to the conversation (e.g. Telegram sendDocument). */
   enqueueFile?: (filePath: string, fileName?: string, caption?: string) => Promise<string | undefined>;

@@ -66,6 +66,12 @@ export async function runEvaluationCheck(id: EvaluationCheckId, rootDir: string)
       case "host-turn-boundary-runs": {
         return await runHostTurnBoundaryCheck(id, rootDir);
       }
+      case "background-subagent-lifecycle-ready": {
+        return await runBackgroundSubagentLifecycleCheck(id, rootDir);
+      }
+      case "delegation-behavior-boundary-ready": {
+        return await runDelegationBehaviorBoundaryCheck(id);
+      }
       case "remote-entrypoints-available": {
         return await runRemoteEntrypointsCheck(id);
       }
@@ -80,5 +86,143 @@ export async function runEvaluationCheck(id: EvaluationCheckId, rootDir: string)
       fact: `${id} failed`,
       error: error instanceof Error ? error.message : String(error),
     };
+  }
+}
+
+async function runDelegationBehaviorBoundaryCheck(id: EvaluationCheckId): Promise<EvaluationCheckResult> {
+  const { EXTENSION_DEFINITIONS } = await import("../extensions/definitions.js");
+
+  const background = EXTENSION_DEFINITIONS.find((definition) => definition.id === "background");
+  const subagent = EXTENSION_DEFINITIONS.find((definition) => definition.id === "subagent");
+  if (!background || !subagent) {
+    throw new Error("background/subagent extension definitions are missing");
+  }
+
+  const backgroundSurface = readExtensionSurface(background);
+  const subagentSurface = readExtensionSurface(subagent);
+
+  assertSurfaceIncludes(backgroundSurface, [
+    "long local commands",
+    "without blocking",
+    "output over time",
+  ], "background behavior surface");
+  assertSurfaceIncludes(subagentSurface, [
+    "independent context",
+    "simple direct edits",
+    "dependent tasks",
+    "shared plan",
+    "independent",
+  ], "subagent behavior surface");
+
+  return passed(id, "delegation behavior boundary ready: lead direct work, background long commands, subagent independent bounded work");
+}
+
+async function runBackgroundSubagentLifecycleCheck(id: EvaluationCheckId, rootDir: string): Promise<EvaluationCheckResult> {
+  const { BackgroundExecutionStore, readBackgroundExecutionOutput } = await import("../execution/background.js");
+  const { cancelExecution, readExecutionOutput } = await import("../execution/lifecycle.js");
+  const { ExecutionStore } = await import("../execution/store.js");
+  const { buildRuntimeStatus } = await import("../runtime/status.js");
+
+  const backgroundStore = new BackgroundExecutionStore(rootDir);
+  const background = backgroundStore.create({
+    command: "eval background lifecycle",
+    cwd: rootDir,
+    requestedBy: "eval",
+  });
+  backgroundStore.close(background.id, {
+    status: "completed",
+    exitCode: 0,
+    output: "alpha\nbeta\n",
+    summary: "beta",
+  });
+  const backgroundTail = readBackgroundExecutionOutput({
+    rootDir,
+    id: background.id,
+    mode: "tail",
+    lines: 1,
+  });
+  if (backgroundTail.output !== "beta") {
+    throw new Error("background output tail was not readable");
+  }
+
+  const executionStore = new ExecutionStore(rootDir);
+  const completedSubagent = executionStore.create({
+    kind: "subagent",
+    prompt: "eval subagent lifecycle",
+    cwd: rootDir,
+    requestedBy: "lead",
+    actorName: "eval-subagent",
+    actorRole: "explorer",
+  });
+  executionStore.close(completedSubagent.id, {
+    status: "completed",
+    resultText: "subagent-result\n",
+    summary: "subagent-result",
+  });
+  const subagentOutput = readExecutionOutput({
+    rootDir,
+    id: completedSubagent.id,
+    kind: "subagent",
+    mode: "summary",
+  });
+  if (subagentOutput.output !== "subagent-result") {
+    throw new Error("subagent summary output was not readable");
+  }
+
+  const runningSubagent = executionStore.create({
+    kind: "subagent",
+    prompt: "eval cancellable subagent",
+    cwd: rootDir,
+    requestedBy: "lead",
+  });
+  executionStore.markRunning(runningSubagent.id, { pid: process.pid });
+  const cancelled = cancelExecution(rootDir, runningSubagent.id, {
+    expectedKind: "subagent",
+    terminatedBy: "eval",
+  });
+  if (cancelled.status !== "aborted") {
+    throw new Error("subagent cancel did not close execution as aborted");
+  }
+
+  const status = await buildRuntimeStatus(rootDir);
+  const wakeCount = status.wakeSignals.recent.filter((signal) =>
+    signal.executionId === runningSubagent.id && signal.reason === "aborted").length;
+  if (wakeCount === 0) {
+    throw new Error("subagent cancel wake signal was not recorded");
+  }
+
+  return passed(id, `background/subagent lifecycle ready: executions=${status.executions.total}, wakes=${status.wakeSignals.recent.length}`);
+}
+
+function readExtensionSurface(definition: {
+  summary: string;
+  capability: {
+    description: string;
+    bestFor: readonly string[];
+  };
+  createTools: () => readonly {
+    definition: {
+      function: {
+        description?: string;
+      };
+    };
+  }[];
+}): string {
+  const toolDescriptions = definition.createTools()
+    .map((tool) => tool.definition.function.description ?? "")
+    .join("\n");
+  return [
+    definition.summary,
+    definition.capability.description,
+    ...definition.capability.bestFor,
+    toolDescriptions,
+  ].join("\n").toLowerCase();
+}
+
+function assertSurfaceIncludes(surface: string, needles: readonly string[], label: string): void {
+  for (const needle of needles) {
+    if (!surface.includes(needle.toLowerCase())) {
+      throw new Error(`${label} does not include '${needle}'`);
+    }
   }
 }

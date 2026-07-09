@@ -2,6 +2,7 @@ export const RUNTIME_UI_EVENT_PROTOCOL = "kitty.runtime-ui-event" as const;
 
 export type RuntimeUiChannel =
   | "lead"
+  | "subagent"
   | "system";
 
 export type RuntimeUiEventKind =
@@ -41,6 +42,8 @@ export function normalizeRuntimeUiChannel(value: string | undefined): RuntimeUiC
   switch (normalized) {
     case "lead":
       return "lead";
+    case "subagent":
+      return "subagent";
     default:
       return "system";
   }

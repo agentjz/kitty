@@ -55,6 +55,61 @@ test("tui turn display keeps live tool facts in runtime dock", () => {
   assert.equal(state.dock.current, undefined);
 });
 
+test("tui turn display renders replayed subagent runtime UI in the current transcript", () => {
+  const controller = new TuiController();
+  const shell = createTuiInteractionShell(controller);
+  const display = shell.createTurnDisplay({
+    cwd: process.cwd(),
+    config: { showReasoning: true } as never,
+    abortSignal: new AbortController().signal,
+  });
+
+  display.callbacks.onRuntimeUiEvent?.({
+    protocol: "kitty.runtime-ui-event",
+    channel: "subagent",
+    kind: "tool_call",
+    toolName: "read",
+    payload: JSON.stringify({ path: "src/index.ts" }),
+    createdAt: "2026-07-09T00:00:00.000Z",
+  });
+  display.callbacks.onRuntimeUiEvent?.({
+    protocol: "kitty.runtime-ui-event",
+    channel: "subagent",
+    kind: "assistant_text",
+    message: "worker answer",
+    createdAt: "2026-07-09T00:00:01.000Z",
+  });
+  display.callbacks.onRuntimeUiEvent?.({
+    protocol: "kitty.runtime-ui-event",
+    channel: "lead",
+    kind: "status",
+    message: "Lead resumed after delegated execution settled.",
+    createdAt: "2026-07-09T00:00:02.000Z",
+  });
+
+  const state = controller.getState();
+  const text = state.transcript.map((entry) => entry.text).join("\n");
+  assert.match(text, /\[子代理\]/);
+  assert.match(text, /worker answer/);
+  assert.equal(state.dock.current, "Lead resumed after delegated execution settled.");
+});
+
+test("tui turn display does not keep subagent read failures as live subagent state", () => {
+  const controller = new TuiController();
+  const shell = createTuiInteractionShell(controller);
+  const display = shell.createTurnDisplay({
+    cwd: process.cwd(),
+    config: { showReasoning: true } as never,
+    abortSignal: new AbortController().signal,
+  });
+
+  display.callbacks.onToolError?.("subagent_read", "Unknown execution: subagent-1");
+  display.flush();
+
+  assert.equal(controller.getState().dock.subagent, undefined);
+  assert.equal(controller.getState().dock.current, undefined);
+});
+
 test("tui turn display shows todo_write preview as a tool transcript fact", () => {
   const controller = new TuiController();
   const shell = createTuiInteractionShell(controller);

@@ -28,14 +28,17 @@
 
 - `background_run`：启动后台命令，写入 control-plane execution 账本，持续记录运行输出预览、摘要、last output 和 deadline，返回 execution id、pid、deadline 和状态。
 - `background_check`：读取后台 execution 摘要，并 reconcile 已丢失的 running pid；输出 total、active、recent、health、deadline、last output 和 output preview。
+- `background_read`：按 summary、tail 或 full 模式读取已记录后台输出。
 - `background_wait`：等待指定后台 execution 完成或超时，返回最新 lifecycle、health 和 output preview。
-- `background_stop`：停止指定后台 execution，并返回最终 lifecycle 事实。
-- `background_terminate`：终止一个后台 execution，等待当前宿主进程内的后台 handle 释放，并把生命周期关闭为 aborted。
+- `background_stop`：停止指定后台 execution，终止其子进程树，并返回最终 lifecycle 事实。
+- `background_terminate`：终止一个后台 execution 的子进程树，等待当前宿主进程内的后台 handle 释放，并把生命周期关闭为 aborted。
 
 ## subagent
 
-- `subagent_launch`：启动聚焦 subagent execution，写入 objective、boundary、expected output、timeout/deadline 等派工事实，返回 execution id、actor、deadline 和状态。execution 默认带阻塞型 `waitPolicy`；lead 调用后会让出当前轮，由 host 等 execution 结束后唤醒 lead。worker 最终可见回答写入 execution summary/output/changed paths。
+- `subagent_launch`：启动聚焦 subagent execution，写入 objective、boundary、expected output、timeout/deadline 等派工事实，返回 execution id、actor、deadline 和状态。execution 默认带阻塞型 `waitPolicy`；lead 调用后会让出当前轮，由 host 等 execution 结束后唤醒 lead。等待期间，subagent 的 runtime UI event 会被复放到当前输出流。worker 最终可见回答写入 execution summary/output/changed paths。
 - `subagent_check`：列出 subagent execution 摘要；输出 total、active、recent、health、派工边界、deadline 和 worker summary/output preview。
+- `subagent_read`：按 summary、tail 或 full 模式读取已记录 subagent 输出。
+- `subagent_cancel`：取消仍在运行的 subagent execution，终止其 worker 子进程树，关闭为 aborted 并发布 wake fact。
 
 ## skills
 

@@ -1,5 +1,7 @@
 import type { AgentCallbacks } from "../../agent/types.js";
 import type { InteractionTurnDisplay } from "../../interaction/shell.js";
+import type { RuntimeUiChannel, RuntimeUiEvent } from "../../runtime-ui/events.js";
+import { channelLabel } from "../../runtime-ui/theme.js";
 import type { TuiController } from "./controller.js";
 import type { TuiRuntimeDockState } from "./store.js";
 import { projectTuiToolCallFact, projectTuiToolErrorFact, projectTuiToolResultFact } from "./toolFacts.js";
@@ -18,6 +20,14 @@ export function createTuiTurnDisplay(options: {
       });
     }
   };
+  let visibleChannel: RuntimeUiChannel | undefined;
+  const ensureVisibleChannel = (channel: RuntimeUiChannel): void => {
+    if (visibleChannel === channel || isAborted()) {
+      return;
+    }
+    visibleChannel = channel;
+    options.controller.append("system", `[${channelLabel(channel)}]`);
+  };
 
   options.abortSignal.addEventListener("abort", () => {
     aborted = true;
@@ -25,6 +35,9 @@ export function createTuiTurnDisplay(options: {
   });
 
   const callbacks: AgentCallbacks = {
+    onRuntimeUiEvent(event) {
+      renderRuntimeUiEvent(event);
+    },
     onModelWaitStart() {
       updateCurrent("思考中");
     },
@@ -107,6 +120,47 @@ export function createTuiTurnDisplay(options: {
       });
     },
   };
+
+  function renderRuntimeUiEvent(event: RuntimeUiEvent): void {
+    if (isAborted()) {
+      return;
+    }
+    ensureVisibleChannel(event.channel);
+    switch (event.kind) {
+      case "assistant_text":
+        if (event.message) {
+          options.controller.appendStreaming("assistant", event.message);
+        }
+        return;
+      case "reasoning":
+        if (options.config.showReasoning && event.message) {
+          options.controller.appendStreaming("reasoning", event.message);
+        }
+        return;
+      case "status":
+        updateCurrent(event.message?.trim() || undefined);
+        return;
+      case "tool_call": {
+        const fact = projectTuiToolCallFact(event.toolName ?? "tool", event.payload ?? "{}");
+        options.controller.updateDock(toDockPatch(fact));
+        return;
+      }
+      case "tool_result": {
+        const fact = projectTuiToolResultFact(event.toolName ?? "tool", event.payload ?? event.message ?? "");
+        options.controller.updateDock(toDockPatch(fact));
+        if (fact.transcript) {
+          options.controller.append("system", fact.transcript);
+        }
+        return;
+      }
+      case "tool_error": {
+        const fact = projectTuiToolErrorFact(event.toolName ?? "tool", event.payload ?? event.message ?? "");
+        options.controller.updateDock(toDockPatch(fact));
+        options.controller.append("system", `工具失败：${event.toolName ?? "tool"}`);
+        return;
+      }
+    }
+  }
 }
 
 function toDockPatch(fact: {

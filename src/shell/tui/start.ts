@@ -1,4 +1,5 @@
 import { loadProjectContext } from "../../context/projectContext.js";
+import { buildRuntimeStatus } from "../../runtime/status.js";
 import { InteractiveSessionDriver } from "../../interaction/sessionDriver.js";
 import type { SessionStoreLike } from "../../session/index.js";
 import type { RuntimeConfig, SessionRecord } from "../../types.js";
@@ -9,6 +10,7 @@ import {
 import { enableMouseWheelTracking } from "./input/scroll.js";
 import { createTuiInputGateway } from "./input/gateway.js";
 import { TuiController } from "./controller.js";
+import { projectRuntimeStatusToDock } from "./store.js";
 import { createTuiInteractionShell } from "./shell.js";
 import { createCleanupStack } from "./lifecycle.js";
 import { selectTuiSession } from "./sessionPicker.js";
@@ -42,6 +44,7 @@ export async function startTuiChat(options: StartTuiChatOptions): Promise<void> 
     projectDocMaxBytes: options.config.projectDocMaxBytes,
   });
   const controller = new TuiController(selected.session);
+  controller.updateDock(projectRuntimeStatusToDock(await buildRuntimeStatus(projectContext.stateRootDir)));
   const shell = createTuiInteractionShell(controller);
   const terminalLogWriter = createTerminalLogWriter(projectContext.stateRootDir, selected.session.id);
   const terminalShell = mirrorInteractionShellToTerminalLog(shell, terminalLogWriter);

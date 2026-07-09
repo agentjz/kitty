@@ -12,6 +12,10 @@ export const RUNTIME_UI_CHANNEL_IDENTITIES: Record<RuntimeUiChannel, RuntimeUiCh
     channel: "lead",
     label: "决策主脑",
   },
+  subagent: {
+    channel: "subagent",
+    label: "子代理",
+  },
   system: {
     channel: "system",
     label: "系统",

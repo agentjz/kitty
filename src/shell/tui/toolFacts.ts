@@ -45,10 +45,10 @@ function projectLiveExecutionFact(
   value: string | undefined,
 ): Pick<TuiToolCallFact, "background" | "subagent"> {
   const normalized = name.toLowerCase();
-  if (normalized.includes("background")) {
+  if (normalized === "background_run") {
     return { background: value };
   }
-  if (normalized.includes("subagent")) {
+  if (normalized === "subagent_launch") {
     return { subagent: value };
   }
   return {};
