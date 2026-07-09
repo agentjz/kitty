@@ -64,7 +64,10 @@ function renderTranscriptLine(
     React.createElement(Text, { color: row.style.accent, wrap: "truncate-end" }, row.frame.gutter),
     React.createElement(
       Box,
-      { width: row.frame.bodyWidth, marginLeft: row.frame.gap },
+      {
+        width: row.frame.bodyWidth,
+        marginLeft: row.frame.gap,
+      },
       row.prefix
         ? React.createElement(
           Text,

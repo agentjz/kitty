@@ -11,7 +11,7 @@ description: 维护小猫智能体 Kitty 源码时使用。适用于修改 agent
 
 先看事实。再做判断。最后改代码。
 
-事实来自当前 `spec/`、`src/`、`tests/`、`.kitty/.env*`、`skills/`、`.codex/skills/`、`package.json`、git 状态、命令结果和工具反馈。
+事实来自当前根目录 `spec.md`、`src/`、`tests/`、`.kitty/.env*`、`skills/`、`.codex/skills/`、`package.json`、git 状态、命令结果和工具反馈。
 
 用户偏好、用户一句话、旧提交、测试绿灯、历史设计、当前实现，都不是绝对真理。它们只是证据。结论必须来自证据之间的一致性。
 

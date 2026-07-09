@@ -306,7 +306,7 @@ test("runtime prompt cache stable prefix ignores volatile runtime facts", () => 
         entryFiles: ["src/cli.ts"],
         testDirectories: ["tests"],
         packageScripts: ["test"],
-        specDocuments: ["spec/README.md"],
+        specDocuments: ["spec.md"],
         git: {
           available: true,
           hasChanges: false,
@@ -341,7 +341,7 @@ test("runtime prompt cache stable prefix ignores volatile runtime facts", () => 
         entryFiles: ["src/cli.ts"],
         testDirectories: ["tests"],
         packageScripts: ["test"],
-        specDocuments: ["spec/README.md"],
+        specDocuments: ["spec.md"],
         git: {
           available: true,
           hasChanges: true,

@@ -147,7 +147,7 @@ kitty config show
 ## 📜 文档
 
 - `AGENTS.md`
-- `spec/`
+- `spec.md`
 - `.codex/skills/kitty-agent-development/SKILL.md`
 
 项目文档、代码和测试共同描述同一个当前现实。

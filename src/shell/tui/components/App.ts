@@ -1,10 +1,9 @@
 import type { TuiController } from "../controller.js";
 import {
   measureTuiFooterRows,
-  TUI_DOCK_ROWS,
-  TUI_FOOTER_BORDER_TOP_ROWS,
   TUI_FOOTER_PADDING_BOTTOM_ROWS,
   TUI_FOOTER_PADDING_X,
+  TUI_FOOTER_TOP_GAP_ROWS,
   TUI_MIN_HEIGHT,
   TUI_MIN_WIDTH,
 } from "../layout.js";
@@ -70,16 +69,15 @@ export function createTuiAppComponent(kit: InkRuntime) {
       Box,
       { flexDirection: "column", width, height },
       React.createElement(Transcript, { controller: props.controller, state, viewport: transcriptViewport }),
+      React.createElement(Box, {
+        backgroundColor: TUI_COLORS.background,
+        height: TUI_FOOTER_TOP_GAP_ROWS,
+        width: "100%",
+      }),
       React.createElement(
         Box,
         {
           flexDirection: "column",
-          borderStyle: "single",
-          borderTop: true,
-          borderBottom: false,
-          borderLeft: false,
-          borderRight: false,
-          borderColor: TUI_COLORS.border,
           backgroundColor: TUI_COLORS.panel,
           paddingX: TUI_FOOTER_PADDING_X,
           paddingBottom: TUI_FOOTER_PADDING_BOTTOM_ROWS,

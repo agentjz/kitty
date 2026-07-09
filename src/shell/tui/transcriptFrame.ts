@@ -30,7 +30,7 @@ export function readTranscriptRoleStyle(role: TuiTranscriptRole, theme: TuiTrans
     case "user":
       return {
         accent: theme.user,
-        background: undefined,
+        background: theme.panel,
         text: theme.text,
         bold: true,
         dim: false,
@@ -39,7 +39,7 @@ export function readTranscriptRoleStyle(role: TuiTranscriptRole, theme: TuiTrans
     case "reasoning":
     case "subagent_reasoning":
       return {
-        accent: theme.border,
+        accent: role === "subagent_reasoning" ? theme.subagent : theme.reasoning,
         background: undefined,
         text: role === "subagent_reasoning" ? theme.subagent : theme.reasoning,
         bold: false,
@@ -130,7 +130,7 @@ function readRoleFrameBase(role: TuiTranscriptRole): Omit<TuiTranscriptLineFrame
       return {
         gap: 2,
         gutter: role === "subagent" ? "◇" : " ",
-        marginLeft: 2,
+        marginLeft: 1,
         paddingLeft: 1,
         paddingRight: 1,
       };

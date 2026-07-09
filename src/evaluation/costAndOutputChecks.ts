@@ -115,7 +115,7 @@ export async function runCacheEconomyCheck(id: EvaluationCheckId): Promise<Evalu
         entryFiles: ["src/cli.ts"],
         testDirectories: ["tests"],
         packageScripts: ["test"],
-        specDocuments: ["spec/README.md"],
+        specDocuments: ["spec.md"],
         git: {
           available: true,
           hasChanges: false,
@@ -138,7 +138,7 @@ export async function runCacheEconomyCheck(id: EvaluationCheckId): Promise<Evalu
         entryFiles: ["src/cli.ts"],
         testDirectories: ["tests"],
         packageScripts: ["test"],
-        specDocuments: ["spec/README.md"],
+        specDocuments: ["spec.md"],
         git: {
           available: true,
           hasChanges: true,

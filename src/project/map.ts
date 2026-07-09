@@ -2,7 +2,6 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { execa } from "execa";
-import fg from "fast-glob";
 
 import type { ProjectMap } from "../types.js";
 
@@ -119,12 +118,7 @@ async function readTestDirectories(rootDir: string): Promise<string[]> {
 }
 
 async function readSpecDocuments(rootDir: string): Promise<string[]> {
-  return fg("spec/**/*.md", {
-    cwd: rootDir,
-    dot: false,
-    onlyFiles: true,
-    unique: true,
-  }).then((files) => files.sort((left, right) => left.localeCompare(right)).slice(0, 20)).catch(() => []);
+  return isFile(path.join(rootDir, "spec.md")).then((exists) => (exists ? ["spec.md"] : []));
 }
 
 async function readGitFacts(rootDir: string): Promise<ProjectMap["git"]> {

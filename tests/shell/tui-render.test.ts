@@ -17,6 +17,7 @@ import {
   measureComposerContentWidth,
   measureComposerTextOrigin,
 } from "../../src/shell/tui/composerLayout.js";
+import { TUI_FOOTER_TOP_GAP_ROWS, measureTuiFooterRows } from "../../src/shell/tui/layout.js";
 
 test("tui runtime dock renders the current scene facts", async () => {
   const React = await import("react");
@@ -312,9 +313,23 @@ function createFakeDomElement(
   };
 }
 
-test("tui theme uses sky blue as the primary accent", () => {
-  assert.equal(TUI_COLORS.user, "#5db7ff");
-  assert.equal(TUI_COLORS.warning, "#5db7ff");
+test("tui theme uses black surfaces with light gold text accents", () => {
+  assert.equal(TUI_COLORS.background, "#05080c");
+  assert.equal(TUI_COLORS.panel, "#0d141c");
+  assert.equal(TUI_COLORS.panelStrong, "#121d28");
+  assert.equal(TUI_COLORS.text, "#fff7e6");
+  assert.equal(TUI_COLORS.user, "#f6d58b");
+  assert.equal(TUI_COLORS.reasoning, "#bfa977");
+  assert.equal(TUI_COLORS.warning, "#f6d58b");
+});
+
+test("tui footer height reserves a gap but not a top border row", () => {
+  assert.equal(measureTuiFooterRows(1), 7);
+});
+
+test("tui footer top gap is a visible background row", () => {
+  assert.equal(TUI_FOOTER_TOP_GAP_ROWS, 1);
+  assert.equal(TUI_COLORS.background, "#05080c");
 });
 
 test("tui transcript renders an empty first screen without transcript facts", async () => {
@@ -372,6 +387,49 @@ test("tui transcript renders user, reasoning, assistant, and system rows", async
   assert.match(output, /answer/);
   assert.match(output, /worker answer/);
   assert.match(output, /notice/);
+});
+
+test("tui transcript reasoning gutter uses the muted reasoning color", () => {
+  const rows = renderTranscriptLineViews([{
+    id: "entry-1",
+    role: "reasoning",
+    text: "thinking",
+  }], 80);
+  const content = rows.find((row) => row.kind === "content");
+
+  assert.equal(content?.style.accent, TUI_COLORS.reasoning);
+  assert.equal(content?.style.text, TUI_COLORS.reasoning);
+});
+
+test("tui transcript aligns user reasoning and assistant content columns", async () => {
+  const React = await import("react");
+  const ink = await import("ink");
+  const { createTranscriptComponent } = await import("../../src/shell/tui/components/Transcript.js");
+  const Transcript = createTranscriptComponent({
+    React: React.default,
+    Box: ink.Box,
+    Text: ink.Text,
+  });
+  const viewport = { width: 80, height: 8 };
+  let state = createInitialTuiState();
+  state = appendTranscriptEntry(state, { role: "user", text: "user text" }, viewport);
+  state = appendTranscriptEntry(state, { role: "reasoning", text: "thinking text" }, viewport);
+  state = appendTranscriptEntry(state, { role: "assistant", text: "assistant text" }, viewport);
+
+  const output = ink.renderToString(
+    React.default.createElement(Transcript, {
+      state,
+      viewport,
+    }),
+    { columns: 100 },
+  );
+  const lines = output.split("\n");
+  const userColumn = readRenderedColumn(lines, "user text");
+  const reasoningColumn = readRenderedColumn(lines, "Thinking:");
+  const assistantColumn = readRenderedColumn(lines, "assistant text");
+
+  assert.equal(userColumn, reasoningColumn);
+  assert.equal(assistantColumn, reasoningColumn);
 });
 
 test("tui transcript renders assistant markdown without changing stored text", async () => {
@@ -439,3 +497,9 @@ test("tui transcript render does not create unmanaged wrapped rows", async () =>
   assert.equal(expectedRows.length, viewport.height);
   assert.equal(output.includes("Thinking:"), expectedRows.some((row) => row.prefix === "Thinking: "));
 });
+
+function readRenderedColumn(lines: readonly string[], text: string): number {
+  const line = lines.find((candidate) => candidate.includes(text));
+  assert.ok(line, `expected rendered transcript line to contain ${text}`);
+  return line.indexOf(text);
+}

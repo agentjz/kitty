@@ -44,7 +44,7 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     baseUrl: "https://api.deepseek.com",
     model: "deepseek-v4-flash",
     thinking: "enabled",
-    reasoningEffort: "max",
+    reasoningEffort: "high",
     activeByDefault: true,
   },
 ] as const;
