@@ -1,4 +1,4 @@
-# 小猫智能体 Kitty
+# Kitty Agent
 
 ![demo](site/images/product.png)
 
