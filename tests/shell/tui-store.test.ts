@@ -15,10 +15,13 @@ import {
   scrollTuiTranscriptToBottom,
   type TuiViewport,
 } from "../../src/shell/tui/store.js";
+import { projectTuiExecutionDockFacts, readTuiLiveExecutionDock } from "../../src/shell/tui/executionDock.js";
+import { ExecutionStore } from "../../src/execution/store.js";
 import type { RuntimeStatus } from "../../src/runtime/status.js";
 import { TuiTranscriptProjection } from "../../src/shell/tui/transcriptProjection.js";
 import type { SessionRecord } from "../../src/types.js";
 import type { TuiTranscriptEntry } from "../../src/shell/tui/store.js";
+import { createTempWorkspace } from "../helpers.js";
 
 const viewport: TuiViewport = {
   width: 20,
@@ -63,6 +66,38 @@ test("tui dock projects background and subagent facts from runtime status", () =
   assert.match(dock.background ?? "", /attention/);
   assert.match(dock.subagent ?? "", /inspect files/);
   assert.equal(dock.context, "250/1000 chars (25%)");
+});
+
+test("tui execution dock only keeps active control-plane lanes", () => {
+  const dock = projectTuiExecutionDockFacts([
+    { kind: "background", status: "running", summary: "watch server", risk: "watch" },
+    { kind: "subagent", status: "completed", summary: "inspect files" },
+  ]);
+
+  assert.match(dock.background ?? "", /watch server/);
+  assert.equal(dock.subagent, undefined);
+});
+
+test("tui live execution dock clears a completed subagent from the control plane", async (t) => {
+  const root = await createTempWorkspace("tui-live-execution-dock", t);
+  const store = new ExecutionStore(root);
+  const execution = store.create({
+    kind: "subagent",
+    assignment: {
+      objective: "inspect files",
+    },
+    cwd: root,
+    requestedBy: "lead",
+  });
+
+  assert.match(readTuiLiveExecutionDock({ rootDir: root, cwd: root }).subagent ?? "", /inspect files/);
+
+  store.close(execution.id, {
+    status: "completed",
+    summary: "inspection complete",
+  });
+
+  assert.equal(readTuiLiveExecutionDock({ rootDir: root, cwd: root }).subagent, undefined);
 });
 
 test("tui transcript sticks to bottom unless user scrolls history", () => {

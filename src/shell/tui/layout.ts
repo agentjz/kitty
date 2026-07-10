@@ -3,8 +3,9 @@ export const TUI_MIN_HEIGHT = 14;
 export const TUI_DOCK_ROWS = 2;
 export const TUI_COMPOSER_MAX_ROWS = 6;
 export const TUI_FOOTER_TOP_GAP_ROWS = 1;
-export const TUI_FOOTER_PADDING_X = 2;
+export const TUI_FOOTER_CONTENT_INSET_X = 2;
 export const TUI_FOOTER_PADDING_BOTTOM_ROWS = 1;
+export const TUI_FOOTER_META_ROWS = 1;
 
 const COMPOSER_VERTICAL_PADDING_ROWS = 2;
 
@@ -13,6 +14,7 @@ export function measureTuiFooterRows(composerRows: number): number {
     + TUI_DOCK_ROWS
     + COMPOSER_VERTICAL_PADDING_ROWS
     + normalizeComposerRows(composerRows)
+    + TUI_FOOTER_META_ROWS
     + TUI_FOOTER_PADDING_BOTTOM_ROWS;
 }
 

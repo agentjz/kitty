@@ -33,10 +33,6 @@ export function createRuntimeDockComponent(kit: Pick<InkRuntime, "React" | "Box"
     if (props.dock.subagent) {
       facts.push({ label: "子代理", value: props.dock.subagent });
     }
-    if (props.dock.context) {
-      facts.push({ label: "上下文", value: props.dock.context });
-    }
-
     return React.createElement(
       Box,
       {
@@ -45,23 +41,21 @@ export function createRuntimeDockComponent(kit: Pick<InkRuntime, "React" | "Box"
         height: TUI_DOCK_ROWS,
       },
       renderActivityRow(React, Box, Text, activity, now, { spinnerFrame }),
-      facts.length > 0
-        ? React.createElement(
+      React.createElement(
+        Box,
+        { flexDirection: "row", height: 1, marginTop: 0, width: "100%" },
+        React.createElement(
           Box,
-          { height: 1, marginTop: 0 },
-          ...facts.flatMap(({ label, value }, index) => [
-            index > 0 ? React.createElement(Text, { color: TUI_COLORS.muted, key: `${label}-gap` }, "   ") : null,
-            React.createElement(Text, { color: TUI_COLORS.muted, key: `${label}-label` }, `${label} `),
-            React.createElement(Text, { color: TUI_COLORS.text, key: `${label}-value`, wrap: "truncate-end" }, value),
-          ]),
-        )
-        : React.createElement(
-          Box,
-          { height: 1, marginTop: 0 },
-          props.dock.context
-            ? React.createElement(Text, { color: TUI_COLORS.muted }, `上下文 ${props.dock.context}`)
+          { flexGrow: 1, flexShrink: 1, height: 1 },
+          facts.length > 0
+            ? facts.flatMap(({ label, value }, index) => [
+              index > 0 ? React.createElement(Text, { color: TUI_COLORS.muted, key: `${label}-gap` }, "   ") : null,
+              React.createElement(Text, { color: TUI_COLORS.muted, key: `${label}-label` }, `${label} `),
+              React.createElement(Text, { color: TUI_COLORS.text, key: `${label}-value`, wrap: "truncate-end" }, value),
+            ])
             : null,
         ),
+      ),
     );
   };
 }

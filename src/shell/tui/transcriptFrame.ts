@@ -11,6 +11,12 @@ import type { TuiMarkdownLineKind } from "./markdown.js";
 export const TRANSCRIPT_OUTER_PADDING_X = 3;
 
 const MIN_BODY_WIDTH = 8;
+const TRANSCRIPT_CONTENT_FRAME = {
+  gap: 2,
+  marginLeft: 1,
+  paddingLeft: 1,
+  paddingRight: 1,
+} as const;
 
 export function readTranscriptRoleFrame(role: TuiTranscriptRole, viewportWidth: number): TuiTranscriptLineFrame {
   const frameWidth = Math.max(1, viewportWidth - TRANSCRIPT_OUTER_PADDING_X * 2);
@@ -111,28 +117,19 @@ function readRoleFrameBase(role: TuiTranscriptRole): Omit<TuiTranscriptLineFrame
     case "reasoning":
     case "subagent_reasoning":
       return {
-        gap: 2,
+        ...TRANSCRIPT_CONTENT_FRAME,
         gutter: role === "subagent_reasoning" ? "┊" : "┃",
-        marginLeft: 1,
-        paddingLeft: 1,
-        paddingRight: 1,
       };
     case "system":
       return {
-        gap: 2,
+        ...TRANSCRIPT_CONTENT_FRAME,
         gutter: "│",
-        marginLeft: 2,
-        paddingLeft: 1,
-        paddingRight: 1,
       };
     case "assistant":
     case "subagent":
       return {
-        gap: 2,
+        ...TRANSCRIPT_CONTENT_FRAME,
         gutter: role === "subagent" ? "◇" : " ",
-        marginLeft: 1,
-        paddingLeft: 1,
-        paddingRight: 1,
       };
   }
 }

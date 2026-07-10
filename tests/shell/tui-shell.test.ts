@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { TuiController } from "../../src/shell/tui/controller.js";
+import { createTuiExecutionDockWatcher } from "../../src/shell/tui/executionDock.js";
 import { createTuiInteractionShell } from "../../src/shell/tui/shell.js";
 
 test("tui shell input queue resolves submitted input", async () => {
@@ -53,6 +54,34 @@ test("tui turn display keeps live tool facts in runtime dock", () => {
   assert.match(state.dock.background, /background_run/);
   assert.match(state.dock.background, /running/);
   assert.equal(state.dock.activity, undefined);
+});
+
+test("tui execution watcher clears settled background and subagent lanes", () => {
+  const controller = new TuiController();
+  let poll: (() => void) | undefined;
+  let stopped = false;
+  const watcher = createTuiExecutionDockWatcher({
+    controller,
+    readLiveDock: () => ({ background: undefined, subagent: undefined }),
+    schedule: (callback) => {
+      poll = callback;
+      return () => {
+        stopped = true;
+      };
+    },
+  });
+
+  controller.updateDock({
+    background: "1 running; watch server",
+    subagent: "1 running; inspect files",
+  });
+
+  assert.ok(poll);
+  poll?.();
+  assert.equal(controller.getState().dock.background, undefined);
+  assert.equal(controller.getState().dock.subagent, undefined);
+  assert.equal(stopped, true);
+  watcher.dispose();
 });
 
 test("tui turn display renders replayed subagent runtime UI in the current transcript", () => {

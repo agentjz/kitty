@@ -17,7 +17,12 @@ import {
   measureComposerContentWidth,
   measureComposerTextOrigin,
 } from "../../src/shell/tui/composerLayout.js";
-import { TUI_FOOTER_TOP_GAP_ROWS, measureTuiFooterRows } from "../../src/shell/tui/layout.js";
+import {
+  TUI_FOOTER_CONTENT_INSET_X,
+  TUI_FOOTER_META_ROWS,
+  TUI_FOOTER_TOP_GAP_ROWS,
+  measureTuiFooterRows,
+} from "../../src/shell/tui/layout.js";
 
 test("tui runtime dock renders the current scene facts", async () => {
   const React = await import("react");
@@ -39,6 +44,7 @@ test("tui runtime dock renders the current scene facts", async () => {
     },
     background: "background_run 运行中",
     context: "100/1000 chars (10%)",
+    model: "deepseek-v4-flash",
   };
 
   const output = ink.renderToString(React.default.createElement(RuntimeDock, { dock, now: 13_000 }), { columns: 80 });
@@ -50,7 +56,8 @@ test("tui runtime dock renders the current scene facts", async () => {
   assert.match(output, /background_run 运行中/);
   assert.doesNotMatch(output, /子代理/);
   assert.doesNotMatch(output, /空闲/);
-  assert.match(output, /上下文/);
+  assert.doesNotMatch(output, /上下文/);
+  assert.doesNotMatch(output, /模型/);
 });
 
 test("tui runtime dock keeps the stable two-line idle structure without inventing execution facts", async () => {
@@ -64,14 +71,58 @@ test("tui runtime dock keeps the stable two-line idle structure without inventin
   });
 
   const output = ink.renderToString(
-    React.default.createElement(RuntimeDock, { dock: { context: "0%" } satisfies TuiRuntimeDockState }),
+    React.default.createElement(RuntimeDock, {
+      dock: { context: "0%", model: "deepseek-v4-flash" } satisfies TuiRuntimeDockState,
+    }),
     { columns: 80 },
   );
 
   assert.match(output, /空闲/);
   assert.doesNotMatch(output, /后台/);
   assert.doesNotMatch(output, /子代理/);
-  assert.match(output, /上下文/);
+  assert.doesNotMatch(output, /上下文/);
+  assert.doesNotMatch(output, /模型/);
+});
+
+test("tui footer model and runtime dock share the same left anchor", async () => {
+  const React = await import("react");
+  const ink = await import("ink");
+  const { createFooterMetaComponent } = await import("../../src/shell/tui/components/FooterMeta.js");
+  const { createRuntimeDockComponent } = await import("../../src/shell/tui/components/RuntimeDock.js");
+  const FooterMeta = createFooterMetaComponent({
+    React: React.default,
+    Box: ink.Box,
+    Text: ink.Text,
+  });
+  const RuntimeDock = createRuntimeDockComponent({
+    React: React.default,
+    Box: ink.Box,
+    Text: ink.Text,
+  });
+
+  const output = ink.renderToString(
+    React.default.createElement(
+      ink.Box,
+      { flexDirection: "column", paddingX: TUI_FOOTER_CONTENT_INSET_X, width: "100%" },
+      React.default.createElement(RuntimeDock, {
+        dock: {
+          context: "100/1000 chars (10%)",
+        } satisfies TuiRuntimeDockState,
+        now: 13_000,
+      }),
+      React.default.createElement(FooterMeta, {
+        dock: {
+          context: "100/1000 chars (10%)",
+          model: "deepseek-v4-flash",
+        } satisfies TuiRuntimeDockState,
+      }),
+    ),
+    { columns: 80 },
+  );
+
+  const lines = output.split("\n");
+  assert.equal(readRenderedColumn(lines, "模型 deepseek-v4-flash"), readRenderedColumn(lines, "空闲"));
+  assert.match(output, /上下文 100\/1000 chars \(10%\)$/);
 });
 
 test("tui runtime dock renders failed activity without parsing message words", async () => {
@@ -324,11 +375,12 @@ test("tui theme uses black surfaces with light gold text accents", () => {
 });
 
 test("tui footer height reserves a gap but not a top border row", () => {
-  assert.equal(measureTuiFooterRows(1), 7);
+  assert.equal(measureTuiFooterRows(1), 8);
 });
 
 test("tui footer top gap is a visible background row", () => {
   assert.equal(TUI_FOOTER_TOP_GAP_ROWS, 1);
+  assert.equal(TUI_FOOTER_META_ROWS, 1);
   assert.equal(TUI_COLORS.background, "#05080c");
 });
 
@@ -401,7 +453,7 @@ test("tui transcript reasoning gutter uses the muted reasoning color", () => {
   assert.equal(content?.style.text, TUI_COLORS.reasoning);
 });
 
-test("tui transcript aligns user reasoning and assistant content columns", async () => {
+test("tui transcript aligns every message role content column", async () => {
   const React = await import("react");
   const ink = await import("ink");
   const { createTranscriptComponent } = await import("../../src/shell/tui/components/Transcript.js");
@@ -410,11 +462,13 @@ test("tui transcript aligns user reasoning and assistant content columns", async
     Box: ink.Box,
     Text: ink.Text,
   });
-  const viewport = { width: 80, height: 8 };
+  const viewport = { width: 80, height: 12 };
   let state = createInitialTuiState();
   state = appendTranscriptEntry(state, { role: "user", text: "user text" }, viewport);
   state = appendTranscriptEntry(state, { role: "reasoning", text: "thinking text" }, viewport);
   state = appendTranscriptEntry(state, { role: "assistant", text: "assistant text" }, viewport);
+  state = appendTranscriptEntry(state, { role: "subagent", text: "subagent text" }, viewport);
+  state = appendTranscriptEntry(state, { role: "system", text: "system text" }, viewport);
 
   const output = ink.renderToString(
     React.default.createElement(Transcript, {
@@ -427,9 +481,13 @@ test("tui transcript aligns user reasoning and assistant content columns", async
   const userColumn = readRenderedColumn(lines, "user text");
   const reasoningColumn = readRenderedColumn(lines, "Thinking:");
   const assistantColumn = readRenderedColumn(lines, "assistant text");
+  const subagentColumn = readRenderedColumn(lines, "subagent text");
+  const systemColumn = readRenderedColumn(lines, "system text");
 
   assert.equal(userColumn, reasoningColumn);
   assert.equal(assistantColumn, reasoningColumn);
+  assert.equal(subagentColumn, reasoningColumn);
+  assert.equal(systemColumn, reasoningColumn);
 });
 
 test("tui transcript renders assistant markdown without changing stored text", async () => {

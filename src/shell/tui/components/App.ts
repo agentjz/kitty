@@ -1,8 +1,8 @@
 import type { TuiController } from "../controller.js";
 import {
   measureTuiFooterRows,
+  TUI_FOOTER_CONTENT_INSET_X,
   TUI_FOOTER_PADDING_BOTTOM_ROWS,
-  TUI_FOOTER_PADDING_X,
   TUI_FOOTER_TOP_GAP_ROWS,
   TUI_MIN_HEIGHT,
   TUI_MIN_WIDTH,
@@ -11,12 +11,14 @@ import type { TuiState, TuiViewport } from "../store.js";
 import { TUI_COLORS } from "../theme.js";
 import type { InkRuntime } from "./kit.js";
 import { createComposerComponent } from "./Composer.js";
+import { createFooterMetaComponent } from "./FooterMeta.js";
 import { createRuntimeDockComponent } from "./RuntimeDock.js";
 import { createTranscriptComponent } from "./Transcript.js";
 
 export function createTuiAppComponent(kit: InkRuntime) {
   const { React, Box, useInput, useStdout } = kit;
   const Composer = createComposerComponent(kit);
+  const FooterMeta = createFooterMetaComponent(kit);
   const RuntimeDock = createRuntimeDockComponent(kit);
   const Transcript = createTranscriptComponent(kit);
 
@@ -37,7 +39,7 @@ export function createTuiAppComponent(kit: InkRuntime) {
       hasMeasured: false,
       left: 0,
       top: 0,
-      width: Math.max(1, width - TUI_FOOTER_PADDING_X * 2),
+      width: Math.max(1, width - TUI_FOOTER_CONTENT_INSET_X * 2),
     }), [transcriptViewport.height, width]);
 
     React.useEffect(() => {
@@ -79,7 +81,7 @@ export function createTuiAppComponent(kit: InkRuntime) {
         {
           flexDirection: "column",
           backgroundColor: TUI_COLORS.panel,
-          paddingX: TUI_FOOTER_PADDING_X,
+          paddingX: TUI_FOOTER_CONTENT_INSET_X,
           paddingBottom: TUI_FOOTER_PADDING_BOTTOM_ROWS,
           width: "100%",
         },
@@ -89,6 +91,7 @@ export function createTuiAppComponent(kit: InkRuntime) {
           frame: composerFrame,
           state,
         }),
+        React.createElement(FooterMeta, { dock: state.dock }),
       ),
     );
   };
