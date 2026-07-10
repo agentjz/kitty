@@ -83,6 +83,17 @@ test("relay transport derives probe kind from provider transport and model wire 
   );
 });
 
+test("named OpenAI-compatible providers probe the chat endpoint", () => {
+  assert.equal(
+    resolveProviderProbeKind(resolveModelProfile({ provider: "nvidia", model: "deepseek-ai/deepseek-v4-flash" })),
+    "chat.completions",
+  );
+  assert.equal(
+    resolveProviderProbeKind(resolveModelProfile({ provider: "groq", model: "openai/gpt-oss-120b" })),
+    "chat.completions",
+  );
+});
+
 test("relay chat completions probe uses the chat endpoint shape", () => {
   const request = buildProviderProbeRequest({
     baseUrl: "https://relay.example/api",

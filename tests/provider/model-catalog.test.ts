@@ -36,6 +36,29 @@ test("relay providers are explicit provider facts", () => {
   assert.equal(findProviderInfo("ttapi")?.transport, "relay");
   assert.equal(findProviderInfo("openai")?.transport, "standard");
   assert.equal(findProviderInfo("openai-compatible")?.transport, "standard");
+  assert.equal(findProviderInfo("nvidia")?.defaultBaseUrl, "https://integrate.api.nvidia.com/v1");
+  assert.equal(findProviderInfo("groq")?.defaultBaseUrl, "https://api.groq.com/openai/v1");
+  assert.equal(findProviderInfo("cerebras")?.defaultBaseUrl, "https://api.cerebras.ai/v1");
+  assert.equal(findProviderInfo("gemini")?.defaultBaseUrl, "https://generativelanguage.googleapis.com/v1beta/openai");
+});
+
+test("named compatible provider profiles use explicit current model facts", () => {
+  assert.equal(resolveModelProfile({
+    provider: "nvidia",
+    model: "deepseek-ai/deepseek-v4-flash",
+  }).model.request.chat?.reasoning, "nvidia-reasoning-effort");
+  assert.equal(resolveModelProfile({
+    provider: "groq",
+    model: "openai/gpt-oss-120b",
+  }).model.request.chat?.reasoning, "reasoning-effort");
+  assert.equal(resolveModelProfile({
+    provider: "cerebras",
+    model: "gpt-oss-120b",
+  }).model.request.maxOutputTokensParam, "max_completion_tokens");
+  assert.equal(resolveModelProfile({
+    provider: "gemini",
+    model: "gemini-2.5-flash",
+  }).model.limit.context, 1_000_000);
 });
 
 test("unknown provider model pair fails clearly", () => {

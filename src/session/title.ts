@@ -69,8 +69,9 @@ export function normalizeModelSessionTitle(rawTitle: string): string | undefined
     .replace(/^#+\s*/, "")
     .replace(/^["'“”‘’]+|["'“”‘’]+$/g, "")
     .replace(/[。！？!?；;，,：:、]+$/g, "")
+    .replace(/^["'“”‘’]+|["'“”‘’]+$/g, "")
     .trim();
-  if (!normalized) {
+  if (!normalized || containsToolProtocolText(normalized)) {
     return undefined;
   }
 
@@ -78,6 +79,13 @@ export function normalizeModelSessionTitle(rawTitle: string): string | undefined
   return chars.length > MAX_SESSION_TITLE_CHARS
     ? `${chars.slice(0, MAX_SESSION_TITLE_CHARS).join("")}...`
     : normalized;
+}
+
+function containsToolProtocolText(value: string): boolean {
+  return value.includes("<｜") ||
+    value.includes("<tool_call>") ||
+    value.includes("\"tool_calls\"") ||
+    value.includes("tool_calls");
 }
 
 function truncate(value: string, maxChars: number): string {

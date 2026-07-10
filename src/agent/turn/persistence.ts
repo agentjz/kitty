@@ -1,5 +1,4 @@
 import {
-  noteCheckpointRecovery,
   noteCheckpointToolBatch,
   noteCheckpointTransition,
   noteCheckpointTurnInput,
@@ -7,12 +6,7 @@ import {
 import { createMessage } from "../../session/messages.js";
 import { applyCurrentTurnFrame } from "../../session/taskState.js";
 import type { SessionStoreLike } from "../../session/store.js";
-import type {
-  RuntimeRecoverTransition,
-  RuntimeTransition,
-  SessionRecord,
-  StoredMessage,
-} from "../../types.js";
+import type { RuntimeTransition, SessionRecord, StoredMessage } from "../../types.js";
 
 interface PersistToolBatchInput {
   session: SessionRecord;
@@ -35,14 +29,6 @@ export async function initializeTurnSession(
   const framed = applyCurrentTurnFrame(appended, input, undefined, source);
 
   return sessionStore.save(noteCheckpointTurnInput(framed, input));
-}
-
-export async function persistRecoveryTurn(
-  session: SessionRecord,
-  sessionStore: SessionStoreLike,
-  transition: RuntimeRecoverTransition,
-): Promise<SessionRecord> {
-  return sessionStore.save(noteCheckpointRecovery(session, transition));
 }
 
 export async function persistToolBatchCheckpoint(

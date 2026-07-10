@@ -127,7 +127,6 @@ export function noteCheckpointToolBatch(
 ): SessionRecord {
   const checkpoint = resolveCurrentFocusCheckpoint(session, timestamp);
   const recentToolBatch = buildToolBatch(input.toolNames, input.toolMessages, input.changedPaths, timestamp);
-  const phase = checkpoint.flow.phase === "recovery" ? "active" : checkpoint.flow.phase;
   const transition = createToolBatchTransition({
     toolNames: input.toolNames,
     changedPaths: input.changedPaths,
@@ -143,7 +142,7 @@ export function noteCheckpointToolBatch(
         current: checkpoint.flow,
         status: checkpoint.status,
         transition,
-        defaultPhase: phase,
+        defaultPhase: checkpoint.flow.phase,
         timestamp,
       }),
       updatedAt: timestamp,

@@ -1,6 +1,6 @@
 ﻿import type OpenAI from "openai";
 
-import { withApiRetries } from "./apiRetry.js";
+import { API_MAX_ATTEMPTS, createApiRetryBudget, withApiRetries } from "./apiRetry.js";
 import type { ModelRequestMetric } from "./metrics.js";
 import { hasProviderUsageSnapshot } from "./usageNormalizer.js";
 import { isAbortError } from "../utils/abort.js";
@@ -88,6 +88,19 @@ async function tryFetch(
     latestMetric = metric;
     onRequestMetric?.(metric);
   };
+  const retryOptions = {
+    abortSignal,
+    onRetry: (state: {
+      nextAttempt: number;
+      maxAttempts: number;
+      delayMs: number;
+    }) => {
+      callbacks?.onStatus?.(
+        `模型请求暂时失败，${formatRetryDelay(state.delayMs)} 后重试（${state.nextAttempt}/${state.maxAttempts}）。`,
+      );
+    },
+  };
+  const retryBudget = createApiRetryBudget();
 
   if (observability) {
     await recordObservabilityEvent(observability.rootDir, {
@@ -127,7 +140,10 @@ async function tryFetch(
           onRequestMetric: forwardMetric,
         });
       }),
-      abortSignal,
+      {
+        ...retryOptions,
+        budget: retryBudget,
+      },
     );
 
     if (observability) {
@@ -156,6 +172,35 @@ async function tryFetch(
       throw error;
     }
 
+    if (!isStreamingFallbackEligible(error)) {
+      if (observability) {
+        await recordObservabilityEvent(observability.rootDir, {
+          event: "model.request",
+          status: "failed",
+          sessionId: observability.sessionId,
+          identityKind: observability.identityKind,
+          identityName: observability.identityName,
+          model: request.model,
+          durationMs: Date.now() - startedAt,
+          error,
+          details: {
+            provider: request.provider,
+            configuredModel: observability.configuredModel,
+            requestModel: request.model,
+            wireApi: adapter.wireApi,
+            baseUrl: resolvedBaseUrl,
+            usage: latestMetric?.usage,
+            usageAvailable: hasProviderUsageSnapshot(latestMetric?.usage),
+          },
+        });
+      }
+      throw error;
+    }
+
+    if (retryBudget.attempts >= API_MAX_ATTEMPTS) {
+      throw error;
+    }
+
     try {
       const response = await withApiRetries(
         () => invokeWithProviderClients(client, async (providerClient, baseUrl) => {
@@ -176,7 +221,10 @@ async function tryFetch(
             onRequestMetric: forwardMetric,
           });
         }),
-        abortSignal,
+        {
+          ...retryOptions,
+          budget: retryBudget,
+        },
       );
 
       if (observability) {
@@ -225,6 +273,25 @@ async function tryFetch(
       throw fallbackError;
     }
   }
+}
+
+function isStreamingFallbackEligible(error: unknown): boolean {
+  const status = (error as { status?: unknown }).status;
+  if (typeof status === "number") {
+    return false;
+  }
+
+  const message = String((error as { message?: unknown }).message ?? error).toLowerCase();
+  return (
+    message.includes("stream ended unexpectedly") ||
+    message.includes("unexpected end of stream") ||
+    message.includes("invalid sse") ||
+    message.includes("event stream parse")
+  );
+}
+
+function formatRetryDelay(ms: number): string {
+  return ms % 1_000 === 0 ? `${ms / 1_000}s` : `${ms}ms`;
 }
 
 function selectProviderWireAdapter(

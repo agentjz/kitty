@@ -1,7 +1,6 @@
 import { buildCheckpointFlow } from "../../agent/runtimeTransition.js";
 import type {
   RuntimeFinalizeTransition,
-  RuntimeRecoverTransition,
   RuntimeTransition,
   SessionRecord,
 } from "../../types.js";
@@ -24,36 +23,6 @@ export function noteCheckpointTransition(
         status: checkpoint.status,
         transition,
         defaultPhase: checkpoint.flow.phase,
-        timestamp,
-      }),
-      updatedAt: timestamp,
-    },
-  };
-}
-
-export function noteCheckpointRecovery(
-  session: SessionRecord,
-  transition: RuntimeRecoverTransition,
-  timestamp = new Date().toISOString(),
-): SessionRecord {
-  const checkpoint = resolveCurrentFocusCheckpoint(session, timestamp);
-
-  if (checkpoint.status === "completed") {
-    return {
-      ...session,
-      checkpoint,
-    };
-  }
-
-  return {
-    ...session,
-    checkpoint: {
-      ...checkpoint,
-      flow: buildCheckpointFlow({
-        current: checkpoint.flow,
-        status: checkpoint.status,
-        transition,
-        defaultPhase: "recovery",
         timestamp,
       }),
       updatedAt: timestamp,

@@ -90,6 +90,10 @@ function formatProviderProbeSuccess(
     return "Provider reachable. responses probe ok";
   }
 
+  if (diagnosis.probe === "chat.completions") {
+    return "Provider reachable. chat completions probe ok";
+  }
+
   return `Provider reachable. models=${diagnosis.models ?? 0}`;
 }
 

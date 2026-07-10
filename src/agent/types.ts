@@ -46,7 +46,6 @@ export interface RunTurnOptions {
   fetchAssistantResponse?: (input: ModelRequestInput) => Promise<AssistantResponse>;
   fetchSessionMemoryResponse?: (input: ModelRequestInput) => Promise<AssistantResponse>;
   fetchSessionTitleResponse?: (input: ModelRequestInput) => Promise<AssistantResponse>;
-  recoverySleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
 }
 
 export interface ModelRequestInput {

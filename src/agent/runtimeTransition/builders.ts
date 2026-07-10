@@ -1,9 +1,7 @@
-import type { RecoveryRequestConfig } from "../../provider/retryPolicy.js";
 import type { RunTurnResult } from "../types.js";
 import type {
   RuntimeContinueTransition,
   RuntimeFinalizeTransition,
-  RuntimeRecoverTransition,
   RuntimeTerminalTransition,
   RuntimeYieldTransition,
   SessionRecord,
@@ -35,34 +33,6 @@ export function createEmptyAssistantResponseTransition(
     action: "continue",
     reason: {
       code: "continue.empty_assistant_response",
-    },
-    timestamp,
-  };
-}
-
-export function createProviderRecoveryTransition(
-  input: {
-    consecutiveFailures: number;
-    error: unknown;
-    configuredModel: string;
-    requestModel: string;
-    requestConfig: RecoveryRequestConfig;
-    delayMs: number;
-  },
-  timestamp = new Date().toISOString(),
-): RuntimeRecoverTransition {
-  return {
-    action: "recover",
-    reason: {
-      code: "recover.provider_request_retry",
-      consecutiveFailures: Math.max(1, Math.trunc(input.consecutiveFailures)),
-      error: truncate(normalizeText((input.error as { message?: unknown })?.message ?? input.error) || "request failed"),
-      configuredModel: normalizeText(input.configuredModel) || "unknown_model",
-      requestModel: normalizeText(input.requestModel) || "unknown_model",
-      contextWindowMessages: Math.max(1, Math.trunc(input.requestConfig.contextWindowMessages)),
-      maxContextChars: Math.max(1, Math.trunc(input.requestConfig.maxContextChars)),
-      contextSummaryChars: Math.max(1, Math.trunc(input.requestConfig.contextSummaryChars)),
-      delayMs: Math.max(0, Math.trunc(input.delayMs)),
     },
     timestamp,
   };

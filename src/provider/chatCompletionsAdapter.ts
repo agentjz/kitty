@@ -6,6 +6,7 @@ import type {
 
 import { collapseContentParts, readReasoningContent } from "../session/messages.js";
 import { buildProviderRequestBody } from "./chatRequestBody.js";
+import { resolveModelProfile } from "./catalog.js";
 import type { ProviderAdapterRequest, ProviderMessage, ProviderWireAdapter } from "./contract.js";
 import type { ProviderUsageSnapshot } from "./metrics.js";
 import { normalizeProviderUsage } from "./usageNormalizer.js";
@@ -19,22 +20,20 @@ export const chatCompletionsAdapter: ProviderWireAdapter = {
     throwIfAborted(request.abortSignal, "Streaming request aborted");
     try {
       const stream = await client.chat.completions.create(
-        {
-          ...buildProviderRequestBody({
-            provider: request.provider,
-            model: request.model,
-            messages: request.messages,
-            tools: request.tools,
-            stream: true,
-            forceReasoning: request.forceReasoning,
-            thinking: request.thinking,
-            reasoningEffort: request.reasoningEffort,
-            maxOutputTokens: request.maxOutputTokens,
-            sessionId: request.sessionId,
-            projectRoot: request.projectRoot,
-          }),
-          signal: request.abortSignal,
-        } as never,
+        buildProviderRequestBody({
+          provider: request.provider,
+          model: request.model,
+          messages: request.messages,
+          tools: request.tools,
+          stream: true,
+          forceReasoning: request.forceReasoning,
+          thinking: request.thinking,
+          reasoningEffort: request.reasoningEffort,
+          maxOutputTokens: request.maxOutputTokens,
+          sessionId: request.sessionId,
+          projectRoot: request.projectRoot,
+        }) as never,
+        { signal: request.abortSignal },
       );
 
       if (request.abortSignal?.aborted) {
@@ -79,9 +78,10 @@ export const chatCompletionsAdapter: ProviderWireAdapter = {
           request.callbacks?.onAssistantDelta?.(delta.content);
         }
 
-        if (typeof delta.reasoning_content === "string" && delta.reasoning_content.length > 0) {
-          reasoningContent += delta.reasoning_content;
-          request.callbacks?.onReasoningDelta?.(delta.reasoning_content);
+        const reasoningDelta = readChatReasoningContent(delta);
+        if (reasoningDelta) {
+          reasoningContent += reasoningDelta;
+          request.callbacks?.onReasoningDelta?.(reasoningDelta);
         }
 
         if (Array.isArray(delta.tool_calls)) {
@@ -112,8 +112,9 @@ export const chatCompletionsAdapter: ProviderWireAdapter = {
 
       return {
         content: content.length > 0 ? content : null,
-        reasoningContent: resolveDeepSeekToolCallReasoningReplay({
+        reasoningContent: resolveToolCallReasoningContent({
           provider: request.provider,
+          model: request.model,
           thinking: request.thinking,
           reasoningContent,
           toolCallCount: toolCallParts.size,
@@ -144,22 +145,20 @@ export const chatCompletionsAdapter: ProviderWireAdapter = {
     throwIfAborted(request.abortSignal, "Request aborted");
     try {
       const completion = await client.chat.completions.create(
-        {
-          ...buildProviderRequestBody({
-            provider: request.provider,
-            model: request.model,
-            messages: request.messages,
-            tools: request.tools,
-            stream: false,
-            forceReasoning: request.forceReasoning,
-            thinking: request.thinking,
-            reasoningEffort: request.reasoningEffort,
-            maxOutputTokens: request.maxOutputTokens,
-            sessionId: request.sessionId,
-            projectRoot: request.projectRoot,
-          }),
-          signal: request.abortSignal,
-        } as never,
+        buildProviderRequestBody({
+          provider: request.provider,
+          model: request.model,
+          messages: request.messages,
+          tools: request.tools,
+          stream: false,
+          forceReasoning: request.forceReasoning,
+          thinking: request.thinking,
+          reasoningEffort: request.reasoningEffort,
+          maxOutputTokens: request.maxOutputTokens,
+          sessionId: request.sessionId,
+          projectRoot: request.projectRoot,
+        }) as never,
+        { signal: request.abortSignal },
       );
       usage = normalizeProviderUsage((completion as { usage?: unknown }).usage);
 
@@ -171,10 +170,11 @@ export const chatCompletionsAdapter: ProviderWireAdapter = {
       return {
         content:
           typeof message.content === "string" ? message.content : collapseContentParts(message.content),
-        reasoningContent: resolveDeepSeekToolCallReasoningReplay({
+        reasoningContent: resolveToolCallReasoningContent({
           provider: request.provider,
+          model: request.model,
           thinking: request.thinking,
-          reasoningContent: readReasoningContent(message),
+          reasoningContent: readChatReasoningContent(message),
           toolCallCount: message.tool_calls?.length ?? 0,
         }),
         streamedAssistantContent: false,
@@ -199,14 +199,18 @@ export const chatCompletionsAdapter: ProviderWireAdapter = {
   },
 };
 
-function resolveDeepSeekToolCallReasoningReplay(input: {
+function resolveToolCallReasoningContent(input: {
   provider: string;
+  model: string;
   thinking?: "enabled" | "disabled";
   reasoningContent: string | undefined;
   toolCallCount: number;
 }): string | undefined {
   if (
-    input.provider === "deepseek" &&
+    resolveModelProfile({
+      provider: input.provider,
+      model: input.model,
+    }).model.capabilities.reasoningContentReplay === "tool-call-required" &&
     input.thinking !== "disabled" &&
     input.toolCallCount > 0
   ) {
@@ -218,6 +222,17 @@ function resolveDeepSeekToolCallReasoningReplay(input: {
     : undefined;
 }
 
+function readChatReasoningContent(message: unknown): string | undefined {
+  return readReasoningContent(message) ??
+    readStringProperty(message, "reasoning") ??
+    readStringProperty(message, "reasoning_text");
+}
+
+function readStringProperty(value: unknown, key: string): string | undefined {
+  const candidate = (value as Record<string, unknown> | undefined)?.[key];
+  return typeof candidate === "string" && candidate.length > 0 ? candidate : undefined;
+}
+
 function abortStream(stream: { controller?: AbortController } | undefined): void {
   try {
     stream?.controller?.abort();
@@ -226,7 +241,16 @@ function abortStream(stream: { controller?: AbortController } | undefined): void
   }
 }
 
-export function toChatCompletionMessages(messages: ProviderMessage[]): ChatCompletionMessageParam[] {
+export function toChatCompletionMessages(
+  messages: ProviderMessage[],
+  profileInput: {
+    provider?: string;
+    model: string;
+  },
+): ChatCompletionMessageParam[] {
+  const profile = resolveModelProfile(profileInput);
+  const replayReasoningContent = profile.model.capabilities.reasoningContentReplay === "tool-call-required";
+
   return messages.map((message) => {
     if (message.role === "tool") {
       return {
@@ -243,7 +267,7 @@ export function toChatCompletionMessages(messages: ProviderMessage[]): ChatCompl
         tool_calls: message.toolCalls,
       };
 
-      if (message.reasoningContent !== undefined) {
+      if (replayReasoningContent && message.reasoningContent !== undefined) {
         assistantMessage.reasoning_content = message.reasoningContent;
       }
 
@@ -256,7 +280,7 @@ export function toChatCompletionMessages(messages: ProviderMessage[]): ChatCompl
       name: message.name,
     };
 
-    if (message.role === "assistant" && message.reasoningContent !== undefined) {
+    if (message.role === "assistant" && replayReasoningContent && message.reasoningContent !== undefined) {
       baseMessage.reasoning_content = message.reasoningContent;
     }
 

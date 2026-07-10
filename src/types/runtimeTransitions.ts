@@ -8,18 +8,6 @@ export interface RuntimeContinueEmptyAssistantResponseReason {
   code: "continue.empty_assistant_response";
 }
 
-export interface RuntimeRecoverProviderRequestReason {
-  code: "recover.provider_request_retry";
-  consecutiveFailures: number;
-  error: string;
-  configuredModel: string;
-  requestModel: string;
-  contextWindowMessages: number;
-  maxContextChars: number;
-  contextSummaryChars: number;
-  delayMs: number;
-}
-
 export interface RuntimeFinalizeCompletedReason {
   code: "finalize.completed";
   changedPaths: string[];
@@ -35,8 +23,6 @@ export type RuntimeContinueReason =
   | RuntimeContinueToolBatchReason
   | RuntimeContinueEmptyAssistantResponseReason;
 
-export type RuntimeRecoverReason = RuntimeRecoverProviderRequestReason;
-
 export type RuntimeFinalizeReason = RuntimeFinalizeCompletedReason;
 
 export type RuntimeYieldReason = RuntimeYieldExecutionWaitReason;
@@ -44,12 +30,6 @@ export type RuntimeYieldReason = RuntimeYieldExecutionWaitReason;
 export interface RuntimeContinueTransition {
   action: "continue";
   reason: RuntimeContinueReason;
-  timestamp: string;
-}
-
-export interface RuntimeRecoverTransition {
-  action: "recover";
-  reason: RuntimeRecoverReason;
   timestamp: string;
 }
 
@@ -67,7 +47,6 @@ export interface RuntimeYieldTransition {
 
 export type RuntimeTransition =
   | RuntimeContinueTransition
-  | RuntimeRecoverTransition
   | RuntimeFinalizeTransition
   | RuntimeYieldTransition;
 

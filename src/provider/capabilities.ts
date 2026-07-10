@@ -1,4 +1,4 @@
-import { resolveModelProfile } from "./catalog.js";
+import { resolveModelProfile, type ChatReasoningRequestMode } from "./catalog.js";
 
 export interface ProviderCapabilities {
   provider: string;
@@ -7,6 +7,12 @@ export interface ProviderCapabilities {
   supportsReasoningContent: boolean;
   defaultReasoningEnabled: boolean;
   defaultReasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+  maxOutputTokensParam: "max_tokens" | "max_completion_tokens" | "max_output_tokens";
+  chat: {
+    reasoning: ChatReasoningRequestMode;
+    toolChoice: "auto" | "omit";
+    streamUsage: "include_usage" | "omit";
+  };
   requestTimeoutMs: number;
   doctorProbeTimeoutMs: number;
 }
@@ -25,6 +31,12 @@ export function resolveProviderCapabilities(input: ProviderProfileInput): Provid
     supportsReasoningContent: profile.model.capabilities.reasoningContentReplay !== "never",
     defaultReasoningEnabled: profile.model.capabilities.reasoning,
     defaultReasoningEffort: profile.model.request.reasoningEffortDefault,
+    maxOutputTokensParam: profile.model.request.maxOutputTokensParam,
+    chat: profile.model.request.chat ?? {
+      reasoning: "none",
+      toolChoice: "auto",
+      streamUsage: "include_usage",
+    },
     requestTimeoutMs: profile.provider.requestTimeoutMs,
     doctorProbeTimeoutMs: profile.provider.doctorProbeTimeoutMs,
   };

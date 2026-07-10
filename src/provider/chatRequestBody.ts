@@ -22,21 +22,21 @@ export function buildProviderRequestBody(
   input: BuildProviderRequestBodyInput,
 ): Record<string, unknown> {
   const capabilities = resolveProviderCapabilities(input);
-  const thinking = capabilities.provider === "deepseek"
-    ? resolveDeepSeekThinking(input.messages, input.thinking ?? "enabled")
-    : input.thinking;
   const body: Record<string, unknown> = {
     model: input.model,
-    messages: toChatCompletionMessages(input.messages),
+    messages: toChatCompletionMessages(input.messages, {
+      provider: input.provider,
+      model: input.model,
+    }),
     tools: input.tools,
     stream: input.stream,
   };
 
-  if (capabilities.provider !== "deepseek" && input.tools?.length) {
+  if (input.tools?.length && capabilities.chat.toolChoice === "auto") {
     body.tool_choice = "auto";
   }
 
-  if (input.stream) {
+  if (input.stream && capabilities.chat.streamUsage === "include_usage") {
     body.stream_options = {
       include_usage: true,
     };
@@ -48,16 +48,42 @@ export function buildProviderRequestBody(
   }
 
   if (typeof input.maxOutputTokens === "number" && Number.isFinite(input.maxOutputTokens)) {
-    body.max_tokens = Math.max(1, Math.trunc(input.maxOutputTokens));
+    body[capabilities.maxOutputTokensParam] = Math.max(1, Math.trunc(input.maxOutputTokens));
   }
 
-  if (capabilities.provider === "deepseek") {
-    body.thinking = { type: thinking };
-    if (thinking === "enabled") {
-      body.reasoning_effort = normalizeDeepSeekReasoningEffort(input.reasoningEffort ?? capabilities.defaultReasoningEffort);
+  switch (capabilities.chat.reasoning) {
+    case "deepseek-thinking": {
+      const thinking = resolveDeepSeekThinking(input.messages, input.thinking ?? "enabled");
+      body.thinking = { type: thinking };
+      if (thinking === "enabled") {
+        body.reasoning_effort = normalizeDeepSeekReasoningEffort(
+          input.reasoningEffort ?? capabilities.defaultReasoningEffort,
+        );
+      }
+      break;
     }
-  } else if (input.forceReasoning || capabilities.defaultReasoningEnabled) {
-    body.thinking = { type: "enabled" };
+    case "nvidia-reasoning-effort":
+      body.reasoning_effort = resolveNvidiaReasoningEffort({
+        thinking: input.thinking,
+        forceReasoning: input.forceReasoning,
+        defaultReasoningEnabled: capabilities.defaultReasoningEnabled,
+        effort: input.reasoningEffort ?? capabilities.defaultReasoningEffort,
+      });
+      break;
+    case "reasoning-effort": {
+      const reasoningEffort = resolveReasoningEffort({
+        thinking: input.thinking,
+        forceReasoning: input.forceReasoning,
+        defaultReasoningEnabled: capabilities.defaultReasoningEnabled,
+        effort: input.reasoningEffort ?? capabilities.defaultReasoningEffort,
+      });
+      if (reasoningEffort) {
+        body.reasoning_effort = reasoningEffort;
+      }
+      break;
+    }
+    case "none":
+      break;
   }
 
   return body;
@@ -99,4 +125,46 @@ function normalizeDeepSeekReasoningEffort(
   }
 
   return "high";
+}
+
+function resolveNvidiaReasoningEffort(input: {
+  thinking?: "enabled" | "disabled";
+  forceReasoning: boolean;
+  defaultReasoningEnabled: boolean;
+  effort?: "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+}): "none" | "high" | "max" {
+  if (input.thinking === "disabled") {
+    return "none";
+  }
+
+  if (!input.forceReasoning && input.thinking !== "enabled" && !input.defaultReasoningEnabled) {
+    return "none";
+  }
+
+  return input.effort === "xhigh" || input.effort === "max" ? "max" : "high";
+}
+
+function resolveReasoningEffort(input: {
+  thinking?: "enabled" | "disabled";
+  forceReasoning: boolean;
+  defaultReasoningEnabled: boolean;
+  effort?: "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+}): "low" | "medium" | "high" | undefined {
+  if (input.thinking === "disabled") {
+    return undefined;
+  }
+
+  if (!input.forceReasoning && input.thinking !== "enabled" && !input.defaultReasoningEnabled) {
+    return undefined;
+  }
+
+  if (input.effort === "minimal" || input.effort === "low") {
+    return "low";
+  }
+
+  if (input.effort === "high" || input.effort === "xhigh" || input.effort === "max") {
+    return "high";
+  }
+
+  return "medium";
 }

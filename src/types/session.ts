@@ -81,7 +81,7 @@ export interface SessionDiffState {
 }
 
 export type SessionCheckpointStatus = "active" | "completed";
-export type SessionCheckpointPhase = "active" | "recovery";
+export type SessionCheckpointPhase = "active";
 
 export interface SessionCheckpointToolBatch {
   tools: string[];
@@ -104,7 +104,6 @@ export interface SessionRunState {
 export interface SessionCheckpointFlow {
   phase: SessionCheckpointPhase;
   reason?: string;
-  recoveryFailures?: number;
   runState?: SessionRunState;
   lastTransition?: RuntimeTransition;
   updatedAt: string;

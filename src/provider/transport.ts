@@ -14,6 +14,13 @@ export function resolveProviderProbeKind(profile: ResolvedModelProfile): Provide
     return profile.model.wireApi;
   }
 
+  if (
+    profile.provider.apiKind === "openai-compatible" &&
+    profile.provider.id !== "openai-compatible"
+  ) {
+    return profile.model.wireApi;
+  }
+
   return "models";
 }
 

@@ -13,6 +13,5 @@ export {
   buildRunTurnResult,
   createExecutionWaitYieldTransition,
   createFinalizeTransition,
-  createProviderRecoveryTransition,
   createToolBatchTransition,
 } from "./runtimeTransition/builders.js";

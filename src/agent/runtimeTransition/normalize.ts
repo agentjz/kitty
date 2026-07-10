@@ -1,7 +1,6 @@
 import type {
   RuntimeContinueTransition,
   RuntimeFinalizeTransition,
-  RuntimeRecoverTransition,
   RuntimeTransition,
   RuntimeYieldTransition,
 } from "../../types.js";
@@ -31,8 +30,6 @@ export function normalizeRuntimeTransition(
   switch (action) {
     case "continue":
       return normalizeContinueTransition(reason as RuntimeContinueTransition["reason"], normalizedTimestamp);
-    case "recover":
-      return normalizeRecoverTransition(reason as RuntimeRecoverTransition["reason"], normalizedTimestamp);
     case "finalize":
       return normalizeFinalizeTransition(reason as RuntimeFinalizeTransition["reason"], normalizedTimestamp);
     case "yield":
@@ -73,31 +70,6 @@ function normalizeContinueTransition(
     default:
       return undefined;
   }
-}
-
-function normalizeRecoverTransition(
-  reason: RuntimeRecoverTransition["reason"],
-  timestamp: string,
-): RuntimeRecoverTransition | undefined {
-  if (reason.code !== "recover.provider_request_retry") {
-    return undefined;
-  }
-
-  return {
-    action: "recover",
-    reason: {
-      code: reason.code,
-      consecutiveFailures: clampWholeNumber(reason.consecutiveFailures, 1, 50, 1) ?? 1,
-      error: truncate(normalizeText(reason.error) || "request failed"),
-      configuredModel: normalizeText(reason.configuredModel) || "unknown_model",
-      requestModel: normalizeText(reason.requestModel) || "unknown_model",
-      contextWindowMessages: clampWholeNumber(reason.contextWindowMessages, 1, 999, 1) ?? 1,
-      maxContextChars: clampWholeNumber(reason.maxContextChars, 1, 1_000_000, 1) ?? 1,
-      contextSummaryChars: clampWholeNumber(reason.contextSummaryChars, 1, 1_000_000, 1) ?? 1,
-      delayMs: clampWholeNumber(reason.delayMs, 0, 3_600_000, 0) ?? 0,
-    },
-    timestamp,
-  };
 }
 
 function normalizeFinalizeTransition(
@@ -143,7 +115,7 @@ function normalizeYieldTransition(
 }
 
 function normalizeAction(value: unknown): RuntimeTransition["action"] | undefined {
-  return value === "continue" || value === "recover" || value === "finalize" || value === "yield"
+  return value === "continue" || value === "finalize" || value === "yield"
     ? value
     : undefined;
 }

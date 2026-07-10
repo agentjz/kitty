@@ -8,6 +8,5 @@ export {
 
 export {
   noteCheckpointCompleted,
-  noteCheckpointRecovery,
   noteCheckpointTransition,
 } from "./checkpoint/transitions.js";

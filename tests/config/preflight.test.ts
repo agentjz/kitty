@@ -32,5 +32,5 @@ test("config preflight reports current env contract and provider preset", async 
   assert.equal(report.ready, true);
   assert.equal(report.env.missingKeys.length, 0);
   assert.equal(report.env.apiKeyPresent, true);
-  assert.equal(report.env.providerPreset, "DeepSeek official V4");
+  assert.equal(report.env.providerPreset, "NVIDIA NIM + DeepSeek V4 Flash");
 });

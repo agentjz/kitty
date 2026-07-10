@@ -8,7 +8,7 @@ import type {
   SessionCheckpointStatus,
 } from "../../types.js";
 import { normalizeRuntimeTransition } from "./normalize.js";
-import { clampWholeNumber, normalizeText, normalizeTimestamp } from "./shared.js";
+import { normalizeText, normalizeTimestamp } from "./shared.js";
 
 interface BuildCheckpointFlowInput {
   current: SessionCheckpointFlow | undefined;
@@ -38,12 +38,6 @@ export function normalizeCheckpointFlow(
   return {
     phase,
     reason: lastTransition ? formatRuntimeTransitionReason(lastTransition) : normalizeText(flow?.reason) || undefined,
-    recoveryFailures:
-      lastTransition?.action === "recover"
-        ? lastTransition.reason.consecutiveFailures
-        : phase === "recovery"
-          ? clampWholeNumber(flow?.recoveryFailures, 1, 50, undefined)
-          : undefined,
     runState,
     lastTransition,
     updatedAt: normalizeTimestamp(flow?.updatedAt, timestamp),
@@ -67,7 +61,6 @@ export function buildCheckpointFlow(input: BuildCheckpointFlowInput): SessionChe
   return {
     phase,
     reason: transition ? formatRuntimeTransitionReason(transition) : undefined,
-    recoveryFailures: transition?.action === "recover" ? transition.reason.consecutiveFailures : undefined,
     runState,
     lastTransition: transition,
     updatedAt: timestamp,
@@ -86,10 +79,6 @@ export function formatRuntimeTransitionReason(transition: RuntimeTransition): st
 }
 
 export function getRuntimeTransitionPhase(transition: RuntimeTransition): SessionCheckpointPhase {
-  if (transition.action === "recover") {
-    return "recovery";
-  }
-
   return "active";
 }
 
@@ -101,7 +90,7 @@ function normalizePhase(
     return "active";
   }
 
-  return value === "recovery" ? value : "active";
+  return "active";
 }
 
 function normalizeRunState(input: {

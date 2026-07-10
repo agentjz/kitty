@@ -78,6 +78,8 @@ Kitty 是本地编程智能体。它接收用户任务，构建上下文，调�
 
 未知 provider、不支持的 provider/model 组合、缺失必填项和非法值必须显式失败。运行时不能静默猜测 model 或 provider。
 
+当前具名 provider profile 包括 NVIDIA NIM、Groq、Cerebras、Gemini、DeepSeek、OpenAI、YLS 和 TTAPI。`openai-compatible` 仅用于用户明确配置的高级兼容 endpoint；它不是任何具名 provider 的别名。
+
 `kitty init` 创建项目状态模板。`kitty doctor` 展示配置和 provider 连接事实。
 
 ## 4. Agent 与 Host Turn
@@ -109,7 +111,7 @@ Kitty 是本地编程智能体。它接收用户任务，构建上下文，调�
 6. 执行工具批次或收束最终回答。
 7. 最终回答后写入 session title、memory 和完成态 task lifecycle 事实。
 
-Provider 临时失败走有界的 retry/recovery 事实。Abort 必须通过 host lifecycle 退出，不能伪造正常完成。
+Provider request 是临时失败的唯一重试 owner：同一逻辑请求最多四次调用、总等待最多 90 秒，并优先采用服务端 `Retry-After`。Agent turn 不得重新发送已耗尽重试预算的请求。Abort 必须中断当前请求或等待，不能伪造正常完成。
 
 ## 5. Context 与 Session 连续性
 
@@ -121,7 +123,7 @@ Provider 临时失败走有界的 retry/recovery 事实。Abort 必须通过 hos
 
 ### Session 事实
 
-Session 保存可见消息、context budget、task state、checkpoint、workset、session diff、可选标题和模型写出的 session memory。快照存入 `.kitty/sessions/`；每次保存同步写入可审阅的 session memory asset。
+Session 保存可见消息、context budget、task state、checkpoint、workset、session diff、可选标题和模型写出的 session memory。快照存入 `.kitty/sessions/`；每次保存同步写入可审阅的 session memory asset。模型生成的 session title 只接受普通标题文本；工具协议、tool call JSON 或空文本不能写成标题事实。
 
 内部 wake/reminder 消息不作为普通用户对话渲染，也不进入自然对话历史。
 
@@ -148,15 +150,17 @@ Context budget 记录 limit、estimate、remaining、compression mode、source�
 
 ### 职责
 
-- `src/provider/catalog.ts`：provider/model catalog 与 capability 事实。
+- `src/provider/catalog.ts`：provider/model catalog、Chat Completions 请求方言与 capability 事实。
 - `src/provider/capabilities.ts`：请求期 capability 投影。
 - `src/provider/client.ts`、`transport.ts`、`connection.ts`：client、base URL、probe。
 - `src/provider/request.ts`：请求生命周期、streaming fallback、retry 接入和 observability。
 - `src/provider/*Adapter.ts`：Responses 与 Chat Completions wire adapter。
 
-Provider 与 model 是独立事实。Provider 决定 transport、endpoint 行为、认证形态和 probe 行为；model 决定 wire API、限制、thinking/reasoning 选项、工具、usage、cache 和 reasoning replay 要求。
+Provider 与 model 是独立事实。Provider 决定 transport、endpoint 行为、认证形态和 probe 行为；model 决定 wire API、限制、工具、usage、cache、reasoning replay 和 Chat Completions 请求方言。方言包括 reasoning 参数、tool choice、stream usage 和输出 token 参数名；request body 只能投影这些事实，不能按 provider 名称散落特判。
 
-Provider 层把模型响应、streaming、usage 和临时 transport 失败归一为 agent 事实。它不增加任务策略。
+Chat Completions 的 HTTP abort signal 必须作为 SDK request options 传递，不能进入 JSON body。只有明确的无状态 stream framing 故障可以降级为一次非流式请求；认证、参数校验、限流和 HTTP provider error 不得被非流式 fallback 重放。
+
+Provider 层把模型响应、streaming、usage 和有界临时失败归一为 agent 事实。它不增加任务策略。
 
 ## 7. Tools 与 Extensions
 

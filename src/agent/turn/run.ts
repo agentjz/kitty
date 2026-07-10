@@ -1,22 +1,18 @@
 import { AgentTurnError, getErrorMessage } from "../errors.js";
 import { fetchAssistantResponse as fetchProviderAssistantResponse } from "../../provider/index.js";
 import { createProviderClientPool } from "../../provider/client.js";
-import { buildRecoveryRequestConfig, buildRecoveryStatus, computeRecoveryDelayMs, isRecoverableTurnError, sleep } from "../../provider/retryPolicy.js";
 import {
   buildContextRuntimePromptLayers,
   buildContextRuntimeRequest,
 } from "../../context/runtime/index.js";
-import { createProviderRecoveryTransition } from "../runtimeTransition.js";
 import { resolveAgentProfile } from "../profiles/registry.js";
 import { emitAssistantFinalOutput, emitAssistantReasoning } from "./finalize.js";
 import { updateSessionMemoryAfterTurn, updateSessionTitleAfterTurn } from "./lifecycle.js";
 import {
   initializeTurnSession,
-  persistRecoveryTurn,
 } from "./persistence.js";
 import { processToolCallBatch } from "./toolBatchLifecycle.js";
 import { resolveToollessTurn } from "./toolless.js";
-import { extendPromptLayersForTurnState } from "./state.js";
 import { consumeToolLoopCloseout, createToolLoopProgressState, recordToolBatchProgress } from "./toolLoopProgress.js";
 import type { RunTurnOptions, RunTurnResult } from "../types.js";
 import { ChangeStore } from "../changes/store.js";
@@ -57,7 +53,6 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
   const toolRegistry = options.toolRegistry ?? (await createDefaultAgentToolRegistry(options.config));
   const changeStore = new ChangeStore(options.config.paths.changesDir);
   let changedPaths = new Set<string>();
-  let consecutiveRequestFailures = 0;
   let toolLoopProgress = createToolLoopProgressState();
   let runtimePromptState = options.runtimePromptState;
   let unavailableToolProtocolOutputs = 0;
@@ -75,7 +70,7 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
       } finally {
         lifecycleLedger.close();
       }
-      let promptLayers = buildContextRuntimePromptLayers({
+      const promptLayers = buildContextRuntimePromptLayers({
         cwd: options.cwd,
         config: turnModelConfig,
         projectContext,
@@ -89,13 +84,17 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
         profile,
         messages: session.messages,
       });
-      promptLayers = extendPromptLayersForTurnState(promptLayers, consecutiveRequestFailures);
       const requestModel = turnModelConfig.model;
-      const requestConfig = buildRecoveryRequestConfig(options.config, requestModel, consecutiveRequestFailures);
       const requestContext = buildContextRuntimeRequest({
         prompt: promptLayers,
         session,
-        config: requestConfig,
+        config: {
+          provider: options.config.provider,
+          model: requestModel,
+          contextWindowMessages: options.config.contextWindowMessages,
+          maxContextChars: options.config.maxContextChars,
+          contextSummaryChars: options.config.contextSummaryChars,
+        },
       });
       session = await options.sessionStore.save({
         ...session,
@@ -142,35 +141,6 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
             undefined,
             modelRequest.observability,
           );
-        consecutiveRequestFailures = 0;
-      } catch (error) {
-        if (!isRecoverableTurnError(error)) {
-          throw error;
-        }
-        consecutiveRequestFailures += 1;
-        const delayMs = computeRecoveryDelayMs(consecutiveRequestFailures);
-        const transition = createProviderRecoveryTransition({
-          consecutiveFailures: consecutiveRequestFailures,
-          error,
-          configuredModel: options.config.model,
-          requestModel,
-          requestConfig,
-          delayMs,
-        });
-        const recoveryLedger = new ControlPlaneLedger(projectContext.stateRootDir);
-        try {
-          recoveryLedger.taskLifecycle.update({
-            sessionId: session.id,
-            stage: "recovery",
-            reason: transition.reason.code,
-          });
-        } finally {
-          recoveryLedger.close();
-        }
-        session = await persistRecoveryTurn(session, options.sessionStore, transition);
-        options.callbacks?.onStatus?.(buildRecoveryStatus(transition));
-        await (options.recoverySleep ?? sleep)(delayMs, options.abortSignal);
-        continue;
       } finally {
         options.callbacks?.onModelWaitStop?.();
       }
