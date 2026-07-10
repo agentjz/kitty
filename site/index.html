@@ -3,126 +3,304 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kitty Agent — 找得准，改得对</title>
-<meta name="description" content="Kitty Agent 是一个 AI Agent 编程工作台。一个高级工程师就会这样工作：找得准，改得对。">
-<meta property="og:title" content="Kitty Agent">
-<meta property="og:description" content="一个把编程任务真正往前推的 AI Agent 工作台。找得准，改得对。">
+<title>如何设计一个智能体 | Kitty Agent</title>
+<meta name="description" content="从工具循环、记忆、上下文、计划到子代理，理解一个智能体如何持续完成任务。">
+<meta property="og:title" content="如何设计一个智能体 | Kitty Agent">
+<meta property="og:description" content="从工具循环、记忆、上下文、计划到子代理。">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.13.1/font/bootstrap-icons.min.css" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body id="top">
 
-<nav class="site-topbar py-3">
-  <div class="container d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-2">
-    <div class="d-flex align-items-center gap-3">
-      <a class="navbar-brand d-flex align-items-center fw-bold" href="#top" aria-label="Kitty Agent home">
-        <span>Kitty Agent</span>
-      </a>
-      <span class="small text-secondary d-none d-md-inline">找得准，改得对，跑得通，记得住。</span>
-    </div>
-    <a class="github-link" href="https://github.com/luckymaomi/kitty" target="_blank" rel="noopener" aria-label="Open Kitty Agent on GitHub">
+<nav class="site-topbar">
+  <div class="container topbar-inner">
+    <a class="navbar-brand" href="#top" aria-label="回到页面顶部">Kitty Agent</a>
+    <a class="github-link" href="https://github.com/luckymaomi/kitty" target="_blank" rel="noopener" aria-label="在 GitHub 打开 Kitty Agent" title="GitHub">
       <i class="bi bi-github" aria-hidden="true"></i>
     </a>
   </div>
 </nav>
 
 <main>
-
-<section class="py-5 py-lg-6" id="main">
-  <div class="container">
-
-    <!-- Hero text -->
-    <div class="text-center mb-5">
-      <h1 class="display-2 fw-black lh-1 mb-3">找得准，改得对</h1>
-      <p class="hero-line fs-3 fw-semibold mb-3">一个高级工程师的工作方式</p>
-      <p class="lead text-secondary mx-auto" style="max-width:680px;">
-        Kitty Agent 不靠猜测写代码。先调查项目事实，再动手修改，最后自动验证并记录现场。每一步都像资深工程师一样严谨。
-      </p>
-      <div class="install-panel mx-auto mt-4" aria-label="Kitty Agent 安装命令">
+  <header class="hero">
+    <div class="container hero-inner">
+      <h1>如何设计一个智能体</h1>
+      <div class="install-panel" aria-label="Kitty Agent 安装命令">
         <div class="install-copy">
-          <div class="install-label">一键全局安装</div>
-          <div class="install-next">安装后运行 <code>kitty init</code> 初始化项目，运行 <code>kitty doctor</code> 检查配置。</div>
+          <strong>Kitty Agent 一键全局安装</strong>
+          <span>安装后运行 <code>kitty init</code> 初始化项目，运行 <code>kitty doctor</code> 检查配置。</span>
         </div>
         <div class="install-command">
           <code>npm install -g @jun133/kitty</code>
-          <button class="copy-install" type="button" data-copy="npm install -g @jun133/kitty" aria-label="复制安装命令">
+          <button class="copy-install" type="button" data-copy="npm install -g @jun133/kitty" aria-label="复制安装命令" title="复制安装命令">
             <i class="bi bi-clipboard" aria-hidden="true"></i>
           </button>
         </div>
       </div>
     </div>
+  </header>
 
-    <section class="history-panel mx-auto mb-5" aria-label="Kitty Agent 开发历史">
-      <div class="history-head">
-        <div>
-          <h2>开发历史</h2>
-          <p>从前身项目到 Kitty 的关键选择、失败路线和最终实践。</p>
+  <article class="guide container" aria-label="如何设计一个智能体">
+    <section class="chapter reveal" id="tool-loop">
+      <div class="chapter-body">
+        <h2>工具循环</h2>
+        <p>最开始，模型只有一个简单循环：用户问，模型想，模型答。</p>
+
+        <h3>只有大脑的循环</h3>
+        <pre><code>用户问题
+  ↓
+模型判断
+  ↓
+输出回答</code></pre>
+
+        <p>模型本身像孙膑：孙膑是行动受限的军师，空有强大的大脑，自己无法行动。模型也是这样，它能分析、推理、安排下一步，但它自己碰不到外部项目。工具就是给它接上的外部能力，可以理解成望远镜、义肢、轮椅，或者任何让它能向外部探索的东西。</p>
+        <p>加入第一个工具后，模型开始能向外部探索。它先判断需不需要工具；需要时发出工具调用；系统执行工具得到工具结果；然后把“原来的用户问题 + 当前提示词 + 工具结果”一起喂回模型。模型再判断一次，继续调用工具，或者输出最终回答。</p>
+
+        <h3>装入工具后的循环</h3>
+        <div class="loop-visual" aria-label="用户问题和当前提示词进入模型判断；需要工具时，模型发出工具调用，系统执行工具并得到工具结果，工具结果回到模型判断；不需要工具时，模型输出最终回答。">
+          <div class="flow-stack">
+            <div class="flow-node">用户问题 + 当前提示词</div>
+            <div class="flow-arrow" aria-hidden="true"></div>
+            <div class="flow-node">模型判断</div>
+            <div class="flow-arrow" aria-hidden="true"></div>
+            <div class="flow-node">需要工具？</div>
+          </div>
+          <div class="flow-branches">
+            <div class="flow-path">
+              <span class="flow-label">是</span>
+              <div class="flow-node">发出工具调用</div>
+              <div class="flow-arrow" aria-hidden="true"></div>
+              <div class="flow-node">系统执行工具</div>
+              <div class="flow-arrow" aria-hidden="true"></div>
+              <div class="flow-node">得到工具结果</div>
+              <div class="flow-return">
+                工具结果回到“模型判断”
+              </div>
+            </div>
+            <div class="flow-path flow-path-final">
+              <span class="flow-label">否</span>
+              <div class="flow-node">输出最终回答</div>
+            </div>
+          </div>
         </div>
-        <button class="history-toggle" type="button" id="historyToggle" aria-expanded="false">展开全部</button>
       </div>
-      <div class="history-preview" id="historyPreview">加载中。</div>
-      <article class="history-content" id="historyContent" hidden></article>
     </section>
 
-    <!-- product.png centered -->
-    <div class="text-center mb-5">
-      <div class="page-img">
-        <img src="images/product.png" alt="Kitty Agent 产品界面" class="img-fluid rounded-3 shadow">
+    <section class="chapter reveal" id="short-memory">
+      <div class="chapter-body">
+        <h2>短期记忆</h2>
+        <h3>具体例子</h3>
+        <p>用户输入：</p>
+        <pre><code>帮我看看这个项目是干什么的。</code></pre>
+        <p>模型可以先调用几个工具：</p>
+        <pre><code>工具调用：read("README.md")
+工具调用：read("spec.md")
+工具调用：bash("npm test")</code></pre>
+        <p>工具结果回来后，模型知道：</p>
+        <pre><code>README：项目叫 Kitty，是本地编程 agent。
+spec：核心链路是输入、上下文、模型、工具、状态、输出。
+npm test：测试通过。</code></pre>
+        <p>这一轮结束后，session 记住这些事：</p>
+        <pre><code>用户问题：帮我看看这个项目是干什么的。
+模型调用过：read README.md、read spec.md、bash npm test。
+工具结果：README 说明项目用途，spec 说明核心链路，测试通过。
+活跃文件：README.md、spec.md。
+最后回答：这个项目是一个本地编程 agent。</code></pre>
+        <p>session 就是当前对话的工作现场。它把工具结果、活跃文件和最后回答留下来，下一轮可以接着这个现场继续。</p>
       </div>
-    </div>
+    </section>
 
-    <!-- Cards heading -->
-    <div class="text-center mb-5">
-      <h2 class="display-6 fw-bold">不猜，不蒙，不返工</h2>
-      <p class="lead text-secondary mx-auto mt-3" style="max-width:600px;">
-        每一步都有事实依据，每一轮修改都有验证收口。
-      </p>
-    </div>
+    <section class="chapter reveal" id="long-memory">
+      <div class="chapter-body">
+        <h2>长期记忆</h2>
+        <p>长期记忆是项目长期放着的规则和经验。它让模型每次进入项目时，都能先知道这里长期遵守什么、有哪些已经沉淀好的做法。</p>
+        <p>在 Kitty 里，长期记忆主要来自两类东西：</p>
+        <pre><code>AGENTS.md
+  项目的长期工作规则。
 
-    <!-- Three capability cards -->
-    <div class="row g-4 justify-content-center mb-5">
-      <div class="col-md-6 col-lg-4">
-        <div class="cap-card">
-          <div class="cap-number">01</div>
-          <div class="cap-icon">🎯</div>
-          <h3 class="h4 fw-bold">找得准</h3>
-          <p class="text-secondary mb-0">先读入口、组件、状态、测试。精确定位要改什么、不改什么，不凭空想象。</p>
+skills
+  项目的长期能力包。</code></pre>
+        <p><code>AGENTS.md</code> 像项目规则：</p>
+        <pre><code>先看事实，再做判断。
+先思考，再行动。
+抓根本逻辑。</code></pre>
+        <p>skill 像一份经过试错的熟练做法。上下文先给模型可用 skill 的名字和简介；模型判断任务需要某一份经验时，调用 <code>skill_load</code> 加载完整做法。</p>
+
+        <h3>做菜例子</h3>
+        <p>假设有一个 skill 叫“西红柿炒鸡蛋”：</p>
+        <pre><code>skill 名称：西红柿炒鸡蛋
+skill 简介：适合把鸡蛋炒嫩、把西红柿炒出汁。
+skill 细则：
+  先把鸡蛋炒到刚凝固，盛出来。
+  再把西红柿炒出汁。
+  最后把鸡蛋倒回锅里一起收味。</code></pre>
+        <p>用户输入：</p>
+        <pre><code>帮我做一盘西红柿炒鸡蛋。</code></pre>
+        <p>模型看到这份 skill 可用，判断需要这套做法，于是调用 <code>skill_load("西红柿炒鸡蛋")</code>。系统把 skill 细则放进当前上下文，模型按熟练做法继续回答。</p>
+      </div>
+    </section>
+
+    <section class="chapter reveal" id="context">
+      <div class="chapter-body">
+        <h2>上下文装配</h2>
+        <p>上下文是这一轮真正喂给模型的整包输入。它会把前面几种东西装到一起：</p>
+        <pre><code>系统提示词
+  + 人格提示词
+  + 短期记忆
+  + 长期记忆
+  + 工具定义
+  + 用户输入
+  ↓
+发给模型</code></pre>
+
+        <h3>具体例子</h3>
+        <p>用户输入：</p>
+        <pre><code>这个项目已经写完了，请把 README 重写一下。</code></pre>
+        <p>先把这一轮的积木摆出来：</p>
+        <pre><code>【系统提示词】你是本 session 的主导 agent。
+【人格提示词】你是一位重视结构和事实的工程师，表达短、准、清楚。
+【短期记忆】来自上一轮：项目的主要功能已经完成，README 已经有一份旧内容。
+【长期记忆】长期规则是先看事实，再做判断，再行动；可用 skill 是“文档修改 skill”。
+【工具定义】你可以使用两个工具：read 用来读取文件，edit 用来修改文件。
+【用户输入】这个项目已经写完了，请把 README 重写一下。</code></pre>
+        <p>系统把这六块拼成一段完整输入，发给模型：</p>
+        <pre><code>你是本 session 的主导 agent。你是一位重视结构和事实的工程师，表达短、准、清楚。上一轮已经确认项目的主要功能完成，README 还是旧说明。项目要求先看事实，再做判断，再行动；当前有一份“文档修改 skill”可用。你可以使用两个工具：read 用来读取文件，edit 用来修改文件。现在用户说：这个项目已经写完了，请把 README 重写一下。</code></pre>
+        <p>模型拿到这段话后，知道该先用 <code>read</code> 打开旧 README，了解真实内容；再用 <code>edit</code> 重写说明。</p>
+        <p>完成后，它会回答：</p>
+        <pre><code>我已经根据现有内容重写了 README。</code></pre>
+      </div>
+    </section>
+
+    <section class="chapter reveal" id="compression">
+      <div class="chapter-body">
+        <h2>对话太长需要压缩</h2>
+        <p>对话达到上下文极限时，模型已经装不下全部历史。Kitty 会把较早的对话整理成摘要，再把这份摘要和最近几轮对话、当前用户输入一起装进下一轮输入。</p>
+
+        <h3>具体例子</h3>
+        <p>Kitty 和用户已经聊了很多轮。早期对话里完成了项目初始化、读过 README、确认项目使用 TypeScript；最近几轮正在修改一个功能的测试。现在对话已经达到上下文极限。</p>
+        <p>Kitty 先把早期对话整理成摘要，然后模型会看到：</p>
+        <pre><code>【早期对话摘要】项目已经初始化。README 已读过。项目使用 TypeScript。
+【最近对话】正在修改一个功能的测试。
+【用户输入】把这个功能的提示也改清楚。</code></pre>
+        <p>这样模型既知道前面已经做到哪里，也能集中处理眼前这一步。</p>
+      </div>
+    </section>
+
+    <section class="chapter reveal" id="todo">
+      <div class="chapter-body">
+        <h2>计划和 To Do</h2>
+        <p>复杂任务先把完整步骤拆出来，再全部写进 To Do list。列表写好后，模型从第一步开始执行，每次只有一个步骤处于进行中。</p>
+
+        <h3>具体例子</h3>
+        <p>用户输入：</p>
+        <pre><code>做一盘西红柿炒鸡蛋。</code></pre>
+        <p>模型把计划写成 To Do list：</p>
+        <pre><code>[&gt;] 1. 把鸡蛋炒到刚凝固，盛出来。
+[ ] 2. 把西红柿炒出汁。
+[ ] 3. 把鸡蛋倒回锅里，一起收味。</code></pre>
+        <p><code>[&gt;]</code> 表示正在做，<code>[ ]</code> 表示后面要做。Kitty 的 To Do 只允许一个步骤处于进行中。第一步完成后，它会变成 <code>[x]</code>，第二步才变成新的 <code>[&gt;]</code>。</p>
+      </div>
+    </section>
+
+    <section class="chapter reveal" id="subagent">
+      <div class="chapter-body">
+        <h2>子代理</h2>
+        <p>子代理是另一个独立工作的 agent。主 agent 给它一个明确目标、边界和期望结果；子代理带着自己的上下文和工具，专门完成这块工作，最后把结果交回主 agent。</p>
+
+        <h3>具体例子</h3>
+        <p>主 agent 正在完成一个复杂任务，同时需要有人专门查看相关文件。它可以交给子代理：</p>
+        <pre><code>目标：查看相关文件，找出需要同步调整的地方。
+边界：只研究测试，不修改产品代码。
+期望结果：列出需要修改的测试文件和原因。</code></pre>
+        <p>Kitty 为子代理启动独立的 agent 循环。子代理完成后，结果回到主 agent，再由主 agent 完成整个任务。</p>
+      </div>
+    </section>
+
+    <section class="chapter complete-example reveal" id="complete-example">
+      <div class="chapter-body">
+        <h2>最后看一个完整例子</h2>
+        <p>下面把前面讲的东西放回同一个西红柿炒鸡蛋任务里。这个任务已经进行了几轮。</p>
+
+        <h3>工具循环</h3>
+        <p>Kitty 先查资料，再加载做法：</p>
+        <pre><code>【工具调用】read("食材清单.md")
+【工具结果】有 3 个西红柿、4 个鸡蛋，家里有人喜欢鸡蛋炒嫩一点。
+
+【工具调用】skill_load("西红柿炒鸡蛋")
+【工具结果】鸡蛋先炒到刚凝固，西红柿炒出汁后，再把鸡蛋倒回锅里。</code></pre>
+
+        <h3>短期记忆</h3>
+        <p>这一轮留下了三件当前事实：食材够用、鸡蛋要炒嫩、已经加载了西红柿炒鸡蛋的做法。</p>
+
+        <h3>长期记忆</h3>
+        <p>项目长期规则告诉模型：先看事实，再做判断，再行动。西红柿炒鸡蛋 skill 提供已经试过的熟练做法。</p>
+
+        <h3>子代理</h3>
+        <p>用户还要确认客人有没有额外忌口。主 agent 把这件独立的小事交给子代理：</p>
+        <pre><code>目标：查看客人偏好，确认有没有额外忌口。
+边界：只查看偏好，不调整做法。
+期望结果：返回客人的忌口情况。</code></pre>
+        <p>子代理完成后，把“没有额外忌口”交回主 agent。</p>
+
+        <p>现在用户继续说：</p>
+        <pre><code>鸡蛋再嫩一点，少放糖。</code></pre>
+
+        <h3>上下文装配</h3>
+        <p>Kitty 把上面的事实拼成一段话，发给模型：</p>
+        <pre><code>你是本 session 的主导 agent。你是一位重视结构和事实的工程师，表达短、准、清楚。现在要做西红柿炒鸡蛋，食材清单已经确认有 3 个西红柿、4 个鸡蛋，用户喜欢鸡蛋炒嫩一点。项目长期规则要求先看事实，再做判断，再行动。已经加载的西红柿炒鸡蛋 skill 说明：鸡蛋先炒到刚凝固，西红柿炒出汁后，再把鸡蛋倒回锅里。子代理已经确认客人没有额外忌口。你可以用 read 读取资料，用 skill_load 加载熟练做法。现在用户说：鸡蛋再嫩一点，少放糖。</code></pre>
+
+        <h3>计划和 To Do</h3>
+        <p>这是一个需要按顺序完成的任务，Kitty 先拆成以下步骤：</p>
+        <div class="plan-visual" aria-label="计划从待处理推进到进行中，再标记为已完成。">
+          <div class="plan-row plan-row-one">
+            <span class="plan-state" aria-hidden="true">
+              <span class="plan-dot plan-dot-pending"></span>
+              <span class="plan-dot plan-dot-active"></span>
+              <span class="plan-dot plan-dot-done">✓</span>
+            </span>
+            <span class="plan-task">按更嫩的做法处理鸡蛋。</span>
+            <span class="plan-status">
+              <span class="status-pending">待处理</span>
+              <span class="status-active">进行中</span>
+              <span class="status-done">已完成</span>
+            </span>
+          </div>
+          <div class="plan-row plan-row-two">
+            <span class="plan-state" aria-hidden="true">
+              <span class="plan-dot plan-dot-pending"></span>
+              <span class="plan-dot plan-dot-active"></span>
+              <span class="plan-dot plan-dot-done">✓</span>
+            </span>
+            <span class="plan-task">炒西红柿。</span>
+            <span class="plan-status">
+              <span class="status-pending">待处理</span>
+              <span class="status-active">进行中</span>
+              <span class="status-done">已完成</span>
+            </span>
+          </div>
+          <div class="plan-row plan-row-three">
+            <span class="plan-state" aria-hidden="true">
+              <span class="plan-dot plan-dot-pending"></span>
+              <span class="plan-dot plan-dot-active"></span>
+              <span class="plan-dot plan-dot-done">✓</span>
+            </span>
+            <span class="plan-task">把鸡蛋倒回锅里收味。</span>
+            <span class="plan-status">
+              <span class="status-pending">待处理</span>
+              <span class="status-active">进行中</span>
+              <span class="status-done">已完成</span>
+            </span>
+          </div>
         </div>
+        <p>最后一步完成，端上一盘西红柿炒鸡蛋。</p>
       </div>
-      <div class="col-md-6 col-lg-4">
-        <div class="cap-card">
-          <div class="cap-number">02</div>
-          <div class="cap-icon">✅</div>
-          <h3 class="h4 fw-bold">改得对</h3>
-          <p class="text-secondary mb-0">改完立即跑验证。不改第二遍同样的问题，不把未验证的代码交出去。</p>
-        </div>
-      </div>
-      <div class="col-md-6 col-lg-4">
-        <div class="cap-card">
-          <div class="cap-number">03</div>
-          <div class="cap-icon">🔄</div>
-          <h3 class="h4 fw-bold">跑得通</h3>
-          <p class="text-secondary mb-0">长任务不中断，现场可恢复。每次都能从上次停下的地方继续推进。</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- demo.png centered -->
-    <div class="text-center">
-      <div class="page-img">
-        <img src="images/demo.png" alt="Kitty Agent 运行演示 — research → plan → build → verify" class="img-fluid rounded-3 shadow">
-      </div>
-    </div>
-
-  </div>
-</section>
-
+    </section>
+  </article>
 </main>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/js/bootstrap.bundle.min.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

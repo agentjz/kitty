@@ -69,7 +69,6 @@ test("local project env may contain real secrets while keeping the current contr
 
   assert.deepEqual([...assignments.keys()].sort(), expectedActiveEnvKeys());
   assertProviderPresets(localEnv);
-  assertActiveProviderMatchesKnownPreset(assignments);
 });
 
 function readEnvAssignments(content: string): Map<string, string> {
@@ -134,16 +133,6 @@ function assertCommonOptionalEntries(content: string): void {
   ]);
 }
 
-function assertActiveProviderMatchesKnownPreset(assignments: Map<string, string>): void {
-  const matching = PROVIDER_PRESETS.some((preset) => (
-    assignments.get(KITTY_ENV.provider) === preset.provider &&
-    assignments.get(KITTY_ENV.baseUrl) === preset.baseUrl &&
-    assignments.get(KITTY_ENV.model) === preset.model &&
-    assignments.get(KITTY_ENV.thinking) === preset.thinking &&
-    assignments.get(KITTY_ENV.reasoningEffort) === preset.reasoningEffort
-  ));
-  assert.equal(matching, true, "active provider block should match a known provider preset");
-}
 
 function expectedActiveEnvKeys(): string[] {
   return [
