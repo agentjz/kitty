@@ -1,11 +1,9 @@
 # Kitty Agent
 
-![demo](site/images/product.png)
-
 官网：https://luckymaomi.github.io/kitty/
 
 <p align="center">
-  <strong>🐾 一个 agent 编程工作台：搜得到，看得懂，改得准，跑得通，记得住，能继续。</strong>
+  <strong>🐾 一个 Agent 是如何设计的：从工具循环开始，组装成能完成任务的智能体。</strong>
 </p>
 
 <p align="center">
@@ -16,20 +14,13 @@
   <img alt="agent" src="https://img.shields.io/badge/mode-agent-7c3aed">
 </p>
 
-![demo](site/images/demo.png)
+## 一个 Agent 是如何组装的
 
+Kitty 是一个智能体。它用一套可直接运行的实现，展示 Agent 如何从最初的工具循环，逐步拥有记忆、上下文、计划和协作能力。
 
-小猫智能体是给本地代码仓库使用的 agent harness。
+模型先在工具循环中判断、调用工具、读取工具结果，再根据新事实继续判断。session 留下这一轮已经确认的现场；`AGENTS.md` 和 skills 提供长期规则与熟练做法；上下文把这些信息和用户输入组装成下一轮模型能看懂的完整输入。复杂任务会拆成 To Do，每次只推进一个步骤；需要独立调查时，子代理在自己的循环中完成工作，再把结果交回主 agent。
 
-它把本地对话、任务现场、恢复能力和验证事实收进一个稳定的编程工作台，让长任务可以继续，失败可以看见，现场可以审阅。
-
-## ✨ 你能得到什么
-
-- 本地 agent 交互
-- 可恢复的 session 现场
-- CLI、TUI、Telegram 三种入口
-- 当前现场、后台任务、子执行、会话事件、memory 和 eval
-- 省 token 的上下文、缓存事实和工具输出治理
+这让一个 Agent 能在真实项目里搜得到、看得懂、改得准、跑得通、记得住，并继续完成长任务。
 
 ## ⚡ 快速开始
 

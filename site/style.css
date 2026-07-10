@@ -361,26 +361,16 @@ pre:hover {
   background: #b7c0c9;
 }
 
-.flow-arrow::before {
-  position: absolute;
-  top: -0.05rem;
-  left: 50%;
-  width: 0.34rem;
-  height: 0.34rem;
-  border-radius: 50%;
-  background: #5d6975;
-  content: "";
-  transform: translateX(-50%);
-}
-
 .flow-arrow::after {
   position: absolute;
-  bottom: -0.36rem;
+  bottom: -0.32rem;
   left: 50%;
-  color: #7f8a95;
-  content: "↓";
-  font-size: 0.88rem;
-  line-height: 1;
+  width: 0;
+  height: 0;
+  border-top: 0.34rem solid #7f8a95;
+  border-right: 0.24rem solid transparent;
+  border-left: 0.24rem solid transparent;
+  content: "";
   transform: translateX(-50%);
 }
 
@@ -415,15 +405,6 @@ pre:hover {
   border: 1px solid #e1e5e9;
   border-radius: 6px;
   background: #ffffff;
-  animation: plan-row-breathe 6s ease-in-out infinite;
-}
-
-.plan-row-two {
-  animation-delay: 1.6s;
-}
-
-.plan-row-three {
-  animation-delay: 3.2s;
 }
 
 .plan-state {
@@ -453,7 +434,6 @@ pre:hover {
 .plan-dot-active {
   border: 1px solid #596574;
   background: #596574;
-  animation: active-pulse 1.35s ease-in-out infinite;
 }
 
 .plan-dot-done {
@@ -483,149 +463,184 @@ pre:hover {
   top: 0;
   right: 0;
   opacity: 0;
+  transform: translateY(0.2rem);
 }
 
 .plan-row-one .plan-dot-pending,
 .plan-row-one .status-pending {
-  animation: plan-pending-one 6s linear infinite;
+  animation: plan-pending-one 9s cubic-bezier(0.22, 0.8, 0.28, 1) infinite;
 }
 
 .plan-row-one .plan-dot-active,
 .plan-row-one .status-active {
-  animation: plan-active-one 6s linear infinite;
+  animation: plan-active-one 9s cubic-bezier(0.22, 0.8, 0.28, 1) infinite;
 }
 
 .plan-row-one .plan-dot-done,
 .plan-row-one .status-done {
-  animation: plan-done-one 6s linear infinite;
+  animation: plan-done-one 9s cubic-bezier(0.22, 0.8, 0.28, 1) infinite;
 }
 
 .plan-row-two .plan-dot-pending,
 .plan-row-two .status-pending {
-  animation: plan-pending-two 6s linear infinite;
+  animation: plan-pending-two 9s cubic-bezier(0.22, 0.8, 0.28, 1) infinite;
 }
 
 .plan-row-two .plan-dot-active,
 .plan-row-two .status-active {
-  animation: plan-active-two 6s linear infinite;
+  animation: plan-active-two 9s cubic-bezier(0.22, 0.8, 0.28, 1) infinite;
 }
 
 .plan-row-two .plan-dot-done,
 .plan-row-two .status-done {
-  animation: plan-done-two 6s linear infinite;
+  animation: plan-done-two 9s cubic-bezier(0.22, 0.8, 0.28, 1) infinite;
 }
 
 .plan-row-three .plan-dot-pending,
 .plan-row-three .status-pending {
-  animation: plan-pending-three 6s linear infinite;
+  animation: plan-pending-three 9s cubic-bezier(0.22, 0.8, 0.28, 1) infinite;
 }
 
 .plan-row-three .plan-dot-active,
 .plan-row-three .status-active {
-  animation: plan-active-three 6s linear infinite;
+  animation: plan-active-three 9s cubic-bezier(0.22, 0.8, 0.28, 1) infinite;
 }
 
 .plan-row-three .plan-dot-done,
 .plan-row-three .status-done {
-  animation: plan-done-three 6s linear infinite;
-}
-
-@keyframes plan-row-breathe {
-  0%,
-  100% {
-    border-color: #e1e5e9;
-    transform: translateY(0);
-  }
-
-  18% {
-    border-color: #aeb8c2;
-    transform: translateY(-1px);
-  }
-
-  36% {
-    border-color: #e1e5e9;
-    transform: translateY(0);
-  }
-}
-
-@keyframes active-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(89, 101, 116, 0.22);
-  }
-
-  50% {
-    box-shadow: 0 0 0 5px rgba(89, 101, 116, 0);
-  }
+  animation: plan-done-three 9s cubic-bezier(0.22, 0.8, 0.28, 1) infinite;
 }
 
 @keyframes plan-pending-one {
   0%,
-  5% { opacity: 1; }
-  13%,
-  100% { opacity: 0; }
+  8% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  14%,
+  100% {
+    opacity: 0;
+    transform: translateY(-0.2rem);
+  }
 }
 
 @keyframes plan-active-one {
   0%,
-  5% { opacity: 0; }
-  13%,
-  27% { opacity: 1; }
+  8% {
+    opacity: 0;
+    transform: translateY(0.2rem) scale(0.9);
+  }
+  15%,
+  29% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
   35%,
-  100% { opacity: 0; }
+  100% {
+    opacity: 0;
+    transform: translateY(-0.2rem) scale(0.94);
+  }
 }
 
 @keyframes plan-done-one {
   0%,
-  27% { opacity: 0; }
-  35%,
-  100% { opacity: 1; }
+  29% {
+    opacity: 0;
+    transform: translateY(0.2rem) scale(0.9);
+  }
+  36%,
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 @keyframes plan-pending-two {
   0%,
-  27% { opacity: 1; }
-  35%,
-  100% { opacity: 0; }
+  36% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  42%,
+  100% {
+    opacity: 0;
+    transform: translateY(-0.2rem);
+  }
 }
 
 @keyframes plan-active-two {
   0%,
-  27% { opacity: 0; }
-  35%,
-  50% { opacity: 1; }
-  58%,
-  100% { opacity: 0; }
+  36% {
+    opacity: 0;
+    transform: translateY(0.2rem) scale(0.9);
+  }
+  43%,
+  57% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  63%,
+  100% {
+    opacity: 0;
+    transform: translateY(-0.2rem) scale(0.94);
+  }
 }
 
 @keyframes plan-done-two {
   0%,
-  50% { opacity: 0; }
-  58%,
-  100% { opacity: 1; }
+  57% {
+    opacity: 0;
+    transform: translateY(0.2rem) scale(0.9);
+  }
+  64%,
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 @keyframes plan-pending-three {
   0%,
-  50% { opacity: 1; }
-  58%,
-  100% { opacity: 0; }
+  64% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: translateY(-0.2rem);
+  }
 }
 
 @keyframes plan-active-three {
   0%,
-  50% { opacity: 0; }
-  58%,
-  75% { opacity: 1; }
-  83%,
-  100% { opacity: 0; }
+  64% {
+    opacity: 0;
+    transform: translateY(0.2rem) scale(0.9);
+  }
+  71%,
+  85% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  91%,
+  100% {
+    opacity: 0;
+    transform: translateY(-0.2rem) scale(0.94);
+  }
 }
 
 @keyframes plan-done-three {
   0%,
-  75% { opacity: 0; }
-  83%,
-  100% { opacity: 1; }
+  85% {
+    opacity: 0;
+    transform: translateY(0.2rem) scale(0.9);
+  }
+  92%,
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 @media (max-width: 767.98px) {
@@ -659,6 +674,8 @@ pre:hover {
 
   .flow-branches {
     grid-template-columns: 1fr;
+    gap: 1.8rem;
+    margin-top: 0.55rem;
   }
 
   .plan-row {
@@ -674,6 +691,95 @@ pre:hover {
   .plan-status span {
     right: auto;
     left: 0;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .topbar-inner {
+    min-height: 3.5rem;
+  }
+
+  .hero-inner {
+    padding-top: 3.2rem;
+    padding-bottom: 2.2rem;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 10vw, 2.7rem);
+    line-height: 1.2;
+  }
+
+  .install-panel {
+    margin-top: 1.45rem;
+    padding: 0.8rem;
+  }
+
+  .install-copy span {
+    font-size: 0.86rem;
+  }
+
+  .install-command {
+    gap: 0.45rem;
+    min-height: 2.7rem;
+    padding: 0.38rem 0.38rem 0.38rem 0.65rem;
+  }
+
+  .install-command code {
+    font-size: 0.8rem;
+  }
+
+  .copy-install {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .guide {
+    padding-top: 0.3rem;
+    padding-bottom: 2.5rem;
+  }
+
+  .chapter {
+    padding: 2.25rem 0;
+  }
+
+  .chapter h3 {
+    margin-top: 1.8rem;
+  }
+
+  .loop-visual,
+  .plan-visual {
+    margin-left: -0.1rem;
+    margin-right: -0.1rem;
+    padding: 0.8rem;
+  }
+
+  .flow-path {
+    padding: 0.9rem 0.55rem 0.7rem;
+  }
+
+  .flow-node {
+    padding-inline: 0.55rem;
+    font-size: 0.84rem;
+  }
+
+  pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .plan-row {
+    gap: 0.55rem;
+    min-height: 0;
+    padding: 0.65rem;
+  }
+
+  .plan-status {
+    display: none;
+  }
+
+  .plan-task {
+    font-size: 0.9rem;
   }
 }
 
