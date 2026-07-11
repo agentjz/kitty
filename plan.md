@@ -872,9 +872,11 @@ rg -n "TODO|FIXME|legacy|compat|alias" src tests spec.md dev.md
   - `production-runtime-status`
 - `git diff --check`：通过；仅有 Windows Git 换行提示，没有 whitespace error。
 
-### 剩余风险与发布
+### 发布收口
 
-- 本次没有做 npm 发布、版本升级、commit 或 push；这些需要项目所有者明确发起。
+- 项目所有者已明确要求发布；版本已从 `0.0.25` 升级至 `0.0.26`。
+- 已提交并推送 `76bb94c` 到 `origin/master`。
+- `@jun133/kitty@0.0.26` 已发布到 npm 的 `latest` tag。
 - 已验证当前公开面和主链路。无法从仓库证明的外部私有 import 不构成保留已删除内部平台的理由。
 
 已确认的最高优先级：
