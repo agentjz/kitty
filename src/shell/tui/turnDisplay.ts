@@ -18,6 +18,8 @@ export function createTuiTurnDisplay(options: {
   abortSignal: AbortSignal;
 }): InteractionTurnDisplay {
   let aborted = false;
+  let startedAt: number | undefined;
+  let finished = false;
   const isAborted = (): boolean => aborted || options.abortSignal.aborted;
   const updateActivity = (activity: TuiRuntimeDockState["activity"]): void => {
     if (!isAborted()) {
@@ -37,10 +39,7 @@ export function createTuiTurnDisplay(options: {
 
   options.abortSignal.addEventListener("abort", () => {
     aborted = true;
-    options.controller.updateDock({
-      activity: undefined,
-      turnStartedAt: undefined,
-    });
+    finishTurn("aborted");
   });
 
   const callbacks: AgentCallbacks = {
@@ -81,7 +80,6 @@ export function createTuiTurnDisplay(options: {
     onAssistantDone() {
       options.controller.updateDock({
         activity: undefined,
-        turnStartedAt: undefined,
       });
     },
     onToolCall(name, args) {
@@ -123,21 +121,31 @@ export function createTuiTurnDisplay(options: {
   return {
     callbacks,
     start() {
-      options.controller.updateDock({ turnStartedAt: Date.now() });
+      startedAt = Date.now();
+      finished = false;
+      options.controller.updateDock({
+        turnStartedAt: startedAt,
+      });
+    },
+    finish(status) {
+      finishTurn(status);
     },
     flush() {
-      options.controller.updateDock({
-        activity: undefined,
-        turnStartedAt: undefined,
-      });
+      if (!finished) finishTurn(aborted ? "aborted" : "completed");
     },
     dispose() {
-      options.controller.updateDock({
-        activity: undefined,
-        turnStartedAt: undefined,
-      });
+      if (!finished) finishTurn(aborted ? "aborted" : "completed");
     },
   };
+
+  function finishTurn(status: "completed" | "failed" | "aborted"): void {
+    if (finished) return;
+    finished = true;
+    options.controller.updateDock({
+      activity: undefined,
+      turnStartedAt: undefined,
+    });
+  }
 
   function renderRuntimeUiEvent(event: RuntimeUiEvent): void {
     if (isAborted()) {

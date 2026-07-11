@@ -65,11 +65,7 @@ export class TurnLedgerRepo {
       const candidate = this.load(id);
       if (!candidate || candidate.status !== "queued") return undefined;
       const sessionId = candidate.sessionId;
-      this.db.prepare(`
-        UPDATE session_turns
-        SET status='failed', error='Turn lease expired before completion.', updated_at=@now, finished_at=@now
-        WHERE session_id=@sessionId AND status='running' AND lease_expires_at IS NOT NULL AND lease_expires_at <= @now
-      `).run({ sessionId, now: nowIso });
+      this.reconcileExpired(sessionId, now);
       const active = this.db.prepare(`
         SELECT 1 FROM session_turns
         WHERE session_id=? AND status='running' AND lease_expires_at > ? LIMIT 1
@@ -135,6 +131,30 @@ export class TurnLedgerRepo {
     `).run({ id, error, now });
     if (result.changes !== 1) throw new Error(`Turn ${id} is no longer queued.`);
     return this.load(id)!;
+  }
+
+  reconcileExpired(sessionId: string, now = new Date()): number {
+    const nowIso = now.toISOString();
+    return this.db.prepare(`
+      UPDATE session_turns
+      SET status='failed', error='Turn lease expired before completion.', updated_at=@now, finished_at=@now,
+          lease_expires_at=NULL
+      WHERE session_id=@sessionId AND status='running' AND lease_expires_at IS NOT NULL AND lease_expires_at <= @now
+    `).run({ sessionId, now: nowIso }).changes;
+  }
+
+  listPending(sessionId: string): TurnRecord[] {
+    return (this.db.prepare(`
+      SELECT * FROM session_turns
+      WHERE session_id=? AND status IN ('running', 'queued')
+      ORDER BY created_at ASC
+    `).all(sessionId) as TurnRow[]).map(fromRow);
+  }
+
+  listBySession(sessionId: string): TurnRecord[] {
+    return (this.db.prepare(`
+      SELECT * FROM session_turns WHERE session_id=? ORDER BY created_at ASC
+    `).all(sessionId) as TurnRow[]).map(fromRow);
   }
 
   load(id: string): TurnRecord | undefined {

@@ -57,70 +57,129 @@
     }
   ];
   var currentStep = reduceMotion ? cycleSteps.length - 1 : 0;
-  var renderedStep = -1;
   var timer;
   var lineTimers = [];
+  var streamVersion = 0;
+  var streamComplete = true;
+  var completedStep = -1;
   var visible = false;
-  var paused = false;
+  var playing = false;
 
-  function createStreamLine(entry) {
+  function createStreamLine(entry, content) {
     var line = document.createElement('div');
     var role = document.createElement('span');
     var text = document.createElement('p');
     line.className = 'cycle-stream-line is-' + entry.kind;
     role.textContent = entry.role;
-    text.textContent = entry.text;
+    text.textContent = content === undefined ? entry.text : content;
     line.appendChild(role);
     line.appendChild(text);
     return line;
   }
 
   function clearLineTimers() {
+    streamVersion += 1;
     lineTimers.forEach(function (lineTimer) { window.clearTimeout(lineTimer); });
     lineTimers = [];
   }
 
-  function appendEntries(entries, immediate, onComplete) {
+  function appendEntries(entries, immediate, stepIndex, onComplete) {
     var stream = document.getElementById('cycle-stream');
-    entries.forEach(function (entry, index) {
-      var append = function () {
-        stream.appendChild(createStreamLine(entry));
+    var version = streamVersion;
+    if (immediate || reduceMotion) {
+      entries.forEach(function (entry) {
+        var line = createStreamLine(entry);
+        line.setAttribute('data-cycle-stream-step', String(stepIndex));
+        stream.appendChild(line);
         stream.scrollTop = stream.scrollHeight;
-        if (index === entries.length - 1 && onComplete) onComplete();
+      });
+      if (onComplete) onComplete();
+      return;
+    }
+
+    var appendEntry = function (entryIndex) {
+      if (version !== streamVersion) return;
+      if (entryIndex >= entries.length) {
+        if (onComplete) onComplete();
+        return;
+      }
+
+      var entry = entries[entryIndex];
+      var characters = Array.from(entry.text);
+      var offset = 0;
+      var line = createStreamLine(entry, '');
+      line.setAttribute('data-cycle-stream-step', String(stepIndex));
+      var paragraph = line.querySelector('p');
+      stream.appendChild(line);
+      stream.scrollTop = stream.scrollHeight;
+
+      var writeNextCharacter = function () {
+        if (version !== streamVersion) return;
+        offset += 1;
+        paragraph.textContent = characters.slice(0, offset).join('');
+        stream.scrollTop = stream.scrollHeight;
+        if (offset < characters.length) {
+          lineTimers.push(window.setTimeout(writeNextCharacter, 24));
+          return;
+        }
+        lineTimers.push(window.setTimeout(function () {
+          appendEntry(entryIndex + 1);
+        }, 110));
       };
-      if (immediate || reduceMotion) append();
-      else lineTimers.push(window.setTimeout(append, index * 230));
-    });
+
+      if (characters.length === 0) appendEntry(entryIndex + 1);
+      else writeNextCharacter();
+    };
+
+    appendEntry(0);
   }
 
-  function rebuildStreamThrough(stepIndex) {
+  function prepareIncrementalStream(stepIndex) {
     var stream = document.getElementById('cycle-stream');
-    clearLineTimers();
-    stream.replaceChildren();
-    for (var index = 0; index <= stepIndex; index += 1) {
-      appendEntries(cycleSteps[index].entries, true);
+    if (completedStep === -1) {
+      stream.replaceChildren();
+    } else {
+      stream.querySelectorAll('[data-cycle-stream-step]').forEach(function (line) {
+        var lineStep = Number(line.getAttribute('data-cycle-stream-step'));
+        var isIncompleteLine = lineStep > completedStep;
+        var isAfterRewindTarget = stepIndex <= completedStep && lineStep >= stepIndex;
+        if (isIncompleteLine || isAfterRewindTarget) {
+          line.remove();
+        }
+      });
+      if (stepIndex <= completedStep) completedStep = stepIndex - 1;
+    }
+
+    for (var index = completedStep + 1; index < stepIndex; index += 1) {
+      appendEntries(cycleSteps[index].entries, true, index);
+      completedStep = index;
     }
   }
 
-  function renderCycle() {
+  function renderCycle(options) {
     if (!cycle) return;
+    var stream = document.getElementById('cycle-stream');
+    var animateCurrent = Boolean(options && options.animateCurrent);
+    clearCycleTimer();
+    clearLineTimers();
+    streamComplete = false;
+    stream.classList.toggle('is-streaming', animateCurrent && !reduceMotion);
+    stream.setAttribute('aria-busy', 'true');
+    setCopyReady(false);
     cycle.setAttribute('data-step', String(currentStep));
     cycle.classList.remove('is-finished');
     document.getElementById('cycle-count').textContent = String(currentStep + 1) + ' / ' + String(cycleSteps.length);
-
-    if (renderedStep >= 0 && currentStep === renderedStep + 1) {
-      appendEntries(cycleSteps[currentStep].entries, false, function () {
-        if (currentStep === cycleSteps.length - 1) cycle.classList.add('is-finished');
-      });
-    } else {
-      rebuildStreamThrough(currentStep);
-      if (currentStep === cycleSteps.length - 1) {
-        lineTimers.push(window.setTimeout(function () {
-          cycle.classList.add('is-finished');
-        }, reduceMotion ? 0 : 180));
-      }
-    }
-    renderedStep = currentStep;
+    var stepIndex = currentStep;
+    prepareIncrementalStream(stepIndex);
+    appendEntries(cycleSteps[stepIndex].entries, !animateCurrent, stepIndex, function () {
+      completedStep = stepIndex;
+      streamComplete = true;
+      stream.classList.remove('is-streaming');
+      stream.setAttribute('aria-busy', 'false');
+      setCopyReady(true);
+      if (stepIndex === cycleSteps.length - 1) cycle.classList.add('is-finished');
+      if (playing) scheduleCycle(cycleStepIntervalMs);
+    });
 
     cycle.querySelectorAll('[data-cycle-step]').forEach(function (node, index) {
       var active = index === currentStep;
@@ -138,40 +197,68 @@
 
   function scheduleCycle(delay) {
     clearCycleTimer();
-    if (reduceMotion || !visible || paused) return;
+    if (reduceMotion || !visible || !playing || !streamComplete) return;
     timer = window.setTimeout(function () {
       currentStep = (currentStep + 1) % cycleSteps.length;
-      renderCycle();
-      scheduleCycle(cycleStepIntervalMs);
+      renderCycle({ animateCurrent: true });
     }, delay || cycleStepIntervalMs);
+  }
+
+  function setCopyReady(ready) {
+    var button = cycle && cycle.querySelector('[data-cycle-copy]');
+    if (!button) return;
+    var icon = button.querySelector('i');
+    button.disabled = !ready;
+    button.setAttribute('aria-label', ready ? '复制当前输出' : '等待当前输出完成');
+    button.setAttribute('title', ready ? '复制当前输出' : '等待输出完成');
+    if (icon) icon.className = 'bi bi-clipboard';
+  }
+
+  function renderPlayControl() {
+    var button = cycle && cycle.querySelector('[data-cycle-play]');
+    if (!button) return;
+    var label = playing ? '暂停 Agent 循环' : '播放 Agent 循环';
+    var icon = button.querySelector('i');
+    button.setAttribute('aria-label', label);
+    button.setAttribute('aria-pressed', playing ? 'true' : 'false');
+    button.setAttribute('title', playing ? '暂停' : '播放');
+    if (icon) icon.className = playing ? 'bi bi-pause-fill' : 'bi bi-play-fill';
   }
 
   if (cycle) {
     cycle.querySelectorAll('[data-cycle-step]').forEach(function (node) {
       node.addEventListener('click', function () {
         currentStep = Number(node.getAttribute('data-cycle-step'));
-        renderedStep = -1;
-        renderCycle();
-        scheduleCycle(cycleStepIntervalMs);
+        renderCycle({ animateCurrent: true });
       });
     });
 
-    cycle.addEventListener('mouseenter', function () {
-      paused = true;
-      clearCycleTimer();
+    var playControl = cycle.querySelector('[data-cycle-play]');
+    playControl.addEventListener('click', function () {
+      playing = !playing;
+      renderPlayControl();
+      if (playing) scheduleCycle(cycleStepIntervalMs);
+      else clearCycleTimer();
     });
-    cycle.addEventListener('mouseleave', function () {
-      paused = false;
-      scheduleCycle(cycleStepIntervalMs);
-    });
-    cycle.addEventListener('focusin', function () {
-      paused = true;
-      clearCycleTimer();
-    });
-    cycle.addEventListener('focusout', function (event) {
-      if (cycle.contains(event.relatedTarget)) return;
-      paused = false;
-      scheduleCycle(cycleStepIntervalMs);
+
+    var copyControl = cycle.querySelector('[data-cycle-copy]');
+    copyControl.addEventListener('click', function () {
+      if (!streamComplete || !navigator.clipboard) return;
+      var stream = document.getElementById('cycle-stream');
+      var text = Array.from(stream.querySelectorAll('.cycle-stream-line')).map(function (line) {
+        var role = line.querySelector('span');
+        var content = line.querySelector('p');
+        return (role ? role.textContent : '') + '  ' + (content ? content.textContent : '');
+      }).join('\n');
+      navigator.clipboard.writeText(text).then(function () {
+        var icon = copyControl.querySelector('i');
+        copyControl.setAttribute('aria-label', '已复制当前输出');
+        copyControl.setAttribute('title', '已复制');
+        if (icon) icon.className = 'bi bi-check2';
+        window.setTimeout(function () {
+          if (streamComplete) setCopyReady(true);
+        }, 1400);
+      }).catch(function () {});
     });
 
     if (reduceMotion || !('IntersectionObserver' in window)) {
@@ -187,8 +274,8 @@
       cycleObserver.observe(cycle);
     }
 
-    renderCycle();
-    scheduleCycle(cycleStepIntervalMs);
+    renderCycle({ animateCurrent: false });
+    renderPlayControl();
   }
 
   document.querySelectorAll('[data-copy]').forEach(function (button) {

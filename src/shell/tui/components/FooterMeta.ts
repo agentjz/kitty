@@ -17,7 +17,7 @@ export function createFooterMetaComponent(kit: Pick<InkRuntime, "React" | "Box" 
       },
       React.createElement(
         Text,
-        { color: TUI_COLORS.text, wrap: "truncate-end" },
+        { color: TUI_COLORS.muted, wrap: "truncate-end" },
         props.dock.model ? `模型 ${props.dock.model}` : "",
       ),
       React.createElement(
@@ -25,7 +25,7 @@ export function createFooterMetaComponent(kit: Pick<InkRuntime, "React" | "Box" 
         { flexDirection: "row", flexShrink: 1 },
         React.createElement(
           Text,
-          { color: TUI_COLORS.text, wrap: "truncate-end" },
+          { color: TUI_COLORS.muted, wrap: "truncate-end" },
           `上下文 ${props.dock.context}`,
         ),
       ),

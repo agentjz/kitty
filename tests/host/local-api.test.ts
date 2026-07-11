@@ -77,7 +77,7 @@ test("local agent api records aborted turn events", async (t) => {
 
   assert.equal(result.status, "aborted");
   const events = await api.listEvents({ cwd: root, sessionId: session.id });
-  assert.equal(events.some((event) => event.type === "turn.started"), true);
+  assert.equal(events.some((event) => event.type === "turn.started"), false);
   assert.equal(events.some((event) => event.type === "turn.aborted"), true);
 });
 

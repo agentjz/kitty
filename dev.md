@@ -128,7 +128,19 @@ Presenter 不能重新计算事实。UI 不能保存第二套生命周期。测�
 
 不能靠到处匹配 message 字符串长期维持行为。message 可以用于展示，不能成为核心控制流的主要 contract。
 
-## 8. 发布规则
+## 8. 中断、崩溃与恶劣用户路径
+
+把用户视为会在任意边界连续按 Ctrl+C、关闭终端、杀死 Node 进程、让 Agent 杀死自身进程、断电或重启主机。正常退出不是正确性的前提。
+
+- UI 只有在 SQLite transaction 提交后才能把输入视为已接受并回显；提交失败必须明确显示未接收，不能只留在进程内存、输入框或 presenter 状态。SQLite 必须使用能抵抗进程强杀和断电的 durability 配置。
+- 同一 session 的执行保持串行，但 admission 不能等待上一轮结束。当前 owner 清理期间收到的新输入必须持久排队并自动接棒。
+- Ctrl+C 只取消当前有效 owner。连续 Ctrl+C 必须幂等，不能误删、跳过或取消后续已接受输入。
+- running turn 依靠 owner token、heartbeat 和 lease 判定存活。进程消失后，过期 owner 必须进入明确终态，不能永久阻塞队首。
+- 重启必须从 SQLite 恢复 queued turn；不能要求用户重输，不能重复 admission，也不能把展示字符串当作恢复事实。
+- 工具副作用不盲目重放。恢复使用 tool journal、结果 envelope 和文件 hash 判断已知事实，未知边界返回 interrupted evidence。
+- 测试必须覆盖 interrupt cleanup 期间提交、连续中断、queued turn 重启恢复、expired running 对账、进程树终止和重复恢复幂等性。
+
+## 9. 发布规则
 
 普通提交前：
 
@@ -153,7 +165,7 @@ npm.cmd run eval:production
 
 `eval:production` 使用真实 provider，不进入普通 verify。
 
-## 9. 收口规则
+## 10. 收口规则
 
 每次大改收口只写事实：
 

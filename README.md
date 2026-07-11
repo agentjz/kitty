@@ -123,7 +123,7 @@ kitty config show
 
 `kitty init` 创建 `.kitty/.env`、`.kitty/.env.example` 和 `.kitty/.kittyignore`，并输出本地配置 preflight 和下一步。`kitty doctor` 先检查这些本地事实，再加载 runtime，最后在 API key 存在时探测 provider 连接；失败时说明该补什么，成功时说明可以启动 Kitty。
 
-`.kitty/.env` 放当前启用的 provider 和 API key，同时保留 NVIDIA、Agnes AI、Gemini、TTAPI、DeepSeek provider preset 注释块，方便直接切换。Telegram、扩展开关和运行时配置也在 `.kitty/.env` 与 `.kitty/.env.example` 中保持同一结构。
+`.kitty/.env` 放当前启用的 provider 和 API key，默认使用 Agnes AI，同时保留 NVIDIA、Gemini、TTAPI、DeepSeek provider preset 注释块，方便直接切换。Telegram、扩展开关和运行时配置也在 `.kitty/.env` 与 `.kitty/.env.example` 中保持同一结构。
 
 当前支持的主要环境配置包括：
 

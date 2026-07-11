@@ -11,18 +11,9 @@ export function buildProjectEnvTemplate(example: boolean): string {
   const providerKey = example ? "replace-with-your-provider-key" : "";
   const defaultPreset = getDefaultProviderPreset();
 
-  if (!example) {
-    return [
-      "# Kitty environment",
-      "# Local credentials, provider presets, Telegram, and runtime configuration for this project.",
-      "",
-      ...formatCommonEnvSections({ initialConfig, defaultPreset, providerKey, example }),
-    ].join("\n");
-  }
-
   return [
     "# Kitty environment",
-    "# Copy to .kitty/.env, then fill real credentials and choose one active provider preset.",
+    "# Local credentials, provider presets, Telegram, and runtime configuration for this project.",
     "",
     ...formatCommonEnvSections({ initialConfig, defaultPreset, providerKey, example }),
   ].join("\n");
@@ -35,8 +26,8 @@ function formatCommonEnvSections(input: {
   example: boolean;
 }): string[] {
   const inactiveProviderKey = input.example ? "replace-with-your-provider-key" : "";
-  const activeTelegramToken = input.example ? "replace-with-your-telegram-bot-token" : "";
-  const activeTelegramAllowedUsers = input.example ? "replace-with-your-telegram-user-id" : "";
+  const activeTelegramToken = "";
+  const activeTelegramAllowedUsers = "";
   return [
     "# Agent profile",
     `${KITTY_ENV.profile}=${input.initialConfig.profile}`,

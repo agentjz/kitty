@@ -14,6 +14,7 @@ import type { RuntimeConfig, SessionRecord } from "../types.js";
 import { createWebInteractionShell } from "./shell.js";
 import { serveHtml } from "./serveHtml.js";
 import { writeStdoutLine, writeStdout } from "../utils/stdio.js";
+import { resolveProjectRoots } from "../context/repoRoots.js";
 
 export interface StartWebShellOptions {
   cwd: string;
@@ -117,6 +118,7 @@ export async function startWebShell(options: StartWebShellOptions): Promise<void
     session,
     sessionStore: options.sessionStore,
     shell,
+    stateRootDir: (await resolveProjectRoots(options.cwd)).stateRootDir,
   };
 
   const driver = new InteractiveSessionDriver(driverOptions);

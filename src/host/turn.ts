@@ -21,6 +21,10 @@ const DEFAULT_IDENTITY = {
   name: "lead",
 };
 
+export const PRESERVE_QUEUED_TURN_ABORT_REASON = "Preserve accepted queued turn for restart.";
+
+class QueuedTurnDetachedError extends Error {}
+
 export async function runHostTurn(
   options: HostTurnOptions,
   dependencies: HostTurnDependencies = {},
@@ -37,7 +41,7 @@ export async function runHostTurn(
   const sessionEvents = new SessionEventStore(options.config.paths.eventsDir);
   let toolRegistry: Awaited<ReturnType<typeof createToolRegistry>> | null = null;
   let session = options.session;
-  let turnRecord: { id: string; ownerToken?: string } | undefined;
+  let turnRecord: { id: string; input: string; ownerToken?: string } | undefined;
   let terminalStatus: "completed" | "failed" | "aborted" | undefined;
   let heartbeatTimer: NodeJS.Timeout | undefined;
   const leaseAbortController = new AbortController();
@@ -52,26 +56,40 @@ export async function runHostTurn(
       sessionId: options.session.id,
       input: options.input,
       inputSource: "external",
+      admittedTurnId: options.admittedTurnId,
       abortSignal: turnAbortSignal,
       session: options.session,
-      onAdmitted: async () => {
-        await recordHostTurnStarted(stateRootDir, {
-          host,
-          sessionId: options.session.id,
-          identityKind: (options.identity ?? DEFAULT_IDENTITY).kind,
-          identityName: (options.identity ?? DEFAULT_IDENTITY).name,
-          cwd: options.cwd,
-        });
-        await sessionEvents.append({
-          type: "turn.started",
-          sessionId: options.session.id,
-          cwd: options.cwd,
-          host,
-          message: options.input,
-        });
-      },
+    });
+    if (!turnRecord.ownerToken) {
+      const existing = new ControlPlaneLedger(stateRootDir);
+      try {
+        const settled = existing.turns.load(turnRecord.id);
+        const settledSession = existing.sessions.load(options.session.id) ?? options.session;
+        return {
+          status: settled?.status === "completed" ? "completed" : settled?.status === "aborted" ? "aborted" : "failed",
+          session: settledSession,
+          errorMessage: settled?.error,
+        };
+      } finally {
+        existing.close();
+      }
+    }
+    await recordHostTurnStarted(stateRootDir, {
+      host,
+      sessionId: options.session.id,
+      identityKind: (options.identity ?? DEFAULT_IDENTITY).kind,
+      identityName: (options.identity ?? DEFAULT_IDENTITY).name,
+      cwd: options.cwd,
+    });
+    await sessionEvents.append({
+      type: "turn.started",
+      sessionId: options.session.id,
+      cwd: options.cwd,
+      host,
+      message: turnRecord.input,
     });
     if (options.abortSignal?.aborted) {
+      terminalStatus = "aborted";
       await recordHostTurnFinished(stateRootDir, {
         host,
         sessionId: options.session.id,
@@ -113,6 +131,7 @@ export async function runHostTurn(
     });
 
     if (options.abortSignal?.aborted) {
+      terminalStatus = "aborted";
       await recordHostTurnFinished(stateRootDir, {
         host,
         sessionId: options.session.id,
@@ -130,7 +149,7 @@ export async function runHostTurn(
       };
     }
 
-    let nextInput = options.input;
+    let nextInput = turnRecord.input;
     let runtimePromptState = options.runtimePromptState;
     let wakeCloseoutTurn = false;
     let result: Awaited<ReturnType<typeof runTurn>>;
@@ -151,6 +170,7 @@ export async function runHostTurn(
         identity: options.identity ?? DEFAULT_IDENTITY,
         runtimePromptState,
       });
+      dependencies.onRunTurnStarted?.();
       const resultPromise = turnRecord?.ownerToken
         ? runWithTurnOwnership({
             rootDir: stateRootDir,
@@ -159,7 +179,6 @@ export async function runHostTurn(
             ownerToken: turnRecord.ownerToken,
           }, runTurnOperation)
         : runTurnOperation();
-      dependencies.onRunTurnStarted?.();
       result = await resultPromise;
       session = result.session;
 
@@ -255,6 +274,14 @@ export async function runHostTurn(
     };
   } catch (error) {
     const failedSession = error instanceof AgentTurnError ? error.session : session;
+    if (error instanceof QueuedTurnDetachedError) {
+      return {
+        status: "aborted",
+        session: failedSession,
+        error,
+        errorMessage: "Accepted input remains queued for restart.",
+      };
+    }
     if (isAbortError(error)) {
       terminalStatus = "aborted";
       await recordHostTurnFinished(stateRootDir, {
@@ -322,26 +349,32 @@ async function claimTurn(input: {
   sessionId: string;
   input: string;
   inputSource: "external" | "internal";
+  admittedTurnId?: string;
   abortSignal?: AbortSignal;
   session: SessionRecord;
-  onAdmitted?: () => Promise<void>;
-}): Promise<{ id: string; ownerToken?: string }> {
+}): Promise<{ id: string; input: string; ownerToken?: string }> {
   const ledger = new ControlPlaneLedger(input.rootDir);
   let admitted;
   try {
     if (!ledger.sessions.load(input.sessionId)) ledger.sessions.save(input.session);
-    admitted = ledger.turns.admit({
-      sessionId: input.sessionId,
-      input: input.input,
-      inputSource: input.inputSource,
-    });
+    admitted = input.admittedTurnId
+      ? ledger.turns.load(input.admittedTurnId)
+      : ledger.turns.admit({
+          sessionId: input.sessionId,
+          input: input.input,
+          inputSource: input.inputSource,
+        });
+    if (!admitted || admitted.sessionId !== input.sessionId) {
+      throw new Error(`Pending turn ${input.admittedTurnId ?? "unknown"} does not belong to session ${input.sessionId}.`);
+    }
   } finally {
     ledger.close();
   }
-  await input.onAdmitted?.();
-
   for (;;) {
     if (input.abortSignal?.aborted) {
+      if (input.abortSignal.reason === PRESERVE_QUEUED_TURN_ABORT_REASON) {
+        throw new QueuedTurnDetachedError(PRESERVE_QUEUED_TURN_ABORT_REASON);
+      }
       const aborted = new ControlPlaneLedger(input.rootDir);
       try {
         aborted.turns.abortQueued(admitted.id);
@@ -354,7 +387,11 @@ async function claimTurn(input: {
     try {
       const claimed = current.turns.claim(admitted.id);
       if (claimed) {
-        return { id: claimed.id, ownerToken: claimed.ownerToken };
+        return { id: claimed.id, input: claimed.input, ownerToken: claimed.ownerToken };
+      }
+      const observed = current.turns.load(admitted.id);
+      if (observed && ["completed", "failed", "aborted"].includes(observed.status)) {
+        return { id: observed.id, input: observed.input };
       }
     } finally {
       current.close();

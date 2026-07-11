@@ -198,6 +198,46 @@
   font-weight: 800;
 }
 
+.cycle-controls {
+  display: inline-flex;
+  gap: 0.55rem;
+  align-items: center;
+}
+
+.cycle-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 1px solid #cfd6dc;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #46535e;
+  font-size: 0.85rem;
+  line-height: 1;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.cycle-action:hover:not(:disabled),
+.cycle-action:focus-visible,
+.cycle-action[aria-pressed="true"] {
+  border-color: #303a44;
+  background: #303a44;
+  color: #ffffff;
+}
+
+.cycle-action:focus-visible {
+  outline: 2px solid #87929c;
+  outline-offset: 2px;
+}
+
+.cycle-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
 .cycle-stream {
   flex: 1;
   min-height: 0;
@@ -233,6 +273,23 @@
   font-size: 0.76rem;
   font-weight: 700;
   line-height: 1.55;
+}
+
+.cycle-stream.is-streaming .cycle-stream-line:last-child p::after {
+  display: inline-block;
+  width: 0.08rem;
+  height: 0.9em;
+  margin-left: 0.18rem;
+  background: #68747f;
+  content: "";
+  vertical-align: -0.08em;
+  animation: cycle-caret 720ms steps(1, end) infinite;
+}
+
+@keyframes cycle-caret {
+  50% {
+    opacity: 0;
+  }
 }
 
 .cycle-stream-line.is-tool p {

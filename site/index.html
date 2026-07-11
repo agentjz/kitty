@@ -269,7 +269,15 @@ skill 细则：
             <div class="cycle-model">
               <i class="bi bi-cpu" aria-hidden="true"></i>
               <span>Kitty</span>
-              <span id="cycle-count">1 / 8</span>
+              <div class="cycle-controls">
+                <span id="cycle-count">1 / 8</span>
+                <button class="cycle-action" type="button" data-cycle-copy aria-label="复制当前输出" title="复制当前输出">
+                  <i class="bi bi-clipboard" aria-hidden="true"></i>
+                </button>
+                <button class="cycle-action" type="button" data-cycle-play aria-label="播放 Agent 循环" aria-pressed="false" title="播放">
+                  <i class="bi bi-play-fill" aria-hidden="true"></i>
+                </button>
+              </div>
             </div>
             <div class="cycle-stream" id="cycle-stream" role="log" aria-live="polite" aria-label="Agent 运行过程">
               <div class="cycle-stream-line">

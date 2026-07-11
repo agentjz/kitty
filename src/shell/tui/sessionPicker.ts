@@ -6,9 +6,9 @@ import {
   formatSessionPickerTitle,
   parseSessionPickerChoice,
 } from "../../session/picker.js";
-import { renderKittyBanner } from "../banner.js";
 import { TUI_COLORS } from "./theme.js";
 import type { InkRuntime } from "./components/kit.js";
+import { createWelcomeWordmarkComponent } from "./components/WelcomeWordmark.js";
 
 export interface TuiSessionSelection {
   session: SessionRecord;
@@ -89,6 +89,7 @@ export function createTuiSessionPickerComponent(
   kit: Pick<InkRuntime, "React" | "Box" | "Text" | "useInput" | "useStdout">,
 ) {
   const { React, Box, Text, useInput, useStdout } = kit;
+  const WelcomeWordmark = createWelcomeWordmarkComponent(kit);
   return function TuiSessionPicker(props: {
     sessions: readonly SessionRecord[];
     now: Date;
@@ -98,7 +99,11 @@ export function createTuiSessionPickerComponent(
     const [cursor, setCursor] = React.useState(1);
     const { stdout } = useStdout();
     const width = Math.max(40, stdout.columns ?? 80);
+    const height = Math.max(16, stdout.rows ?? 24);
+    const contentWidth = Math.max(36, Math.min(76, width - 8));
     const choices = props.sessions.length + 1;
+    const compact = height < 10 + choices;
+    const dense = height < 7 + choices;
 
     useInput((input, key) => {
       if (key.ctrl && input === "c") {
@@ -134,36 +139,55 @@ export function createTuiSessionPickerComponent(
       {
         flexDirection: "column",
         width,
-        minHeight: 16,
-        paddingX: 3,
+        height,
+        alignItems: "center",
         paddingY: 1,
         backgroundColor: TUI_COLORS.background,
       },
-      React.createElement(Text, { color: TUI_COLORS.user, bold: true }, renderKittyBanner()),
+      React.createElement(Box, { flexGrow: 1, minHeight: 0 }),
       React.createElement(
         Box,
-        { flexDirection: "row", marginTop: 1 },
-        React.createElement(Text, { color: TUI_COLORS.text, bold: true }, props.sessions.length > 0 ? "继续会话" : "新会话"),
-        React.createElement(Text, { color: TUI_COLORS.muted }, "  Enter 进入  ↑/↓ 切换  0 新建  Esc 退出"),
+        { flexDirection: "column", flexShrink: 0, width: contentWidth },
+        compact
+          ? React.createElement(
+            Box,
+            { justifyContent: "center", width: "100%" },
+            React.createElement(Text, { color: TUI_COLORS.text, bold: true }, "kitty agent"),
+          )
+          : React.createElement(
+            Box,
+            { justifyContent: "center", width: "100%" },
+            React.createElement(WelcomeWordmark),
+          ),
+        React.createElement(Box, { height: 1 }),
+        React.createElement(Text, { color: TUI_COLORS.text, bold: true }, "会话"),
+        React.createElement(Box, { height: 1 }),
+        React.createElement(
+          Box,
+          { flexDirection: "column" },
+          renderChoiceLine(React, Box, Text, cursor === 0, "0", "新建会话", ""),
+          ...props.sessions.map((session, index) =>
+            renderChoiceLine(
+              React,
+              Box,
+              Text,
+              cursor === index + 1,
+              String(index + 1),
+              formatSessionPickerTitle(session),
+              formatRelativeSessionTime(session.updatedAt, props.now),
+            )),
+        ),
+        dense ? null : React.createElement(Box, { height: 1 }),
+        dense ? null : React.createElement(Text, { color: TUI_COLORS.muted }, "↑↓ 选择  ·  Enter 打开  ·  Esc 退出"),
       ),
-      React.createElement(Box, { marginTop: 1, flexDirection: "column" },
-        renderChoiceLine(React, Text, cursor === 0, "0", "新建会话", ""),
-        ...props.sessions.map((session, index) =>
-          renderChoiceLine(
-            React,
-            Text,
-            cursor === index + 1,
-            String(index + 1),
-            formatSessionPickerTitle(session),
-            formatRelativeSessionTime(session.updatedAt, props.now),
-          )),
-      ),
+      React.createElement(Box, { flexGrow: 1, minHeight: 0 }),
     );
   };
 }
 
 function renderChoiceLine(
   React: InkRuntime["React"],
+  Box: typeof import("ink").Box,
   Text: typeof import("ink").Text,
   selected: boolean,
   index: string,
@@ -171,9 +195,12 @@ function renderChoiceLine(
   meta: string,
 ): React.ReactNode {
   return React.createElement(
-    Text,
-    { color: selected ? TUI_COLORS.user : TUI_COLORS.text, bold: selected },
-    `${selected ? "▌" : " "} ${index}. ${title}${meta ? `  ${meta}` : ""}`,
+    Box,
+    { flexDirection: "row", height: 1 },
+    React.createElement(Text, { color: selected ? TUI_COLORS.accentGold : TUI_COLORS.background }, selected ? "▌ " : "  "),
+    React.createElement(Text, { color: TUI_COLORS.muted }, `${index}. `),
+    React.createElement(Text, { color: TUI_COLORS.text, bold: selected }, title),
+    meta ? React.createElement(Text, { color: TUI_COLORS.muted }, `  ${meta}`) : null,
   );
 }
 

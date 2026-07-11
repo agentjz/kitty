@@ -1,19 +1,22 @@
 import type { TuiController } from "../controller.js";
 import {
   measureTuiFooterRows,
+  TUI_COMPOSER_META_GAP_ROWS,
+  TUI_DOCK_COMPOSER_GAP_ROWS,
   TUI_FOOTER_CONTENT_INSET_X,
   TUI_FOOTER_PADDING_BOTTOM_ROWS,
   TUI_FOOTER_TOP_GAP_ROWS,
   TUI_MIN_HEIGHT,
   TUI_MIN_WIDTH,
 } from "../layout.js";
-import type { TuiState, TuiViewport } from "../store.js";
+import { hasTuiConversation, type TuiState, type TuiViewport } from "../store.js";
 import { TUI_COLORS } from "../theme.js";
 import type { InkRuntime } from "./kit.js";
 import { createComposerComponent } from "./Composer.js";
 import { createFooterMetaComponent } from "./FooterMeta.js";
 import { createRuntimeDockComponent } from "./RuntimeDock.js";
 import { createTranscriptComponent } from "./Transcript.js";
+import { createWelcomeWordmarkComponent } from "./WelcomeWordmark.js";
 
 export function createTuiAppComponent(kit: InkRuntime) {
   const { React, Box, useInput, useStdout } = kit;
@@ -21,6 +24,7 @@ export function createTuiAppComponent(kit: InkRuntime) {
   const FooterMeta = createFooterMetaComponent(kit);
   const RuntimeDock = createRuntimeDockComponent(kit);
   const Transcript = createTranscriptComponent(kit);
+  const WelcomeWordmark = createWelcomeWordmarkComponent(kit);
 
   return function TuiApp(props: {
     controller: TuiController;
@@ -30,6 +34,8 @@ export function createTuiAppComponent(kit: InkRuntime) {
     const { stdout } = useStdout();
     const width = Math.max(TUI_MIN_WIDTH, stdout.columns ?? 80);
     const height = Math.max(TUI_MIN_HEIGHT, stdout.rows ?? 24);
+    const welcome = !hasTuiConversation(state);
+    const welcomeWidth = Math.max(40, Math.min(76, width - 8));
     const footerRows = measureTuiFooterRows(state.composer.visibleRows);
     const transcriptViewport = React.useMemo<TuiViewport>(() => ({
       width,
@@ -39,8 +45,8 @@ export function createTuiAppComponent(kit: InkRuntime) {
       hasMeasured: false,
       left: 0,
       top: 0,
-      width: Math.max(1, width - TUI_FOOTER_CONTENT_INSET_X * 2),
-    }), [transcriptViewport.height, width]);
+      width: Math.max(1, (welcome ? welcomeWidth : width) - TUI_FOOTER_CONTENT_INSET_X * 2),
+    }), [transcriptViewport.height, welcome, welcomeWidth, width]);
 
     React.useEffect(() => {
       props.controller.setViewport(transcriptViewport);
@@ -67,6 +73,43 @@ export function createTuiAppComponent(kit: InkRuntime) {
       }
     });
 
+    if (welcome) {
+      return React.createElement(
+        Box,
+        {
+          flexDirection: "column",
+          width,
+          height,
+          backgroundColor: TUI_COLORS.background,
+        },
+        React.createElement(Box, { flexGrow: 1, minHeight: 1 }),
+        React.createElement(
+          Box,
+          { flexDirection: "column", alignItems: "center", width: "100%" },
+          React.createElement(WelcomeWordmark),
+          React.createElement(Box, { height: 2 }),
+          React.createElement(
+            Box,
+            {
+              flexDirection: "column",
+              backgroundColor: TUI_COLORS.background,
+              paddingX: TUI_FOOTER_CONTENT_INSET_X,
+              paddingBottom: TUI_FOOTER_PADDING_BOTTOM_ROWS,
+              width: welcomeWidth,
+            },
+            React.createElement(Composer, {
+              controller: props.controller,
+              frame: composerFrame,
+              state,
+            }),
+            React.createElement(Box, { height: TUI_COMPOSER_META_GAP_ROWS }),
+            React.createElement(FooterMeta, { dock: state.dock }),
+          ),
+        ),
+        React.createElement(Box, { flexGrow: 1, minHeight: 1 }),
+      );
+    }
+
     return React.createElement(
       Box,
       { flexDirection: "column", width, height },
@@ -80,17 +123,19 @@ export function createTuiAppComponent(kit: InkRuntime) {
         Box,
         {
           flexDirection: "column",
-          backgroundColor: TUI_COLORS.panel,
+          backgroundColor: TUI_COLORS.background,
           paddingX: TUI_FOOTER_CONTENT_INSET_X,
           paddingBottom: TUI_FOOTER_PADDING_BOTTOM_ROWS,
           width: "100%",
         },
         React.createElement(RuntimeDock, { dock: state.dock }),
+        React.createElement(Box, { height: TUI_DOCK_COMPOSER_GAP_ROWS }),
         React.createElement(Composer, {
           controller: props.controller,
           frame: composerFrame,
           state,
         }),
+        React.createElement(Box, { height: TUI_COMPOSER_META_GAP_ROWS }),
         React.createElement(FooterMeta, { dock: state.dock }),
       ),
     );

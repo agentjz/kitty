@@ -100,6 +100,7 @@ export async function startTuiChat(options: StartTuiChatOptions): Promise<void> 
     session: selected.session,
     sessionStore: options.sessionStore,
     shell: terminalShell,
+    stateRootDir: projectContext.stateRootDir,
     onSessionUpdated(session) {
       controller.updateSessionFacts(session);
     },

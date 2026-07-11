@@ -41,6 +41,7 @@ export class ControlPlaneLedger {
     fs.mkdirSync(statePaths.kittyDir, { recursive: true });
     this.db = new Database(statePaths.controlPlaneLedgerFile);
     this.db.pragma("journal_mode = WAL");
+    this.db.pragma("synchronous = FULL");
     this.db.pragma("foreign_keys = ON");
     initializeControlPlaneSchema(this.db);
     this.executions = new ExecutionLedgerRepo(this.db);

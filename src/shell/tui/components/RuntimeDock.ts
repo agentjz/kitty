@@ -26,9 +26,9 @@ export function createRuntimeDockComponent(kit: Pick<InkRuntime, "React" | "Box"
       intervalMs: 80,
     });
     const now = props.now ?? clock;
-    const elapsed = props.dock.turnStartedAt === undefined
-      ? undefined
-      : `思考 ${formatElapsedCompact(now - props.dock.turnStartedAt)}`;
+    const elapsed = props.dock.turnStartedAt !== undefined
+      ? `思考中 ${formatElapsedCompact(now - props.dock.turnStartedAt)}`
+      : undefined;
     const facts: Array<{ label: string; value: string }> = [];
     if (props.dock.background) {
       facts.push({ label: "后台", value: props.dock.background });
@@ -36,6 +36,7 @@ export function createRuntimeDockComponent(kit: Pick<InkRuntime, "React" | "Box"
     if (props.dock.subagent) {
       facts.push({ label: "子代理", value: props.dock.subagent });
     }
+    const compactFacts = facts.map(({ label, value }) => `${label} ${value}`).join("  ·  ");
     return React.createElement(
       Box,
       {
@@ -45,30 +46,22 @@ export function createRuntimeDockComponent(kit: Pick<InkRuntime, "React" | "Box"
       },
       React.createElement(
         Box,
-        { flexDirection: "row", height: 1, width: "100%" },
+        { flexDirection: "row", height: 1, justifyContent: "space-between", width: "100%" },
         renderActivityRow(React, Box, Text, activity, { spinnerFrame }),
+        compactFacts
+          ? React.createElement(
+            Box,
+            { flexShrink: 1, marginLeft: 2, overflowX: "hidden" },
+            React.createElement(Text, { color: TUI_COLORS.muted, wrap: "truncate-end" }, compactFacts),
+          )
+          : null,
         elapsed
           ? React.createElement(
             Box,
-            { flexShrink: 0, height: 1, marginLeft: 2 },
+            { alignSelf: "flex-start", flexShrink: 0, height: 1, marginLeft: 2 },
             React.createElement(Text, { color: TUI_COLORS.muted, wrap: "truncate-end" }, elapsed),
           )
           : null,
-      ),
-      React.createElement(
-        Box,
-        { flexDirection: "row", height: 1, marginTop: 0, width: "100%" },
-        React.createElement(
-          Box,
-          { flexGrow: 1, flexShrink: 1, height: 1 },
-          facts.length > 0
-            ? facts.flatMap(({ label, value }, index) => [
-              index > 0 ? React.createElement(Text, { color: TUI_COLORS.muted, key: `${label}-gap` }, "   ") : null,
-              React.createElement(Text, { color: TUI_COLORS.muted, key: `${label}-label` }, `${label} `),
-              React.createElement(Text, { color: TUI_COLORS.text, key: `${label}-value`, wrap: "truncate-end" }, value),
-            ])
-            : null,
-        ),
       ),
     );
   };
@@ -90,6 +83,15 @@ function renderActivityRow(
   }
 
   const color = readSeverityColor(activity.severity);
+  if (activity.kind === "model" && activity.status === "running") {
+    return React.createElement(
+      Box,
+      { flexDirection: "row", flexGrow: 1, flexShrink: 1, height: 1, overflowX: "hidden" },
+      React.createElement(Text, { color }, readActivityMarker(activity, animation)),
+      React.createElement(Text, { color: TUI_COLORS.muted }, "正在运行"),
+    );
+  }
+
   const label = readActivityLabel(activity);
   const blocker = activity.blockingLead ? "  阻塞 lead" : "";
   const detail = activity.detail ? `  ${activity.detail}` : "";
@@ -142,6 +144,6 @@ function readSeverityColor(severity: TuiActivitySeverity): string {
     case "success":
       return TUI_COLORS.success;
     case "info":
-      return TUI_COLORS.user;
+      return TUI_COLORS.accentBlue;
   }
 }

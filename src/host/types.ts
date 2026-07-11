@@ -21,6 +21,7 @@ export interface HostTurnOptions {
   builtinToolFilter?: ToolFilter;
   extraTools?: readonly RegisteredTool[];
   runtimePromptState?: RunTurnOptions["runtimePromptState"];
+  admittedTurnId?: string;
 }
 
 export interface HostTurnDependencies {

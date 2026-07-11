@@ -6,6 +6,7 @@ import {
   appendTranscriptText,
   createInitialTuiState,
   getVisibleTranscriptRows,
+  hasTuiConversation,
   measureTranscriptRows,
   parseSubmittedInputEcho,
   projectRuntimeStatusToDock,
@@ -27,6 +28,16 @@ const viewport: TuiViewport = {
   width: 20,
   height: 3,
 };
+
+test("tui welcome is reserved for sessions without real conversation", () => {
+  const empty = createInitialTuiState();
+  const systemOnly = appendTranscriptEntry(empty, { role: "system", text: "recovery notice" }, viewport);
+  const conversation = appendTranscriptEntry(systemOnly, { role: "user", text: "hello" }, viewport);
+
+  assert.equal(hasTuiConversation(empty), false);
+  assert.equal(hasTuiConversation(systemOnly), false);
+  assert.equal(hasTuiConversation(conversation), true);
+});
 
 test("tui state projects external session messages without internal facts", () => {
   const state = createInitialTuiState(createSession([
@@ -161,17 +172,32 @@ test("tui transcript layout uses terminal display width for wide characters", ()
   assert.equal(rows.every((row) => row.kind === "spacer" || !row.text.includes("你好你好你好你好你好")), true);
 });
 
-test("tui transcript keeps submitted user messages compact with a full-row background", () => {
+test("tui Thinking remains readable without terminal dim styling", () => {
+  const rows = renderTranscriptLineViews([{
+    id: "entry-1",
+    role: "reasoning",
+    text: "inspect the evidence",
+  }], 80).filter((row) => row.kind === "content");
+
+  assert.equal(rows.length > 0, true);
+  assert.equal(rows.every((row) => row.style.dim === false), true);
+  assert.equal(rows[0]?.prefix, "Thinking: ");
+});
+
+test("tui transcript gives submitted user messages a padded focus surface", () => {
   const rows = renderTranscriptLineViews([{
     id: "entry-1",
     role: "user",
     text: "hello",
   }], 80);
 
-  assert.equal(rows.length, 2);
+  assert.equal(rows.length, 4);
   assert.equal(rows[0]?.kind, "spacer");
-  assert.equal(rows[1]?.text, "hello");
+  assert.equal(rows[1]?.text, "");
+  assert.equal(rows[2]?.text, "hello");
+  assert.equal(rows[3]?.text, "");
   assert.equal(typeof rows[1]?.style.background, "string");
+  assert.equal(typeof rows[3]?.style.background, "string");
 });
 
 test("tui transcript keeps markdown structure as display facts", () => {

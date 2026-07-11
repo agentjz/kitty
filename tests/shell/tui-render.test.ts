@@ -16,9 +16,14 @@ import {
   measureComposerContentWidth,
   measureComposerTextOrigin,
 } from "../../src/shell/tui/composerLayout.js";
-import { TUI_FOOTER_CONTENT_INSET_X } from "../../src/shell/tui/layout.js";
+import {
+  measureTuiFooterRows,
+  TUI_COMPOSER_META_GAP_ROWS,
+  TUI_DOCK_COMPOSER_GAP_ROWS,
+  TUI_FOOTER_CONTENT_INSET_X,
+} from "../../src/shell/tui/layout.js";
 
-test("tui footer model and runtime dock share the same left anchor", async () => {
+test("tui footer keeps model and context below the composer", async () => {
   const React = await import("react");
   const ink = await import("ink");
   const { createFooterMetaComponent } = await import("../../src/shell/tui/components/FooterMeta.js");
@@ -45,6 +50,9 @@ test("tui footer model and runtime dock share the same left anchor", async () =>
         } satisfies TuiRuntimeDockState,
         now: 13_000,
       }),
+      React.default.createElement(ink.Box, { height: TUI_DOCK_COMPOSER_GAP_ROWS }),
+      React.default.createElement(ink.Text, null, "输入消息"),
+      React.default.createElement(ink.Box, { height: TUI_COMPOSER_META_GAP_ROWS }),
       React.default.createElement(FooterMeta, {
         dock: {
           context: "100/1000 chars (10%)",
@@ -56,10 +64,13 @@ test("tui footer model and runtime dock share the same left anchor", async () =>
   );
 
   const lines = output.split("\n");
-  assert.equal(readRenderedColumn(lines, "模型 deepseek-v4-flash"), readRenderedColumn(lines, "空闲"));
-  assert.match(lines[0] ?? "", /空闲\s+思考 3s$/);
+  assert.match(lines[0] ?? "", /^\s*空闲\s+思考中 3s$/);
+  assert.equal(lines[1]?.trim(), "");
+  assert.equal(lines[3]?.trim(), "");
   assert.match(output, /上下文 100\/1000 chars \(10%\)$/);
+  assert.equal(lines.findIndex((line) => line.includes("模型 deepseek-v4-flash")) > lines.findIndex((line) => line.includes("输入消息")), true);
   assert.doesNotMatch(output, /本轮/);
+  assert.equal(measureTuiFooterRows(1), 10);
 });
 
 test("tui runtime dock truncates long tool activity before the turn clock", async () => {
@@ -90,9 +101,80 @@ test("tui runtime dock truncates long tool activity before the turn clock", asyn
   );
 
   const lines = output.split("\n");
-  assert.equal(lines.length, 2);
-  assert.match(lines[0] ?? "", /思考 3s$/);
+  assert.equal(lines.length, 1);
+  assert.match(lines[0] ?? "", /思考中 3s$/);
   assert.doesNotMatch(output, /TOOL_ARGUMENT_TAIL/);
+});
+
+test("tui runtime dock does not repeat thinking on both sides", async () => {
+  const React = await import("react");
+  const ink = await import("ink");
+  const { createRuntimeDockComponent } = await import("../../src/shell/tui/components/RuntimeDock.js");
+  const RuntimeDock = createRuntimeDockComponent({
+    React: React.default,
+    Box: ink.Box,
+    Text: ink.Text,
+  });
+  const output = ink.renderToString(
+    React.default.createElement(RuntimeDock, {
+      dock: {
+        context: "0%",
+        turnStartedAt: 10_000,
+        activity: {
+          kind: "model",
+          channel: "lead",
+          status: "running",
+          summary: "思考中",
+          severity: "info",
+        },
+      } satisfies TuiRuntimeDockState,
+      now: 13_000,
+    }),
+    { columns: 48 },
+  );
+
+  assert.match(output, /正在运行\s+思考中 3s$/);
+  assert.equal(output.match(/思考中/g)?.length, 1);
+});
+
+test("tui session picker uses a centered compact identity and fills the terminal", async () => {
+  const React = await import("react");
+  const ink = await import("ink");
+  const { createTuiSessionPickerComponent } = await import("../../src/shell/tui/sessionPicker.js");
+  const Picker = createTuiSessionPickerComponent({
+    React: React.default,
+    Box: ink.Box,
+    Text: ink.Text,
+    useInput() {},
+    useStdout() {
+      return { stdout: { columns: 80, rows: 24 } } as ReturnType<typeof ink.useStdout>;
+    },
+  });
+  const output = ink.renderToString(
+    React.default.createElement(Picker, {
+      sessions: [{
+        id: "session-1",
+        revision: 0,
+        createdAt: "2026-07-11T12:00:00.000Z",
+        updatedAt: "2026-07-11T13:00:00.000Z",
+        cwd: process.cwd(),
+        messageCount: 0,
+        messages: [],
+        title: "模型身份与能力",
+      }],
+      now: new Date("2026-07-11T13:01:00.000Z"),
+      onSelect() {},
+      onCancel() {},
+    }),
+    { columns: 80 },
+  );
+  const lines = output.split(/\r?\n|\r/);
+
+  assert.equal(lines.length, 24);
+  assert.equal(Math.max(...lines.map((line) => [...line].length)) <= 80, true);
+  assert.match(output, /会话/);
+  assert.match(output, /模型身份与能力/);
+  assert.doesNotMatch(output, /继续会话/);
 });
 
 test("tui composer layout derives visible rows and cursor from one frame model", () => {

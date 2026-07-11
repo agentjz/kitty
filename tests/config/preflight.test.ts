@@ -6,6 +6,7 @@ import test from "node:test";
 import { KITTY_ENV } from "../../src/config/envKeys.js";
 import { inspectConfigPreflight } from "../../src/config/preflight.js";
 import { buildProjectEnvTemplate } from "../../src/config/projectEnvTemplate.js";
+import { getDefaultProviderPreset } from "../../src/config/providerPresets.js";
 import { PROJECT_STATE_DIR_NAME, PROJECT_STATE_ENV_FILE_NAME } from "../../src/project/statePaths.js";
 import { createTempWorkspace } from "../helpers.js";
 
@@ -32,5 +33,5 @@ test("config preflight reports current env contract and provider preset", async 
   assert.equal(report.ready, true);
   assert.equal(report.env.missingKeys.length, 0);
   assert.equal(report.env.apiKeyPresent, true);
-  assert.equal(report.env.providerPreset, "NVIDIA NIM + DeepSeek V4 Flash");
+  assert.equal(report.env.providerPreset, getDefaultProviderPreset().label);
 });

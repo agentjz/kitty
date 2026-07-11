@@ -66,7 +66,7 @@ export async function updateSessionTitleAfterTurn(
     identityName: input.identity.name,
     model: input.requestModel,
   });
-  input.options.callbacks?.onStatus?.("Generating session title...");
+  input.options.callbacks?.onStatus?.("正在生成会话标题");
 
   try {
     const titleResponse = input.options.fetchSessionTitleResponse

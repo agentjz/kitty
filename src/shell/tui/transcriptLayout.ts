@@ -18,6 +18,7 @@ import type {
 import {
   wrapTranscriptEntryRows,
   type TuiTranscriptSourceRow,
+  type TuiTranscriptWrappedRow,
 } from "./transcriptWrap.js";
 
 export { TRANSCRIPT_OUTER_PADDING_X };
@@ -67,7 +68,9 @@ export function renderTranscriptEntryLineViews(
   const wrappedRows = contentRows.length > 0
     ? contentRows
     : [{ markdownKind: undefined, language: undefined, prefix: "", text: "", spans: [] }];
-  const rows = wrappedRows;
+  const rows = entry.role === "user"
+    ? [createEmptyWrappedRow(), ...wrappedRows, createEmptyWrappedRow()]
+    : wrappedRows;
   const entryId = entry.id;
   const firstContentIndex = rows.findIndex((row) => row.text.length > 0 || row.spans.length > 0 || row.prefix.length > 0);
   return [
@@ -100,6 +103,16 @@ export function renderTranscriptEntryLineViews(
       style: applyTranscriptMarkdownStyle(style, row.markdownKind, theme),
     })),
   ];
+}
+
+function createEmptyWrappedRow(): TuiTranscriptWrappedRow {
+  return {
+    markdownKind: undefined,
+    language: undefined,
+    prefix: "",
+    text: "",
+    spans: [],
+  };
 }
 
 function readEntryDisplayRows(entry: TuiTranscriptEntry): TuiTranscriptSourceRow[] {

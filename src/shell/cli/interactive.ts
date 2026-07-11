@@ -64,10 +64,12 @@ export async function startInteractiveChat(
     dependencies.createDriver?.({
       ...options,
       shell: terminalShell,
+      stateRootDir: projectContext.stateRootDir,
     }) ??
     new InteractiveSessionDriver({
       ...options,
       shell: terminalShell,
+      stateRootDir: projectContext.stateRootDir,
     });
 
   try {

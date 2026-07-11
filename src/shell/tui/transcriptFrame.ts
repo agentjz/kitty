@@ -38,18 +38,18 @@ export function readTranscriptRoleStyle(role: TuiTranscriptRole, theme: TuiTrans
         accent: theme.user,
         background: theme.panel,
         text: theme.text,
-        bold: true,
+        bold: false,
         dim: false,
         italicPrefix: false,
       };
     case "reasoning":
     case "subagent_reasoning":
       return {
-        accent: role === "subagent_reasoning" ? theme.subagent : theme.reasoning,
+        accent: role === "subagent_reasoning" ? theme.subagent : theme.muted,
         background: undefined,
         text: role === "subagent_reasoning" ? theme.subagent : theme.reasoning,
         bold: false,
-        dim: true,
+        dim: false,
         italicPrefix: true,
       };
     case "system":

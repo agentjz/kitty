@@ -97,6 +97,36 @@ test("terminal log fallback keeps tool call arguments reviewable", () => {
   assert.doesNotMatch(log, /\(missing path\)/);
 });
 
+test("terminal log wrapper preserves turn display lifecycle", () => {
+  const lifecycle: string[] = [];
+  const shell = mirrorInteractionShellToTerminalLog({
+    ...createSilentShell(),
+    createTurnDisplay() {
+      return {
+        callbacks: {},
+        start() {
+          lifecycle.push("started");
+        },
+        finish(status) {
+          lifecycle.push(status);
+        },
+        flush() {},
+        dispose() {},
+      };
+    },
+  }, createMemoryWriter([]));
+  const display = shell.createTurnDisplay({
+    cwd: process.cwd(),
+    config: createTestRuntimeConfig(process.cwd()),
+    abortSignal: new AbortController().signal,
+  });
+
+  display.start?.();
+  display.finish?.("completed");
+
+  assert.deepEqual(lifecycle, ["started", "completed"]);
+});
+
 function createStdoutWritingClosedShell(): InteractionShell {
   const write = (text: string): void => {
     process.stdout.write(`${text}\n`);

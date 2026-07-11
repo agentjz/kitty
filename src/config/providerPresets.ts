@@ -17,7 +17,7 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     model: "deepseek-ai/deepseek-v4-flash",
     thinking: "enabled",
     reasoningEffort: "high",
-    activeByDefault: true,
+    activeByDefault: false,
   },
   {
     label: "Agnes AI + 2.0 Flash",
@@ -25,7 +25,7 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     model: "agnes-2.0-flash",
     thinking: "enabled",
     reasoningEffort: "high",
-    activeByDefault: false,
+    activeByDefault: true,
   },
   {
     label: "Gemini + 2.5 Flash",

@@ -231,6 +231,12 @@ function mirrorTurnDisplay(
         }), { cwd: options.cwd }));
       },
     },
+    start() {
+      display.start?.();
+    },
+    finish(status) {
+      display.finish?.(status);
+    },
     flush() {
       flushTextBuffers();
       display.flush();

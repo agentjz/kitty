@@ -82,6 +82,10 @@ export function createInitialTuiState(session?: SessionRecord): TuiState {
   };
 }
 
+export function hasTuiConversation(state: Pick<TuiState, "transcript">): boolean {
+  return state.transcript.some((entry) => entry.role !== "system");
+}
+
 export function appendTranscriptEntry(
   state: TuiState,
   entry: Omit<TuiTranscriptEntry, "id">,
