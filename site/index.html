@@ -12,6 +12,7 @@
 <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.13.1/font/bootstrap-icons.min.css" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="cycle.css">
 </head>
 <body id="top">
 
@@ -208,94 +209,86 @@ skill 细则：
     <section class="chapter reveal" id="subagent">
       <div class="chapter-body">
         <h2>子代理</h2>
-        <p>子代理是另一个独立工作的 agent。主 agent 给它一个明确目标、边界和期望结果；子代理带着自己的上下文和工具，专门完成这块工作，最后把结果交回主 agent。</p>
+        <p>子代理是另一个拥有独立上下文的 agent。它把专项调查、大量文件和中间过程留在自己的上下文里，最后只把结论交回主 agent。这样主 agent 的上下文可以继续保留整个任务的目标、关键事实和决策。</p>
+        <p>历史压缩整理同一段会话里较早的信息；子代理隔离一块独立工作的上下文。两者分别处理时间方向和任务分支带来的上下文压力。</p>
+        <p>主 agent 给子代理一个明确目标、边界和期望结果；子代理带着自己的上下文和工具完成这块工作，再把压缩后的结果交回主 agent。</p>
 
         <h3>具体例子</h3>
         <p>主 agent 正在完成一个复杂任务，同时需要有人专门查看相关文件。它可以交给子代理：</p>
         <pre><code>目标：查看相关文件，找出需要同步调整的地方。
 边界：只研究测试，不修改产品代码。
 期望结果：列出需要修改的测试文件和原因。</code></pre>
-        <p>Kitty 为子代理启动独立的 agent 循环。子代理完成后，结果回到主 agent，再由主 agent 完成整个任务。</p>
+        <p>Kitty 为子代理启动独立的 agent 循环。查看文件、工具结果和中间判断都留在子代理上下文；子代理完成后，把“需要修改的测试文件和原因”交回主 agent，再由主 agent 完成整个任务。</p>
       </div>
     </section>
 
     <section class="chapter complete-example reveal" id="complete-example">
       <div class="chapter-body">
-        <h2>最后看一个完整例子</h2>
         <p>下面把前面讲的东西放回同一个西红柿炒鸡蛋任务里。这个任务已经进行了几轮。</p>
 
-        <h3>工具循环</h3>
-        <p>Kitty 先查资料，再加载做法：</p>
-        <pre><code>【工具调用】read("食材清单.md")
-【工具结果】有 3 个西红柿、4 个鸡蛋，家里有人喜欢鸡蛋炒嫩一点。
+        <div class="agent-cycle" data-agent-cycle data-step="0" tabindex="0" role="group" aria-label="西红柿炒鸡蛋 Agent 循环。点击环上的步骤可以查看模型在该步骤的判断和动作。">
+          <div class="cycle-orbit">
+            <div class="cycle-track" aria-hidden="true"></div>
+            <span class="cycle-cursor" aria-hidden="true"></span>
 
-【工具调用】skill_load("西红柿炒鸡蛋")
-【工具结果】鸡蛋先炒到刚凝固，西红柿炒出汁后，再把鸡蛋倒回锅里。</code></pre>
-
-        <h3>短期记忆</h3>
-        <p>这一轮留下了三件当前事实：食材够用、鸡蛋要炒嫩、已经加载了西红柿炒鸡蛋的做法。</p>
-
-        <h3>长期记忆</h3>
-        <p>项目长期规则告诉模型：先看事实，再做判断，再行动。西红柿炒鸡蛋 skill 提供已经试过的熟练做法。</p>
-
-        <h3>子代理</h3>
-        <p>用户还要确认客人有没有额外忌口。主 agent 把这件独立的小事交给子代理：</p>
-        <pre><code>目标：查看客人偏好，确认有没有额外忌口。
-边界：只查看偏好，不调整做法。
-期望结果：返回客人的忌口情况。</code></pre>
-        <p>子代理完成后，把“没有额外忌口”交回主 agent。</p>
-
-        <p>现在用户继续说：</p>
-        <pre><code>鸡蛋再嫩一点，少放糖。</code></pre>
-
-        <h3>上下文装配</h3>
-        <p>Kitty 把上面的事实拼成一段话，发给模型：</p>
-        <pre><code>你是本 session 的主导 agent。你是一位重视结构和事实的工程师，表达短、准、清楚。现在要做西红柿炒鸡蛋，食材清单已经确认有 3 个西红柿、4 个鸡蛋，用户喜欢鸡蛋炒嫩一点。项目长期规则要求先看事实，再做判断，再行动。已经加载的西红柿炒鸡蛋 skill 说明：鸡蛋先炒到刚凝固，西红柿炒出汁后，再把鸡蛋倒回锅里。子代理已经确认客人没有额外忌口。你可以用 read 读取资料，用 skill_load 加载熟练做法。现在用户说：鸡蛋再嫩一点，少放糖。</code></pre>
-
-        <h3>计划和 To Do</h3>
-        <p>这是一个需要按顺序完成的任务，Kitty 先拆成以下步骤：</p>
-        <div class="plan-visual" aria-label="计划从待处理推进到进行中，再标记为已完成。">
-          <div class="plan-row plan-row-one">
-            <span class="plan-state" aria-hidden="true">
-              <span class="plan-dot plan-dot-pending"></span>
-              <span class="plan-dot plan-dot-active"></span>
-              <span class="plan-dot plan-dot-done">✓</span>
-            </span>
-            <span class="plan-task">按更嫩的做法处理鸡蛋。</span>
-            <span class="plan-status">
-              <span class="status-pending">待处理</span>
-              <span class="status-active">进行中</span>
-              <span class="status-done">已完成</span>
-            </span>
+            <button class="cycle-node cycle-node-one is-active" type="button" data-cycle-step="0" aria-label="查看上一轮现场">
+              <span class="cycle-node-icon"><i class="bi bi-chat-left-text" aria-hidden="true"></i></span>
+              <span>用户任务</span>
+            </button>
+            <button class="cycle-node cycle-node-two" type="button" data-cycle-step="1" aria-label="查看模型判断步骤">
+              <span class="cycle-node-icon"><i class="bi bi-cpu" aria-hidden="true"></i></span>
+              <span>模型判断</span>
+            </button>
+            <button class="cycle-node cycle-node-three" type="button" data-cycle-step="2" aria-label="查看读取食材步骤">
+              <span class="cycle-node-icon"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></span>
+              <span>read</span>
+            </button>
+            <button class="cycle-node cycle-node-four" type="button" data-cycle-step="3" aria-label="查看加载 skill 步骤">
+              <span class="cycle-node-icon"><i class="bi bi-journal-check" aria-hidden="true"></i></span>
+              <span>skill</span>
+            </button>
+            <button class="cycle-node cycle-node-five" type="button" data-cycle-step="4" aria-label="查看短期和长期记忆步骤">
+              <span class="cycle-node-icon"><i class="bi bi-database-check" aria-hidden="true"></i></span>
+              <span>记忆</span>
+            </button>
+            <button class="cycle-node cycle-node-six" type="button" data-cycle-step="5" aria-label="查看子代理步骤">
+              <span class="cycle-node-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
+              <span>子代理</span>
+            </button>
+            <button class="cycle-node cycle-node-seven" type="button" data-cycle-step="6" aria-label="查看生成计划步骤">
+              <span class="cycle-node-icon"><i class="bi bi-list-check" aria-hidden="true"></i></span>
+              <span>计划</span>
+            </button>
+            <button class="cycle-node cycle-node-eight" type="button" data-cycle-step="7" aria-label="查看执行完成和最终回答">
+              <span class="cycle-node-icon"><i class="bi bi-check2-circle" aria-hidden="true"></i></span>
+              <span>回答</span>
+            </button>
           </div>
-          <div class="plan-row plan-row-two">
-            <span class="plan-state" aria-hidden="true">
-              <span class="plan-dot plan-dot-pending"></span>
-              <span class="plan-dot plan-dot-active"></span>
-              <span class="plan-dot plan-dot-done">✓</span>
-            </span>
-            <span class="plan-task">炒西红柿。</span>
-            <span class="plan-status">
-              <span class="status-pending">待处理</span>
-              <span class="status-active">进行中</span>
-              <span class="status-done">已完成</span>
-            </span>
-          </div>
-          <div class="plan-row plan-row-three">
-            <span class="plan-state" aria-hidden="true">
-              <span class="plan-dot plan-dot-pending"></span>
-              <span class="plan-dot plan-dot-active"></span>
-              <span class="plan-dot plan-dot-done">✓</span>
-            </span>
-            <span class="plan-task">把鸡蛋倒回锅里收味。</span>
-            <span class="plan-status">
-              <span class="status-pending">待处理</span>
-              <span class="status-active">进行中</span>
-              <span class="status-done">已完成</span>
-            </span>
+
+          <div class="cycle-output">
+            <div class="cycle-model">
+              <i class="bi bi-cpu" aria-hidden="true"></i>
+              <span>Kitty</span>
+              <span id="cycle-count">1 / 8</span>
+            </div>
+            <div class="cycle-stream" id="cycle-stream" role="log" aria-live="polite" aria-label="Agent 运行过程">
+              <div class="cycle-stream-line">
+                <span>用户</span>
+                <p>做一盘西红柿炒鸡蛋。</p>
+              </div>
+            </div>
+            <div class="cycle-dish" aria-label="完成的西红柿炒鸡蛋">
+              <span class="dish-caption">西红柿炒鸡蛋</span>
+              <div class="dish-plate" aria-hidden="true">
+                <span class="dish-egg dish-egg-one"></span>
+                <span class="dish-egg dish-egg-two"></span>
+                <span class="dish-tomato dish-tomato-one"></span>
+                <span class="dish-tomato dish-tomato-two"></span>
+                <span class="dish-tomato dish-tomato-three"></span>
+              </div>
+            </div>
           </div>
         </div>
-        <p>最后一步完成，端上一盘西红柿炒鸡蛋。</p>
       </div>
     </section>
   </article>

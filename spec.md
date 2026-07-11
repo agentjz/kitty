@@ -287,8 +287,8 @@ TUI 规则：
 - Footer 的 model 标签与 Runtime Dock 的 activity/background/subagent 标签使用同一个左侧内容 inset。
 - Model metadata 位于 composer 下方左侧；context budget 位于右侧。
 - Context budget 必须属于当前选中的 session。项目全局 runtime status 不能用另一条最近已保存 session 的 budget 覆盖新建或已选 session。
-- 用户提交后到最终模型回答完成期间，TUI 在 context budget 右侧显示本轮持续时间；思考、工具调用和后续模型请求不重置它。
-- Runtime Dock 保持稳定两行结构，展示当前 activity、运行时长、lead blocking 和 live background/subagent lane。
+- 用户提交后到最终模型回答完成期间，TUI 在 Runtime Dock 第一行右侧显示本轮持续时间；思考、工具调用和后续模型请求不重置它。
+- Runtime Dock 保持稳定两行结构；第一行左侧展示当前 activity，过长摘要单行截断，右侧展示本轮持续时间；第二行展示 live background/subagent lane。
 - TUI 只显示 control-plane 状态为 `created` 或 `running` 的 background/subagent lane。
 - 存在 live execution lane 时，TUI 轻量刷新 execution 账本。Execution 进入终态后必须清除 lane；启动时的 `running` 文案不能成为错误的当前状态。
 - 阻塞型 subagent 的 reasoning、工具动作和回答必须显示在当前 lead transcript，直到 lead 恢复。

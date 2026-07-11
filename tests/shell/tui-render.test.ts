@@ -41,6 +41,7 @@ test("tui footer model and runtime dock share the same left anchor", async () =>
       React.default.createElement(RuntimeDock, {
         dock: {
           context: "100/1000 chars (10%)",
+          turnStartedAt: 10_000,
         } satisfies TuiRuntimeDockState,
         now: 13_000,
       }),
@@ -48,9 +49,7 @@ test("tui footer model and runtime dock share the same left anchor", async () =>
         dock: {
           context: "100/1000 chars (10%)",
           model: "deepseek-v4-flash",
-          turnStartedAt: 10_000,
         } satisfies TuiRuntimeDockState,
-        now: 13_000,
       }),
     ),
     { columns: 80 },
@@ -58,7 +57,42 @@ test("tui footer model and runtime dock share the same left anchor", async () =>
 
   const lines = output.split("\n");
   assert.equal(readRenderedColumn(lines, "模型 deepseek-v4-flash"), readRenderedColumn(lines, "空闲"));
-  assert.match(output, /上下文 100\/1000 chars \(10%\)  本轮 3s$/);
+  assert.match(lines[0] ?? "", /空闲\s+思考 3s$/);
+  assert.match(output, /上下文 100\/1000 chars \(10%\)$/);
+  assert.doesNotMatch(output, /本轮/);
+});
+
+test("tui runtime dock truncates long tool activity before the turn clock", async () => {
+  const React = await import("react");
+  const ink = await import("ink");
+  const { createRuntimeDockComponent } = await import("../../src/shell/tui/components/RuntimeDock.js");
+  const RuntimeDock = createRuntimeDockComponent({
+    React: React.default,
+    Box: ink.Box,
+    Text: ink.Text,
+  });
+  const output = ink.renderToString(
+    React.default.createElement(RuntimeDock, {
+      dock: {
+        context: "0%",
+        turnStartedAt: 10_000,
+        activity: {
+          kind: "tool",
+          channel: "lead",
+          status: "running",
+          summary: `bash ${"long-argument ".repeat(20)}TOOL_ARGUMENT_TAIL`,
+          severity: "info",
+        },
+      } satisfies TuiRuntimeDockState,
+      now: 13_000,
+    }),
+    { columns: 42 },
+  );
+
+  const lines = output.split("\n");
+  assert.equal(lines.length, 2);
+  assert.match(lines[0] ?? "", /思考 3s$/);
+  assert.doesNotMatch(output, /TOOL_ARGUMENT_TAIL/);
 });
 
 test("tui composer layout derives visible rows and cursor from one frame model", () => {

@@ -104,7 +104,6 @@ h1 {
   font-weight: 850;
   line-height: 1.12;
   letter-spacing: 0;
-  animation: title-enter 540ms ease-out both;
 }
 
 .install-panel {
@@ -114,7 +113,6 @@ h1 {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface-soft);
-  animation: panel-enter 580ms 120ms ease-out both;
 }
 
 .install-copy {
@@ -236,59 +234,9 @@ pre code {
   color: inherit;
 }
 
-.chapter.is-visible pre {
-  animation: code-enter 500ms 100ms ease-out both;
-}
-
 pre:hover {
   border-color: #aeb8c2;
   transform: translateY(-1px);
-}
-
-.reveal {
-  opacity: 1;
-  transform: none;
-}
-
-.reveal.is-visible {
-  opacity: 1;
-  transform: none;
-}
-
-@keyframes title-enter {
-  from {
-    opacity: 0;
-    transform: translateY(14px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes panel-enter {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes code-enter {
-  from {
-    opacity: 0;
-    transform: translateY(7px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .loop-visual {
