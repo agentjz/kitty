@@ -1,6 +1,6 @@
 ﻿import fs from "node:fs/promises";
 
-import { resolveUserPath, truncateText } from "../utils/fs.js";
+import { atomicWriteFile, resolveUserPath, sha256Content, truncateText } from "../utils/fs.js";
 import { decodeTextFileEnvelope, encodeTextFileEnvelope } from "../utils/text.js";
 import { recordToolChange } from "../tools/core/changeTracking.js";
 import { ToolExecutionError } from "../tools/core/errors.js";
@@ -96,7 +96,10 @@ export const editToolDefinition: RegisteredTool = {
       }
 
       const diff = buildDiffPreview(before, after);
-      await fs.writeFile(resolved, encodeTextFileEnvelope(after, beforeEnvelope));
+      const afterBuffer = encodeTextFileEnvelope(after, beforeEnvelope);
+      const beforeHash = sha256Content(beforeBuffer);
+      const afterHash = sha256Content(afterBuffer);
+      await atomicWriteFile(resolved, afterBuffer);
       const changeRecord = await recordToolChange(context, {
         toolName: "edit",
         summary: `edit ${displayPath}`,
@@ -134,6 +137,8 @@ export const editToolDefinition: RegisteredTool = {
             path: displayPath,
             requestedEdits: edits.length,
             appliedEdits: plannedEdits.length,
+            beforeHash,
+            afterHash,
             changedPaths: [displayPath],
             changeId: changeRecord.change?.id,
             changeHistoryWarning: changeRecord.warning,

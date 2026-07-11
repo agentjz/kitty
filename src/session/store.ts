@@ -1,14 +1,16 @@
 import crypto from "node:crypto";
-import fs from "node:fs/promises";
 import path from "node:path";
 
+import { ControlPlaneLedger } from "../control/ledger.js";
+import { SessionRevisionConflictError } from "../control/sessions.js";
+import { assertActiveTurnOwnership } from "../control/turnOwnership.js";
 import type { SessionRecord, StoredMessage } from "../types.js";
 import { createEmptyCheckpoint } from "./checkpoint.js";
 import { createEmptyTaskState } from "./taskState.js";
 import { createEmptySessionDiff } from "./sessionDiff.js";
-import { createSessionNotFoundError, SessionStoreError } from "./errors.js";
-import { writeSessionMemoryAsset } from "./memoryAsset.js";
-import { parseSessionSnapshot, prepareSessionRecordForSave, serializeSessionSnapshot } from "./snapshot.js";
+import { createSessionNotFoundError } from "./errors.js";
+import { prepareSessionRecordForSave } from "./snapshot.js";
+import { createToolMessage } from "./messages.js";
 
 export interface SkippedSessionSnapshot {
   path?: string;
@@ -30,32 +32,37 @@ export interface SessionStoreLike {
 }
 
 export class SessionStore implements SessionStoreLike {
-  constructor(
-    private readonly sessionsDir: string,
-    private readonly options: {
-      memorySessionsDir?: string;
-    } = {},
-  ) {}
+  private readonly rootDir: string;
+
+  constructor(private readonly sessionsDir: string) {
+    this.rootDir = resolveLedgerRoot(sessionsDir);
+  }
 
   async create(cwd: string): Promise<SessionRecord> {
     return createSessionRecord(cwd);
   }
 
   async save(session: SessionRecord): Promise<SessionRecord> {
+    assertActiveTurnOwnership(session.id);
     const updated = prepareSessionRecordForSave(session);
-    await fs.mkdir(this.sessionsDir, { recursive: true });
-    await fs.writeFile(this.getPath(updated.id), serializeSessionSnapshot(updated), "utf8");
-    await writeSessionMemoryAsset({
-      memorySessionsDir: this.options.memorySessionsDir ?? this.defaultMemorySessionsDir(),
-      session: updated,
-    });
-    return updated;
+    const ledger = new ControlPlaneLedger(this.rootDir);
+    try {
+      return ledger.sessions.save(updated);
+    } finally {
+      ledger.close();
+    }
   }
 
   async load(id: string): Promise<SessionRecord> {
-    const sessionPath = this.getPath(id);
-    const raw = await this.readSnapshotFile(id, sessionPath);
-    return parseSessionSnapshot(raw, sessionPath);
+    const ledger = new ControlPlaneLedger(this.rootDir);
+    try {
+      let session = ledger.sessions.load(id);
+      if (!session) throw createSessionNotFoundError(id, `sqlite:${id}`);
+      session = recoverDurableToolResults(ledger, session);
+      return prepareSessionRecordForSave(session, false);
+    } finally {
+      ledger.close();
+    }
   }
 
   async loadLatest(): Promise<SessionRecord | null> {
@@ -71,30 +78,16 @@ export class SessionStore implements SessionStoreLike {
     sessions: SessionRecord[];
     skipped: SkippedSessionSnapshot[];
   }> {
-    await fs.mkdir(this.sessionsDir, { recursive: true });
-    const entries = await fs.readdir(this.sessionsDir, { withFileTypes: true });
-    const sessions: SessionRecord[] = [];
-    const skipped: SkippedSessionSnapshot[] = [];
-
-    for (const entry of entries.filter((item) => item.isFile() && item.name.endsWith(".json"))) {
-      const sessionPath = path.join(this.sessionsDir, entry.name);
-      try {
-        const raw = await fs.readFile(sessionPath, "utf8");
-        sessions.push(parseSessionSnapshot(raw, sessionPath));
-      } catch (error) {
-        skipped.push(toSkippedSessionSnapshot(error, sessionPath));
-      }
+    const ledger = new ControlPlaneLedger(this.rootDir);
+    try {
+      return { sessions: ledger.sessions.list(limit), skipped: [] };
+    } finally {
+      ledger.close();
     }
-
-    return {
-      sessions: sessions
-        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
-        .slice(0, limit),
-      skipped,
-    };
   }
 
   async appendMessages(session: SessionRecord, messages: StoredMessage[]): Promise<SessionRecord> {
+    assertActiveTurnOwnership(session.id);
     const next = {
       ...session,
       messages: [...session.messages, ...messages],
@@ -102,40 +95,6 @@ export class SessionStore implements SessionStoreLike {
     return this.save(next);
   }
 
-  private getPath(id: string): string {
-    return path.join(this.sessionsDir, `${id}.json`);
-  }
-
-  private defaultMemorySessionsDir(): string {
-    return path.join(path.dirname(this.sessionsDir), "memory", "sessions");
-  }
-
-  private async readSnapshotFile(id: string, sessionPath: string): Promise<string> {
-    try {
-      return await fs.readFile(sessionPath, "utf8");
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        throw createSessionNotFoundError(id, sessionPath, error);
-      }
-      throw error;
-    }
-  }
-}
-
-function toSkippedSessionSnapshot(error: unknown, fallbackPath?: string): SkippedSessionSnapshot {
-  if (error instanceof SessionStoreError) {
-    return {
-      path: error.sessionPath ?? fallbackPath,
-      code: error.code,
-      error: error.message,
-    };
-  }
-
-  return {
-    path: fallbackPath,
-    code: "SESSION_READ_FAILED",
-    error: error instanceof Error ? error.message : String(error),
-  };
 }
 
 export class InProcessSessionStore implements SessionStoreLike {
@@ -146,7 +105,12 @@ export class InProcessSessionStore implements SessionStoreLike {
   }
 
   async save(session: SessionRecord): Promise<SessionRecord> {
+    const existing = this.sessions.get(session.id);
+    if (existing && existing.revision !== session.revision) {
+      throw new SessionRevisionConflictError(session.id, session.revision, existing.revision);
+    }
     const prepared = prepareSessionRecordForSave(session);
+    prepared.revision = (existing?.revision ?? session.revision) + 1;
     this.sessions.set(prepared.id, prepared);
     return prepared;
   }
@@ -193,6 +157,7 @@ export async function createSessionRecord(cwd: string): Promise<SessionRecord> {
   const timestamp = new Date().toISOString();
   return prepareSessionRecordForSave({
     id: createSessionId(),
+    revision: 0,
     createdAt: timestamp,
     updatedAt: timestamp,
     cwd,
@@ -202,6 +167,33 @@ export async function createSessionRecord(cwd: string): Promise<SessionRecord> {
     checkpoint: createEmptyCheckpoint(timestamp),
     sessionDiff: createEmptySessionDiff(timestamp),
   });
+}
+
+function resolveLedgerRoot(sessionsDir: string): string {
+  const parent = path.dirname(path.resolve(sessionsDir));
+  return path.basename(parent).toLowerCase() === ".kitty" ? path.dirname(parent) : parent;
+}
+
+function recoverDurableToolResults(ledger: ControlPlaneLedger, session: SessionRecord): SessionRecord {
+  ledger.toolCalls.interruptRecoverable(session.id);
+  const recordedToolCallIds = new Set(
+    session.messages
+      .filter((message) => message.role === "tool" && message.tool_call_id)
+      .map((message) => message.tool_call_id!),
+  );
+  const recoveredMessages = ledger.toolCalls.listBySession(session.id)
+    .filter((toolCall) => toolCall.result && !recordedToolCallIds.has(toolCall.callId))
+    .map((toolCall) => createToolMessage(
+      toolCall.callId,
+      toolCall.result!.modelView,
+      toolCall.toolName,
+      toolCall.result,
+    ));
+  if (recoveredMessages.length === 0) return session;
+  return ledger.sessions.save(prepareSessionRecordForSave({
+    ...session,
+    messages: [...session.messages, ...recoveredMessages],
+  }));
 }
 
 function createSessionId(): string {

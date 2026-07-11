@@ -20,6 +20,7 @@ import {
 } from "./requestObservability.js";
 import type { FunctionToolDefinition } from "../tools/index.js";
 import type { ModelReasoningEffort, ModelThinkingMode } from "../types.js";
+import crypto from "node:crypto";
 
 export async function fetchAssistantResponse(
   client: OpenAI | ProviderClientPool,
@@ -77,6 +78,7 @@ async function tryFetch(
   observability?: ProviderRequestObservability,
 ): Promise<AssistantResponse> {
   const startedAt = Date.now();
+  const requestId = crypto.randomUUID();
   let latestMetric: ModelRequestMetric | undefined;
   let resolvedBaseUrl: string | undefined;
   const forwardMetric = (metric: ModelRequestMetric) => {
@@ -96,34 +98,60 @@ async function tryFetch(
     },
   };
   const retryBudget = createApiRetryBudget();
+  const recordAttempt = async (status: "started" | "completed" | "failed", error?: unknown) => {
+    const attemptId = `${requestId}:${retryBudget.attempts + (status === "started" ? 1 : 0)}`;
+    await recordProviderRequestEvent({
+      observability,
+      request,
+      wireApi: adapter.wireApi,
+      status,
+      startedAt,
+      baseUrl: resolvedBaseUrl,
+      usage: latestMetric?.usage,
+      error,
+      requestId,
+      attemptId,
+    });
+  };
 
   await recordProviderRequestEvent({
     observability,
     request,
     wireApi: adapter.wireApi,
     status: "started",
+    requestId,
   });
 
   try {
     const response = await withApiRetries(
-      () => invokeWithProviderClients(client, async (providerClient, baseUrl) => {
-        resolvedBaseUrl = baseUrl;
-        return adapter.fetchStreaming(providerClient, {
-          provider: request.provider,
-          model: request.model,
-          messages,
-          tools,
-          callbacks,
-          forceReasoning,
-          thinking: request.thinking,
-          reasoningEffort: request.reasoningEffort,
-          maxOutputTokens: request.maxOutputTokens,
-          sessionId: request.sessionId,
-          projectRoot: request.projectRoot,
-          abortSignal,
-          onRequestMetric: forwardMetric,
-        });
-      }),
+      async () => {
+        await recordAttempt("started");
+        try {
+          const result = await invokeWithProviderClients(client, async (providerClient, baseUrl) => {
+            resolvedBaseUrl = baseUrl;
+            return adapter.fetchStreaming(providerClient, {
+              provider: request.provider,
+              model: request.model,
+              messages,
+              tools,
+              callbacks,
+              forceReasoning,
+              thinking: request.thinking,
+              reasoningEffort: request.reasoningEffort,
+              maxOutputTokens: request.maxOutputTokens,
+              sessionId: request.sessionId,
+              projectRoot: request.projectRoot,
+              abortSignal,
+              onRequestMetric: forwardMetric,
+            });
+          });
+          await recordAttempt("completed");
+          return result;
+        } catch (error) {
+          await recordAttempt("failed", error);
+          throw error;
+        }
+      },
       {
         ...retryOptions,
         budget: retryBudget,
@@ -138,6 +166,7 @@ async function tryFetch(
       startedAt,
       baseUrl: resolvedBaseUrl,
       usage: latestMetric?.usage,
+      requestId,
     });
     return response;
   } catch (error) {
@@ -155,6 +184,7 @@ async function tryFetch(
         baseUrl: resolvedBaseUrl,
         usage: latestMetric?.usage,
         error,
+        requestId,
       });
       throw error;
     }
@@ -165,24 +195,34 @@ async function tryFetch(
 
     try {
       const response = await withApiRetries(
-        () => invokeWithProviderClients(client, async (providerClient, baseUrl) => {
-          resolvedBaseUrl = baseUrl;
-          return adapter.fetchNonStreaming(providerClient, {
-            provider: request.provider,
-            model: request.model,
-            messages,
-            tools,
-            callbacks,
-            forceReasoning,
-            thinking: request.thinking,
-            reasoningEffort: request.reasoningEffort,
-            maxOutputTokens: request.maxOutputTokens,
-            sessionId: request.sessionId,
-            projectRoot: request.projectRoot,
-            abortSignal,
-            onRequestMetric: forwardMetric,
-          });
-        }),
+        async () => {
+          await recordAttempt("started");
+          try {
+            const result = await invokeWithProviderClients(client, async (providerClient, baseUrl) => {
+              resolvedBaseUrl = baseUrl;
+              return adapter.fetchNonStreaming(providerClient, {
+                provider: request.provider,
+                model: request.model,
+                messages,
+                tools,
+                callbacks,
+                forceReasoning,
+                thinking: request.thinking,
+                reasoningEffort: request.reasoningEffort,
+                maxOutputTokens: request.maxOutputTokens,
+                sessionId: request.sessionId,
+                projectRoot: request.projectRoot,
+                abortSignal,
+                onRequestMetric: forwardMetric,
+              });
+            });
+            await recordAttempt("completed");
+            return result;
+          } catch (error) {
+            await recordAttempt("failed", error);
+            throw error;
+          }
+        },
         {
           ...retryOptions,
           budget: retryBudget,
@@ -197,6 +237,7 @@ async function tryFetch(
         startedAt,
         baseUrl: resolvedBaseUrl,
         usage: latestMetric?.usage,
+        requestId,
       });
       return response;
     } catch (fallbackError) {
@@ -210,6 +251,7 @@ async function tryFetch(
           baseUrl: resolvedBaseUrl,
           usage: latestMetric?.usage,
           error: fallbackError,
+          requestId,
         });
       }
       throw fallbackError;

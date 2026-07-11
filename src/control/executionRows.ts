@@ -30,6 +30,10 @@ export interface ExecutionRow {
   updated_at: string;
   finished_at: string | null;
   timeout_ms: number | null;
+  owner_token: string | null;
+  heartbeat_at: string | null;
+  lease_expires_at: string | null;
+  cancel_requested_at: string | null;
 }
 
 export function toExecutionRow(record: ExecutionRecord): Record<string, unknown> {
@@ -61,6 +65,10 @@ export function toExecutionRow(record: ExecutionRecord): Record<string, unknown>
     updatedAt: record.updatedAt,
     finishedAt: record.finishedAt,
     timeoutMs: record.timeoutMs,
+    ownerToken: record.ownerToken,
+    heartbeatAt: record.heartbeatAt,
+    leaseExpiresAt: record.leaseExpiresAt,
+    cancelRequestedAt: record.cancelRequestedAt,
   };
 }
 
@@ -93,6 +101,10 @@ export function fromExecutionRow(row: ExecutionRow): ExecutionRecord {
     updatedAt: row.updated_at,
     finishedAt: row.finished_at ?? undefined,
     timeoutMs: row.timeout_ms ?? undefined,
+    ownerToken: row.owner_token ?? undefined,
+    heartbeatAt: row.heartbeat_at ?? undefined,
+    leaseExpiresAt: row.lease_expires_at ?? undefined,
+    cancelRequestedAt: row.cancel_requested_at ?? undefined,
   };
 }
 

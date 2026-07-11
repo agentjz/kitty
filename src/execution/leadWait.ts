@@ -2,6 +2,7 @@ import { ExecutionStore, type ExecutionRecord } from "./store.js";
 import { isLeadBlockingPolicy, isLeadWaitTerminalStatus } from "./leadWaitPolicy.js";
 import { createInternalReminder } from "../session/turnFrame.js";
 import { throwIfAborted } from "../utils/abort.js";
+import { terminatePid } from "./process.js";
 
 const POLL_INTERVAL_MS = 250;
 const DEFAULT_LEAD_WAIT_TIMEOUT_MS = 30 * 60 * 1000;
@@ -49,7 +50,7 @@ export async function waitForLeadWaitExecutions(input: {
 
   for (;;) {
     throwIfAborted(input.abortSignal, "Lead wait was aborted.");
-    pauseExpiredLeadWaitExecutions(input.rootDir, input.executionIds, now());
+    cancelExpiredLeadWaitExecutions(input.rootDir, input.executionIds, now());
     const executions = collectLeadWaitExecutionResults(input.rootDir, input.executionIds);
     await input.onPoll?.(executions);
     if (!hasUnsettledLeadWaitExecutions(input.rootDir, input.executionIds)) {
@@ -59,13 +60,13 @@ export async function waitForLeadWaitExecutions(input: {
   }
 }
 
-export function pauseExpiredLeadWaitExecutions(
+export function cancelExpiredLeadWaitExecutions(
   rootDir: string,
   executionIds: readonly string[],
   nowMs = Date.now(),
 ): ExecutionRecord[] {
   const store = new ExecutionStore(rootDir);
-  const paused: ExecutionRecord[] = [];
+  const aborted: ExecutionRecord[] = [];
   for (const execution of collectLeadWaitExecutionResults(rootDir, executionIds)) {
     if (!isLeadBlockingPolicy(execution.waitPolicy) || isLeadWaitTerminalStatus(execution.waitPolicy, execution.status)) {
       continue;
@@ -74,12 +75,16 @@ export function pauseExpiredLeadWaitExecutions(
     if (deadline > nowMs) {
       continue;
     }
-    paused.push(store.close(execution.id, {
-      status: "paused",
-      summary: `Lead wait deadline reached for execution ${execution.id}.`,
+    store.requestCancellation(execution.id);
+    if (typeof execution.pid === "number") terminatePid(execution.pid);
+    aborted.push(store.close(execution.id, {
+      status: "aborted",
+      summary: `Execution ${execution.id} exceeded its deadline and was terminated.`,
+      closeReason: "deadline_exceeded",
+      terminatedBy: "lead_wait_deadline",
     }));
   }
-  return paused;
+  return aborted;
 }
 
 export function getLeadWaitDeadlineMs(execution: ExecutionRecord): number {

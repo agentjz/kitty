@@ -8,6 +8,7 @@ import type { AgentCallbacks } from "../agent/types.js";
 import { isAgentWorkerExecutionKind, toAgentWorkerIdentityKind } from "./kinds.js";
 import { executionKindMismatch, unknownExecution } from "./errors.js";
 import { ExecutionStore } from "./store.js";
+import { runWithExecutionOwnership } from "./ownership.js";
 
 export async function runExecutionWorker(input: {
   rootDir: string;
@@ -24,13 +25,29 @@ export async function runExecutionWorker(input: {
   if (!isAgentWorkerExecutionKind(execution.kind)) {
     throw executionKindMismatch(execution.id, execution.kind, "subagent");
   }
+  const workerKind = execution.kind;
 
   const sessionStore = await createSessionStore(input.config.paths.sessionsDir);
   const session = await createHostSession(sessionStore, execution.cwd || input.cwd);
-  store.markRunning(execution.id, {
+  const running = store.markRunning(execution.id, {
     pid: process.pid,
     sessionId: session.id,
   });
+  if (!running.ownerToken) throw new Error(`Execution ${execution.id} did not receive a worker token.`);
+  const workerAbortController = new AbortController();
+  const heartbeat = setInterval(() => {
+    try {
+      store.heartbeat(execution.id, running.ownerToken!);
+    } catch (error) {
+      workerAbortController.abort(error);
+    }
+  }, 10_000);
+  heartbeat.unref();
+  const deadlineDelay = running.deadlineAt ? Date.parse(running.deadlineAt) - Date.now() : undefined;
+  const deadlineTimer = typeof deadlineDelay === "number" && Number.isFinite(deadlineDelay)
+    ? setTimeout(() => workerAbortController.abort(new Error(`Execution ${execution.id} exceeded its deadline.`)), Math.max(0, deadlineDelay))
+    : undefined;
+  deadlineTimer?.unref();
   const eventBackedCallbacks = createWorkerRuntimeUiCallbacks({
     config: input.config,
     cwd: execution.cwd || input.cwd,
@@ -42,22 +59,29 @@ export async function runExecutionWorker(input: {
   const runTurn = input.runTurn ?? runHostTurn;
   let outcome: Awaited<ReturnType<typeof runTurn>>;
   try {
-    outcome = await runTurn({
-      host: execution.kind,
+    outcome = await runWithExecutionOwnership({
+      rootDir: input.rootDir,
+      executionId: execution.id,
+      ownerToken: running.ownerToken,
+    }, () => runTurn({
+      host: workerKind,
       input: execution.prompt ?? "",
       cwd: execution.cwd || input.cwd,
       stateRootDir: input.rootDir,
       config: input.config,
       session,
       sessionStore,
+      abortSignal: workerAbortController.signal,
       callbacks: eventBackedCallbacks.callbacks,
       identity: {
-        kind: toAgentWorkerIdentityKind(execution.kind),
-        name: execution.actorName ?? execution.kind,
+        kind: toAgentWorkerIdentityKind(workerKind),
+        name: execution.actorName ?? workerKind,
         role: execution.actorRole,
       },
-    });
+    }));
   } finally {
+    clearInterval(heartbeat);
+    if (deadlineTimer) clearTimeout(deadlineTimer);
     await eventBackedCallbacks.flush();
   }
 
@@ -72,6 +96,7 @@ export async function runExecutionWorker(input: {
     changedPaths: outcome.result?.changedPaths ?? [],
     closeReason: outcome.status,
     error: outcome.status === "failed" ? outcome.errorMessage : undefined,
+    ownerToken: running.ownerToken,
   });
 
 }

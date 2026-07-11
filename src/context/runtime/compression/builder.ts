@@ -14,11 +14,19 @@ import type { PromptLayerMetrics, PromptLayers } from "../../../agent/prompt/typ
 import type { RuntimeConfig, StoredMessage } from "../../../types.js";
 import type { ContextBudgetReport, ContextCacheLayoutReport } from "../../../types/contextBudget.js";
 import type { ContextRuntimeRequest } from "../types.js";
+import crypto from "node:crypto";
 
 const MIN_TAIL_MESSAGES = 8;
 const DETAILED_RECENT_MESSAGES = 8;
 const HARD_TAIL_COUNTS = [8, 6, 4, 2, 1];
 const MAX_SUMMARY_MESSAGE_COUNT = 48;
+
+export class ContextBudgetExceededError extends Error {
+  constructor(readonly limitChars: number, readonly estimatedChars: number) {
+    super(`Context cannot fit within the provider budget: estimated ${estimatedChars} chars, limit ${limitChars}.`);
+    this.name = "ContextBudgetExceededError";
+  }
+}
 
 export function buildCompressedContextRequest(
   systemPrompt: string | PromptLayers,
@@ -91,6 +99,7 @@ export function buildCompressedContextRequest(
         summary,
         promptMetrics,
         cacheLayout,
+        epoch: summary ? buildContextEpoch(compressedFrameHead, summary) : undefined,
       };
     }
 
@@ -118,6 +127,7 @@ export function buildCompressedContextRequest(
         summary,
         promptMetrics,
         cacheLayout,
+        epoch: summary ? buildContextEpoch(compressedFrameHead, summary) : undefined,
       };
     }
 
@@ -140,7 +150,7 @@ export function buildCompressedContextRequest(
       );
       const hardEstimatedChars = estimateChatMessagesChars(hardMessages);
       const hardCacheLayout = buildCacheLayoutReport(hardPrompt, compactedHardTail);
-      if (hardEstimatedChars <= safeMaxChars || hardTailCount === 1) {
+      if (hardEstimatedChars <= safeMaxChars) {
         return {
           messages: hardMessages,
           compressed: true,
@@ -158,10 +168,31 @@ export function buildCompressedContextRequest(
           summary: hardSummary,
           promptMetrics: measureSystemPrompt(hardPrompt),
           cacheLayout: hardCacheLayout,
+          epoch: hardSummary ? buildContextEpoch(compressedFrameHead, hardSummary) : undefined,
         };
+      }
+      if (hardTailCount === 1) {
+        throw new ContextBudgetExceededError(safeMaxChars, hardEstimatedChars);
       }
     }
   }
+}
+
+function buildContextEpoch(messages: StoredMessage[], summary: string): NonNullable<ContextRuntimeRequest["epoch"]> {
+  const source = JSON.stringify(messages.map((message) => ({
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    toolCallId: message.tool_call_id,
+    toolCalls: message.tool_calls,
+    toolResult: message.toolResult,
+  })));
+  return {
+    sourceMessageCount: messages.length,
+    sourceLastMessageId: messages.at(-1)?.id,
+    sourcePrefixHash: crypto.createHash("sha256").update(source).digest("hex"),
+    summary,
+  };
 }
 
 function sliceTailMessages(messages: StoredMessage[], tailCount: number): StoredMessage[] {

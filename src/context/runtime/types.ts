@@ -29,7 +29,7 @@ export interface BuildContextRuntimeSnapshotInput {
   projectMap?: ProjectMap;
   session: Pick<
     SessionRecord,
-    "messages" | "sessionMemory" | "todoItems" | "taskState" | "checkpoint" | "workset"
+    "messages" | "todoItems" | "taskState" | "checkpoint" | "workset"
   >;
   taskLifecycle?: TaskLifecycleRecord;
 }
@@ -43,7 +43,6 @@ export interface BuildContextRuntimePromptLayersInput {
   runtimeState?: PromptRuntimeState;
   taskLifecycle?: TaskLifecycleRecord;
   checkpoint?: SessionCheckpoint;
-  sessionMemory?: SessionRecord["sessionMemory"];
   workset?: SessionWorksetState;
   messages?: SessionRecord["messages"];
 }
@@ -65,4 +64,10 @@ export interface ContextRuntimeRequest {
   summary?: string;
   promptMetrics?: PromptLayerMetrics;
   cacheLayout?: ContextCacheLayoutReport;
+  epoch?: {
+    sourceMessageCount: number;
+    sourceLastMessageId?: string;
+    sourcePrefixHash: string;
+    summary: string;
+  };
 }

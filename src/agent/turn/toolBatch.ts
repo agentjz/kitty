@@ -10,7 +10,7 @@ import type {
 import type { RunTurnOptions } from "../types.js";
 import { executeToolCallWithRecovery } from "./toolExecutor.js";
 
-interface BatchExecutionItem {
+export interface BatchExecutionItem {
   toolCall: ToolCallRecord;
   result: ToolExecutionResult;
   durationMs: number;
@@ -29,16 +29,12 @@ export async function executeToolBatch(
     options: RunTurnOptions;
     projectContext: ProjectContext;
     changeStore: ChangeStore;
+    onItemSettled?: (item: BatchExecutionItem) => Promise<void>;
   },
 ): Promise<ExecuteToolBatchResult> {
   const items: BatchExecutionItem[] = [];
   const entryByName = new Map((params.toolRegistry.entries ?? []).map((entry) => [entry.name, entry]));
-  let saveQueue: Promise<unknown> = Promise.resolve();
-  const persistSession = (session: SessionRecord): Promise<void> => {
-    const snapshot = structuredClone(session);
-    saveQueue = saveQueue.then(() => params.options.sessionStore.save(snapshot));
-    return saveQueue.then(() => undefined);
-  };
+  const persistSession = async (): Promise<void> => undefined;
 
   for (let index = 0; index < params.toolCalls.length;) {
     const toolCall = params.toolCalls[index];
@@ -63,7 +59,6 @@ export async function executeToolBatch(
     index += 1;
   }
 
-  await saveQueue;
   params.session = await params.options.sessionStore.save(params.session);
 
   return {
@@ -81,6 +76,7 @@ async function executeOne(
     options: RunTurnOptions;
     projectContext: ProjectContext;
     changeStore: ChangeStore;
+    onItemSettled?: (item: BatchExecutionItem) => Promise<void>;
   },
 ): Promise<BatchExecutionItem> {
   const startedAt = Date.now();
@@ -93,11 +89,13 @@ async function executeOne(
     params.changeStore,
     persistSession,
   );
-  return {
+  const item = {
     toolCall,
     result,
     durationMs: Date.now() - startedAt,
   };
+  await params.onItemSettled?.(item);
+  return item;
 }
 
 function isParallelRead(

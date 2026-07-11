@@ -57,6 +57,26 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
   const leadWaitExecutionsBefore = identity.kind === "lead"
     ? listLeadWaitExecutions(projectContext.stateRootDir)
     : [];
+  const toolEntryByName = new Map((toolRegistry.entries ?? []).map((entry) => [entry.name, entry]));
+  if (options.turnId) {
+    const ledger = new ControlPlaneLedger(projectContext.stateRootDir);
+    try {
+      ledger.transaction(() => {
+        for (const toolCall of response.toolCalls) {
+          ledger.toolCalls.start({
+            callId: toolCall.id,
+            turnId: options.turnId!,
+            sessionId: session.id,
+            toolName: toolCall.function.name,
+            argumentsJson: toolCall.function.arguments,
+            effect: toolEntryByName.get(toolCall.function.name)?.effect ?? "external",
+          });
+        }
+      });
+    } finally {
+      ledger.close();
+    }
+  }
   for (const toolCall of response.toolCalls) {
     throwIfAborted(options.abortSignal, "Turn aborted by user.");
     await sessionEvents.append({
@@ -82,6 +102,28 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
     options,
     projectContext,
     changeStore,
+    onItemSettled: options.turnId
+      ? async (item) => {
+          const result = buildToolResultEnvelope({
+            callId: item.toolCall.id,
+            toolName: item.toolCall.function.name,
+            rawArguments: item.toolCall.function.arguments,
+            cwd: options.cwd,
+            result: item.result,
+          });
+          const ledger = new ControlPlaneLedger(projectContext.stateRootDir);
+          try {
+            ledger.toolCalls.settle({
+              callId: item.toolCall.id,
+              result,
+              beforeHash: typeof result.facts.beforeHash === "string" ? result.facts.beforeHash : undefined,
+              afterHash: typeof result.facts.afterHash === "string" ? result.facts.afterHash : undefined,
+            });
+          } finally {
+            ledger.close();
+          }
+        }
+      : undefined,
   });
   session = batchExecution.session;
 

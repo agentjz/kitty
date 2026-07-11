@@ -9,10 +9,12 @@ import { enterCrashContext } from "../observability/crashRecorder.js";
 import { recordHostTurnFinished, recordHostTurnStarted } from "../observability/hostEvents.js";
 import { createRuntimeUiEvent } from "../runtime-ui/events.js";
 import { SessionEventStore } from "../session/events.js";
-import { isAbortError } from "../utils/abort.js";
+import { isAbortError, sleepWithSignal, throwIfAborted } from "../utils/abort.js";
 import { createHostToolRegistry } from "./toolRegistry.js";
 import type { HostTurnDependencies, HostTurnOptions, HostTurnOutcome } from "./types.js";
 import type { ToolRegistry } from "../tools/core/types.js";
+import type { SessionRecord } from "../types.js";
+import { runWithTurnOwnership } from "../control/turnOwnership.js";
 
 const DEFAULT_IDENTITY = {
   kind: "lead" as const,
@@ -34,23 +36,41 @@ export async function runHostTurn(
   const runTurn = dependencies.runTurn ?? runAgentTurn;
   const sessionEvents = new SessionEventStore(options.config.paths.eventsDir);
   let toolRegistry: Awaited<ReturnType<typeof createToolRegistry>> | null = null;
-
-  await recordHostTurnStarted(stateRootDir, {
-    host,
-    sessionId: options.session.id,
-    identityKind: (options.identity ?? DEFAULT_IDENTITY).kind,
-    identityName: (options.identity ?? DEFAULT_IDENTITY).name,
-    cwd: options.cwd,
-  });
-  await sessionEvents.append({
-    type: "turn.started",
-    sessionId: options.session.id,
-    cwd: options.cwd,
-    host,
-    message: options.input,
-  });
+  let session = options.session;
+  let turnRecord: { id: string; ownerToken?: string } | undefined;
+  let terminalStatus: "completed" | "failed" | "aborted" | undefined;
+  let heartbeatTimer: NodeJS.Timeout | undefined;
+  const leaseAbortController = new AbortController();
+  const turnAbortSignal = AbortSignal.any([
+    leaseAbortController.signal,
+    ...(options.abortSignal ? [options.abortSignal] : []),
+  ]);
 
   try {
+    turnRecord = await claimTurn({
+      rootDir: stateRootDir,
+      sessionId: options.session.id,
+      input: options.input,
+      inputSource: "external",
+      abortSignal: turnAbortSignal,
+      session: options.session,
+      onAdmitted: async () => {
+        await recordHostTurnStarted(stateRootDir, {
+          host,
+          sessionId: options.session.id,
+          identityKind: (options.identity ?? DEFAULT_IDENTITY).kind,
+          identityName: (options.identity ?? DEFAULT_IDENTITY).name,
+          cwd: options.cwd,
+        });
+        await sessionEvents.append({
+          type: "turn.started",
+          sessionId: options.session.id,
+          cwd: options.cwd,
+          host,
+          message: options.input,
+        });
+      },
+    });
     if (options.abortSignal?.aborted) {
       await recordHostTurnFinished(stateRootDir, {
         host,
@@ -69,6 +89,24 @@ export async function runHostTurn(
       };
     }
 
+    try {
+      session = await options.sessionStore.load(options.session.id);
+    } catch {
+      session = await options.sessionStore.save(options.session);
+    }
+    if (turnRecord.ownerToken) {
+      heartbeatTimer = setInterval(() => {
+        const ledger = new ControlPlaneLedger(stateRootDir);
+        try {
+          ledger.turns.heartbeat(turnRecord!.id, turnRecord!.ownerToken!);
+        } catch (error) {
+          leaseAbortController.abort(error);
+        } finally {
+          ledger.close();
+        }
+      }, 10_000);
+      heartbeatTimer.unref();
+    }
     toolRegistry = await createToolRegistry(options.config, {
       builtinToolFilter: options.builtinToolFilter,
       extraTools: options.extraTools,
@@ -87,30 +125,40 @@ export async function runHostTurn(
       await appendTurnAbortedEvent(sessionEvents, options.session.id, options.cwd, host);
       return {
         status: "aborted",
-        session: options.session,
+        session,
         errorMessage: "Turn interrupted. You can keep chatting.",
       };
     }
 
     let nextInput = options.input;
-    let session = options.session;
     let runtimePromptState = options.runtimePromptState;
     let wakeCloseoutTurn = false;
     let result: Awaited<ReturnType<typeof runTurn>>;
     for (;;) {
-      const resultPromise = runTurn({
+      const runTurnOperation = () => runTurn({
         input: nextInput,
         cwd: options.cwd,
+        stateRootDir,
         config: options.config,
         session,
         sessionStore: options.sessionStore,
         inputSource: wakeCloseoutTurn ? "internal" : "external",
-        abortSignal: options.abortSignal,
+        turnId: turnRecord?.id,
+        turnOwnerToken: turnRecord?.ownerToken,
+        abortSignal: turnAbortSignal,
         callbacks: options.callbacks,
-        toolRegistry: wakeCloseoutTurn ? createToollessRegistry(toolRegistry) : toolRegistry,
+        toolRegistry: wakeCloseoutTurn ? createToollessRegistry(toolRegistry!) : toolRegistry!,
         identity: options.identity ?? DEFAULT_IDENTITY,
         runtimePromptState,
       });
+      const resultPromise = turnRecord?.ownerToken
+        ? runWithTurnOwnership({
+            rootDir: stateRootDir,
+            sessionId: session.id,
+            turnId: turnRecord.id,
+            ownerToken: turnRecord.ownerToken,
+          }, runTurnOperation)
+        : runTurnOperation();
       dependencies.onRunTurnStarted?.();
       result = await resultPromise;
       session = result.session;
@@ -129,7 +177,7 @@ export async function runHostTurn(
       const executions = await waitForLeadWaitExecutions({
         rootDir: stateRootDir,
         executionIds: transition.reason.executionIds,
-        abortSignal: options.abortSignal,
+        abortSignal: turnAbortSignal,
         onPoll: streamLeadWaitEvents,
       });
       await streamLeadWaitEvents(executions);
@@ -199,17 +247,19 @@ export async function runHostTurn(
       },
     });
 
+    terminalStatus = "completed";
     return {
       status: "completed",
       session: result.session,
       result,
     };
   } catch (error) {
-    const session = error instanceof AgentTurnError ? error.session : options.session;
+    const failedSession = error instanceof AgentTurnError ? error.session : session;
     if (isAbortError(error)) {
+      terminalStatus = "aborted";
       await recordHostTurnFinished(stateRootDir, {
         host,
-        sessionId: session.id,
+        sessionId: failedSession.id,
         identityKind: (options.identity ?? DEFAULT_IDENTITY).kind,
         identityName: (options.identity ?? DEFAULT_IDENTITY).name,
         status: "aborted",
@@ -217,10 +267,10 @@ export async function runHostTurn(
         cwd: options.cwd,
         error,
       });
-      await appendTurnAbortedEvent(sessionEvents, session.id, options.cwd, host);
+      await appendTurnAbortedEvent(sessionEvents, failedSession.id, options.cwd, host);
       return {
         status: "aborted",
-        session,
+        session: failedSession,
         error,
         errorMessage: "Turn interrupted. You can keep chatting.",
       };
@@ -228,7 +278,7 @@ export async function runHostTurn(
 
     await recordHostTurnFinished(stateRootDir, {
       host,
-      sessionId: session.id,
+      sessionId: failedSession.id,
       identityKind: (options.identity ?? DEFAULT_IDENTITY).kind,
       identityName: (options.identity ?? DEFAULT_IDENTITY).name,
       status: "failed",
@@ -238,20 +288,78 @@ export async function runHostTurn(
     });
     await sessionEvents.append({
       type: "turn.failed",
-      sessionId: session.id,
+      sessionId: failedSession.id,
       cwd: options.cwd,
       host,
       message: getErrorMessage(error),
     });
+    terminalStatus = "failed";
     return {
       status: "failed",
-      session,
+      session: failedSession,
       error,
       errorMessage: getErrorMessage(error),
     };
   } finally {
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    if (turnRecord?.ownerToken) {
+      const ledger = new ControlPlaneLedger(stateRootDir);
+      try {
+        ledger.turns.finish(turnRecord.id, turnRecord.ownerToken, terminalStatus ?? "failed");
+      } catch {
+        // The lease may have expired and been recovered by another host.
+      } finally {
+        ledger.close();
+      }
+    }
     releaseCrashContext();
     await toolRegistry?.close?.().catch(() => undefined);
+  }
+}
+
+async function claimTurn(input: {
+  rootDir: string;
+  sessionId: string;
+  input: string;
+  inputSource: "external" | "internal";
+  abortSignal?: AbortSignal;
+  session: SessionRecord;
+  onAdmitted?: () => Promise<void>;
+}): Promise<{ id: string; ownerToken?: string }> {
+  const ledger = new ControlPlaneLedger(input.rootDir);
+  let admitted;
+  try {
+    if (!ledger.sessions.load(input.sessionId)) ledger.sessions.save(input.session);
+    admitted = ledger.turns.admit({
+      sessionId: input.sessionId,
+      input: input.input,
+      inputSource: input.inputSource,
+    });
+  } finally {
+    ledger.close();
+  }
+  await input.onAdmitted?.();
+
+  for (;;) {
+    if (input.abortSignal?.aborted) {
+      const aborted = new ControlPlaneLedger(input.rootDir);
+      try {
+        aborted.turns.abortQueued(admitted.id);
+      } finally {
+        aborted.close();
+      }
+      throwIfAborted(input.abortSignal, "Turn admission aborted.");
+    }
+    const current = new ControlPlaneLedger(input.rootDir);
+    try {
+      const claimed = current.turns.claim(admitted.id);
+      if (claimed) {
+        return { id: claimed.id, ownerToken: claimed.ownerToken };
+      }
+    } finally {
+      current.close();
+    }
+    await sleepWithSignal(50, input.abortSignal);
   }
 }
 

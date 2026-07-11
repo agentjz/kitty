@@ -7,7 +7,7 @@ import {
 } from "../../context/runtime/index.js";
 import { resolveAgentProfile } from "../profiles/registry.js";
 import { emitAssistantFinalOutput, emitAssistantReasoning } from "./finalize.js";
-import { updateSessionMemoryAfterTurn, updateSessionTitleAfterTurn } from "./lifecycle.js";
+import { updateSessionTitleAfterTurn } from "./lifecycle.js";
 import {
   initializeTurnSession,
 } from "./persistence.js";
@@ -24,9 +24,12 @@ import { throwIfAborted } from "../../utils/abort.js";
 export type { AgentCallbacks, RunTurnOptions } from "../types.js";
 
 export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResult> {
-  const projectContext = await loadProjectContext(options.cwd, {
+  const loadedProjectContext = await loadProjectContext(options.cwd, {
     projectDocMaxBytes: options.config.projectDocMaxBytes,
   });
+  const projectContext = options.stateRootDir
+    ? { ...loadedProjectContext, stateRootDir: options.stateRootDir }
+    : loadedProjectContext;
   const identity = options.identity ?? { kind: "lead" as const, name: "lead" };
   const turnModelConfig = options.config;
   const profile = resolveAgentProfile(options.config.profile);
@@ -77,7 +80,6 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
         taskLifecycle,
         taskState: session.taskState,
         todoItems: session.todoItems,
-        sessionMemory: session.sessionMemory,
         workset: session.workset,
         runtimeState: turnRuntimeState,
         checkpoint: session.checkpoint,
@@ -97,6 +99,18 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
           contextSummaryChars: options.config.contextSummaryChars,
         },
       });
+      if (requestContext.epoch) {
+        const contextLedger = new ControlPlaneLedger(projectContext.stateRootDir);
+        try {
+          contextLedger.contextEpochs.record({
+            sessionId: session.id,
+            ...requestContext.epoch,
+            budget: requestContext.budget,
+          });
+        } finally {
+          contextLedger.close();
+        }
+      }
       session = await options.sessionStore.save({
         ...session,
         contextBudget: requestContext.budget,
@@ -128,6 +142,7 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
             identityKind: identity.kind,
             identityName: identity.name,
             configuredModel: turnModelConfig.model,
+            turnId: options.turnId,
           },
         };
         response = options.fetchAssistantResponse
@@ -175,16 +190,6 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
           continue;
         }
         completed.result.session = await updateSessionTitleAfterTurn({
-          session: completed.result.session,
-          input: options.input,
-          response,
-          options,
-          client,
-          requestModel,
-          identity,
-          rootDir: projectContext.stateRootDir,
-        });
-        completed.result.session = await updateSessionMemoryAfterTurn({
           session: completed.result.session,
           input: options.input,
           response,

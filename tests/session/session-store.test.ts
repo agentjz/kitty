@@ -1,24 +1,22 @@
 import assert from "node:assert/strict";
-import fs from "node:fs/promises";
-import path from "node:path";
 import test from "node:test";
 
 import { getAppPaths } from "../../src/config/paths.js";
+import { SessionRevisionConflictError } from "../../src/control/sessions.js";
+import { createMessage } from "../../src/session/messages.js";
 import { SessionStore } from "../../src/session/store.js";
 import { createTempWorkspace } from "../helpers.js";
 
-test("session store persists and reloads session snapshots", async (t) => {
+test("session store persists and reloads SQLite sessions", async (t) => {
   const root = await createTempWorkspace("session-store", t);
   const store = new SessionStore(getAppPaths(root).sessionsDir);
-  const session = await store.create(root);
-  await store.save(session);
+  const session = await store.save(await store.create(root));
 
   const loaded = await store.load(session.id);
   assert.equal(loaded.id, session.id);
   assert.equal(loaded.cwd, root);
-
-  const latest = await store.loadLatest();
-  assert.equal(latest?.id, session.id);
+  assert.equal(loaded.revision, 1);
+  assert.equal((await store.loadLatest())?.id, session.id);
 });
 
 test("session store preserves context cache layout facts", async (t) => {
@@ -54,7 +52,6 @@ test("session store preserves context cache layout facts", async (t) => {
   });
 
   const loaded = await store.load(session.id);
-
   assert.deepEqual(loaded.contextBudget?.cacheLayout, {
     stablePrefixFingerprint: "aaaaaaaa",
     volatileTailFingerprint: "bbbbbbbb",
@@ -65,61 +62,31 @@ test("session store preserves context cache layout facts", async (t) => {
   });
 });
 
-test("session store projects model-written session memory into a readable asset", async (t) => {
-  const root = await createTempWorkspace("session-memory-asset", t);
-  const paths = getAppPaths(root);
-  const store = new SessionStore(paths.sessionsDir);
-  const session = await store.create(root);
-  await store.save({
-    ...session,
-    sessionMemory: {
-      summary: [
-        "## Current Focus",
-        "None",
-        "",
-        "## User Constraints",
-        "用户要求本 session 用 txt 纯文本回答。",
-        "",
-        "## Decisions",
-        "None",
-        "",
-        "## Open Threads",
-        "None",
-        "",
-        "## Verification Facts",
-        "None",
-        "",
-        "## Reusable Lessons",
-        "None",
-      ].join("\n"),
-      updatedAt: "2026-05-22T00:00:00.000Z",
-    },
-  });
+test("session store rejects stale revisions and preserves append-only messages", async (t) => {
+  const root = await createTempWorkspace("session-revision", t);
+  const store = new SessionStore(getAppPaths(root).sessionsDir);
+  const created = await store.save(await store.create(root));
+  const firstReader = await store.load(created.id);
+  const staleReader = await store.load(created.id);
+  const saved = await store.appendMessages(firstReader, [createMessage("user", "first durable input")]);
 
-  const asset = await fs.readFile(path.join(paths.sessionMemoryDir, `${session.id}.md`), "utf8");
-  assert.match(asset, /^# Session Memory/);
-  assert.match(asset, /Kind: session/);
-  assert.match(asset, new RegExp(`Evidence: session:${session.id}`));
-  assert.match(asset, new RegExp(`Scope: ${session.id}`));
-  assert.match(asset, /Tags: same-session, continuity/);
-  assert.match(asset, /## Current Focus/);
-  assert.match(asset, /## User Constraints/);
-  assert.match(asset, /txt 纯文本回答/);
+  await assert.rejects(
+    store.appendMessages(staleReader, [createMessage("user", "stale input")]),
+    SessionRevisionConflictError,
+  );
+
+  const loaded = await store.load(created.id);
+  assert.equal(loaded.revision, saved.revision);
+  assert.deepEqual(loaded.messages.map((message) => message.content), ["first durable input"]);
 });
 
-test("session store lists readable sessions while exposing corrupt snapshots", async (t) => {
-  const root = await createTempWorkspace("session-corrupt-list", t);
-  const paths = getAppPaths(root);
-  const store = new SessionStore(paths.sessionsDir);
+test("session store lists SQLite-backed sessions", async (t) => {
+  const root = await createTempWorkspace("session-list", t);
+  const store = new SessionStore(getAppPaths(root).sessionsDir);
   const session = await store.save(await store.create(root));
-  await fs.mkdir(paths.sessionsDir, { recursive: true });
-  await fs.writeFile(path.join(paths.sessionsDir, "broken.json"), "{not json", "utf8");
 
   const readable = await store.listReadable(10);
-
   assert.equal(readable.sessions.length, 1);
   assert.equal(readable.sessions[0]?.id, session.id);
-  assert.equal(readable.skipped.length, 1);
-  assert.equal(readable.skipped[0]?.code, "SESSION_CORRUPT");
-  assert.match(readable.skipped[0]?.path ?? "", /broken\.json$/);
+  assert.deepEqual(readable.skipped, []);
 });

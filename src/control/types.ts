@@ -1,8 +1,8 @@
 import type { ExecutionKind } from "../execution/kinds.js";
 import type { LeadWaitPolicy } from "../execution/leadWaitPolicy.js";
 
-export type ExecutionStatus = "created" | "running" | "paused" | "completed" | "failed" | "aborted" | "stale";
-export type WakeSignalReason = "completed" | "failed" | "aborted" | "paused" | "stale";
+export type ExecutionStatus = "created" | "claimed" | "running" | "cancelling" | "completed" | "failed" | "aborted" | "lost";
+export type WakeSignalReason = "completed" | "failed" | "aborted" | "lost";
 
 export interface ExecutionRecord {
   id: string;
@@ -32,6 +32,10 @@ export interface ExecutionRecord {
   updatedAt: string;
   finishedAt?: string;
   timeoutMs?: number;
+  ownerToken?: string;
+  heartbeatAt?: string;
+  leaseExpiresAt?: string;
+  cancelRequestedAt?: string;
 }
 
 export interface ExecutionAssignment {

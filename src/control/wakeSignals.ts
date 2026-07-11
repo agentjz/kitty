@@ -14,6 +14,8 @@ export class WakeSignalLedgerRepo {
   constructor(private readonly db: Database.Database) {}
 
   publish(input: { executionId: string; reason: WakeSignalReason; createdAt?: string }): WakeSignalRecord {
+    const existing = this.loadByExecution(input.executionId);
+    if (existing) return existing;
     const record: WakeSignalRecord = {
       id: createControlPlaneId("wake"),
       executionId: input.executionId,
@@ -25,6 +27,18 @@ export class WakeSignalLedgerRepo {
       VALUES (@id, @executionId, @reason, @createdAt)
     `).run(record);
     return record;
+  }
+
+  loadByExecution(executionId: string): WakeSignalRecord | undefined {
+    const row = this.db.prepare(`
+      SELECT * FROM wake_signals WHERE execution_id=? ORDER BY created_at ASC LIMIT 1
+    `).get(executionId) as WakeSignalRow | undefined;
+    return row ? {
+      id: row.id,
+      executionId: row.execution_id,
+      reason: row.reason as WakeSignalReason,
+      createdAt: row.created_at,
+    } : undefined;
   }
 
   list(): WakeSignalRecord[] {

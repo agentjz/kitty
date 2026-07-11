@@ -22,7 +22,7 @@ export const backgroundCheckTool: RegisteredTool = {
     const jobs = new BackgroundExecutionStore(context.projectContext.stateRootDir).listAll();
     const summary = summarizeExecutionSet(jobs);
     return okResult(JSON.stringify({
-      stale: reconcile.staleExecutions.map((item) => item.id),
+      lost: reconcile.lostExecutions.map((item) => item.id),
       total: summary.total,
       active: summary.active,
       recent: summary.recent,

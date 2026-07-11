@@ -10,7 +10,11 @@ export interface ObservabilityEventRecord {
   status: string;
   host?: string;
   sessionId?: string;
+  turnId?: string;
+  itemId?: string;
   executionId?: string;
+  requestId?: string;
+  attemptId?: string;
   identityKind?: string;
   identityName?: string;
   durationMs?: number;
@@ -25,7 +29,11 @@ export interface ObservabilityEventInput {
   status: string;
   host?: string;
   sessionId?: string;
+  turnId?: string;
+  itemId?: string;
   executionId?: string;
+  requestId?: string;
+  attemptId?: string;
   identityKind?: string;
   identityName?: string;
   durationMs?: number;
@@ -56,7 +64,11 @@ export function buildObservabilityEventRecord(input: ObservabilityEventInput): O
     status: normalizeText(input.status, "unknown"),
     host: normalizeOptionalText(input.host),
     sessionId: normalizeOptionalText(input.sessionId),
+    turnId: normalizeOptionalText(input.turnId),
+    itemId: normalizeOptionalText(input.itemId),
     executionId: normalizeOptionalText(input.executionId),
+    requestId: normalizeOptionalText(input.requestId),
+    attemptId: normalizeOptionalText(input.attemptId),
     identityKind: normalizeOptionalText(input.identityKind),
     identityName: normalizeOptionalText(input.identityName),
     durationMs: normalizeOptionalNumber(input.durationMs),

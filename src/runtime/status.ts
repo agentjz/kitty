@@ -1,16 +1,11 @@
-import fs from "node:fs/promises";
-import path from "node:path";
-
 import { ControlPlaneLedger, type ExecutionRecord, type WakeSignalRecord } from "../control/ledger.js";
 import { reconcileExecutions } from "../execution/lifecycle.js";
 import type { TaskLifecycleRecord } from "../control/ledger.js";
 import { getProjectStatePaths } from "../project/statePaths.js";
 import { buildProjectMap } from "../project/map.js";
-import { listRuntimeMemoryAssets } from "./memory/index.js";
 import { loadProjectContext } from "../context/projectContext.js";
-import { summarizeExecution, summarizeExecutionSet } from "./executionSummary.js";
+import { summarizeExecutionSet } from "./executionSummary.js";
 import { buildRuntimeScene } from "./scene.js";
-import { SessionStore } from "../session/store.js";
 import type { SessionRecord } from "../types.js";
 import type {
   ObservabilityEventRecord,
@@ -32,22 +27,23 @@ const DEFAULT_RECENT_LIMIT = 10;
 
 export async function buildRuntimeStatus(rootDir: string): Promise<RuntimeStatus> {
   const paths = getProjectStatePaths(rootDir);
-  const sessionStore = new SessionStore(paths.sessionsDir, {
-    memorySessionsDir: paths.sessionMemoryDir,
-  });
+  reconcileExecutions(paths.rootDir);
+  const durable = readRuntimeLedgerSnapshot(paths.rootDir);
 
-  const [sessionRead, memoryAssets, control, projectMap, projectContext, modelRequests, toolOutputs] = await Promise.all([
-    sessionStore.listReadable?.(DEFAULT_RECENT_LIMIT) ?? sessionStore.list(DEFAULT_RECENT_LIMIT).then((sessions) => ({ sessions, skipped: [] })),
-    listRuntimeMemoryAssets(paths.rootDir),
-    readControlPlaneStatus(paths.rootDir),
+  const [projectMap, projectContext] = await Promise.all([
     buildProjectMap(paths.rootDir),
     loadProjectContext(paths.rootDir, { projectDocMaxBytes: 24_576 }),
-    readRecentModelRequests(paths.observabilityEventsDir),
-    readRecentToolOutputs(paths.observabilityEventsDir),
   ]);
 
-  const sessions = sessionRead.sessions.map(summarizeSession);
-  const taskLifecycle = sessions[0] ? readTaskLifecycleStatus(paths.rootDir, sessions[0].id) : undefined;
+  const sessions = durable.sessions.map(summarizeSession);
+  const modelRequests = durable.events
+    .filter((record) => record.event === "model.request" && record.status === "completed")
+    .slice(0, DEFAULT_RECENT_LIMIT)
+    .map(summarizeModelRequest);
+  const toolOutputs = durable.events
+    .filter((record) => record.event === "tool.output")
+    .slice(0, DEFAULT_RECENT_LIMIT)
+    .map(summarizeToolOutput);
 
   const statusWithoutScene = {
     rootDir: paths.rootDir,
@@ -56,10 +52,7 @@ export async function buildRuntimeStatus(rootDir: string): Promise<RuntimeStatus
       total: sessions.length,
       latest: sessions[0],
       recent: sessions,
-      skipped: sessionRead.skipped.length,
-    },
-    memory: {
-      assets: memoryAssets,
+      skipped: 0,
     },
     skills: summarizeSkills(projectContext.skills),
     projectMap: summarizeProjectMap(projectMap),
@@ -69,9 +62,11 @@ export async function buildRuntimeStatus(rootDir: string): Promise<RuntimeStatus
     toolOutputs: {
       recent: toolOutputs,
     },
-    taskLifecycle,
-    executions: control.executions,
-    wakeSignals: control.wakeSignals,
+    taskLifecycle: durable.taskLifecycle ? summarizeTaskLifecycle(durable.taskLifecycle) : undefined,
+    executions: summarizeExecutionSet(durable.executions, { recentLimit: DEFAULT_RECENT_LIMIT }),
+    wakeSignals: {
+      recent: durable.wakeSignals.slice(-DEFAULT_RECENT_LIMIT).reverse().map(summarizeWakeSignal),
+    },
   };
 
   return {
@@ -101,7 +96,6 @@ function summarizeSession(session: SessionRecord): RuntimeSessionSummary {
     updatedAt: session.updatedAt,
     messageCount: session.messageCount,
     focus: session.taskState?.focus ?? session.checkpoint?.focus,
-    hasMemory: Boolean(session.sessionMemory?.summary.trim()),
     contextBudget: session.contextBudget ? {
       limitChars: session.contextBudget.limitChars,
       estimatedChars: session.contextBudget.estimatedChars,
@@ -128,62 +122,27 @@ function summarizeSession(session: SessionRecord): RuntimeSessionSummary {
   };
 }
 
-async function readRecentModelRequests(eventsDir: string): Promise<RuntimeModelRequestSummary[]> {
-  const files = await fs.readdir(eventsDir).catch(() => []);
-  const jsonlFiles = files
-    .filter((file) => file.endsWith(".jsonl"))
-    .sort()
-    .slice(-3);
-  const records: RuntimeModelRequestSummary[] = [];
-
-  for (const file of jsonlFiles) {
-    const content = await fs.readFile(path.join(eventsDir, file), "utf8").catch(() => "");
-    for (const line of content.split(/\r?\n/)) {
-      if (!line.trim()) {
-        continue;
-      }
-      const record = parseObservabilityRecord(line);
-      if (!record || record.event !== "model.request" || record.status !== "completed") {
-        continue;
-      }
-      records.push(summarizeModelRequest(record));
-    }
-  }
-
-  return records.slice(-DEFAULT_RECENT_LIMIT).reverse();
-}
-
-async function readRecentToolOutputs(eventsDir: string): Promise<RuntimeToolOutputSummary[]> {
-  const files = await fs.readdir(eventsDir).catch(() => []);
-  const jsonlFiles = files
-    .filter((file) => file.endsWith(".jsonl"))
-    .sort()
-    .slice(-3);
-  const records: RuntimeToolOutputSummary[] = [];
-
-  for (const file of jsonlFiles) {
-    const content = await fs.readFile(path.join(eventsDir, file), "utf8").catch(() => "");
-    for (const line of content.split(/\r?\n/)) {
-      if (!line.trim()) {
-        continue;
-      }
-      const record = parseObservabilityRecord(line);
-      if (!record || record.event !== "tool.output") {
-        continue;
-      }
-      records.push(summarizeToolOutput(record));
-    }
-  }
-
-  return records.slice(-DEFAULT_RECENT_LIMIT).reverse();
-}
-
-function parseObservabilityRecord(line: string): ObservabilityEventRecord | undefined {
+function readRuntimeLedgerSnapshot(rootDir: string): {
+  sessions: SessionRecord[];
+  taskLifecycle?: TaskLifecycleRecord;
+  executions: ExecutionRecord[];
+  wakeSignals: WakeSignalRecord[];
+  events: ObservabilityEventRecord[];
+} {
+  const ledger = new ControlPlaneLedger(rootDir);
   try {
-    const parsed = JSON.parse(line) as ObservabilityEventRecord;
-    return parsed && typeof parsed === "object" ? parsed : undefined;
-  } catch {
-    return undefined;
+    return ledger.transaction(() => {
+      const sessions = ledger.sessions.list(DEFAULT_RECENT_LIMIT);
+      return {
+        sessions,
+        taskLifecycle: sessions[0] ? ledger.taskLifecycle.loadCurrent(sessions[0].id) : undefined,
+        executions: ledger.executions.list(),
+        wakeSignals: ledger.wakeSignals.list(),
+        events: ledger.runtimeEvents.list(200),
+      };
+    });
+  } finally {
+    ledger.close();
   }
 }
 
@@ -261,38 +220,6 @@ function summarizeSkills(skills: Awaited<ReturnType<typeof loadProjectContext>>[
     ready: summaries.filter((skill) => skill.status === "ready").length,
     needsAttention: summaries.filter((skill) => skill.status !== "ready"),
   };
-}
-
-function readControlPlaneStatus(rootDir: string): {
-  executions: RuntimeStatus["executions"];
-  wakeSignals: RuntimeStatus["wakeSignals"];
-} {
-  reconcileExecutions(rootDir);
-  const ledger = new ControlPlaneLedger(rootDir);
-  try {
-    const executions = ledger.executions.list();
-    return {
-      executions: summarizeExecutionSet(executions, { recentLimit: DEFAULT_RECENT_LIMIT }),
-      wakeSignals: {
-        recent: ledger.wakeSignals.list()
-          .slice(-DEFAULT_RECENT_LIMIT)
-          .reverse()
-          .map(summarizeWakeSignal),
-      },
-    };
-  } finally {
-    ledger.close();
-  }
-}
-
-function readTaskLifecycleStatus(rootDir: string, sessionId: string): RuntimeTaskLifecycleSummary | undefined {
-  const ledger = new ControlPlaneLedger(rootDir);
-  try {
-    const lifecycle = ledger.taskLifecycle.loadCurrent(sessionId);
-    return lifecycle ? summarizeTaskLifecycle(lifecycle) : undefined;
-  } finally {
-    ledger.close();
-  }
 }
 
 function summarizeTaskLifecycle(lifecycle: TaskLifecycleRecord): RuntimeTaskLifecycleSummary {

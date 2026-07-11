@@ -52,8 +52,8 @@ test("background reconcile marks dead running pid as stale", async (t) => {
   const result = reconcileBackgroundExecutions(root);
   const reloaded = store.load(job.id);
 
-  assert.equal(result.staleExecutions.length, 1);
-  assert.equal(reloaded?.status, "stale");
+  assert.equal(result.lostExecutions.length, 1);
+  assert.equal(reloaded?.status, "lost");
   assert.match(String(reloaded?.summary), /disappeared/i);
 });
 

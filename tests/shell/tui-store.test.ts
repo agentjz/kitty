@@ -284,6 +284,7 @@ test("tui parses submitted input echo from session driver", () => {
 function createSession(messages: Array<{ role: "user" | "assistant"; content: string; source?: "external" | "internal" }>): SessionRecord {
   return {
     id: "session-1",
+    revision: 0,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
     cwd: process.cwd(),

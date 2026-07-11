@@ -8,7 +8,6 @@ export function buildContextRuntimeSnapshot(
   return {
     sessionBrief: buildSessionConversationBrief({
       messages: input.session.messages,
-      sessionMemory: input.session.sessionMemory,
     }),
     taskLifecycle: input.taskLifecycle,
     projectMap: input.projectMap,

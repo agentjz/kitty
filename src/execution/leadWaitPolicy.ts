@@ -1,4 +1,4 @@
-export const LEAD_WAIT_TERMINAL_STATUSES = ["completed", "failed", "aborted", "paused", "stale"] as const;
+export const LEAD_WAIT_TERMINAL_STATUSES = ["completed", "failed", "aborted", "lost"] as const;
 
 export type LeadWaitMode = "none" | "while_execution_active";
 export type LeadWakePolicy = "optional" | "required";

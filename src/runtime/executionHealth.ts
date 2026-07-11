@@ -2,13 +2,13 @@ import type { ExecutionRecord } from "../control/ledger.js";
 import type { RuntimeExecutionHealth } from "./statusTypes.js";
 
 export function isActiveExecution(execution: ExecutionRecord): boolean {
-  return execution.status === "created" || execution.status === "running" || execution.status === "paused";
+  return execution.status === "created" || execution.status === "claimed" || execution.status === "running" || execution.status === "cancelling";
 }
 
 export function summarizeExecutionHealth(execution: ExecutionRecord): RuntimeExecutionHealth {
-  if (execution.status === "stale") {
+  if (execution.status === "lost") {
     return {
-      state: "stale",
+      state: "lost",
       message: "Execution process disappeared before a normal closeout.",
     };
   }

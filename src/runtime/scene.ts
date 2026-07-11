@@ -27,11 +27,6 @@ export function buildRuntimeScene(status: RuntimeStatusFacts): RuntimeSceneSumma
       total: status.skills.total,
       nextAction: readSkillsNextAction(status),
     },
-    memory: {
-      assets: status.memory.assets.length,
-      latestSessionMemory: Boolean(status.sessions.latest?.hasMemory),
-      nextAction: readMemoryNextAction(status),
-    },
     background: {
       active: activeBackground.length,
       blocked: blockedBackground.length,
@@ -215,19 +210,6 @@ function readSkillsNextAction(status: RuntimeStatusFacts): string {
   return "Skills are ready; load full skill content only when needed.";
 }
 
-function readMemoryNextAction(status: RuntimeStatusFacts): string {
-  if (!status.sessions.latest) {
-    return "Memory will appear after a session produces useful continuity.";
-  }
-  if (!status.sessions.latest.hasMemory && status.memory.assets.length === 0) {
-    return "Continue the session until useful memory is saved.";
-  }
-  if (!status.sessions.latest.hasMemory && status.memory.assets.length > 0) {
-    return "Review memory assets when prior evidence is needed.";
-  }
-  return "Session memory is available; use assets only when needed.";
-}
-
 function readBackgroundNextAction(backgrounds: RuntimeExecutionSceneSummary[]): string {
   if (backgrounds.length === 0) {
     return "No background work is running.";
@@ -246,7 +228,7 @@ function readBackgroundNextAction(backgrounds: RuntimeExecutionSceneSummary[]): 
 function readExecutionRisk(execution: RuntimeExecutionSummary): RuntimeExecutionSceneSummary["risk"] {
   switch (execution.health?.state) {
     case "deadline_passed":
-    case "stale":
+    case "lost":
       return "blocked";
     case "no_output":
       return "watch";

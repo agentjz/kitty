@@ -64,8 +64,26 @@ export class ExecutionStore {
     }
   }
 
+  heartbeat(id: string, ownerToken: string): ExecutionRecord {
+    const ledger = new ControlPlaneLedger(this.rootDir);
+    try {
+      return ledger.executions.heartbeat(id, ownerToken);
+    } finally {
+      ledger.close();
+    }
+  }
+
+  requestCancellation(id: string): ExecutionRecord {
+    const ledger = new ControlPlaneLedger(this.rootDir);
+    try {
+      return ledger.executions.requestCancellation(id);
+    } finally {
+      ledger.close();
+    }
+  }
+
   close(id: string, input: {
-    status: "completed" | "failed" | "aborted" | "stale" | "paused";
+    status: "completed" | "failed" | "aborted" | "lost";
     exitCode?: number | null;
     output?: string;
     resultText?: string;
@@ -74,24 +92,28 @@ export class ExecutionStore {
     terminatedBy?: string;
     changedPaths?: readonly string[];
     error?: string;
+    ownerToken?: string;
   }): ExecutionRecord {
     const ledger = new ControlPlaneLedger(this.rootDir);
     try {
-      const closed = ledger.executions.close(id, {
-        status: input.status,
-        exitCode: input.exitCode,
-        output: input.output ?? input.resultText,
-        summary: input.summary,
-        closeReason: input.closeReason,
-        terminatedBy: input.terminatedBy,
-        changedPaths: input.changedPaths,
-        error: input.error,
+      return ledger.transaction(() => {
+        const closed = ledger.executions.close(id, {
+          status: input.status,
+          exitCode: input.exitCode,
+          output: input.output ?? input.resultText,
+          summary: input.summary,
+          closeReason: input.closeReason,
+          terminatedBy: input.terminatedBy,
+          changedPaths: input.changedPaths,
+          error: input.error,
+          ownerToken: input.ownerToken,
+        });
+        ledger.wakeSignals.publish({
+          executionId: id,
+          reason: closed.status as typeof input.status,
+        });
+        return closed;
       });
-      ledger.wakeSignals.publish({
-        executionId: id,
-        reason: input.status,
-      });
-      return closed;
     } finally {
       ledger.close();
     }

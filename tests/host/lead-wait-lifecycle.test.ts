@@ -9,7 +9,7 @@ import { ExecutionStore } from "../../src/execution/store.js";
 import { ControlPlaneLedger } from "../../src/control/ledger.js";
 import { createRuntimeUiEvent } from "../../src/runtime-ui/events.js";
 import { SessionEventStore } from "../../src/session/events.js";
-import { buildLeadWakeFacts, hasUnsettledLeadWaitExecutions, pauseExpiredLeadWaitExecutions, waitForLeadWaitExecutions } from "../../src/execution/leadWait.js";
+import { buildLeadWakeFacts, cancelExpiredLeadWaitExecutions, hasUnsettledLeadWaitExecutions, waitForLeadWaitExecutions } from "../../src/execution/leadWait.js";
 import { createTestRuntimeConfig, createTempWorkspace } from "../helpers.js";
 import type { AssistantResponse } from "../../src/agent/types.js";
 import type { RegisteredTool } from "../../src/tools/core/types.js";
@@ -208,7 +208,7 @@ test("host waits for yielded execution and resumes lead with wake facts", async 
     },
   });
 
-  assert.equal(outcome.status, "completed");
+  assert.equal(outcome.status, "completed", outcome.errorMessage);
   assert.equal(calls, 2);
 });
 
@@ -354,7 +354,7 @@ test("host streams subagent runtime UI while lead waits then switches back to le
     },
   });
 
-  assert.equal(outcome.status, "completed");
+  assert.equal(outcome.status, "completed", outcome.errorMessage);
   assert.deepEqual(
     visibleEvents.map((event) => [event.channel, event.kind, event.toolName ?? event.message]),
     [
@@ -425,7 +425,7 @@ test("host directly closes out delegated exact expected output", async (t) => {
     },
   });
 
-  assert.equal(outcome.status, "completed");
+  assert.equal(outcome.status, "completed", outcome.errorMessage);
   assert.equal(outcome.result?.transition?.action, "finalize");
   assert.equal(calls, 1);
   assert.deepEqual(visibleAnswers, ["worker-ok"]);
@@ -503,7 +503,7 @@ test("host uses delegated closeout turn when output is not exact expected output
     },
   });
 
-  assert.equal(outcome.status, "completed");
+  assert.equal(outcome.status, "completed", outcome.errorMessage);
   assert.equal(calls, 2);
 });
 
@@ -727,15 +727,15 @@ test("lead wait settlement follows the execution wait policy terminal statuses",
     waitPolicy: {
       lead: "while_execution_active",
       wake: "required",
-      terminalStatuses: ["paused"],
+      terminalStatuses: ["aborted"],
     },
   });
   store.markRunning(execution.id, { pid: process.pid });
 
   assert.equal(hasUnsettledLeadWaitExecutions(root, [execution.id]), true);
   store.close(execution.id, {
-    status: "paused",
-    summary: "paused by lifecycle",
+    status: "aborted",
+    summary: "aborted by lifecycle",
   });
 
   assert.equal(hasUnsettledLeadWaitExecutions(root, [execution.id]), false);
@@ -770,7 +770,7 @@ test("lead wake facts include assignment boundaries and worker output for synthe
   assert.match(facts, /Risk: wake facts must stay internal/);
 });
 
-test("lead wait deadline pauses stuck delegated execution", async (t) => {
+test("lead wait deadline terminates stuck delegated execution", async (t) => {
   const root = await createTempWorkspace("lead-wait-deadline", t);
   const store = new ExecutionStore(root);
   const execution = store.create({
@@ -784,13 +784,13 @@ test("lead wait deadline pauses stuck delegated execution", async (t) => {
   const running = store.markRunning(execution.id, { pid: process.pid });
   const deadline = Date.parse(running.startedAt ?? running.createdAt) + 11;
 
-  const paused = pauseExpiredLeadWaitExecutions(root, [execution.id], deadline);
+  const aborted = cancelExpiredLeadWaitExecutions(root, [execution.id], deadline);
   const reloaded = store.load(execution.id);
 
-  assert.equal(paused.length, 1);
-  assert.equal(reloaded?.status, "paused");
+  assert.equal(aborted.length, 1);
+  assert.equal(reloaded?.status, "aborted");
   assert.equal(hasUnsettledLeadWaitExecutions(root, [execution.id]), false);
-  assert.match(reloaded?.summary ?? "", /deadline reached/);
+  assert.match(reloaded?.summary ?? "", /deadline/);
 });
 
 function createDelegatingTool(createExecution: () => string, name = "delegate_once"): RegisteredTool {
@@ -824,6 +824,5 @@ function fastTurnFinalizers() {
   });
   return {
     fetchSessionTitleResponse: emptyResponse,
-    fetchSessionMemoryResponse: emptyResponse,
   };
 }

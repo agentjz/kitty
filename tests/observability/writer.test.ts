@@ -1,44 +1,50 @@
 import assert from "node:assert/strict";
-import fs from "node:fs/promises";
-import path from "node:path";
 import test from "node:test";
 
-import { appendObservabilityEvent, getObservabilityPaths } from "../../src/observability/writer.js";
+import { ControlPlaneLedger } from "../../src/control/ledger.js";
+import { appendObservabilityEvent } from "../../src/observability/writer.js";
 import { createTempWorkspace } from "../helpers.js";
 
-test("observability writes jsonl side-channel events", async (t) => {
+test("observability writes structured SQLite runtime events", async (t) => {
   const root = await createTempWorkspace("observability", t);
-  const record = await appendObservabilityEvent(root, {
-    event: "host.turn.started",
+  await appendObservabilityEvent(root, {
+    event: "host.turn",
     status: "started",
+    sessionId: "session-1",
+    turnId: "turn-1",
     details: { host: "test" },
   });
-  const paths = getObservabilityPaths(root);
-  const filePath = path.join(paths.observabilityEventsDir, `${record.timestamp.slice(0, 10)}.jsonl`);
-  const content = await fs.readFile(filePath, "utf8");
-
-  assert.match(content, /host\.turn\.started/);
+  const ledger = new ControlPlaneLedger(root);
+  try {
+    const [record] = ledger.runtimeEvents.list();
+    assert.equal(record?.event, "host.turn");
+    assert.equal(record?.turnId, "turn-1");
+  } finally {
+    ledger.close();
+  }
 });
 
-test("observability persists model request usage details", async (t) => {
+test("observability persists provider correlation and usage details", async (t) => {
   const root = await createTempWorkspace("observability-usage", t);
-  const record = await appendObservabilityEvent(root, {
+  await appendObservabilityEvent(root, {
     event: "model.request",
     status: "completed",
     model: "gpt-5.5",
+    requestId: "request-1",
+    attemptId: "request-1:1",
     details: {
       provider: "openai",
       usageAvailable: true,
-      usage: {
-        inputTokens: 100,
-        cacheReadTokens: 80,
-      },
+      usage: { inputTokens: 100, cacheReadTokens: 80 },
     },
   });
-  const paths = getObservabilityPaths(root);
-  const filePath = path.join(paths.observabilityEventsDir, `${record.timestamp.slice(0, 10)}.jsonl`);
-  const content = await fs.readFile(filePath, "utf8");
-
-  assert.match(content, /cacheReadTokens/);
-  assert.match(content, /usageAvailable/);
+  const ledger = new ControlPlaneLedger(root);
+  try {
+    const [record] = ledger.runtimeEvents.list();
+    assert.equal(record?.requestId, "request-1");
+    assert.equal(record?.attemptId, "request-1:1");
+    assert.deepEqual(record?.details?.usage, { inputTokens: 100, cacheReadTokens: 80 });
+  } finally {
+    ledger.close();
+  }
 });

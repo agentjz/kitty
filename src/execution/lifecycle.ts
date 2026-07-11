@@ -54,7 +54,7 @@ function reconcileRunningExecutions(rootDir: string): void {
       continue;
     }
     store.close(execution.id, {
-      status: "stale",
+      status: "lost",
       summary: `${execution.kind} process disappeared before reporting completion: pid=${execution.pid}`,
     });
   }
@@ -109,9 +109,9 @@ export function cancelExecution(rootDir: string, id: string, input: {
 
 export function reconcileExecutions(rootDir: string, input: {
   kinds?: readonly ExecutionRecord["kind"][];
-} = {}): { staleExecutions: ExecutionRecord[] } {
+} = {}): { lostExecutions: ExecutionRecord[] } {
   const store = new ExecutionStore(rootDir);
-  const staleExecutions: ExecutionRecord[] = [];
+  const lostExecutions: ExecutionRecord[] = [];
   const kinds = new Set(input.kinds ?? []);
   for (const execution of store.list({ statuses: ["running"] })) {
     if (kinds.size > 0 && !kinds.has(execution.kind)) {
@@ -120,21 +120,21 @@ export function reconcileExecutions(rootDir: string, input: {
     if (typeof execution.pid !== "number" || isProcessAlive(execution.pid)) {
       continue;
     }
-    staleExecutions.push(store.close(execution.id, {
-      status: "stale",
+    lostExecutions.push(store.close(execution.id, {
+      status: "lost",
       output: execution.output,
       summary: `${readExecutionKindLabel(execution.kind)} process disappeared before reporting completion: pid=${execution.pid}`,
       closeReason: "process_disappeared",
     }));
   }
-  return { staleExecutions };
+  return { lostExecutions };
 }
 
 export function isSettled(execution: ExecutionRecord): boolean {
   return execution.status === "completed" ||
     execution.status === "failed" ||
     execution.status === "aborted" ||
-    execution.status === "stale";
+    execution.status === "lost";
 }
 
 function requireExecution(record: ExecutionRecord | undefined, id: string): ExecutionRecord {

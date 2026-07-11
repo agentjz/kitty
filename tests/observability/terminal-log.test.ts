@@ -12,9 +12,7 @@ import { createTempWorkspace, createTestRuntimeConfig } from "../helpers.js";
 test("cli terminal log does not duplicate shell output through process mirroring", async (t) => {
   const root = await createTempWorkspace("terminal-log", t);
   const config = createTestRuntimeConfig(root);
-  const sessionStore = new SessionStore(config.paths.sessionsDir, {
-    memorySessionsDir: config.paths.sessionMemoryDir,
-  });
+  const sessionStore = new SessionStore(config.paths.sessionsDir);
   const session = await sessionStore.save(await sessionStore.create(root));
 
   await startInteractiveChat({

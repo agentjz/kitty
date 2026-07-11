@@ -23,7 +23,7 @@ export const subagentCheckTool: RegisteredTool = {
     const executions = new ExecutionStore(context.projectContext.stateRootDir).list({ kind: "subagent" });
     const summary = summarizeExecutionSet(executions);
     return okResult(JSON.stringify({
-      stale: reconcile.staleExecutions.map((item) => item.id),
+      lost: reconcile.lostExecutions.map((item) => item.id),
       total: summary.total,
       active: summary.active,
       recent: summary.recent,

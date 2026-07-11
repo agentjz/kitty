@@ -36,6 +36,7 @@ test("todo extension writes session todo facts for working memory", async (t) =>
 
   const persisted = prepareSessionRecordForSave({
     id: "session-1",
+    revision: 0,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
     cwd: root,

@@ -9,8 +9,6 @@ export interface AppPaths {
   dataDir: string;
   cacheDir: string;
   sessionsDir: string;
-  memoryDir: string;
-  sessionMemoryDir: string;
   changesDir: string;
   eventsDir: string;
 }

@@ -23,6 +23,7 @@ export interface ToolOutputSource {
   truncated?: boolean;
   outputChars?: number;
   outputBytes?: number;
+  recoveryHint?: string;
 }
 
 export interface ToolOutputGovernance {

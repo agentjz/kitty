@@ -8,7 +8,6 @@ export type LocalCommandId =
   | "exit"
   | "export"
   | "help"
-  | "memory"
   | "reset"
   | "session"
   | "sessions"
@@ -112,15 +111,6 @@ export const LOCAL_COMMAND_DEFINITIONS = [
     description: "Show recent session events",
     helpLabel: "/events",
     helpText: "Show recent session events",
-  },
-  {
-    id: "memory",
-    category: "runtime",
-    aliases: ["/memory"],
-    slashName: "memory",
-    description: "List runtime memory assets",
-    helpLabel: "/memory",
-    helpText: "List runtime memory assets",
   },
   {
     id: "skills",

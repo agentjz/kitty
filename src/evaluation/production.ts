@@ -44,7 +44,7 @@ export const PRODUCTION_EVALUATION_SCENARIOS: readonly EvaluationScenario[] = [
     id: "production-real-turn",
     suite: "production",
     title: "真实 provider 多轮对话可完成",
-    userPath: "维护者显式运行生产验收时，Kitty 用当前 provider 跑隔离 session 的两轮真实对话，验证 turn、session、memory 和 events 主链路。",
+    userPath: "维护者显式运行生产验收时，Kitty 用当前 provider 跑隔离 session 的两轮真实对话，验证 turn、session 和 events 主链路。",
     evidence: "创建隔离 eval workspace，运行两次 runHostTurn，确认用户/assistant 消息、turn events 和 runtime status 都可审阅。",
   },
   {
@@ -58,8 +58,8 @@ export const PRODUCTION_EVALUATION_SCENARIOS: readonly EvaluationScenario[] = [
     id: "production-runtime-status",
     suite: "production",
     title: "真实项目现场可审阅",
-    userPath: "维护者显式运行生产验收时，可以确认当前项目 status 能读取 session、execution、memory、skills、cache 事实。",
-    evidence: "在当前项目构建 runtime status，并确认 scene、sessions、executions、memory 和 skills 可审阅。",
+    userPath: "维护者显式运行生产验收时，可以确认当前项目 status 能读取 session、execution、skills 和 cache 事实。",
+    evidence: "在当前项目构建 runtime status，并确认 scene、sessions、executions 和 skills 可审阅。",
   },
 ];
 
@@ -155,7 +155,7 @@ async function runProductionEvaluationCheck(
         const status = await buildRuntimeStatus(rootDir);
         return passed(
           id,
-          `production runtime status ready: sessions=${status.sessions.total}, executions=${status.executions.total}, memory=${status.memory.assets.length}, skills=${status.skills.total}, headline="${status.scene.headline}", next="${status.scene.nextAction}"`,
+          `production runtime status ready: sessions=${status.sessions.total}, executions=${status.executions.total}, skills=${status.skills.total}, headline="${status.scene.headline}", next="${status.scene.nextAction}"`,
         );
       }
     }
@@ -189,8 +189,6 @@ async function runProductionRealTurnCheck(
       ...sourceConfig.paths,
       dataDir: path.join(workspace, ".kitty"),
       sessionsDir: path.join(workspace, ".kitty", "sessions"),
-      memoryDir: path.join(workspace, ".kitty", "memory"),
-      sessionMemoryDir: path.join(workspace, ".kitty", "memory", "sessions"),
       changesDir: path.join(workspace, ".kitty", "changes"),
       eventsDir: path.join(workspace, ".kitty", "events"),
     },
@@ -199,9 +197,7 @@ async function runProductionRealTurnCheck(
     maxContextChars: Math.min(sourceConfig.maxContextChars, 80_000),
     contextSummaryChars: Math.min(sourceConfig.contextSummaryChars, 8_000),
   };
-  const sessionStore = new SessionStore(config.paths.sessionsDir, {
-    memorySessionsDir: config.paths.sessionMemoryDir,
-  });
+  const sessionStore = new SessionStore(config.paths.sessionsDir);
   let session = await sessionStore.save(await sessionStore.create(workspace));
   const turnInputs = [
     "Answer in one short plain English sentence: say Kitty production eval turn one is ready.",

@@ -1,7 +1,6 @@
 import { BackgroundExecutionStore } from "../execution/background.js";
 import { formatBackgroundExecution } from "../cli/commands/background.js";
 import { formatConfigPreflightReport, inspectConfigPreflight } from "../config/preflight.js";
-import { formatMemoryListForCli, readMemoryListForCli } from "../cli/commands/memory.js";
 import { formatRuntimeStatusText } from "../cli/commands/runtimeStatusPresenter.js";
 import { formatSessionEventsForCli, readSessionEventsForCli } from "../cli/commands/events.js";
 import { getAppPaths } from "../config/paths.js";
@@ -75,11 +74,6 @@ export async function handleLocalCommand(
 
   if (command === "background") {
     output.plain(await formatBackgroundExecutionsForLocalCommand(context));
-    return "handled";
-  }
-
-  if (command === "memory") {
-    output.plain(formatMemoryListForCli(await readMemoryListForCli(await resolveLocalStateRootDir(context))));
     return "handled";
   }
 

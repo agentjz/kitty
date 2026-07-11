@@ -9,9 +9,12 @@ export { estimateTextTokens } from "./metrics.js";
 export function governToolOutput(source: ToolOutputSource): ToolOutputGovernance {
   const kind = classifyToolOutput(source);
   const projected = projectOutputByKind(kind, source);
-  const recoveryHint = source.outputPath
+  const artifactRecoveryHint = source.outputPath
     ? `[full output: ${source.outputPath}; inspect with read {"path":${JSON.stringify(source.outputPath)}}]`
     : undefined;
+  const recoveryHint = [source.recoveryHint, artifactRecoveryHint]
+    .filter((hint): hint is string => Boolean(hint))
+    .join("\n") || undefined;
   const projection = appendRecoveryHint(projected.projection, {
     outputPath: source.outputPath,
     recoveryHint,

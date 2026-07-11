@@ -27,6 +27,7 @@ test("public type barrel exposes runtime, session, transition, and tool result c
 
   const session = {
     id: "session-public-type",
+    revision: 0,
     createdAt: "2026-05-20T00:00:00.000Z",
     updatedAt: "2026-05-20T00:00:00.000Z",
     cwd: ".",

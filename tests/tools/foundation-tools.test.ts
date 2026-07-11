@@ -4,6 +4,9 @@ import path from "node:path";
 import test from "node:test";
 
 import { createDefaultAgentToolRegistry } from "../../src/tools/registry.js";
+import { buildToolResultEnvelope } from "../../src/agent/toolResults/evidenceBuilder.js";
+import { projectToolResultForModel } from "../../src/agent/toolResults/modelProjection.js";
+import { getShellRuntimeInfo } from "../../src/utils/commandRunner/shellRuntime.js";
 import { createTempWorkspace, createTestRuntimeConfig, createToolContext, parseToolJson } from "../helpers.js";
 
 test("agent registry exposes the foundation tools", async (t) => {
@@ -27,6 +30,7 @@ test("read write edit bash complete the coding loop", async (t) => {
     create_directories: true,
   }), context);
   assert.equal(write.ok, true);
+  assert.match(String(parseToolJson(write.output).afterHash), /^[a-f0-9]{64}$/);
   assert.equal(await fs.readFile(path.join(root, "src", "message.txt"), "utf8"), "alpha\nbeta\n");
 
   const read = await registry.execute("read", JSON.stringify({
@@ -42,6 +46,9 @@ test("read write edit bash complete the coding loop", async (t) => {
     edits: [{ oldText: "beta", newText: "gamma" }],
   }), context);
   assert.equal(edit.ok, true);
+  assert.match(String(parseToolJson(edit.output).beforeHash), /^[a-f0-9]{64}$/);
+  assert.match(String(parseToolJson(edit.output).afterHash), /^[a-f0-9]{64}$/);
+  assert.notEqual(parseToolJson(edit.output).beforeHash, parseToolJson(edit.output).afterHash);
   assert.equal(await fs.readFile(path.join(root, "src", "message.txt"), "utf8"), "alpha\ngamma\n");
 
   const bash = await registry.execute("bash", JSON.stringify({
@@ -70,6 +77,18 @@ test("bash reports missing commands as failed machine facts", async (t) => {
   assert.equal(payload.status, "failed");
   assert.notEqual(payload.exitCode, 0);
   assert.doesNotMatch(String(payload.output), /#< CLIXML|<Objs\b/);
+  const modelView = projectToolResultForModel({ toolName: "bash", result });
+  const shell = getShellRuntimeInfo();
+  assert.match(modelView, new RegExp(`runtime shell: ${shell.shell}`));
+  assert.match(modelView, new RegExp(shell.platform));
+  const envelope = buildToolResultEnvelope({
+    callId: "missing-command",
+    toolName: "bash",
+    rawArguments: JSON.stringify({ command: "kitty_missing_command_for_bash_fact --version" }),
+    cwd: root,
+    result,
+  });
+  assert.match(envelope.compactView, new RegExp(`runtime shell: ${shell.shell}`));
 });
 
 test("send_file returns error when host does not support file delivery", async (t) => {

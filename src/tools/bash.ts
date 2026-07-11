@@ -75,6 +75,9 @@ export const bashToolDefinition: RegisteredTool = {
       truncated: result.truncated,
       outputChars: result.outputChars,
       outputBytes: result.outputBytes,
+      recoveryHint: status === "completed"
+        ? undefined
+        : `[runtime shell: ${shell.shell} on ${shell.platform}; ${shell.guidance}]`,
     });
     const metadata: ToolExecutionMetadata = {
       runtime: {

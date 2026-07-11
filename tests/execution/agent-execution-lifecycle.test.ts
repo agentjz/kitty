@@ -140,7 +140,7 @@ test("agent worker completion records the worker final answer for lead wake", as
     runTurn: async (options) => {
       const assistantMessage: StoredMessage = {
         role: "assistant",
-        content: "Context code uses session memory and working memory correctly.",
+        content: "Context code uses durable session facts and working memory correctly.",
         createdAt: "2026-05-22T00:00:00.000Z",
       };
       const session = {
@@ -171,8 +171,8 @@ test("agent worker completion records the worker final answer for lead wake", as
 
   const closed = store.load(execution.id);
   assert.equal(closed?.status, "completed");
-  assert.equal(closed?.summary, "Context code uses session memory and working memory correctly.");
-  assert.equal(closed?.output, "Context code uses session memory and working memory correctly.");
+  assert.equal(closed?.summary, "Context code uses durable session facts and working memory correctly.");
+  assert.equal(closed?.output, "Context code uses durable session facts and working memory correctly.");
   assert.deepEqual(closed?.changedPaths, []);
   assert.equal(closed?.closeReason, "completed");
 });

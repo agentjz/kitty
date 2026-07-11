@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { ControlPlaneLedger } from "../../src/control/ledger.js";
+import { appendObservabilityEvent } from "../../src/observability/writer.js";
 import { buildRuntimeStatus } from "../../src/runtime/status.js";
 import { SessionStore } from "../../src/session/store.js";
 import { createTempWorkspace, initGitRepo } from "../helpers.js";
@@ -15,10 +16,6 @@ test("runtime status projects the current project runtime facts", async (t) => {
   const session = await sessionStore.save({
     ...(await sessionStore.create(root)),
     title: "Investigate runtime",
-    sessionMemory: {
-      summary: "User wants durable runtime visibility.",
-      updatedAt: "2026-05-22T00:00:00.000Z",
-    },
     contextBudget: {
       limitChars: 900_000,
       estimatedChars: 45_000,
@@ -95,8 +92,6 @@ test("runtime status projects the current project runtime facts", async (t) => {
   assert.equal(status.rootDir, root);
   assert.equal(status.sessions.total, 1);
   assert.equal(status.sessions.latest?.id, session.id);
-  assert.equal(status.memory.assets.length, 1);
-  assert.equal(status.memory.assets[0]?.id, session.id);
   assert.equal(status.skills.total, 0);
   assert.equal(status.taskLifecycle?.stage, "normal_work");
   assert.equal(status.sessions.latest?.focus, undefined);
@@ -107,19 +102,13 @@ test("runtime status projects the current project runtime facts", async (t) => {
   assert.equal(status.executions.active[0]?.assignment?.objective, "Inspect runtime visibility");
   assert.equal(status.executions.active[0]?.health?.state, "running");
   assert.equal(status.wakeSignals.recent.length, 1);
-  assert.equal(status.scene.memory.latestSessionMemory, true);
   assert.equal(status.scene.executions[0]?.risk, "none");
 });
 
 test("runtime status surfaces recent model request cache facts", async (t) => {
   const root = await createTempWorkspace("runtime-status-cache", t);
   await initGitRepo(root);
-  const paths = path.join(root, ".kitty", "observability", "events");
-  await fs.mkdir(paths, { recursive: true });
-  await fs.writeFile(
-    path.join(paths, "2026-06-16.jsonl"),
-    JSON.stringify({
-      timestamp: "2026-06-16T00:00:00.000Z",
+  await appendObservabilityEvent(root, {
       event: "model.request",
       status: "completed",
       model: "gpt-5.5",
@@ -136,9 +125,7 @@ test("runtime status surfaces recent model request cache facts", async (t) => {
         },
         usageAvailable: true,
       },
-    }) + "\n",
-    "utf8",
-  );
+  });
 
   const status = await buildRuntimeStatus(root);
   assert.equal(status.modelRequests.recent.length, 1);
@@ -150,12 +137,7 @@ test("runtime status surfaces recent model request cache facts", async (t) => {
 test("runtime status surfaces recent tool output governance facts", async (t) => {
   const root = await createTempWorkspace("runtime-status-tool-output", t);
   await initGitRepo(root);
-  const paths = path.join(root, ".kitty", "observability", "events");
-  await fs.mkdir(paths, { recursive: true });
-  await fs.writeFile(
-    path.join(paths, "2026-06-22.jsonl"),
-    JSON.stringify({
-      timestamp: "2026-06-22T00:00:00.000Z",
+  await appendObservabilityEvent(root, {
       event: "tool.output",
       status: "completed",
       toolName: "bash",
@@ -173,9 +155,7 @@ test("runtime status surfaces recent tool output governance facts", async (t) =>
         degraded: false,
         reason: "structured_projection",
       },
-    }) + "\n",
-    "utf8",
-  );
+  });
 
   const status = await buildRuntimeStatus(root);
   assert.equal(status.toolOutputs.recent.length, 1);
@@ -237,21 +217,8 @@ test("runtime status exposes background executions that are running without outp
   assert.equal(status.scene.executions[0]?.risk, "watch");
 });
 
-test("runtime status exposes corrupt sessions without hiding readable sessions", async (t) => {
-  const root = await createTempWorkspace("runtime-status-corrupt-session", t);
-  const paths = path.join(root, ".kitty", "sessions");
-  const sessionStore = new SessionStore(paths);
-  const session = await sessionStore.save(await sessionStore.create(root));
-  await fs.writeFile(path.join(paths, "broken.json"), "{not json", "utf8");
-
-  const status = await buildRuntimeStatus(root);
-  assert.equal(status.sessions.total, 1);
-  assert.equal(status.sessions.latest?.id, session.id);
-  assert.equal(status.sessions.skipped, 1);
-});
-
-test("runtime status marks stale background executions as blocked recovery work", async (t) => {
-  const root = await createTempWorkspace("runtime-status-stale-background", t);
+test("runtime status marks lost background executions as blocked recovery work", async (t) => {
+  const root = await createTempWorkspace("runtime-status-lost-background", t);
   const ledger = new ControlPlaneLedger(root);
   try {
     const execution = ledger.executions.create({
@@ -262,7 +229,7 @@ test("runtime status marks stale background executions as blocked recovery work"
       requestedBy: "lead",
     });
     ledger.executions.close(execution.id, {
-      status: "stale",
+      status: "lost",
       summary: "process disappeared",
     });
   } finally {

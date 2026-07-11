@@ -8,9 +8,6 @@ export interface RuntimeStatus {
     recent: RuntimeSessionSummary[];
     skipped: number;
   };
-  memory: {
-    assets: RuntimeMemoryAssetSummary[];
-  };
   skills: {
     total: number;
     ready: number;
@@ -45,11 +42,6 @@ export interface RuntimeSceneSummary {
   skills: {
     ready: number;
     total: number;
-    nextAction: string;
-  };
-  memory: {
-    assets: number;
-    latestSessionMemory: boolean;
     nextAction: string;
   };
   background: {
@@ -93,7 +85,6 @@ export interface RuntimeSessionSummary {
   updatedAt: string;
   messageCount: number;
   focus?: string;
-  hasMemory: boolean;
   contextBudget?: RuntimeContextBudgetSummary;
   workset?: {
     total: number;
@@ -173,18 +164,6 @@ export interface RuntimeToolOutputSummary {
   reason?: string;
 }
 
-export interface RuntimeMemoryAssetSummary {
-  id: string;
-  kind: string;
-  title?: string;
-  path: string;
-  updatedAt?: string;
-  size: number;
-  evidenceRefs: string[];
-  scope?: string;
-  tags: string[];
-}
-
 export interface RuntimeSkillSummary {
   name: string;
   path: string;
@@ -237,7 +216,7 @@ export interface RuntimeExecutionSummary {
 }
 
 export interface RuntimeExecutionHealth {
-  state: "running" | "settled" | "no_output" | "stale" | "deadline_passed";
+  state: "running" | "settled" | "no_output" | "lost" | "deadline_passed";
   message: string;
 }
 

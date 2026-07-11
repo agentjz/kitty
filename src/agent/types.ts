@@ -32,9 +32,12 @@ export interface AgentCallbacks {
 }
 
 export interface RunTurnOptions {
+  turnId?: string;
+  turnOwnerToken?: string;
   input: string;
   inputSource?: "external" | "internal";
   cwd: string;
+  stateRootDir?: string;
   config: RuntimeConfig;
   session: SessionRecord;
   sessionStore: SessionStoreLike;
@@ -44,7 +47,6 @@ export interface RunTurnOptions {
   abortSignal?: AbortSignal;
   callbacks?: AgentCallbacks;
   fetchAssistantResponse?: (input: ModelRequestInput) => Promise<AssistantResponse>;
-  fetchSessionMemoryResponse?: (input: ModelRequestInput) => Promise<AssistantResponse>;
   fetchSessionTitleResponse?: (input: ModelRequestInput) => Promise<AssistantResponse>;
 }
 

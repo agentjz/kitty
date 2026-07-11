@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import crypto from "node:crypto";
 
 export async function fileExists(targetPath: string): Promise<boolean> {
   try {
@@ -34,6 +35,22 @@ export function normalizeUserPathInput(inputPath: string): string {
 
 export async function ensureParentDirectory(filePath: string): Promise<void> {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
+}
+
+export async function atomicWriteFile(filePath: string, content: string | Uint8Array): Promise<void> {
+  const directory = path.dirname(filePath);
+  const temporaryPath = path.join(directory, `.${path.basename(filePath)}.${crypto.randomUUID()}.tmp`);
+  await fs.writeFile(temporaryPath, content);
+  try {
+    await fs.rename(temporaryPath, filePath);
+  } catch (error) {
+    await fs.rm(temporaryPath, { force: true }).catch(() => undefined);
+    throw error;
+  }
+}
+
+export function sha256Content(content: string | Uint8Array): string {
+  return crypto.createHash("sha256").update(content).digest("hex");
 }
 
 export function truncateText(input: string, maxChars: number): string {

@@ -34,10 +34,14 @@ export async function runEvaluationCheck(id: EvaluationCheckId, rootDir: string)
         const map = await buildProjectMap(rootDir);
         return passed(id, `project map ready: dirs=${map.topLevelDirectories.length}, scripts=${map.packageScripts.length}`);
       }
-      case "memory-assets-readable": {
-        const { listRuntimeMemoryAssets } = await import("../runtime/memory/index.js");
-        const assets = await listRuntimeMemoryAssets(rootDir);
-        return passed(id, `memory assets readable: total=${assets.length}`);
+      case "context-epochs-readable": {
+        const { ControlPlaneLedger } = await import("../control/ledger.js");
+        const ledger = new ControlPlaneLedger(rootDir);
+        try {
+          return passed(id, `context epoch ledger readable: sessions=${ledger.sessions.list(10).length}`);
+        } finally {
+          ledger.close();
+        }
       }
       case "extension-surface-current": {
         const { EXTENSION_DEFINITIONS } = await import("../extensions/definitions.js");

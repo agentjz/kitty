@@ -6,6 +6,11 @@ import { ExecutionLedgerRepo } from "./executions.js";
 import { initializeControlPlaneSchema } from "./schema.js";
 import { TaskLifecycleLedgerRepo } from "./taskLifecycle.js";
 import { WakeSignalLedgerRepo } from "./wakeSignals.js";
+import { SessionLedgerRepo } from "./sessions.js";
+import { TurnLedgerRepo } from "./turns.js";
+import { ToolCallLedgerRepo } from "./toolCalls.js";
+import { ContextEpochLedgerRepo } from "./contextEpochs.js";
+import { RuntimeEventLedgerRepo } from "./runtimeEvents.js";
 
 export type {
   ExecutionRecord,
@@ -24,6 +29,11 @@ export class ControlPlaneLedger {
   readonly executions: ExecutionLedgerRepo;
   readonly wakeSignals: WakeSignalLedgerRepo;
   readonly taskLifecycle: TaskLifecycleLedgerRepo;
+  readonly sessions: SessionLedgerRepo;
+  readonly turns: TurnLedgerRepo;
+  readonly toolCalls: ToolCallLedgerRepo;
+  readonly contextEpochs: ContextEpochLedgerRepo;
+  readonly runtimeEvents: RuntimeEventLedgerRepo;
   private readonly db: Database.Database;
 
   constructor(rootDir: string) {
@@ -36,6 +46,15 @@ export class ControlPlaneLedger {
     this.executions = new ExecutionLedgerRepo(this.db);
     this.wakeSignals = new WakeSignalLedgerRepo(this.db);
     this.taskLifecycle = new TaskLifecycleLedgerRepo(this.db);
+    this.sessions = new SessionLedgerRepo(this.db);
+    this.turns = new TurnLedgerRepo(this.db);
+    this.toolCalls = new ToolCallLedgerRepo(this.db);
+    this.contextEpochs = new ContextEpochLedgerRepo(this.db);
+    this.runtimeEvents = new RuntimeEventLedgerRepo(this.db);
+  }
+
+  transaction<T>(operation: () => T): T {
+    return this.db.transaction(operation)();
   }
 
   close(): void {

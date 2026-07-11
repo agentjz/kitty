@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 import { listModelInfos } from "../provider/catalog.js";
@@ -38,6 +39,7 @@ export function createMessage(
   } = {},
 ): StoredMessage {
   return {
+    id: createMessageId(),
     role,
     content,
     source: options.source,
@@ -55,6 +57,7 @@ export function createToolMessage(
   toolResult?: ToolResultEnvelope,
 ): StoredMessage {
   return {
+    id: createMessageId(),
     role: "tool",
     content,
     tool_call_id: toolCallId,
@@ -62,6 +65,10 @@ export function createToolMessage(
     toolResult,
     createdAt: new Date().toISOString(),
   };
+}
+
+export function createMessageId(): string {
+  return `msg-${crypto.randomUUID()}`;
 }
 
 export function readReasoningContent(message: unknown): string | undefined {

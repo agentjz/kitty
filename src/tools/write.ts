@@ -1,6 +1,6 @@
 ﻿import fs from "node:fs/promises";
 
-import { ensureParentDirectory, fileExists, resolveUserPath, truncateText } from "../utils/fs.js";
+import { atomicWriteFile, ensureParentDirectory, fileExists, resolveUserPath, sha256Content, truncateText } from "../utils/fs.js";
 import { recordToolChange } from "../tools/core/changeTracking.js";
 import { toToolRelativePath } from "../tools/core/pathDisplay.js";
 import { buildDiffPreview, okResult, parseArgs, readBoolean, readPossiblyEmptyString, readString } from "../tools/core/shared.js";
@@ -44,13 +44,15 @@ export const writeToolDefinition: RegisteredTool = {
     const displayPath = toToolRelativePath(context.cwd, resolved);
     const existed = await fileExists(resolved);
     const before = existed ? await fs.readFile(resolved, "utf8") : "";
+    const beforeHash = existed ? sha256Content(before) : undefined;
+    const afterHash = sha256Content(content);
     const preview = buildDiffPreview(before, content);
 
     if (createDirectories) {
       await ensureParentDirectory(resolved);
     }
 
-    await fs.writeFile(resolved, content, "utf8");
+    await atomicWriteFile(resolved, content);
     const changeRecord = await recordToolChange(context, {
       toolName: "write",
       summary: `write ${displayPath}`,
@@ -88,6 +90,8 @@ export const writeToolDefinition: RegisteredTool = {
           path: displayPath,
           existed,
           bytes: Buffer.byteLength(content, "utf8"),
+          beforeHash,
+          afterHash,
           changedPaths: [displayPath],
           changeId: changeRecord.change?.id,
           changeHistoryWarning: changeRecord.warning,

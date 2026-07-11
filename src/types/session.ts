@@ -13,6 +13,7 @@ export interface ToolCallRecord {
 }
 
 export interface StoredMessage {
+  id?: string;
   role: "system" | "user" | "assistant" | "tool";
   content: string | null;
   source?: "external" | "internal";
@@ -26,13 +27,13 @@ export interface StoredMessage {
 
 export interface SessionRecord {
   id: string;
+  revision: number;
   createdAt: string;
   updatedAt: string;
   cwd: string;
   title?: string;
   messageCount: number;
   messages: StoredMessage[];
-  sessionMemory?: SessionMemoryState;
   todoItems?: TodoItem[];
   taskState?: TaskState;
   checkpoint?: SessionCheckpoint;
@@ -54,11 +55,6 @@ export interface SessionWorksetEntry {
 
 export interface SessionWorksetState {
   files: SessionWorksetEntry[];
-  updatedAt: string;
-}
-
-export interface SessionMemoryState {
-  summary: string;
   updatedAt: string;
 }
 

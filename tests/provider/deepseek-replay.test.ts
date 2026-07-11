@@ -181,7 +181,6 @@ test("agent tool loop replays deepseek reasoning_content into the follow-up requ
       };
     },
     fetchSessionTitleResponse: async (): Promise<AssistantResponse> => ({ content: "DeepSeek replay", toolCalls: [] }),
-    fetchSessionMemoryResponse: async (): Promise<AssistantResponse> => ({ content: "## Current Focus\nNone", toolCalls: [] }),
   });
 
   assert.equal(requests.length, 2);

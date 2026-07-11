@@ -13,7 +13,6 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
   lines.push(`- Next: ${status.scene.nextAction}`);
   lines.push(`- Blocked: ${status.scene.blocked}`);
   lines.push(`- Background: ${readBackgroundSceneLine(status)}`);
-  lines.push(`- Memory: ${readMemorySceneLine(status)}`);
   lines.push(`- Skills: ${readSkillsSceneLine(status)}`);
   lines.push(`- Cost: ${status.scene.cost}`);
   lines.push(`- Tool output: ${status.scene.toolOutputs}`);
@@ -26,7 +25,6 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
   }
   lines.push(`- Context budget: ${readContextBudgetLine(status)}`);
   lines.push(`- Workset: ${status.sessions.latest?.workset ? `${status.sessions.latest.workset.total} file(s)` : "none"}`);
-  lines.push(`- Memory files: ${status.memory.assets.length > 0 ? `${status.memory.assets.length}` : "none"}`);
   lines.push(`- Skills: ${status.skills.ready}/${status.skills.total} ready`);
   lines.push(`- Model cache: ${readModelCacheLine(status)}`);
   lines.push(`- Project orientation: ${status.projectMap ? "ready" : "missing"}`);
@@ -50,7 +48,6 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
       status.sessions.latest.id,
       status.sessions.latest.title ?? "(untitled)",
       `messages=${status.sessions.latest.messageCount}`,
-      status.sessions.latest.hasMemory ? "memory=yes" : "memory=no",
     ].join("  "));
   }
 
@@ -193,20 +190,6 @@ export function formatRuntimeStatusText(status: RuntimeStatus): string {
     }
   }
 
-  if (status.memory.assets.length > 0) {
-    lines.push("");
-    lines.push("Memory:");
-    for (const memory of status.memory.assets.slice(0, 5)) {
-      lines.push([
-        memory.id,
-        memory.kind,
-        `bytes=${memory.size}`,
-        memory.evidenceRefs.length > 0 ? `evidence=${memory.evidenceRefs.join(",")}` : undefined,
-        memory.path,
-      ].filter(Boolean).join("  "));
-    }
-  }
-
   if (status.skills.needsAttention.length > 0) {
     lines.push("");
     lines.push("Skills needing attention:");
@@ -237,14 +220,6 @@ function readBackgroundSceneLine(status: RuntimeStatus): string {
     return nextAction;
   }
   return `${active} active${blocked > 0 ? `, ${blocked} need attention` : ""}; ${nextAction}`;
-}
-
-function readMemorySceneLine(status: RuntimeStatus): string {
-  const session = status.scene.memory.latestSessionMemory ? "session memory ready" : "session memory not saved yet";
-  const assets = status.scene.memory.assets === 0
-    ? "no reviewable memory files"
-    : `${status.scene.memory.assets} reviewable memory file(s)`;
-  return `${session}; ${assets}; ${status.scene.memory.nextAction}`;
 }
 
 function readSkillsSceneLine(status: RuntimeStatus): string {

@@ -44,6 +44,7 @@ function buildWorkLoopBlock(): string {
     "Keep the current user request at the center of the turn.",
     "For concrete work: inspect relevant evidence, make precise changes with the available tools, then run useful commands.",
     "When evidence is missing, inspect it before deciding.",
+    "When a requested change depends on baseline or reproduction evidence, collect that evidence before changing state.",
     "When a tool or path fails, use the error facts to choose the next step.",
     "Stop when the user's goal is satisfied and supported by evidence.",
   ].join("\n");

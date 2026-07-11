@@ -21,7 +21,6 @@ test("slash command metadata comes from the local command registry", () => {
     "/help",
     "/status",
     "/background",
-    "/memory",
     "/skills",
     "/events",
     "/doctor",
@@ -59,9 +58,7 @@ test("local commands classify empty, exit, help, session, and config input", asy
 test("runtime slash commands are handled locally", async (t) => {
   const root = await createTempWorkspace("local-runtime-commands", t);
   const context = createLocalCommandContext(root);
-  const sessionStore = new SessionStore(context.config.paths.sessionsDir, {
-    memorySessionsDir: context.config.paths.sessionMemoryDir,
-  });
+  const sessionStore = new SessionStore(context.config.paths.sessionsDir);
   context.session = await sessionStore.save(context.session);
   context.sessionStore = sessionStore;
 
@@ -86,11 +83,11 @@ test("runtime slash commands are handled locally", async (t) => {
   });
 
   const output = createRecordingOutput();
-  for (const command of ["/status", "/background", "/memory", "/skills", "/events", "/doctor", "/sessions", "/copy", "/export", "/clear"]) {
+  for (const command of ["/status", "/background", "/skills", "/events", "/doctor", "/sessions", "/copy", "/export", "/clear"]) {
     assert.equal(await handleLocalCommand(command, context, output), "handled", `${command} should be local`);
   }
 
-  assert.equal(output.plainText.length, 9);
+  assert.equal(output.plainText.length, 8);
   assert.equal(output.infoText.length, 1);
 });
 
@@ -104,6 +101,7 @@ function createLocalCommandContext(root: string): {
     cwd: root,
     session: {
       id: "session-local-command",
+      revision: 0,
       createdAt: "2026-05-20T00:00:00.000Z",
       updatedAt: "2026-05-20T00:00:00.000Z",
       cwd: root,

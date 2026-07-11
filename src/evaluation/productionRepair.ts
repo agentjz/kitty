@@ -28,8 +28,6 @@ export async function runProductionRepairCheck(
       ...sourceConfig.paths,
       dataDir: path.join(workspace, ".kitty"),
       sessionsDir: path.join(workspace, ".kitty", "sessions"),
-      memoryDir: path.join(workspace, ".kitty", "memory"),
-      sessionMemoryDir: path.join(workspace, ".kitty", "memory", "sessions"),
       changesDir: path.join(workspace, ".kitty", "changes"),
       eventsDir: path.join(workspace, ".kitty", "events"),
     },
@@ -38,9 +36,7 @@ export async function runProductionRepairCheck(
     maxContextChars: Math.min(sourceConfig.maxContextChars, 80_000),
     contextSummaryChars: Math.min(sourceConfig.contextSummaryChars, 8_000),
   };
-  const sessionStore = new SessionStore(config.paths.sessionsDir, {
-    memorySessionsDir: config.paths.sessionMemoryDir,
-  });
+  const sessionStore = new SessionStore(config.paths.sessionsDir);
   const session = await sessionStore.save(await sessionStore.create(workspace));
   const outcome = await runHostTurn({
     host: "eval-production",

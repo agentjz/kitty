@@ -1,5 +1,6 @@
 import type Database from "better-sqlite3";
 import path from "node:path";
+import crypto from "node:crypto";
 
 import { unknownExecution } from "../execution/errors.js";
 import type { ExecutionKind } from "../execution/kinds.js";
@@ -15,6 +16,8 @@ import {
 } from "./executionRows.js";
 import { createControlPlaneId } from "./shared.js";
 import type { ExecutionRecord, ExecutionStatus } from "./types.js";
+
+const EXECUTION_LEASE_MS = 30_000;
 
 export class ExecutionLedgerRepo {
   constructor(private readonly db: Database.Database) {}
@@ -62,11 +65,13 @@ export class ExecutionLedgerRepo {
       INSERT INTO executions (
         id, kind, status, assignment_json, command, prompt, actor_name, actor_role, cwd, requested_by, session_id, pid, exit_code,
         output, summary, wait_policy_json, deadline_at, last_output_at, close_reason, terminated_by, changed_paths_json, error,
-        created_at, started_at, updated_at, finished_at, timeout_ms
+        created_at, started_at, updated_at, finished_at, timeout_ms,
+        owner_token, heartbeat_at, lease_expires_at, cancel_requested_at
       ) VALUES (
         @id, @kind, @status, @assignmentJson, @command, @prompt, @actorName, @actorRole, @cwd, @requestedBy, @sessionId, @pid, @exitCode,
         @output, @summary, @waitPolicyJson, @deadlineAt, @lastOutputAt, @closeReason, @terminatedBy, @changedPathsJson, @error,
-        @createdAt, @startedAt, @updatedAt, @finishedAt, @timeoutMs
+        @createdAt, @startedAt, @updatedAt, @finishedAt, @timeoutMs,
+        @ownerToken, @heartbeatAt, @leaseExpiresAt, @cancelRequestedAt
       )
     `).run(toExecutionRow(record));
     return record;
@@ -98,6 +103,8 @@ export class ExecutionLedgerRepo {
   markRunning(id: string, input: { pid: number; startedAt?: string }): ExecutionRecord {
     const current = requireExecution(this.load(id), id);
     const now = new Date().toISOString();
+    if (isTerminalExecutionStatus(current.status)) return current;
+    const ownerToken = current.ownerToken ?? crypto.randomUUID();
     return this.save({
       ...current,
       status: "running",
@@ -105,11 +112,45 @@ export class ExecutionLedgerRepo {
       startedAt: input.startedAt ?? current.startedAt ?? now,
       deadlineAt: current.deadlineAt ?? buildDeadlineAt(input.startedAt ?? current.startedAt ?? now, current.timeoutMs),
       updatedAt: now,
+      ownerToken,
+      heartbeatAt: now,
+      leaseExpiresAt: new Date(Date.parse(now) + EXECUTION_LEASE_MS).toISOString(),
     });
   }
 
+  heartbeat(id: string, ownerToken: string): ExecutionRecord {
+    const now = new Date();
+    const result = this.db.prepare(`
+      UPDATE executions
+      SET heartbeat_at=@now, lease_expires_at=@lease, updated_at=@now
+      WHERE id=@id AND status='running' AND owner_token=@ownerToken
+    `).run({
+      id,
+      ownerToken,
+      now: now.toISOString(),
+      lease: new Date(now.getTime() + EXECUTION_LEASE_MS).toISOString(),
+    });
+    if (result.changes !== 1) throw new Error(`Execution ${id} no longer owns its worker lease.`);
+    return this.load(id)!;
+  }
+
+  assertOwner(id: string, ownerToken: string): void {
+    const row = this.db.prepare(`
+      SELECT 1 FROM executions
+      WHERE id=? AND status='running' AND owner_token=? AND lease_expires_at > ?
+    `).get(id, ownerToken, new Date().toISOString());
+    if (!row) throw new Error(`Execution ${id} no longer owns its worker lease.`);
+  }
+
+  requestCancellation(id: string): ExecutionRecord {
+    const current = requireExecution(this.load(id), id);
+    if (isTerminalExecutionStatus(current.status)) return current;
+    const now = new Date().toISOString();
+    return this.save({ ...current, status: "cancelling", cancelRequestedAt: now, updatedAt: now });
+  }
+
   close(id: string, input: {
-    status: Extract<ExecutionStatus, "completed" | "failed" | "aborted" | "stale" | "paused">;
+    status: Extract<ExecutionStatus, "completed" | "failed" | "aborted" | "lost">;
     exitCode?: number | null;
     output?: string;
     summary?: string;
@@ -118,10 +159,14 @@ export class ExecutionLedgerRepo {
     changedPaths?: readonly string[];
     error?: string;
     finishedAt?: string;
+    ownerToken?: string;
   }): ExecutionRecord {
     const current = requireExecution(this.load(id), id);
     if (isTerminalExecutionStatus(current.status)) {
       return current;
+    }
+    if (input.ownerToken && current.ownerToken && input.ownerToken !== current.ownerToken) {
+      throw new Error(`Execution ${id} cannot close with an expired worker token.`);
     }
     const now = new Date().toISOString();
     return this.save({
@@ -136,6 +181,7 @@ export class ExecutionLedgerRepo {
       error: input.error ?? current.error,
       updatedAt: now,
       finishedAt: input.finishedAt ?? now,
+      leaseExpiresAt: undefined,
     });
   }
 
@@ -167,7 +213,11 @@ export class ExecutionLedgerRepo {
         started_at=@startedAt,
         updated_at=@updatedAt,
         finished_at=@finishedAt,
-        timeout_ms=@timeoutMs
+        timeout_ms=@timeoutMs,
+        owner_token=@ownerToken,
+        heartbeat_at=@heartbeatAt,
+        lease_expires_at=@leaseExpiresAt,
+        cancel_requested_at=@cancelRequestedAt
       WHERE id=@id
     `).run(toExecutionRow(record));
     return record;
@@ -175,7 +225,7 @@ export class ExecutionLedgerRepo {
 }
 
 function isTerminalExecutionStatus(status: ExecutionStatus): boolean {
-  return status === "completed" || status === "failed" || status === "aborted" || status === "stale";
+  return status === "completed" || status === "failed" || status === "aborted" || status === "lost";
 }
 
 function requireExecution(record: ExecutionRecord | undefined, id: string): ExecutionRecord {

@@ -18,7 +18,7 @@ test("evaluation harness defines current local acceptance checks", () => {
   assert.deepEqual(listEvaluationChecks(), [
     "runtime-status-builds",
     "project-map-builds",
-    "memory-assets-readable",
+    "context-epochs-readable",
     "extension-surface-current",
     "skill-packages-readable",
     "config-preflight-readable",

@@ -31,9 +31,7 @@ export function createLocalAgentApi(dependencies: HostTurnDependencies = {}): Lo
   return {
     async createSession(cwd) {
       const paths = getProjectStatePaths(cwd);
-      const store = new SessionStore(paths.sessionsDir, {
-        memorySessionsDir: paths.sessionMemoryDir,
-      });
+      const store = new SessionStore(paths.sessionsDir);
       const events = new SessionEventStore(paths.eventsDir);
       const session = await store.save(await store.create(cwd));
       await events.append({
@@ -46,9 +44,7 @@ export function createLocalAgentApi(dependencies: HostTurnDependencies = {}): Lo
     },
     async sendMessage(input) {
       const paths = getProjectStatePaths(input.cwd);
-      const store = new SessionStore(paths.sessionsDir, {
-        memorySessionsDir: paths.sessionMemoryDir,
-      });
+      const store = new SessionStore(paths.sessionsDir);
       const session = await store.load(input.sessionId);
       const outcome = await runHostTurn({
         input: input.message,

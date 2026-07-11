@@ -66,7 +66,6 @@ TUI 复用同一套 session、driver、工具和斜杠命令。主区显示用�
 | `/help` | 查看当前可用斜杠命令 |
 | `/status` | 查看当前项目现场 |
 | `/background`、`/bg` | 查看后台任务现场 |
-| `/memory` | 查看 runtime memory assets |
 | `/skills` | 查看 runtime skills 健康状态 |
 | `/events` | 查看当前 session 最近事件 |
 | `/doctor` | 运行本地配置 preflight |
@@ -100,8 +99,7 @@ kitty "用 Spring Boot 3、MySQL、Redis 和 Vue 3 做一个考试管理平台�
 | `kitty events [sessionId]` | 查看最近会话或指定会话的机器事件 |
 | `kitty config show` | 查看从 `.kitty/.env` 解析出的当前运行配置 |
 | `kitty config path` | 查看当前项目 `.kitty/.env` 路径 |
-| `kitty status` | 查看当前项目现场：先显示 Current scene，再显示 session、context budget、memory files、skills、project orientation、execution、wake 等 Runtime facts |
-| `kitty memory` | 创建、查看、读取、搜索、删除 runtime memory assets，或把 memory 沉淀到 skill references |
+| `kitty status` | 查看当前项目现场：session、context budget、skills、project orientation、execution、wake、tool 和 provider 事实 |
 | `kitty changes` | 查看记录的文件变更 |
 | `kitty undo [changeId]` | 撤销最近一次或指定变更 |
 | `kitty diff [path]` | 查看当前 git diff |

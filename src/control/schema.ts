@@ -29,7 +29,11 @@ export function initializeControlPlaneSchema(db: Database.Database): void {
       started_at TEXT,
       updated_at TEXT NOT NULL,
       finished_at TEXT,
-      timeout_ms INTEGER
+      timeout_ms INTEGER,
+      owner_token TEXT,
+      heartbeat_at TEXT,
+      lease_expires_at TEXT,
+      cancel_requested_at TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_executions_kind_status ON executions(kind, status);
@@ -62,6 +66,107 @@ export function initializeControlPlaneSchema(db: Database.Database): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_task_lifecycle_session ON task_lifecycle(session_id, updated_at);
+
+    CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY,
+      revision INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      cwd TEXT NOT NULL,
+      title TEXT,
+      state_json TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sessions_updated ON sessions(updated_at DESC);
+
+    CREATE TABLE IF NOT EXISTS session_messages (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      sequence INTEGER NOT NULL,
+      message_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+      UNIQUE(session_id, sequence)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_session_messages_session ON session_messages(session_id, sequence);
+
+    CREATE TABLE IF NOT EXISTS session_turns (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      input TEXT NOT NULL,
+      input_source TEXT NOT NULL,
+      status TEXT NOT NULL,
+      owner_token TEXT,
+      lease_expires_at TEXT,
+      heartbeat_at TEXT,
+      error TEXT,
+      created_at TEXT NOT NULL,
+      started_at TEXT,
+      updated_at TEXT NOT NULL,
+      finished_at TEXT,
+      FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_session_turns_session_status ON session_turns(session_id, status, created_at);
+
+    CREATE TABLE IF NOT EXISTS tool_calls (
+      call_id TEXT PRIMARY KEY,
+      turn_id TEXT NOT NULL,
+      session_id TEXT NOT NULL,
+      tool_name TEXT NOT NULL,
+      arguments_json TEXT NOT NULL,
+      effect TEXT NOT NULL,
+      status TEXT NOT NULL,
+      result_json TEXT,
+      before_hash TEXT,
+      after_hash TEXT,
+      started_at TEXT,
+      updated_at TEXT NOT NULL,
+      finished_at TEXT,
+      FOREIGN KEY(turn_id) REFERENCES session_turns(id) ON DELETE CASCADE,
+      FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_tool_calls_turn ON tool_calls(turn_id, updated_at);
+
+    CREATE TABLE IF NOT EXISTS context_epochs (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      source_message_count INTEGER NOT NULL,
+      source_last_message_id TEXT,
+      source_prefix_hash TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      budget_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_context_epochs_session ON context_epochs(session_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS runtime_events (
+      id TEXT PRIMARY KEY,
+      timestamp TEXT NOT NULL,
+      event TEXT NOT NULL,
+      status TEXT NOT NULL,
+      host TEXT,
+      session_id TEXT,
+      turn_id TEXT,
+      item_id TEXT,
+      execution_id TEXT,
+      request_id TEXT,
+      attempt_id TEXT,
+      identity_kind TEXT,
+      identity_name TEXT,
+      duration_ms INTEGER,
+      tool_name TEXT,
+      model TEXT,
+      error_json TEXT,
+      details_json TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_runtime_events_time ON runtime_events(timestamp DESC);
+    CREATE INDEX IF NOT EXISTS idx_runtime_events_session ON runtime_events(session_id, timestamp DESC);
   `);
   ensureColumn(db, "executions", "prompt", "TEXT");
   ensureColumn(db, "executions", "assignment_json", "TEXT");
@@ -74,6 +179,10 @@ export function initializeControlPlaneSchema(db: Database.Database): void {
   ensureColumn(db, "executions", "terminated_by", "TEXT");
   ensureColumn(db, "executions", "changed_paths_json", "TEXT NOT NULL DEFAULT '[]'");
   ensureColumn(db, "executions", "error", "TEXT");
+  ensureColumn(db, "executions", "owner_token", "TEXT");
+  ensureColumn(db, "executions", "heartbeat_at", "TEXT");
+  ensureColumn(db, "executions", "lease_expires_at", "TEXT");
+  ensureColumn(db, "executions", "cancel_requested_at", "TEXT");
   ensureColumn(db, "task_lifecycle", "active_execution_ids_json", "TEXT NOT NULL DEFAULT '[]'");
   ensureColumn(db, "task_lifecycle", "active_todo_ids_json", "TEXT NOT NULL DEFAULT '[]'");
   ensureColumn(db, "task_lifecycle", "verification_facts_json", "TEXT NOT NULL DEFAULT '[]'");

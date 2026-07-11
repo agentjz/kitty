@@ -108,7 +108,7 @@ export class BackgroundExecutionStore {
   }
 
   close(id: string, input: {
-    status: "completed" | "failed" | "aborted" | "stale" | "paused";
+    status: "completed" | "failed" | "aborted" | "lost";
     exitCode?: number | null;
     output?: string;
     summary?: string;
@@ -118,12 +118,14 @@ export class BackgroundExecutionStore {
   }): ExecutionRecord {
     const ledger = new ControlPlaneLedger(this.rootDir);
     try {
-      const closed = ledger.executions.close(id, input);
-      ledger.wakeSignals.publish({
-        executionId: id,
-        reason: toWakeReason(input.status),
+      return ledger.transaction(() => {
+        const closed = ledger.executions.close(id, input);
+        ledger.wakeSignals.publish({
+          executionId: id,
+          reason: toWakeReason(closed.status),
+        });
+        return closed;
       });
-      return closed;
     } finally {
       ledger.close();
     }
@@ -139,20 +141,20 @@ export class BackgroundExecutionStore {
   }
 }
 
-export function reconcileBackgroundExecutions(rootDir: string): { staleExecutions: ExecutionRecord[] } {
+export function reconcileBackgroundExecutions(rootDir: string): { lostExecutions: ExecutionRecord[] } {
   const store = new BackgroundExecutionStore(rootDir);
-  const staleExecutions: ExecutionRecord[] = [];
+  const lostExecutions: ExecutionRecord[] = [];
   for (const execution of store.listRunning()) {
     if (typeof execution.pid !== "number" || isProcessAlive(execution.pid)) {
       continue;
     }
-    staleExecutions.push(store.close(execution.id, {
-      status: "stale",
+    lostExecutions.push(store.close(execution.id, {
+      status: "lost",
       summary: `Background process disappeared before reporting completion: pid=${execution.pid}`,
       closeReason: "process_disappeared",
     }));
   }
-  return { staleExecutions };
+  return { lostExecutions };
 }
 
 export async function waitForBackgroundExecution(input: {
@@ -190,7 +192,7 @@ export function terminateBackgroundExecution(rootDir: string, id: string): Execu
   if (!execution) {
     throw unknownExecution(id);
   }
-  if (execution.status === "completed" || execution.status === "failed" || execution.status === "aborted" || execution.status === "stale") {
+  if (execution.status === "completed" || execution.status === "failed" || execution.status === "aborted" || execution.status === "lost") {
     return execution;
   }
   terminateRegisteredBackgroundProcess(id);
@@ -249,7 +251,7 @@ function terminateRegisteredBackgroundProcess(id: string): void {
 }
 
 function toWakeReason(status: ExecutionRecord["status"]): WakeSignalReason {
-  if (status === "completed" || status === "failed" || status === "aborted" || status === "paused" || status === "stale") {
+  if (status === "completed" || status === "failed" || status === "aborted" || status === "lost") {
     return status;
   }
   return "failed";

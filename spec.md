@@ -42,8 +42,6 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 
 ```text
 .kitty/.env
-.kitty/sessions/
-.kitty/memory/{sessions,project,user,evidence}/
 .kitty/events/
 .kitty/changes/
 .kitty/extensions/
@@ -86,7 +84,7 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 
 ### 职责
 
-- `src/agent/`：模型驱动的 turn 循环、prompt layer、profile、工具批次推进、turn 持久化、标题和 memory 更新。
+- `src/agent/`：模型驱动的 turn 循环、prompt layer、profile、工具批次推进、turn 持久化和标题更新。
 - `src/host/`：所有宿主共用的生命周期、session 绑定、工具注册表创建、turn 事件、abort 处理、lead 等待与恢复。
 - `src/interaction/`：宿主无关的交互输入输出驱动。
 
@@ -94,12 +92,12 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 
 `runHostTurn()` 是统一 turn 边界。它：
 
-1. 记录 host 和 session 的 `turn.started` 事实。
-2. 创建已启用的工具注册表。
-3. 运行 lead 或 worker agent turn。
-4. 当 execution 拥有阻塞型 wait policy 时处理 lead 等待。
-5. 记录 completed、failed 或 aborted 事实。
-6. 关闭本轮工具资源。
+1. 将输入写入 durable turn queue。
+2. 按 session 队首原子 claim owner token，并维持 lease heartbeat。
+3. 记录带 turn ID 的 `turn.started` 事实并创建工具注册表。
+4. 运行 lead 或 worker agent turn；所有 session 写入和工具边界校验 owner token。
+5. 当 execution 拥有阻塞型 wait policy 时处理 lead 等待。
+6. 记录 completed、failed 或 aborted 终态并释放 lease。
 
 `runAgentTurn()` 负责模型/工具循环。每一轮循环：
 
@@ -109,7 +107,7 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 4. 请求模型。
 5. 流式输出 reasoning 和回答回调。
 6. 执行工具批次或收束最终回答。
-7. 最终回答后写入 session title、memory 和完成态 task lifecycle 事实。
+7. 最终回答后写入 session title 和完成态 task lifecycle 事实。
 
 Provider request 是临时失败的唯一重试 owner：同一逻辑请求最多四次调用、总等待最多 90 秒，并优先采用服务端 `Retry-After`。Agent turn 不得重新发送已耗尽重试预算的请求。Abort 必须中断当前请求或等待，不能伪造正常完成。
 
@@ -118,35 +116,25 @@ Provider request 是临时失败的唯一重试 owner：同一逻辑请求最多
 ### 职责
 
 - `src/context/`：prompt 组成、项目事实、对话窗口、压缩和 context budget 测量。
-- `src/session/`：session schema、持久快照、消息、checkpoint、workset、task state、memory 和 session 事件。
-- `src/runtime/memory/`：project、user、evidence、session memory asset 的持久访问。
+- `src/session/`：SQLite session 聚合、消息、checkpoint、workset、task state 和 session 事件。
 
 ### Session 事实
 
-Session 保存可见消息、context budget、task state、checkpoint、workset、session diff、可选标题和模型写出的 session memory。快照存入 `.kitty/sessions/`；每次保存同步写入可审阅的 session memory asset。模型生成的 session title 只接受普通标题文本；工具协议、tool call JSON 或空文本不能写成标题事实。
+Session 保存 append-only 可见消息、revision、context budget、task state、checkpoint、workset、session diff 和可选标题。`sessions` 与 `session_messages` 表位于 `.kitty/control-plane.sqlite`；保存使用 revision CAS，不能覆盖并发提交。模型生成的 session title 只接受普通标题文本；工具协议、tool call JSON 或空文本不能写成标题事实。
 
 内部 wake/reminder 消息不作为普通用户对话渲染，也不进入自然对话历史。
 
-Session memory 使用以下固定 Markdown 区块：
-
-- `Current Focus`
-- `User Constraints`
-- `Decisions`
-- `Open Threads`
-- `Verification Facts`
-- `Reusable Lessons`
-
-机器负责区块形状和持久化。模型基于本轮实际证据写入内容。
+产品不维护自动长期 memory。长任务连续性来自同一 session 的 append-only message、task/checkpoint/workset、tool journal 和 context epoch。
 
 ### Context budget
 
 Context 优先保留可见的近场对话。超过配置预算后，它摘要较早消息，并压缩早期 tool/user/assistant 内容，同时保留安全的近期 tail 和工具边界。
 
-近期 canonical tool evidence 使用 model view；较旧 tool evidence 在 normal/aggressive/hard compression 中直接切换为自身 compact view。compact view 已有严格边界，context 不再对它进行第二次无语义字符串截断。状态与 memory 读取 compact evidence，而不是再次解析 model-facing 文本。
+近期 canonical tool evidence 使用 model view；较旧 tool evidence 在 normal/aggressive/hard compression 中直接切换为自身 compact view。compact view 已有严格边界，context 不再对它进行第二次无语义字符串截断。状态与上下文压缩读取 compact evidence，而不是再次解析 model-facing 文本。
 
 Provider replay 是 wire contract。DeepSeek 兼容工具调用历史必须保留所需 reasoning content；无法 replay 的历史工具批次必须转换成明确的摘要事实，不能发送无效请求。
 
-Context budget 记录当前有效 limit、estimate、remaining、compression mode、source、prompt hotspot 和 cache layout 事实。有效 limit 由用户配置的最大上下文字符数和当前 model catalog 的上下文/输出上限共同收束；展示层只显示当前可用预算，不重新计算 provider 能力。它只测量，不替模型决定任务路线。
+Context budget 记录当前有效 limit、estimate、remaining、compression mode、source、prompt hotspot 和 cache layout 事实。压缩结果写入 context epoch，保存 source message count、last message ID、SHA-256 prefix hash、summary 和 budget。最小请求仍超限时本地抛出 `ContextBudgetExceededError`，不得发送已知超限请求。
 
 ## 6. Provider 层
 
@@ -180,7 +168,7 @@ Provider request 边界把 adapter、transport 和 SDK 失败归一为 `Provider
 
 工具执行真实操作，返回有界证据，记录 changed path，并在需要时保留可恢复的原始输出。每次 tool call 无论成功或失败都必须持久为下一次模型请求可见的非空 tool result；成功但没有文本输出时，机器明确记录该事实。Tool output projection 限制上下文成本，但不伪造语义结论。
 
-每个 tool result 同时保存当前唯一的 typed evidence：call id、tool、status、summary、provenance、facts、error、artifact、truncation、model view 和 compact view。工具实现拥有原始结果；evidence builder 拥有模型证据合同；session 保存 canonical evidence；context 只选择 full 或 compact view；宿主展示继续读取 display/raw result。任何状态模块都不得从展示字符串反推工具事实。
+每个 tool result 同时保存当前唯一的 typed evidence：call id、tool、status、summary、provenance、facts、error、artifact、truncation、model view 和 compact view。Tool intent 在副作用前写入 `tool_calls`，每个 canonical result 在执行完成后立即落账；恢复时悬空 intent 变成明确 interrupted evidence，副作用工具不自动重放。工具实现拥有原始结果；evidence builder 拥有模型证据合同；session 保存 canonical evidence；context 只选择 full 或 compact view；宿主展示继续读取 display/raw result。
 
 模型证据遵循最小充分原则：必须足以判断本次操作是否成功、作用于哪里、产生了什么关键事实、失败根因是什么、下一步如何恢复。工作区内目标使用相对路径；工作区外目标保留绝对路径。read 返回实际行区间和 continuation；edit/write 返回目标和变更范围；bash 返回 cwd、exit code、duration、头尾输出和 artifact recovery。大输出保留头尾，明确省略规模，并提供可执行的 `read` 恢复参数。
 
@@ -207,11 +195,11 @@ Extension 只在配置启用时进入同一工具注册表。它们不是另一�
 
 ### 职责
 
-- `src/control/`：task lifecycle、execution record、wake signal 的 SQLite schema 和持久账本。
+- `src/control/`：session、turn、tool call、context epoch、task lifecycle、execution、wake 和 runtime event 的 SQLite schema 与账本。
 - `src/execution/`：execution 启动、worker 生命周期、输出读取、reconcile、取消、lead wait 和进程树终止。
 - `src/subagent/`：subagent 专用 execution 构建。
 
-`.kitty/control-plane.sqlite` 是 execution 生命周期的唯一事实源。Execution 保存 kind、state、assignment、工作目录、pid、output/summary、wait policy、timeout 和关闭事实。
+`.kitty/control-plane.sqlite` 是运行事实的唯一持久主干。Execution 保存 kind、state、assignment、工作目录、pid、owner token、heartbeat、lease、output/summary、wait policy、timeout 和关闭事实。
 
 当前 execution kind：
 
@@ -221,12 +209,13 @@ Extension 只在配置启用时进入同一工具注册表。它们不是另一�
 当前 state：
 
 - `created`
+- `claimed`
 - `running`
-- `paused`
+- `cancelling`
 - `completed`
 - `failed`
 - `aborted`
-- `stale`
+- `lost`
 
 ### Background 与 Subagent 语义
 
@@ -234,7 +223,7 @@ Extension 只在配置启用时进入同一工具注册表。它们不是另一�
 
 `subagent_launch` 记录 objective、boundary、expected output、worker identity 和阻塞型 lead wait policy。Subagent 运行时，lead host 让出当前轮。等待期间，worker runtime UI event 会复放到 lead 当前输出流。Execution 收束后，host 从终态 execution 构建 wake fact，并恢复 lead 做收口。
 
-Lead 不能根据工具名称或旧 tool result 猜测 execution 状态，只能读取 execution record。Deadline 到达时，阻塞 execution 进入 paused 并唤醒 lead。
+Lead 不能根据工具名称或展示字符串猜测 execution 状态，只能读取 execution record。Deadline 到达时进入 cancelling，终止进程树，确认后进入 aborted 并唤醒 lead。
 
 ### 取消与恢复
 
@@ -243,7 +232,7 @@ Execution stop/cancel 必须终止完整进程树：
 - Windows：`taskkill /T /F`。
 - POSIX：先终止进程组和子孙进程，短暂等待后升级为 `SIGKILL`。
 
-Reconcile 会检测仍标记为 running 但进程已消失的 record，并将其关闭为 `stale`。Status 与 TUI 读取 reconcile 后的 control-plane 事实。
+Reconcile 以 lease 和 heartbeat 判断 ownership；PID 只用于诊断和进程树终止。进程消失或 lease 丢失且无法确认正常终态时关闭为 `lost`。Execution 终态与 wake signal 在同一事务内幂等提交。
 
 ## 9. Runtime 事实与 Observability
 
@@ -253,12 +242,12 @@ Reconcile 会检测仍标记为 running 但进程已消失的 record，并将其
 - `src/runtime-ui/`：宿主无关的可见 turn event 与 tool display 投影。
 - `src/observability/`：结构化事件、terminal log 和 crash report。
 
-`buildRuntimeStatus()` 读取 session、memory asset、skill、project map、control-plane execution/wake signal、model request event 和 tool-output event。它不创建第二套状态。
+`buildRuntimeStatus()` 读取 SQLite session、turn、context、execution、wake、model request 和 tool-output event，再投影 skill 与 project map。它不读取 JSON session、JSONL runtime event 或展示字符串作为状态源。
 
 Observability 记录：
 
 - host turn 开始与结束；
-- provider request 开始、完成、失败与 usage；
+- provider logical request、每次 HTTP attempt、完成、失败、usage 与 request/attempt ID；
 - tool-output projection 事实；
 - session event；
 - terminal transcript log；
@@ -289,7 +278,7 @@ TUI 规则：
 - Context budget 必须属于当前选中的 session。项目全局 runtime status 不能用另一条最近已保存 session 的 budget 覆盖新建或已选 session。
 - 用户提交后到最终模型回答完成期间，TUI 在 Runtime Dock 第一行右侧显示本轮持续时间；思考、工具调用和后续模型请求不重置它。
 - Runtime Dock 保持稳定两行结构；第一行左侧展示当前 activity，过长摘要单行截断，右侧展示本轮持续时间；第二行展示 live background/subagent lane。
-- TUI 只显示 control-plane 状态为 `created` 或 `running` 的 background/subagent lane。
+- TUI 只显示 control-plane 状态为 `created`、`claimed`、`running` 或 `cancelling` 的 background/subagent lane。
 - 存在 live execution lane 时，TUI 轻量刷新 execution 账本。Execution 进入终态后必须清除 lane；启动时的 `running` 文案不能成为错误的当前状态。
 - 阻塞型 subagent 的 reasoning、工具动作和回答必须显示在当前 lead transcript，直到 lead 恢复。
 - 首屏 transcript 保持空白。User message 使用紧凑的低对比整行背景。Reasoning 是低强调信息。

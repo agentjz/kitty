@@ -3,7 +3,7 @@ import type { EvaluationCheckId, EvaluationScenario } from "./types.js";
 export const LOCAL_EVALUATION_CHECK_IDS: readonly EvaluationCheckId[] = [
   "runtime-status-builds",
   "project-map-builds",
-  "memory-assets-readable",
+  "context-epochs-readable",
   "extension-surface-current",
   "skill-packages-readable",
   "config-preflight-readable",
@@ -22,7 +22,7 @@ export const EVALUATION_SCENARIOS: readonly EvaluationScenario[] = [
     id: "runtime-status-builds",
     suite: "local",
     title: "当前现场可审阅",
-    userPath: "用户运行 `kitty status` 时，可以看到 session、context、memory、skills、execution 和 cache 的当前事实。",
+    userPath: "用户运行 `kitty status` 时，可以看到 session、context、skills、execution、tool evidence 和 cache 的当前事实。",
     evidence: "构建 runtime status，并确认 sessions / executions 等现场摘要可用。",
   },
   {
@@ -33,11 +33,11 @@ export const EVALUATION_SCENARIOS: readonly EvaluationScenario[] = [
     evidence: "构建 project map，并确认目录、脚本和仓库事实可读。",
   },
   {
-    id: "memory-assets-readable",
+    id: "context-epochs-readable",
     suite: "local",
-    title: "记忆资产可审阅",
-    userPath: "用户可以查看 session/project/user/evidence memory，不靠隐藏上下文猜历史。",
-    evidence: "枚举 runtime memory assets，并确认资产索引可读。",
+    title: "压缩上下文可审阅",
+    userPath: "长 session 经压缩后仍能确认摘要来自哪段消息前缀，不靠隐藏状态猜历史。",
+    evidence: "读取 SQLite context epoch，并确认 source count、last message、prefix hash 和 budget 可用。",
   },
   {
     id: "extension-surface-current",
@@ -78,8 +78,8 @@ export const EVALUATION_SCENARIOS: readonly EvaluationScenario[] = [
     id: "production-scene-ready",
     suite: "local",
     title: "生产现场一眼可读",
-    userPath: "用户运行 `kitty status` 或 `kitty background` 时，能看到当前现场、后台风险、下一步、恢复状态、成本、skill 和 memory 可审阅性。",
-    evidence: "构建带 session、memory、cache、skill、background 和 provider usage 的 runtime scene，并确认 scene 与 CLI 文本都暴露关键事实。",
+    userPath: "用户运行 `kitty status` 或 `kitty background` 时，能看到当前现场、后台风险、下一步、恢复状态、成本、skill 和 context 可审阅性。",
+    evidence: "构建带 session、context、cache、skill、background 和 provider usage 的 runtime scene，并确认 scene 与 CLI 文本都暴露关键事实。",
   },
   {
     id: "host-turn-boundary-runs",
@@ -114,7 +114,7 @@ export const EVALUATION_SCENARIOS: readonly EvaluationScenario[] = [
     suite: "local",
     title: "后台和子执行可恢复",
     userPath: "background 或 subagent 卡住、消失、超时后，Kitty 能 reconcile、暂停等待或终止现场。",
-    evidence: "演练 stale background、expired lead-wait subagent、running process termination 和 runtime status。",
+    evidence: "演练 lost background、expired lead-wait subagent、running process termination 和 runtime status。",
   },
 ];
 

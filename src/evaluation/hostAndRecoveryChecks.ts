@@ -19,9 +19,7 @@ export async function runHostTurnBoundaryCheck(id: EvaluationCheckId, rootDir: s
     telegram: resolveTelegramRuntimeConfig(initial.telegram, workspace),
     paths: getAppPaths(workspace),
   };
-  const sessionStore = new SessionStore(config.paths.sessionsDir, {
-    memorySessionsDir: config.paths.sessionMemoryDir,
-  });
+  const sessionStore = new SessionStore(config.paths.sessionsDir);
   const session = await sessionStore.save(await sessionStore.create(workspace));
   const outcome = await runHostTurn({
     host: "eval",
@@ -135,7 +133,7 @@ export async function runRemoteEntrypointsCheck(id: EvaluationCheckId): Promise<
 export async function runRecoveryDrillsCheck(id: EvaluationCheckId, rootDir: string): Promise<EvaluationCheckResult> {
   const { BackgroundExecutionStore, reconcileBackgroundExecutions } = await import("../execution/background.js");
   const { ExecutionStore } = await import("../execution/store.js");
-  const { pauseExpiredLeadWaitExecutions } = await import("../execution/leadWait.js");
+  const { cancelExpiredLeadWaitExecutions } = await import("../execution/leadWait.js");
   const { terminateRunningExecutionProcesses } = await import("../execution/lifecycle.js");
   const { buildRuntimeStatus } = await import("../runtime/status.js");
   const workspace = await prepareCheckWorkspace(rootDir, "recovery-drills");
@@ -147,7 +145,7 @@ export async function runRecoveryDrillsCheck(id: EvaluationCheckId, rootDir: str
     requestedBy: "eval",
   });
   backgroundStore.markRunning(lostBackground.id, { pid: 999_999_999 });
-  const stale = reconcileBackgroundExecutions(workspace);
+  const lost = reconcileBackgroundExecutions(workspace);
 
   const executionStore = new ExecutionStore(workspace);
   const stuck = executionStore.create({
@@ -159,7 +157,7 @@ export async function runRecoveryDrillsCheck(id: EvaluationCheckId, rootDir: str
   });
   const running = executionStore.markRunning(stuck.id, { pid: process.pid });
   const deadline = Date.parse(running.startedAt ?? running.createdAt) + 11;
-  const paused = pauseExpiredLeadWaitExecutions(workspace, [stuck.id], deadline);
+  const aborted = cancelExpiredLeadWaitExecutions(workspace, [stuck.id], deadline);
 
   const active = executionStore.create({
     kind: "subagent",
@@ -178,21 +176,21 @@ export async function runRecoveryDrillsCheck(id: EvaluationCheckId, rootDir: str
   const status = await buildRuntimeStatus(workspace);
 
   if (
-    stale.staleExecutions.length !== 1 ||
-    paused.length !== 1 ||
+    lost.lostExecutions.length !== 1 ||
+    aborted.length !== 1 ||
     !terminated.terminatedPids.includes(missingPid) ||
     status.executions.total < 3
   ) {
     return {
       id,
       status: "failed",
-      fact: `recovery drills incomplete: stale=${stale.staleExecutions.length}, paused=${paused.length}, terminated=${terminated.terminatedPids.length}, executions=${status.executions.total}`,
+      fact: `recovery drills incomplete: lost=${lost.lostExecutions.length}, aborted=${aborted.length}, terminated=${terminated.terminatedPids.length}, executions=${status.executions.total}`,
     };
   }
 
   return passed(
     id,
-    `recovery drills ready: stale=${stale.staleExecutions.length}, paused=${paused.length}, terminated=${terminated.terminatedPids.length}, executions=${status.executions.total}`,
+    `recovery drills ready: lost=${lost.lostExecutions.length}, aborted=${aborted.length}, terminated=${terminated.terminatedPids.length}, executions=${status.executions.total}`,
   );
 }
 

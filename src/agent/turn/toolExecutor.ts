@@ -5,6 +5,8 @@ import { createToolRegistry } from "../../tools/index.js";
 import type { ProjectContext, SessionRecord, ToolCallRecord, ToolExecutionResult } from "../../types.js";
 import type { RunTurnOptions } from "../types.js";
 import { isAbortError } from "../../utils/abort.js";
+import { assertActiveTurnOwnership } from "../../control/turnOwnership.js";
+import { assertActiveExecutionOwnership } from "../../execution/ownership.js";
 
 export async function executeToolCallWithRecovery(
   toolRegistry: ReturnType<typeof createToolRegistry>,
@@ -16,7 +18,9 @@ export async function executeToolCallWithRecovery(
   updateSession?: (session: SessionRecord) => Promise<void>,
 ): Promise<ToolExecutionResult> {
   try {
-    return await toolRegistry.execute(toolCall.function.name, toolCall.function.arguments, {
+  assertActiveTurnOwnership(session.id);
+  assertActiveExecutionOwnership();
+    const result = await toolRegistry.execute(toolCall.function.name, toolCall.function.arguments, {
       config: options.config,
       cwd: options.cwd,
       sessionId: session.id,
@@ -46,6 +50,9 @@ export async function executeToolCallWithRecovery(
         await updateSession?.(session);
       },
     });
+  assertActiveTurnOwnership(session.id);
+  assertActiveExecutionOwnership();
+    return result;
   } catch (error) {
     return buildToolExecutionFailureResult(toolCall, error);
   }

@@ -1,31 +1,24 @@
 import { buildFieldBlock, formatLimitedList } from "../../../agent/prompt/structured.js";
 import { isInternalMessage, readUserInput } from "../../../session/turnFrame.js";
-import type { SessionMemoryState, StoredMessage } from "../../../types.js";
+import type { StoredMessage } from "../../../types.js";
 import type { SessionConversationBrief } from "./types.js";
 
 const MAX_SIGNALS_PER_KIND = 4;
 
 export interface BuildSessionConversationBriefInput {
   messages: StoredMessage[];
-  sessionMemory?: SessionMemoryState;
   timestamp?: string;
 }
 
 export function buildSessionConversationBrief(
   input: BuildSessionConversationBriefInput,
 ): SessionConversationBrief | undefined {
-  const modelSummary = input.sessionMemory?.summary;
-  if (!modelSummary) {
-    return undefined;
-  }
-
   const visibleTurns = input.messages
     .map(toVisibleTurnFact)
     .filter((turn): turn is VisibleTurnFact => Boolean(turn));
 
+  if (visibleTurns.length === 0) return undefined;
   return {
-    modelSummary,
-    modelSummaryUpdatedAt: input.sessionMemory?.updatedAt,
     userTurnCount: visibleTurns.filter((turn) => turn.role === "user").length,
     assistantTurnCount: visibleTurns.filter((turn) => turn.role === "assistant").length,
     toolActivity: collectToolActivity(visibleTurns),
@@ -36,7 +29,7 @@ export function buildSessionConversationBrief(
 export function buildSessionConversationBriefBlock(
   brief: SessionConversationBrief | undefined,
 ): string | undefined {
-  if (!brief?.modelSummary) {
+  if (!brief) {
     return undefined;
   }
 
@@ -45,18 +38,6 @@ export function buildSessionConversationBriefBlock(
       label: "Purpose",
       value: "Use these facts as private continuity state. Answer the current request directly. Quote prior turns only when the user asks.",
     },
-    brief.modelSummary
-      ? {
-          label: "Model-written session memory",
-          value: brief.modelSummary,
-        }
-      : { label: "Model-written session memory", value: undefined },
-    brief.modelSummaryUpdatedAt
-      ? {
-          label: "Updated",
-          value: brief.modelSummaryUpdatedAt,
-        }
-      : { label: "Updated", value: undefined },
     {
       label: "Near-field visible turns",
       value: `${brief.userTurnCount} user turn(s) with current input / ${brief.assistantTurnCount} assistant response(s)`,

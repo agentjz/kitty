@@ -5,7 +5,6 @@ import type {
   ToolResultEnvelope,
 } from "../types.js";
 import { normalizeSessionCheckpoint } from "./checkpoint.js";
-import { normalizeSessionMemory } from "./memory.js";
 import { normalizeSessionDiffState } from "./sessionDiff.js";
 import { normalizeSessionWorkset } from "./workset.js";
 import {
@@ -14,16 +13,17 @@ import {
 } from "./errors.js";
 import { deriveTaskState, normalizeSessionRecord as normalizeTaskStateSessionRecord } from "./taskState.js";
 import { deriveTodoItems, normalizeSessionTodos, normalizeTodoItems } from "./todos.js";
+import { createMessageId } from "./messages.js";
 
 const SESSION_SNAPSHOT_KEYS = new Set([
   "id",
+  "revision",
   "createdAt",
   "updatedAt",
   "cwd",
   "title",
   "messageCount",
   "messages",
-  "sessionMemory",
   "todoItems",
   "taskState",
   "checkpoint",
@@ -54,13 +54,13 @@ export function parseSessionSnapshot(raw: string, sessionPath: string): SessionR
   rejectUnknownSessionKeys(record, sessionPath);
   const candidate: SessionSnapshotCandidate = {
     id: readRequiredString(record, "id", sessionPath),
+    revision: typeof record.revision === "number" ? Math.trunc(record.revision) : 0,
     createdAt: readRequiredString(record, "createdAt", sessionPath),
     updatedAt: readRequiredString(record, "updatedAt", sessionPath),
     cwd: readRequiredString(record, "cwd", sessionPath),
     title: readOptionalString(record.title, "title", sessionPath),
     messageCount: typeof record.messageCount === "number" ? Math.trunc(record.messageCount) : 0,
     messages: readMessages(record.messages, sessionPath),
-    sessionMemory: normalizeSessionMemory(record.sessionMemory),
     todoItems: readTodoItems(record.todoItems, sessionPath),
     taskState: readOptionalObject(record.taskState, "taskState", sessionPath) as SessionRecord["taskState"],
     checkpoint: readOptionalObject(record.checkpoint, "checkpoint", sessionPath) as SessionRecord["checkpoint"],
@@ -72,15 +72,14 @@ export function parseSessionSnapshot(raw: string, sessionPath: string): SessionR
   return normalizeLoadedSessionRecord(candidate as SessionRecord);
 }
 
-export function prepareSessionRecordForSave(session: SessionRecord): SessionRecord {
+export function prepareSessionRecordForSave(session: SessionRecord, touch = true): SessionRecord {
   const normalizedMessages = Array.isArray(session.messages) ? session.messages : [];
   const prepared = {
     ...session,
-    updatedAt: new Date().toISOString(),
+    updatedAt: touch ? new Date().toISOString() : session.updatedAt,
     title: session.title,
     messageCount: normalizedMessages.length,
     messages: normalizedMessages,
-    sessionMemory: normalizeSessionMemory(session.sessionMemory),
     todoItems: deriveTodoItems(normalizedMessages, session.todoItems ?? []),
     taskState: deriveTaskState(normalizedMessages, session.taskState),
   };
@@ -225,6 +224,7 @@ function readMessage(value: unknown, index: number, sessionPath: string): Stored
   }
 
   return {
+    id: typeof record.id === "string" && record.id ? record.id : createMessageId(),
     role,
     content: readMessageContent(record.content, sessionPath, `messages[${index}]`),
     source: readMessageSource(record.source, sessionPath, `messages[${index}]`),

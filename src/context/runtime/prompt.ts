@@ -17,7 +17,6 @@ export function buildContextRuntimePromptLayers(
   const snapshot = buildContextRuntimeSnapshot({
     session: {
       messages: input.messages ?? [],
-      sessionMemory: input.sessionMemory,
       todoItems: input.todoItems,
       taskState: input.taskState,
       checkpoint: input.checkpoint,

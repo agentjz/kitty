@@ -8,6 +8,8 @@ export interface ProviderRequestObservability {
   identityKind?: string;
   identityName?: string;
   configuredModel: string;
+  turnId?: string;
+  requestId?: string;
 }
 
 export async function recordProviderRequestEvent(input: {
@@ -22,6 +24,8 @@ export async function recordProviderRequestEvent(input: {
   baseUrl?: string;
   usage?: ModelRequestMetric["usage"];
   error?: unknown;
+  requestId?: string;
+  attemptId?: string;
 }): Promise<void> {
   const observability = input.observability;
   if (!observability) {
@@ -32,6 +36,9 @@ export async function recordProviderRequestEvent(input: {
     event: "model.request",
     status: input.status,
     sessionId: observability.sessionId,
+    turnId: observability.turnId,
+    requestId: input.requestId ?? observability.requestId,
+    attemptId: input.attemptId,
     identityKind: observability.identityKind,
     identityName: observability.identityName,
     model: input.request.model,

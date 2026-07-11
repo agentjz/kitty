@@ -53,7 +53,7 @@ test("local agent api sends a message through host turn", async (t) => {
     message: "hello",
   });
 
-  assert.equal(result.status, "completed");
+  assert.equal(result.status, "completed", result.errorMessage);
   const events = await api.listEvents({ cwd: root, sessionId: session.id });
   assert.equal(events.some((event) => event.type === "turn.started"), true);
   assert.equal(events.some((event) => event.type === "turn.completed"), true);
@@ -103,7 +103,7 @@ test("local agent api records successful tool lifecycle events", async (t) => {
     message: "run the success tool",
   });
 
-  assert.equal(result.status, "completed");
+  assert.equal(result.status, "completed", result.errorMessage);
   const events = await api.listEvents({ cwd: root, sessionId: session.id, limit: 20 });
   const started = events.find((event) => event.type === "tool.started");
   const completed = events.find((event) => event.type === "tool.completed");
@@ -140,7 +140,7 @@ test("local agent api records failed tool lifecycle events", async (t) => {
     message: "run the failure tool",
   });
 
-  assert.equal(result.status, "completed");
+  assert.equal(result.status, "completed", result.errorMessage);
   const events = await api.listEvents({ cwd: root, sessionId: session.id, limit: 20 });
   const failed = events.find((event) => event.type === "tool.failed");
 
@@ -168,7 +168,6 @@ function createToolEventDependencies(
         ...options,
         fetchAssistantResponse: async () => responses[responseIndex++] ?? createFinalResponse("done"),
         fetchSessionTitleResponse: async () => createFinalResponse("tool events"),
-        fetchSessionMemoryResponse: async () => createFinalResponse("Tool event test completed."),
       });
     },
   };

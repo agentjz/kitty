@@ -26,7 +26,9 @@ export function buildToolResultEnvelope(input: {
   const provenance = buildProvenance(input.cwd, payload, args);
   const facts = buildFacts(input.result, payload, input.cwd);
   const artifacts = buildArtifacts(payload, governance, input.cwd);
-  const error = input.result.ok ? undefined : buildErrorEvidence(payload, input.result.output);
+  const error = input.result.ok
+    ? undefined
+    : buildErrorEvidence(payload, input.result.output, governance?.recoveryHint);
   const summary = buildSummary(input.toolName, input.result.ok, modelView, error?.message);
   const compactView = buildCompactView({
     toolName: input.toolName,
@@ -98,6 +100,8 @@ function buildFacts(
     totalLines: payload?.totalLines,
     matches: Array.isArray(payload?.matches) ? payload.matches.length : payload?.matches,
     total: payload?.total,
+    beforeHash: payload?.beforeHash,
+    afterHash: payload?.afterHash,
     changedPaths: result.metadata?.changedPaths?.map((changedPath) => normalizePathForModel(changedPath, cwd)),
   };
   return Object.fromEntries(
@@ -127,7 +131,11 @@ function buildArtifacts(
   }];
 }
 
-function buildErrorEvidence(payload: Record<string, unknown> | null, rawOutput: string) {
+function buildErrorEvidence(
+  payload: Record<string, unknown> | null,
+  rawOutput: string,
+  governanceRecoveryHint?: string,
+) {
   const runtimeStatus = readString(payload?.status);
   const exitCode = readNumber(payload?.exitCode);
   const runtimeMessage = runtimeStatus
@@ -136,7 +144,7 @@ function buildErrorEvidence(payload: Record<string, unknown> | null, rawOutput: 
   return {
     code: readString(payload?.code),
     message: readString(payload?.error) ?? runtimeMessage ?? (truncateText(rawOutput.trim(), 500) || "Tool failed."),
-    recoveryHint: readString(payload?.hint),
+    recoveryHint: readString(payload?.hint) ?? governanceRecoveryHint,
   };
 }
 

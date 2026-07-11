@@ -1,7 +1,7 @@
 export type EvaluationCheckId =
   | "runtime-status-builds"
   | "project-map-builds"
-  | "memory-assets-readable"
+  | "context-epochs-readable"
   | "extension-surface-current"
   | "skill-packages-readable"
   | "config-preflight-readable"
