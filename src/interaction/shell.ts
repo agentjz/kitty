@@ -22,6 +22,7 @@ export interface ShellOutputPort {
 
 export interface InteractionTurnDisplay {
   callbacks: AgentCallbacks;
+  start?(): void;
   flush(): void;
   dispose(): void;
 }

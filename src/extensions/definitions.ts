@@ -1,4 +1,3 @@
-import type { CapabilityCost } from "../protocol/capability.js";
 import type { RegisteredTool } from "../tools/core/types.js";
 import { createBackgroundTools } from "./tools/background/index.js";
 import { createNetworkTools } from "./tools/network/index.js";
@@ -6,6 +5,8 @@ import { createSkillTools } from "./tools/skills/index.js";
 import { createSubagentTools } from "./tools/subagent/index.js";
 import { createTodoTools } from "./tools/todo/index.js";
 import { createWorktreeTools } from "./tools/worktree/index.js";
+
+type ExtensionCapabilityCost = "low" | "medium" | "high";
 
 export interface ExtensionDefinition {
   id: string;
@@ -16,7 +17,7 @@ export interface ExtensionDefinition {
   capability: {
     description: string;
     bestFor: readonly string[];
-    cost: CapabilityCost;
+    cost: ExtensionCapabilityCost;
   };
 }
 

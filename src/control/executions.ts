@@ -1,8 +1,9 @@
 import type Database from "better-sqlite3";
 import path from "node:path";
 
+import { unknownExecution } from "../execution/errors.js";
 import type { ExecutionKind } from "../execution/kinds.js";
-import type { LeadWaitPolicyInput } from "../protocol/leadWait.js";
+import type { LeadWaitPolicyInput } from "../execution/leadWaitPolicy.js";
 import {
   buildDeadlineAt,
   fromExecutionRow,
@@ -179,7 +180,7 @@ function isTerminalExecutionStatus(status: ExecutionStatus): boolean {
 
 function requireExecution(record: ExecutionRecord | undefined, id: string): ExecutionRecord {
   if (!record) {
-    throw new Error(`Unknown execution: ${id}`);
+    throw unknownExecution(id);
   }
   return record;
 }

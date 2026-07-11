@@ -1,6 +1,6 @@
 import { ControlPlaneLedger, type ExecutionRecord, type ExecutionStatus } from "../control/ledger.js";
 import type { ExecutionKind } from "./kinds.js";
-import type { LeadWaitPolicyInput } from "../protocol/leadWait.js";
+import type { LeadWaitPolicyInput } from "./leadWaitPolicy.js";
 
 export type { ExecutionKind, ExecutionRecord, ExecutionStatus };
 

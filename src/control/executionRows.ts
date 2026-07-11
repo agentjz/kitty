@@ -1,5 +1,5 @@
 import type { ExecutionKind } from "../execution/kinds.js";
-import { createLeadWaitPolicy, normalizeLeadWaitPolicy, type LeadWaitPolicy, type LeadWaitPolicyInput } from "../protocol/leadWait.js";
+import { createLeadWaitPolicy, normalizeLeadWaitPolicy, type LeadWaitPolicy, type LeadWaitPolicyInput } from "../execution/leadWaitPolicy.js";
 import type { ExecutionRecord, ExecutionStatus } from "./types.js";
 
 export interface ExecutionRow {

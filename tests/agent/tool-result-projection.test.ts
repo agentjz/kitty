@@ -36,3 +36,13 @@ test("tool result projection uses output governance as the model-facing evidence
 
   assert.equal(projectToolResultForModel({ toolName: "bash", result }), "governed projection from metadata");
 });
+
+test("tool result projection never returns an empty model message", () => {
+  assert.equal(
+    projectToolResultForModel({
+      toolName: "network_probe",
+      result: { ok: true, output: "" },
+    }),
+    "network_probe completed without text output.",
+  );
+});

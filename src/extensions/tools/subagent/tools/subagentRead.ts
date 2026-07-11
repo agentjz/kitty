@@ -1,4 +1,4 @@
-import { readExecutionOutput } from "../../../../execution/lifecycle.js";
+import { readExecutionOutput } from "../../../../execution/output.js";
 import { clampNumber, okResult, parseArgs, readString } from "../../../../tools/core/shared.js";
 import type { RegisteredTool } from "../../../../tools/core/types.js";
 

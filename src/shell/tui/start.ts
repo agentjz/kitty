@@ -49,7 +49,10 @@ export async function startTuiChat(options: StartTuiChatOptions): Promise<void> 
   });
   const controller = new TuiController(selected.session);
   controller.updateDock({
-    ...projectRuntimeStatusToDock(await buildRuntimeStatus(projectContext.stateRootDir)),
+    ...projectRuntimeStatusToDock(
+      await buildRuntimeStatus(projectContext.stateRootDir),
+      selected.session,
+    ),
     model: options.config.model,
   });
   const executionDockWatcher = createTuiExecutionDockWatcher({

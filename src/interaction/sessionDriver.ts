@@ -234,6 +234,7 @@ export class InteractiveSessionDriver {
       config: this.options.config,
       abortSignal: controller.signal,
     });
+    turnDisplay.start?.();
 
     try {
       const turnContext = await this.options.turnContextProvider?.(this.session, input);

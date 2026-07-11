@@ -43,6 +43,8 @@ test("tui turn display keeps live tool facts in runtime dock", () => {
     abortSignal: new AbortController().signal,
   });
 
+  display.start?.();
+  assert.equal(typeof controller.getState().dock.turnStartedAt, "number");
   display.callbacks.onAssistantDelta?.("hello");
   display.callbacks.onToolCall?.("background_run", JSON.stringify({ command: "npm.cmd run verify" }));
   display.callbacks.onToolResult?.("background_run", JSON.stringify({ status: "running" }));
@@ -54,6 +56,7 @@ test("tui turn display keeps live tool facts in runtime dock", () => {
   assert.match(state.dock.background, /background_run/);
   assert.match(state.dock.background, /running/);
   assert.equal(state.dock.activity, undefined);
+  assert.equal(state.dock.turnStartedAt, undefined);
 });
 
 test("tui execution watcher clears settled background and subagent lanes", () => {

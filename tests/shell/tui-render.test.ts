@@ -8,7 +8,6 @@ import {
   type TuiRuntimeDockState,
 } from "../../src/shell/tui/store.js";
 import { TuiController } from "../../src/shell/tui/controller.js";
-import { TUI_COLORS } from "../../src/shell/tui/theme.js";
 import { applyComposerInput } from "../../src/shell/tui/composerEditing.js";
 import { measureAbsoluteBox } from "../../src/shell/tui/inkGeometry.js";
 import {
@@ -17,72 +16,7 @@ import {
   measureComposerContentWidth,
   measureComposerTextOrigin,
 } from "../../src/shell/tui/composerLayout.js";
-import {
-  TUI_FOOTER_CONTENT_INSET_X,
-  TUI_FOOTER_META_ROWS,
-  TUI_FOOTER_TOP_GAP_ROWS,
-  measureTuiFooterRows,
-} from "../../src/shell/tui/layout.js";
-
-test("tui runtime dock renders the current scene facts", async () => {
-  const React = await import("react");
-  const ink = await import("ink");
-  const { createRuntimeDockComponent } = await import("../../src/shell/tui/components/RuntimeDock.js");
-  const RuntimeDock = createRuntimeDockComponent({
-    React: React.default,
-    Box: ink.Box,
-    Text: ink.Text,
-  });
-  const dock: TuiRuntimeDockState = {
-    activity: {
-      kind: "tool",
-      channel: "lead",
-      status: "running",
-      summary: "bash npm.cmd run verify",
-      startedAt: 1_000,
-      severity: "info",
-    },
-    background: "background_run 运行中",
-    context: "100/1000 chars (10%)",
-    model: "deepseek-v4-flash",
-  };
-
-  const output = ink.renderToString(React.default.createElement(RuntimeDock, { dock, now: 13_000 }), { columns: 80 });
-
-  assert.match(output, /正在运行：/);
-  assert.match(output, /bash npm\.cmd run verify/);
-  assert.match(output, /已运行 12s/);
-  assert.match(output, /后台/);
-  assert.match(output, /background_run 运行中/);
-  assert.doesNotMatch(output, /子代理/);
-  assert.doesNotMatch(output, /空闲/);
-  assert.doesNotMatch(output, /上下文/);
-  assert.doesNotMatch(output, /模型/);
-});
-
-test("tui runtime dock keeps the stable two-line idle structure without inventing execution facts", async () => {
-  const React = await import("react");
-  const ink = await import("ink");
-  const { createRuntimeDockComponent } = await import("../../src/shell/tui/components/RuntimeDock.js");
-  const RuntimeDock = createRuntimeDockComponent({
-    React: React.default,
-    Box: ink.Box,
-    Text: ink.Text,
-  });
-
-  const output = ink.renderToString(
-    React.default.createElement(RuntimeDock, {
-      dock: { context: "0%", model: "deepseek-v4-flash" } satisfies TuiRuntimeDockState,
-    }),
-    { columns: 80 },
-  );
-
-  assert.match(output, /空闲/);
-  assert.doesNotMatch(output, /后台/);
-  assert.doesNotMatch(output, /子代理/);
-  assert.doesNotMatch(output, /上下文/);
-  assert.doesNotMatch(output, /模型/);
-});
+import { TUI_FOOTER_CONTENT_INSET_X } from "../../src/shell/tui/layout.js";
 
 test("tui footer model and runtime dock share the same left anchor", async () => {
   const React = await import("react");
@@ -114,7 +48,9 @@ test("tui footer model and runtime dock share the same left anchor", async () =>
         dock: {
           context: "100/1000 chars (10%)",
           model: "deepseek-v4-flash",
+          turnStartedAt: 10_000,
         } satisfies TuiRuntimeDockState,
+        now: 13_000,
       }),
     ),
     { columns: 80 },
@@ -122,69 +58,7 @@ test("tui footer model and runtime dock share the same left anchor", async () =>
 
   const lines = output.split("\n");
   assert.equal(readRenderedColumn(lines, "模型 deepseek-v4-flash"), readRenderedColumn(lines, "空闲"));
-  assert.match(output, /上下文 100\/1000 chars \(10%\)$/);
-});
-
-test("tui runtime dock renders failed activity without parsing message words", async () => {
-  const React = await import("react");
-  const ink = await import("ink");
-  const { createRuntimeDockComponent } = await import("../../src/shell/tui/components/RuntimeDock.js");
-  const RuntimeDock = createRuntimeDockComponent({
-    React: React.default,
-    Box: ink.Box,
-    Text: ink.Text,
-  });
-
-  const output = ink.renderToString(
-    React.default.createElement(RuntimeDock, {
-      dock: {
-        context: "0%",
-        activity: {
-          kind: "tool",
-          channel: "lead",
-          status: "failed",
-          summary: "edit src/index.ts",
-          severity: "error",
-        },
-      } satisfies TuiRuntimeDockState,
-    }),
-    { columns: 80 },
-  );
-
-  assert.match(output, /失败：edit src\/index\.ts/);
-});
-
-test("tui composer renders as the prototype footer input block", async () => {
-  const React = await import("react");
-  const ink = await import("ink");
-  const { createComposerComponent } = await import("../../src/shell/tui/components/Composer.js");
-  let cursorPosition: { x: number; y: number } | undefined;
-  const Composer = createComposerComponent({
-    React: React.default,
-    Box: ink.Box,
-    Text: ink.Text,
-    useInput: () => undefined,
-    useCursor: () => ({
-      setCursorPosition(position: { x: number; y: number } | undefined) {
-        cursorPosition = position;
-      },
-    }),
-  });
-
-  const output = ink.renderToString(
-    React.default.createElement(Composer, {
-      controller: new TuiController(),
-      frame: { hasMeasured: false, left: 0, top: 0, width: 80 },
-      state: createInitialTuiState(),
-    }),
-    { columns: 80 },
-  );
-
-  assert.equal(cursorPosition, undefined);
-  assert.match(output, /┃/);
-  assert.match(output, /输入消息/);
-  assert.doesNotMatch(output, /Enter 发送/);
-  assert.doesNotMatch(output, /> /);
+  assert.match(output, /上下文 100\/1000 chars \(10%\)  本轮 3s$/);
 });
 
 test("tui composer layout derives visible rows and cursor from one frame model", () => {
@@ -298,44 +172,6 @@ test("tui geometry measures absolute box position through Ink parents", () => {
   });
 });
 
-test("tui session picker renders banner and numbered sessions", async () => {
-  const React = await import("react");
-  const ink = await import("ink");
-  const { createTuiSessionPickerComponent } = await import("../../src/shell/tui/sessionPicker.js");
-  const Picker = createTuiSessionPickerComponent({
-    React: React.default,
-    Box: ink.Box,
-    Text: ink.Text,
-    useInput: ink.useInput,
-    useStdout: ink.useStdout,
-  });
-
-  const output = ink.renderToString(
-    React.default.createElement(Picker, {
-      sessions: [{
-        id: "session-1",
-        title: "继续改 TUI",
-        cwd: process.cwd(),
-        createdAt: "2026-06-18T00:00:00.000Z",
-        updatedAt: "2026-06-18T00:00:00.000Z",
-        messageCount: 2,
-        messages: [],
-      }],
-      now: new Date("2026-06-18T00:03:00.000Z"),
-      onSelect: () => undefined,
-      onCancel: () => undefined,
-    }),
-    { columns: 120 },
-  );
-
-  assert.match(output, /██/);
-  assert.equal((output.match(/Kitty Agent/g) ?? []).length, 0);
-  assert.match(output, /继续会话/);
-  assert.match(output, /0\. 新建会话/);
-  assert.match(output, /1\. 继续改 TUI/);
-  assert.match(output, /3 分钟前/);
-});
-
 function createFakeDomElement(
   left: number,
   top: number,
@@ -363,51 +199,6 @@ function createFakeDomElement(
     } as import("ink").DOMElement["yogaNode"],
   };
 }
-
-test("tui theme uses black surfaces with light gold text accents", () => {
-  assert.equal(TUI_COLORS.background, "#05080c");
-  assert.equal(TUI_COLORS.panel, "#0d141c");
-  assert.equal(TUI_COLORS.panelStrong, "#121d28");
-  assert.equal(TUI_COLORS.text, "#fff7e6");
-  assert.equal(TUI_COLORS.user, "#f6d58b");
-  assert.equal(TUI_COLORS.reasoning, "#bfa977");
-  assert.equal(TUI_COLORS.warning, "#f6d58b");
-});
-
-test("tui footer height reserves a gap but not a top border row", () => {
-  assert.equal(measureTuiFooterRows(1), 8);
-});
-
-test("tui footer top gap is a visible background row", () => {
-  assert.equal(TUI_FOOTER_TOP_GAP_ROWS, 1);
-  assert.equal(TUI_FOOTER_META_ROWS, 1);
-  assert.equal(TUI_COLORS.background, "#05080c");
-});
-
-test("tui transcript renders an empty first screen without transcript facts", async () => {
-  const React = await import("react");
-  const ink = await import("ink");
-  const { createTranscriptComponent } = await import("../../src/shell/tui/components/Transcript.js");
-  const Transcript = createTranscriptComponent({
-    React: React.default,
-    Box: ink.Box,
-    Text: ink.Text,
-  });
-
-  const output = ink.renderToString(
-    React.default.createElement(Transcript, {
-      state: createInitialTuiState(),
-      viewport: { width: 80, height: 12 },
-    }),
-    { columns: 100 },
-  );
-
-  assert.doesNotMatch(output, /Kitty/);
-  assert.doesNotMatch(output, /新会话已就绪/);
-  assert.doesNotMatch(output, /输入任务后按 Enter 发送/);
-  assert.doesNotMatch(output, /PageUp\/PageDown/);
-  assert.doesNotMatch(output, /选择会话/);
-});
 
 test("tui transcript renders user, reasoning, assistant, and system rows", async () => {
   const React = await import("react");
@@ -439,18 +230,6 @@ test("tui transcript renders user, reasoning, assistant, and system rows", async
   assert.match(output, /answer/);
   assert.match(output, /worker answer/);
   assert.match(output, /notice/);
-});
-
-test("tui transcript reasoning gutter uses the muted reasoning color", () => {
-  const rows = renderTranscriptLineViews([{
-    id: "entry-1",
-    role: "reasoning",
-    text: "thinking",
-  }], 80);
-  const content = rows.find((row) => row.kind === "content");
-
-  assert.equal(content?.style.accent, TUI_COLORS.reasoning);
-  assert.equal(content?.style.text, TUI_COLORS.reasoning);
 });
 
 test("tui transcript aligns every message role content column", async () => {

@@ -1,5 +1,6 @@
 import path from "node:path";
 
+import { ConfigError } from "../config/errors.js";
 import {
   PROJECT_STATE_DIR_NAME,
   PROJECT_STATE_ENV_FILE_NAME,
@@ -8,6 +9,16 @@ import {
 export function formatCliSetupError(error: unknown, cwd = process.cwd()): string | undefined {
   const message = error instanceof Error ? error.message : String(error);
   const envFile = path.join(path.resolve(cwd), PROJECT_STATE_DIR_NAME, PROJECT_STATE_ENV_FILE_NAME);
+
+  if (error instanceof ConfigError) {
+    return [
+      "Project is not ready to run.",
+      "Create or repair the project template with: kitty init",
+      `Config file: ${envFile}`,
+      "Then fill required values and run: kitty doctor",
+      `Original error: ${message}`,
+    ].join("\n");
+  }
 
   if (isMissingRuntimeEnvError(message)) {
     return [

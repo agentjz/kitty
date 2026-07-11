@@ -274,7 +274,10 @@ function readControlPlaneStatus(rootDir: string): {
     return {
       executions: summarizeExecutionSet(executions, { recentLimit: DEFAULT_RECENT_LIMIT }),
       wakeSignals: {
-        recent: ledger.wakeSignals.list().map(summarizeWakeSignal).slice(0, DEFAULT_RECENT_LIMIT),
+        recent: ledger.wakeSignals.list()
+          .slice(-DEFAULT_RECENT_LIMIT)
+          .reverse()
+          .map(summarizeWakeSignal),
       },
     };
   } finally {

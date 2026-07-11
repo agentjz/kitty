@@ -87,6 +87,21 @@ test("Agnes chat request can disable chat template thinking", () => {
   assert.equal("stream_options" in body, false);
 });
 
+test("chat request omits an empty tool surface", () => {
+  const body = buildProviderRequestBody({
+    provider: "agnes",
+    model: "agnes-2.0-flash",
+    messages: [{ role: "user", content: "hello" }],
+    tools: [],
+    stream: true,
+    forceReasoning: false,
+    thinking: "enabled",
+  });
+
+  assert.equal("tools" in body, false);
+  assert.equal("tool_choice" in body, false);
+});
+
 test("non-replay chat profile never sends stored reasoning_content", () => {
   const body = buildProviderRequestBody({
     provider: "nvidia",

@@ -37,7 +37,10 @@ export function createTuiTurnDisplay(options: {
 
   options.abortSignal.addEventListener("abort", () => {
     aborted = true;
-    updateActivity(undefined);
+    options.controller.updateDock({
+      activity: undefined,
+      turnStartedAt: undefined,
+    });
   });
 
   const callbacks: AgentCallbacks = {
@@ -76,7 +79,10 @@ export function createTuiTurnDisplay(options: {
       }
     },
     onAssistantDone() {
-      updateActivity(undefined);
+      options.controller.updateDock({
+        activity: undefined,
+        turnStartedAt: undefined,
+      });
     },
     onToolCall(name, args) {
       if (isAborted()) {
@@ -116,14 +122,19 @@ export function createTuiTurnDisplay(options: {
 
   return {
     callbacks,
+    start() {
+      options.controller.updateDock({ turnStartedAt: Date.now() });
+    },
     flush() {
       options.controller.updateDock({
         activity: undefined,
+        turnStartedAt: undefined,
       });
     },
     dispose() {
       options.controller.updateDock({
         activity: undefined,
+        turnStartedAt: undefined,
       });
     },
   };

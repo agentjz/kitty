@@ -3,7 +3,8 @@ import { EXTENSION_DEFINITIONS } from "../extensions/definitions.js";
 import { INITIAL_TELEGRAM_CONFIG } from "./hosts.js";
 import { INITIAL_PROJECT_DOC_MAX_BYTES } from "./projectDocs.js";
 import { getInitialRuntimeConfig } from "./initialConfig.js";
-import { getDefaultProviderPreset, PROVIDER_PRESETS } from "./providerPresets.js";
+import { getDefaultProviderPreset, getProviderPresetBaseUrl, PROVIDER_PRESETS } from "./providerPresets.js";
+import type { ProviderPreset } from "./providerPresets.js";
 
 export function buildProjectEnvTemplate(example: boolean): string {
   const initialConfig = getInitialRuntimeConfig();
@@ -88,14 +89,7 @@ function formatCommonEnvSections(input: {
 }
 
 function formatProviderPreset(
-  preset: {
-    label: string;
-    provider: string;
-    baseUrl: string;
-    model: string;
-    thinking?: string;
-    reasoningEffort?: string;
-  },
+  preset: ProviderPreset,
   options: {
     apiKey: string;
     commented: boolean;
@@ -106,7 +100,7 @@ function formatProviderPreset(
     `# Provider preset: ${preset.label}`,
     `${prefix}${KITTY_ENV.provider}=${preset.provider}`,
     `${prefix}${KITTY_ENV.apiKey}=${options.apiKey}`,
-    `${prefix}${KITTY_ENV.baseUrl}=${preset.baseUrl}`,
+    `${prefix}${KITTY_ENV.baseUrl}=${getProviderPresetBaseUrl(preset)}`,
     `${prefix}${KITTY_ENV.model}=${preset.model}`,
     `${prefix}${KITTY_ENV.thinking}=${preset.thinking ?? ""}`,
     `${prefix}${KITTY_ENV.reasoningEffort}=${preset.reasoningEffort ?? ""}`,

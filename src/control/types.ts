@@ -1,5 +1,5 @@
 import type { ExecutionKind } from "../execution/kinds.js";
-import type { LeadWaitPolicy } from "../protocol/leadWait.js";
+import type { LeadWaitPolicy } from "../execution/leadWaitPolicy.js";
 
 export type ExecutionStatus = "created" | "running" | "paused" | "completed" | "failed" | "aborted" | "stale";
 export type WakeSignalReason = "completed" | "failed" | "aborted" | "paused" | "stale";

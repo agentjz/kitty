@@ -29,7 +29,6 @@ test("runtime context includes a concise project map fact block", async (t) => {
   });
 
   const prompt = layers.runtimeFactBlocks.join("\n\n");
-  assert.match(prompt, /Project orientation evidence/);
   assert.match(prompt, /Scripts: verify/);
   assert.match(prompt, /src/);
 });

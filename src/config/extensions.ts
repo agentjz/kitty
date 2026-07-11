@@ -1,5 +1,6 @@
 import type { AppConfig } from "../types.js";
 import { EXTENSION_DEFINITIONS, EXTENSION_IDS, type ExtensionId } from "../extensions/definitions.js";
+import { invalidConfigValue, missingConfigValue } from "./errors.js";
 
 export { EXTENSION_IDS, type ExtensionId };
 
@@ -13,7 +14,7 @@ export function getInitialExtensionSwitches(): ExtensionToggleConfig {
 
 export function normalizeExtensions(value: unknown): ExtensionToggleConfig {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("Missing extension switch configuration.");
+    throw missingConfigValue("extensions", "Missing extension switch configuration.");
   }
 
   const record = value as Record<string, unknown>;
@@ -30,7 +31,7 @@ export function readEnabledExtensionIds(config: Pick<AppConfig, "extensions">): 
 
 function readRequiredBoolean(value: unknown, id: ExtensionId): boolean {
   if (typeof value !== "boolean") {
-    throw new Error(`Missing or invalid extension switch: ${id}.`);
+    throw invalidConfigValue(`extensions.${id}`, `Missing or invalid extension switch: ${id}.`);
   }
   return value;
 }

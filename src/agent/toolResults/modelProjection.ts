@@ -10,6 +10,19 @@ export function projectToolResultForModel(input: {
   toolName: string;
   result: ToolExecutionResult;
 }): string {
+  const projection = projectRawToolResultForModel(input);
+  if (projection.trim()) {
+    return projection;
+  }
+  return input.result.ok
+    ? `${input.toolName} completed without text output.`
+    : `${input.toolName} failed without error detail.`;
+}
+
+function projectRawToolResultForModel(input: {
+  toolName: string;
+  result: ToolExecutionResult;
+}): string {
   if (input.result.metadata?.outputGovernance) {
     return input.result.metadata.outputGovernance.projection;
   }

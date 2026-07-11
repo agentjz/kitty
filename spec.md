@@ -76,7 +76,7 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 - extension 开关
 - Telegram 配置
 
-未知 provider、不支持的 provider/model 组合、缺失必填项和非法值必须显式失败。运行时不能静默猜测 model 或 provider。
+未知 provider、不支持的 provider/model 组合、缺失必填项和非法值必须在配置 schema 显式失败。运行时不能静默猜测 model 或 provider。
 
 当前具名 provider profile 包括 NVIDIA NIM、Agnes AI、Groq、Cerebras、Gemini、DeepSeek、OpenAI、YLS 和 TTAPI。`openai-compatible` 仅用于用户明确配置的高级兼容 endpoint；它不是任何具名 provider 的别名。
 
@@ -162,7 +162,7 @@ Provider 与 model 是独立事实。Provider 决定 transport、endpoint 行为
 
 Chat Completions 的 HTTP abort signal 必须作为 SDK request options 传递，不能进入 JSON body。只有明确的无状态 stream framing 故障可以降级为一次非流式请求；认证、参数校验、限流和 HTTP provider error 不得被非流式 fallback 重放。
 
-Provider 层把模型响应、streaming、usage 和有界临时失败归一为 agent 事实。它不增加任务策略。
+Provider request 边界把 adapter、transport 和 SDK 失败归一为 `ProviderError`。错误 kind 驱动 retry、stream fallback 和 alternate base URL；CLI 只展示结构化错误事实。没有可用工具时，Chat Completions request 必须省略 `tools` 字段，不能发送空工具数组。Provider 层不增加任务策略。
 
 ## 7. Tools 与 Extensions
 
@@ -176,7 +176,7 @@ Provider 层把模型响应、streaming、usage 和有界临时失败归一为 a
 - `bash`
 - `send_file`
 
-工具执行真实操作，返回有界证据，记录 changed path，并在需要时保留可恢复的原始输出。Tool output projection 限制上下文成本，但不伪造语义结论。
+工具执行真实操作，返回有界证据，记录 changed path，并在需要时保留可恢复的原始输出。每次 tool call 无论成功或失败都必须持久为下一次模型请求可见的非空 tool result；成功但没有文本输出时，机器明确记录该事实。Tool output projection 限制上下文成本，但不伪造语义结论。
 
 ### Extensions
 
@@ -276,6 +276,8 @@ TUI 规则：
 - Transcript 的 user、assistant、reasoning、system、subagent、subagent-reasoning 使用同一个正文框架。Role 可以改变 gutter、颜色和强调，但不能改变正文起始列。
 - Footer 的 model 标签与 Runtime Dock 的 activity/background/subagent 标签使用同一个左侧内容 inset。
 - Model metadata 位于 composer 下方左侧；context budget 位于右侧。
+- Context budget 必须属于当前选中的 session。项目全局 runtime status 不能用另一条最近已保存 session 的 budget 覆盖新建或已选 session。
+- 用户提交后到最终模型回答完成期间，TUI 在 context budget 右侧显示本轮持续时间；思考、工具调用和后续模型请求不重置它。
 - Runtime Dock 保持稳定两行结构，展示当前 activity、运行时长、lead blocking 和 live background/subagent lane。
 - TUI 只显示 control-plane 状态为 `created` 或 `running` 的 background/subagent lane。
 - 存在 live execution lane 时，TUI 轻量刷新 execution 账本。Execution 进入终态后必须清除 lane；启动时的 `running` 文案不能成为错误的当前状态。

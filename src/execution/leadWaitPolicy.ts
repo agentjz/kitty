@@ -1,5 +1,3 @@
-export const LEAD_WAIT_PROTOCOL = "kitty.lead-wait-policy" as const;
-
 export const LEAD_WAIT_TERMINAL_STATUSES = ["completed", "failed", "aborted", "paused", "stale"] as const;
 
 export type LeadWaitMode = "none" | "while_execution_active";
@@ -8,27 +6,19 @@ export type LeadWaitScope = "global" | "objective" | "task";
 export type LeadWaitTerminalStatus = typeof LEAD_WAIT_TERMINAL_STATUSES[number];
 
 export interface LeadWaitPolicy {
-  protocol: typeof LEAD_WAIT_PROTOCOL;
   lead: LeadWaitMode;
   wake: LeadWakePolicy;
   scope: LeadWaitScope;
   terminalStatuses: readonly LeadWaitTerminalStatus[];
 }
 
-export type LeadWaitPolicyInput = Partial<Omit<LeadWaitPolicy, "protocol">>;
+export type LeadWaitPolicyInput = Partial<LeadWaitPolicy>;
 
-export function createLeadWaitPolicy(input: {
-  lead?: LeadWaitMode;
-  wake?: LeadWakePolicy;
-  scope?: LeadWaitScope;
-  terminalStatuses?: readonly LeadWaitTerminalStatus[];
-} = {}): LeadWaitPolicy {
+export function createLeadWaitPolicy(input: LeadWaitPolicyInput = {}): LeadWaitPolicy {
   const lead = input.lead ?? "none";
-  const wake = input.wake ?? (lead === "while_execution_active" ? "required" : "optional");
   const policy: LeadWaitPolicy = {
-    protocol: LEAD_WAIT_PROTOCOL,
     lead,
-    wake,
+    wake: input.wake ?? (lead === "while_execution_active" ? "required" : "optional"),
     scope: input.scope ?? "objective",
     terminalStatuses: [...(input.terminalStatuses ?? LEAD_WAIT_TERMINAL_STATUSES)],
   };
@@ -36,33 +26,15 @@ export function createLeadWaitPolicy(input: {
   return policy;
 }
 
-export function createLeadWaitPolicyForRunner(input: {
-  createsExecution: boolean;
-  emitsWakeSignal: boolean;
-  policy?: LeadWaitPolicyInput;
-}): LeadWaitPolicy {
-  if (input.policy) {
-    return createLeadWaitPolicy(input.policy);
-  }
-
-  return createLeadWaitPolicy({
-    lead: input.createsExecution && input.emitsWakeSignal ? "while_execution_active" : "none",
-    wake: input.emitsWakeSignal ? "required" : "optional",
-  });
-}
-
 export function assertLeadWaitPolicy(policy: LeadWaitPolicy): void {
-  if (policy.protocol !== LEAD_WAIT_PROTOCOL) {
-    throw new Error(`Unsupported Lead wait policy protocol '${String(policy.protocol)}'.`);
-  }
   if (policy.lead !== "none" && policy.lead !== "while_execution_active") {
-    throw new Error(`Unsupported Lead wait mode '${String(policy.lead)}'.`);
+    throw new Error(`Unsupported lead wait mode '${String(policy.lead)}'.`);
   }
   if (policy.wake !== "optional" && policy.wake !== "required") {
-    throw new Error(`Unsupported Lead wake policy '${String(policy.wake)}'.`);
+    throw new Error(`Unsupported lead wake policy '${String(policy.wake)}'.`);
   }
   if (policy.scope !== "global" && policy.scope !== "objective" && policy.scope !== "task") {
-    throw new Error(`Unsupported Lead wait scope '${String(policy.scope)}'.`);
+    throw new Error(`Unsupported lead wait scope '${String(policy.scope)}'.`);
   }
   if (policy.lead === "while_execution_active" && policy.wake !== "required") {
     throw new Error("Lead-blocking executions must publish a required wake signal.");
@@ -72,7 +44,7 @@ export function assertLeadWaitPolicy(policy: LeadWaitPolicy): void {
   }
   for (const status of policy.terminalStatuses) {
     if (!(LEAD_WAIT_TERMINAL_STATUSES as readonly string[]).includes(status)) {
-      throw new Error(`Unsupported Lead wait terminal status '${String(status)}'.`);
+      throw new Error(`Unsupported lead wait terminal status '${String(status)}'.`);
     }
   }
 }

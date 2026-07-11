@@ -1,6 +1,8 @@
 import { normalizeTelegramConfig } from "../config/hosts.js";
+import { resolveModelProfile } from "../provider/catalog.js";
 import { normalizeModelReasoningEffort, normalizeModelThinkingMode } from "./modelOptions.js";
 import { normalizeExtensions } from "./extensions.js";
+import { invalidConfigValue, missingConfigValue } from "./errors.js";
 import type { AppConfig } from "../types.js";
 
 export const CURRENT_CONFIG_SCHEMA_VERSION = 1 as const;
@@ -13,7 +15,7 @@ export function normalizeRuntimeConfig(
     stateRootDir?: string;
   } = {},
 ): AppConfig {
-  return {
+  const normalized = {
     schemaVersion: CURRENT_CONFIG_SCHEMA_VERSION,
     provider: requireTextConfig(config.provider, "provider"),
     baseUrl: requireTextConfig(config.baseUrl, "baseUrl"),
@@ -37,26 +39,40 @@ export function normalizeRuntimeConfig(
     telegram: normalizeTelegramConfig(config.telegram),
     extensions: normalizeExtensions(config.extensions),
   };
+
+  validateProviderModelConfig(normalized);
+  return normalized;
+}
+
+function validateProviderModelConfig(config: Pick<AppConfig, "provider" | "model">): void {
+  try {
+    resolveModelProfile(config);
+  } catch (error) {
+    throw invalidConfigValue(
+      "KITTY_PROVIDER/KITTY_MODEL",
+      error instanceof Error ? error.message : String(error),
+    );
+  }
 }
 
 function requireTextConfig(value: unknown, name: string): string {
   const normalized = String(value ?? "").trim();
   if (!normalized) {
-    throw new Error(`Missing config value: ${name}.`);
+    throw missingConfigValue(name);
   }
   return normalized;
 }
 
 function requireBooleanConfig(value: unknown, name: string): boolean {
   if (typeof value !== "boolean") {
-    throw new Error(`Missing or invalid config value: ${name}.`);
+    throw invalidConfigValue(name, `Missing or invalid config value: ${name}.`);
   }
   return value;
 }
 
 function clampNumber(value: number, min: number, max: number, name: string): number {
   if (!Number.isFinite(value)) {
-    throw new Error(`Missing or invalid config value: ${name}.`);
+    throw invalidConfigValue(name, `Missing or invalid config value: ${name}.`);
   }
 
   return Math.max(min, Math.min(max, Math.trunc(value)));

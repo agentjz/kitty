@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { BackgroundExecutionStore, reconcileBackgroundExecutions } from "../../src/execution/background.js";
+import {
+  BackgroundExecutionStore,
+  reconcileBackgroundExecutions,
+  waitForBackgroundExecution,
+} from "../../src/execution/background.js";
+import { isAbortError } from "../../src/utils/abort.js";
 import { createTempWorkspace } from "../helpers.js";
 
 test("background execution store creates, starts, closes, and emits wake facts", async (t) => {
@@ -73,4 +78,23 @@ test("background execution store records running output summaries", async (t) =>
   assert.equal(running?.summary, "step two");
   assert.equal(running?.lastOutputAt, "2026-05-22T00:00:00.000Z");
   assert.match(running?.output ?? "", /step one/);
+});
+
+test("background wait stops immediately when its caller aborts", async (t) => {
+  const root = await createTempWorkspace("background-wait-abort", t);
+  const store = new BackgroundExecutionStore(root);
+  const job = store.create({
+    command: "long command",
+    cwd: root,
+    requestedBy: "lead",
+  });
+  store.markRunning(job.id, { pid: process.pid });
+  const controller = new AbortController();
+  controller.abort();
+
+  await assert.rejects(
+    () => waitForBackgroundExecution({ rootDir: root, id: job.id, abortSignal: controller.signal }),
+    isAbortError,
+  );
+  assert.equal(store.load(job.id)?.status, "running");
 });

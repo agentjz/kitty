@@ -6,6 +6,7 @@ import { SessionEventStore } from "../session/events.js";
 import type { RuntimeConfig } from "../types.js";
 import type { AgentCallbacks } from "../agent/types.js";
 import { isAgentWorkerExecutionKind, toAgentWorkerIdentityKind } from "./kinds.js";
+import { executionKindMismatch, unknownExecution } from "./errors.js";
 import { ExecutionStore } from "./store.js";
 
 export async function runExecutionWorker(input: {
@@ -18,10 +19,10 @@ export async function runExecutionWorker(input: {
   const store = new ExecutionStore(input.rootDir);
   const execution = store.load(input.executionId);
   if (!execution) {
-    throw new Error(`Unknown execution: ${input.executionId}`);
+    throw unknownExecution(input.executionId);
   }
   if (!isAgentWorkerExecutionKind(execution.kind)) {
-    throw new Error(`Execution ${execution.id} is '${execution.kind}', not an agent worker execution.`);
+    throw executionKindMismatch(execution.id, execution.kind, "subagent");
   }
 
   const sessionStore = await createSessionStore(input.config.paths.sessionsDir);

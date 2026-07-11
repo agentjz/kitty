@@ -1,6 +1,8 @@
 import type { Command } from "commander";
 
-import { cancelExecution, readExecutionOutput } from "../../execution/lifecycle.js";
+import { cancelExecution } from "../../execution/lifecycle.js";
+import { unknownExecution } from "../../execution/errors.js";
+import { readExecutionOutput } from "../../execution/output.js";
 import { ExecutionStore } from "../../execution/store.js";
 import { summarizeExecution } from "../../runtime/executionSummary.js";
 import type { RuntimeExecutionSummary } from "../../runtime/statusTypes.js";
@@ -46,7 +48,7 @@ export function registerExecutionCommand(
       const runtime = await options.resolveRuntime(options.getCliOverrides());
       const execution = new ExecutionStore(readStateRoot(runtime)).load(id);
       if (!execution) {
-        throw new Error(`Unknown execution: ${id}`);
+        throw unknownExecution(id);
       }
       printExecutionList([summarizeExecution(execution)], Boolean(commandOptions.json));
     });

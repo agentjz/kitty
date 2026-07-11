@@ -3,7 +3,8 @@ import test from "node:test";
 
 import { getInitialRuntimeConfig } from "../../src/config/initialConfig.js";
 import { MODEL_REASONING_EFFORTS, MODEL_THINKING_MODES } from "../../src/config/modelOptions.js";
-import { getDefaultProviderPreset } from "../../src/config/providerPresets.js";
+import { getDefaultProviderPreset, getProviderPresetBaseUrl } from "../../src/config/providerPresets.js";
+import { ConfigError } from "../../src/config/errors.js";
 import { normalizeRuntimeConfig } from "../../src/config/schema.js";
 
 test("runtime config schema normalizes model, context, telegram, and extensions", () => {
@@ -25,7 +26,7 @@ test("runtime config schema normalizes model, context, telegram, and extensions"
   assert.equal(normalized.provider, defaultPreset.provider);
   assert.equal(normalized.model, defaultPreset.model);
   assert.equal(config.provider, defaultPreset.provider);
-  assert.equal(config.baseUrl, defaultPreset.baseUrl);
+  assert.equal(config.baseUrl, getProviderPresetBaseUrl(defaultPreset));
   assert.equal(config.model, defaultPreset.model);
   assert.equal(config.thinking, defaultPreset.thinking);
   assert.equal(config.reasoningEffort, defaultPreset.reasoningEffort);
@@ -53,6 +54,12 @@ test("runtime config schema rejects missing required values instead of hiding de
   assert.throws(
     () => normalizeRuntimeConfig({ ...config, provider: "" }),
     /Missing config value: provider/,
+  );
+  assert.throws(
+    () => normalizeRuntimeConfig({ ...config, provider: "nvidia", model: "not-in-catalog" }),
+    (error: unknown) => error instanceof ConfigError
+      && error.kind === "invalid"
+      && error.key === "KITTY_PROVIDER/KITTY_MODEL",
   );
   assert.throws(
     () => normalizeRuntimeConfig({ ...config, telegram: { ...config.telegram, apiBaseUrl: "" } }),

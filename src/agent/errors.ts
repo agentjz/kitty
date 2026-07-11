@@ -1,4 +1,5 @@
 import type { SessionRecord } from "../types.js";
+import { formatProviderError } from "../provider/errors.js";
 
 export class AgentTurnError extends Error {
   readonly session: SessionRecord;
@@ -16,42 +17,8 @@ export class AgentTurnError extends Error {
 
 export function getErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
-  const code = String((error as { code?: unknown }).code ?? "");
-  const status = (error as { status?: unknown }).status;
-  const lower = message.toLowerCase();
-
-  if (
-    lower.includes("api key missing") ||
-    lower.includes("no api key found") ||
-    lower.includes("set KITTY_api_key")
-  ) {
+  if (message.toLowerCase().includes("api key missing") || message.toLowerCase().includes("no api key found")) {
     return "User-fixable error: API key not found. Set `KITTY_API_KEY` in the current project `.kitty/.env`.";
   }
-
-  if (
-    status === 401 ||
-    lower.includes("authentication fails") ||
-    lower.includes("authentication failed") ||
-    lower.includes("invalid api key") ||
-    lower.includes("api key is invalid")
-  ) {
-    return "API authentication failed. Check whether `KITTY_API_KEY` in the current project `.env` is correct.";
-  }
-
-  if (
-    ["ECONNREFUSED", "ENOTFOUND", "ETIMEDOUT", "UND_ERR_CONNECT_TIMEOUT", "ECONNRESET"].includes(code) ||
-    /fetch failed|network|timeout|socket hang up|econnrefused|enotfound|etimedout/i.test(message)
-  ) {
-    return "Environment error: network connection failed; the current provider/base URL is unreachable. Check network, proxy settings, or `KITTY_BASE_URL`.";
-  }
-
-  if (status === 404 || lower.includes("returned 404")) {
-    return "User-fixable error: provider endpoint returned 404. Check `KITTY_PROVIDER`, `KITTY_MODEL`, and `KITTY_BASE_URL` as one provider profile; the selected provider may use Responses instead of Chat Completions.";
-  }
-
-  if (typeof status === "number" && status >= 500) {
-    return `Provider error: service returned ${status}. Retry later or confirm the provider service is healthy.`;
-  }
-
-  return message;
+  return formatProviderError(error) ?? message;
 }

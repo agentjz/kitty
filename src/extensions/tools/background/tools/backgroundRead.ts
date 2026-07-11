@@ -1,4 +1,4 @@
-import { readBackgroundExecutionOutput } from "../../../../execution/background.js";
+import { readExecutionOutput } from "../../../../execution/output.js";
 import { clampNumber, okResult, parseArgs, readString } from "../../../../tools/core/shared.js";
 import type { RegisteredTool } from "../../../../tools/core/types.js";
 
@@ -23,9 +23,10 @@ export const backgroundReadTool: RegisteredTool = {
   },
   async execute(rawArgs, context) {
     const args = parseArgs(rawArgs);
-    const output = readBackgroundExecutionOutput({
+    const output = readExecutionOutput({
       rootDir: context.projectContext.stateRootDir,
       id: readString(args.id, "id"),
+      kind: "background",
       mode: readOutputMode(args.mode),
       lines: clampNumber(args.lines, 1, 10_000, 80),
       maxChars: clampNumber(args.max_chars, 1, 1_000_000, 20_000),

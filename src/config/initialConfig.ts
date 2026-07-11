@@ -1,6 +1,6 @@
 import { INITIAL_TELEGRAM_CONFIG } from "./hosts.js";
 import { getInitialExtensionSwitches } from "./extensions.js";
-import { getDefaultProviderPreset } from "./providerPresets.js";
+import { getDefaultProviderPreset, getProviderPresetBaseUrl } from "./providerPresets.js";
 import type { AppConfig } from "../types.js";
 
 export function getInitialRuntimeConfig(): AppConfig {
@@ -8,7 +8,7 @@ export function getInitialRuntimeConfig(): AppConfig {
   return {
     schemaVersion: 1,
     provider: preset.provider,
-    baseUrl: preset.baseUrl,
+    baseUrl: getProviderPresetBaseUrl(preset),
     model: preset.model,
     profile: "intp",
     thinking: preset.thinking,

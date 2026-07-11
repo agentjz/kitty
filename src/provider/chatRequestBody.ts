@@ -30,9 +30,12 @@ export function buildProviderRequestBody(
       provider: input.provider,
       model: input.model,
     }),
-    tools: input.tools,
     stream: input.stream,
   };
+
+  if (input.tools?.length) {
+    body.tools = input.tools;
+  }
 
   if (input.tools?.length && capabilities.chat.toolChoice === "auto") {
     body.tool_choice = "auto";

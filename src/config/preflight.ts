@@ -3,7 +3,7 @@ import path from "node:path";
 
 import dotenv from "dotenv";
 import { KITTY_BASE_ENV, KITTY_ENV } from "./envKeys.js";
-import { PROVIDER_PRESETS } from "./providerPresets.js";
+import { getProviderPresetBaseUrl, PROVIDER_PRESETS } from "./providerPresets.js";
 import { resolveModelProfile } from "../provider/catalog.js";
 import {
   PROJECT_STATE_DIR_NAME,
@@ -162,7 +162,7 @@ function readProviderPresetLabel(input: {
   return PROVIDER_PRESETS.find((preset) =>
     preset.provider === input.provider &&
     preset.model === input.model &&
-    preset.baseUrl === input.baseUrl,
+    getProviderPresetBaseUrl(preset) === input.baseUrl,
   )?.label;
 }
 

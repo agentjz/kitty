@@ -1,5 +1,6 @@
 import path from "node:path";
 
+import { invalidConfigValue, missingConfigValue } from "./errors.js";
 import { getProjectStatePaths } from "../project/statePaths.js";
 
 export interface TelegramConfig {
@@ -122,7 +123,7 @@ export function parseTelegramAllowedUserIds(raw: string | undefined): number[] {
 function normalizeApiBaseUrl(raw: string | undefined): string {
   const value = String(raw ?? "").trim().replace(/\/+$/u, "");
   if (!value) {
-    throw new Error("Missing Telegram API base URL.");
+    throw missingConfigValue("telegram.apiBaseUrl", "Missing Telegram API base URL.");
   }
   return value;
 }
@@ -150,7 +151,7 @@ function normalizeAllowedUserIds(values: readonly number[] | undefined): number[
 
 function clampNumber(value: number | undefined, min: number, max: number, name: string): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
-    throw new Error(`Missing or invalid config value: ${name}.`);
+    throw invalidConfigValue(name, `Missing or invalid config value: ${name}.`);
   }
 
   const normalized = Math.trunc(value);

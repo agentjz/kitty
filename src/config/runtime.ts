@@ -9,6 +9,7 @@ import {
 import { KITTY_BASE_ENV, KITTY_ENV } from "./envKeys.js";
 import { EXTENSION_IDS } from "../extensions/definitions.js";
 import { normalizeRuntimeConfig } from "./schema.js";
+import { invalidConfigValue, missingConfigValue } from "./errors.js";
 import { resolveAgentProfile } from "../agent/profiles/registry.js";
 import { resolveProjectRoots } from "../context/repoRoots.js";
 import {
@@ -63,7 +64,10 @@ export async function resolveRuntimeConfig(overrides: CliOverrides = {}): Promis
   });
 
   if (!merged.profile) {
-    throw new Error("Missing agent profile. Set KITTY_PROFILE explicitly in the project's .kitty/.env file.");
+    throw missingConfigValue(
+      "KITTY_PROFILE",
+      "Missing agent profile. Set KITTY_PROFILE explicitly in the project's .kitty/.env file.",
+    );
   }
   resolveAgentProfile(merged.profile);
 
@@ -90,7 +94,10 @@ function readExtensionEnv() {
 function readIntegerEnv(name: keyof typeof KITTY_BASE_ENV, value: string): number {
   const parsed = parseIntegerEnv(value);
   if (parsed === undefined) {
-    throw new Error(`Missing or invalid ${KITTY_BASE_ENV[name]} in the project's .kitty/.env file.`);
+    throw invalidConfigValue(
+      KITTY_BASE_ENV[name],
+      `Missing or invalid ${KITTY_BASE_ENV[name]} in the project's .kitty/.env file.`,
+    );
   }
   return parsed;
 }
@@ -102,7 +109,10 @@ function readBooleanEnv(name: keyof typeof KITTY_BASE_ENV, value: string): boole
 function readBooleanValue(envKey: string, value: string): boolean {
   const parsed = parseBooleanEnv(value);
   if (parsed === undefined) {
-    throw new Error(`Missing or invalid ${envKey} in the project's .kitty/.env file.`);
+    throw invalidConfigValue(
+      envKey,
+      `Missing or invalid ${envKey} in the project's .kitty/.env file.`,
+    );
   }
   return parsed;
 }

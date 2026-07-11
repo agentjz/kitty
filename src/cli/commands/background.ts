@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 
-import { BackgroundExecutionStore, readBackgroundExecutionOutput, terminateBackgroundExecution, waitForBackgroundExecution, waitForRegisteredBackgroundProcess } from "../../execution/background.js";
+import { BackgroundExecutionStore, terminateBackgroundExecution, waitForBackgroundExecution, waitForRegisteredBackgroundProcess } from "../../execution/background.js";
+import { readExecutionOutput } from "../../execution/output.js";
 import { summarizeExecution } from "../../runtime/executionSummary.js";
 import type { RuntimeExecutionSummary } from "../../runtime/statusTypes.js";
 import { buildExecutionScene } from "../../runtime/scene.js";
@@ -51,9 +52,10 @@ export function registerBackgroundCommand(
       }
 
       if (normalizedAction === "read") {
-        const output = readBackgroundExecutionOutput({
+        const output = readExecutionOutput({
           rootDir: runtime.stateRootDir,
           id,
+          kind: "background",
           mode: readOutputMode(commandOptions.mode),
           lines: commandOptions.tail,
         });
@@ -111,7 +113,7 @@ export function formatBackgroundExecution(execution: RuntimeExecutionSummary): s
   ].filter(Boolean).join("  ");
 }
 
-function printBackgroundOutput(output: ReturnType<typeof readBackgroundExecutionOutput>, json: boolean): void {
+function printBackgroundOutput(output: ReturnType<typeof readExecutionOutput>, json: boolean): void {
   if (json) {
     writeStdoutLine(JSON.stringify(output, null, 2));
     return;

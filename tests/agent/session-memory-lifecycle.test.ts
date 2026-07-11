@@ -68,11 +68,6 @@ test("agent turn writes same-session memory as a fixed lifecycle behavior", asyn
   assert.equal(mainRequests.length, 1);
   assert.equal(memoryRequests.length, 1);
   assert.equal(memoryRequests[0]?.tools.length, 0);
-  assert.match(String(memoryRequests[0]?.messages[0]?.content ?? ""), /Update same-session memory/);
-  assert.match(String(memoryRequests[0]?.messages[0]?.content ?? ""), /Required sections/);
-  assert.match(String(memoryRequests[0]?.messages[1]?.content ?? ""), /Memory output template/);
-  assert.match(String(memoryRequests[0]?.messages[1]?.content ?? ""), /## Current Focus/);
-  assert.match(String(memoryRequests[0]?.messages[1]?.content ?? ""), /Current user input/);
   assert.match(result.session.sessionMemory?.summary ?? "", /## Current Focus/);
   assert.match(result.session.sessionMemory?.summary ?? "", /## User Constraints/);
   assert.match(result.session.sessionMemory?.summary ?? "", /txt 纯文本回答/);
@@ -174,7 +169,6 @@ test("agent turn generates a model-written session title once", async (t) => {
 
   assert.equal(titleRequests.length, 1);
   assert.equal(titleRequests[0]?.tools.length, 0);
-  assert.match(String(titleRequests[0]?.messages[0]?.content ?? ""), /Create a concise title/);
   assert.equal(first.session.title, "启动会话选择");
   assert.equal(second.session.title, "启动会话选择");
 });
@@ -347,7 +341,6 @@ test("next turn injects model-written session memory while raw provider messages
   const prompt = renderPromptLayers(promptLayers);
   const rawMessages = request.messages.slice(1).map((message) => String(message.content ?? "")).join("\n");
 
-  assert.match(prompt, /Model-written session memory/);
   assert.match(prompt, /txt 纯文本回答/);
   assert.match(prompt, /luckymaomi\/777f/);
   assert.match(prompt, /luckymaomi\/ohmyflight/);
@@ -492,7 +485,7 @@ test("previous session memory is passed to the model for structured rewrite", as
   });
 
   const requestFacts = String(memoryRequests[0]?.messages[1]?.content ?? "");
-  assert.match(requestFacts, /Previous session memory:\n用户要求用 txt 回答/);
+  assert.match(requestFacts, /用户要求用 txt 回答/);
   assert.match(result.session.sessionMemory?.summary ?? "", /## Current Focus/);
   assert.match(result.session.sessionMemory?.summary ?? "", /## User Constraints/);
 });

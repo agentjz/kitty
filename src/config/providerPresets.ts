@@ -1,9 +1,9 @@
 import type { ModelReasoningEffort, ModelThinkingMode } from "../types.js";
+import { resolveModelProfile } from "../provider/catalog.js";
 
 export interface ProviderPreset {
   label: string;
   provider: string;
-  baseUrl: string;
   model: string;
   thinking?: ModelThinkingMode;
   reasoningEffort?: ModelReasoningEffort;
@@ -14,7 +14,6 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
   {
     label: "NVIDIA NIM + DeepSeek V4 Flash",
     provider: "nvidia",
-    baseUrl: "https://integrate.api.nvidia.com/v1",
     model: "deepseek-ai/deepseek-v4-flash",
     thinking: "enabled",
     reasoningEffort: "high",
@@ -23,7 +22,6 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
   {
     label: "Agnes AI + 2.0 Flash",
     provider: "agnes",
-    baseUrl: "https://apihub.agnes-ai.com/v1",
     model: "agnes-2.0-flash",
     thinking: "enabled",
     reasoningEffort: "high",
@@ -32,16 +30,22 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
   {
     label: "Gemini + 2.5 Flash",
     provider: "gemini",
-    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
     model: "gemini-2.5-flash",
     thinking: "disabled",
     reasoningEffort: "high",
     activeByDefault: false,
   },
   {
+    label: "YLS Codex + GPT-5.4",
+    provider: "yls",
+    model: "gpt-5.4",
+    thinking: "enabled",
+    reasoningEffort: "xhigh",
+    activeByDefault: false,
+  },
+  {
     label: "TTAPI + GPT-5.4",
     provider: "ttapi",
-    baseUrl: "https://w.ciykj.cn",
     model: "gpt-5.4",
     thinking: "disabled",
     reasoningEffort: "xhigh",
@@ -50,7 +54,6 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
   {
     label: "DeepSeek official V4",
     provider: "deepseek",
-    baseUrl: "https://api.deepseek.com",
     model: "deepseek-v4-flash",
     thinking: "enabled",
     reasoningEffort: "high",
@@ -60,4 +63,8 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
 
 export function getDefaultProviderPreset(): ProviderPreset {
   return PROVIDER_PRESETS.find((preset) => preset.activeByDefault) ?? PROVIDER_PRESETS[0]!;
+}
+
+export function getProviderPresetBaseUrl(preset: ProviderPreset): string {
+  return resolveModelProfile(preset).provider.defaultBaseUrl;
 }

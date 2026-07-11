@@ -118,8 +118,9 @@ async function runDelegationBehaviorBoundaryCheck(id: EvaluationCheckId): Promis
 }
 
 async function runBackgroundSubagentLifecycleCheck(id: EvaluationCheckId, rootDir: string): Promise<EvaluationCheckResult> {
-  const { BackgroundExecutionStore, readBackgroundExecutionOutput } = await import("../execution/background.js");
-  const { cancelExecution, readExecutionOutput } = await import("../execution/lifecycle.js");
+  const { BackgroundExecutionStore } = await import("../execution/background.js");
+  const { cancelExecution } = await import("../execution/lifecycle.js");
+  const { readExecutionOutput } = await import("../execution/output.js");
   const { ExecutionStore } = await import("../execution/store.js");
   const { buildRuntimeStatus } = await import("../runtime/status.js");
 
@@ -135,9 +136,10 @@ async function runBackgroundSubagentLifecycleCheck(id: EvaluationCheckId, rootDi
     output: "alpha\nbeta\n",
     summary: "beta",
   });
-  const backgroundTail = readBackgroundExecutionOutput({
+  const backgroundTail = readExecutionOutput({
     rootDir,
     id: background.id,
+    kind: "background",
     mode: "tail",
     lines: 1,
   });

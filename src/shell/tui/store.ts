@@ -26,6 +26,7 @@ export interface TuiRuntimeDockState {
   subagent?: string;
   context: string;
   model?: string;
+  turnStartedAt?: number;
 }
 
 export interface TuiScrollState {
@@ -241,7 +242,7 @@ export function renderTranscriptLineViews(
   return renderTranscriptLayoutLineViews(entries, width, TUI_COLORS);
 }
 
-export function formatContextBudget(session: SessionRecord | undefined): string {
+export function formatContextBudget(session: Pick<SessionRecord, "contextBudget"> | undefined): string {
   const budget = session?.contextBudget;
   if (!budget) {
     return "0%";
@@ -250,10 +251,13 @@ export function formatContextBudget(session: SessionRecord | undefined): string 
   return `${budget.estimatedChars}/${budget.limitChars} chars (${percent}%)`;
 }
 
-export function projectRuntimeStatusToDock(status: RuntimeStatus): Partial<TuiRuntimeDockState> {
+export function projectRuntimeStatusToDock(
+  status: RuntimeStatus,
+  activeSession: Pick<SessionRecord, "contextBudget"> | undefined,
+): Partial<TuiRuntimeDockState> {
   return {
     ...projectTuiExecutionDockFacts(status.scene.executions),
-    context: readRuntimeContextBudget(status),
+    context: formatContextBudget(activeSession),
   };
 }
 
@@ -305,13 +309,4 @@ function createEntryId(index: number): string {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
-}
-
-function readRuntimeContextBudget(status: RuntimeStatus): string {
-  const budget = status.sessions.latest?.contextBudget;
-  if (!budget) {
-    return "0%";
-  }
-  const percent = Math.round(budget.usageRatio * 100);
-  return `${budget.estimatedChars}/${budget.limitChars} chars (${percent}%)`;
 }

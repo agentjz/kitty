@@ -2,15 +2,22 @@
 
 import { API_MAX_ATTEMPTS, createApiRetryBudget, withApiRetries } from "./apiRetry.js";
 import type { ModelRequestMetric } from "./metrics.js";
-import { hasProviderUsageSnapshot } from "./usageNormalizer.js";
 import { isAbortError } from "../utils/abort.js";
 import type { AssistantResponse, AgentCallbacks } from "../agent/types.js";
-import { recordObservabilityEvent } from "../observability/writer.js";
 import { resolveProviderCapabilities } from "./capabilities.js";
 import type { ProviderMessage, ProviderWireAdapter } from "./contract.js";
 import { chatCompletionsAdapter } from "./chatCompletionsAdapter.js";
 import { responsesAdapter } from "./responsesAdapter.js";
 import { isProviderClientPool, type ProviderClientPool } from "./client.js";
+import {
+  canRetryWithAlternateBaseUrl,
+  isStreamingFallbackEligible,
+  normalizeProviderError,
+} from "./errors.js";
+import {
+  recordProviderRequestEvent,
+  type ProviderRequestObservability,
+} from "./requestObservability.js";
 import type { FunctionToolDefinition } from "../tools/index.js";
 import type { ModelReasoningEffort, ModelThinkingMode } from "../types.js";
 
@@ -30,13 +37,7 @@ export async function fetchAssistantResponse(
   callbacks: AgentCallbacks | undefined,
   abortSignal?: AbortSignal,
   onRequestMetric?: (metric: ModelRequestMetric) => void,
-  observability?: {
-    rootDir: string;
-    sessionId: string;
-    identityKind?: string;
-    identityName?: string;
-    configuredModel: string;
-  },
+  observability?: ProviderRequestObservability,
 ): Promise<AssistantResponse> {
   const capabilities = resolveProviderCapabilities(request);
   const adapter = selectProviderWireAdapter(capabilities.wireApi);
@@ -73,13 +74,7 @@ async function tryFetch(
   forceReasoning: boolean,
   abortSignal?: AbortSignal,
   onRequestMetric?: (metric: ModelRequestMetric) => void,
-  observability?: {
-    rootDir: string;
-    sessionId: string;
-    identityKind?: string;
-    identityName?: string;
-    configuredModel: string;
-  },
+  observability?: ProviderRequestObservability,
 ): Promise<AssistantResponse> {
   const startedAt = Date.now();
   let latestMetric: ModelRequestMetric | undefined;
@@ -102,23 +97,12 @@ async function tryFetch(
   };
   const retryBudget = createApiRetryBudget();
 
-  if (observability) {
-    await recordObservabilityEvent(observability.rootDir, {
-      event: "model.request",
-      status: "started",
-      sessionId: observability.sessionId,
-      identityKind: observability.identityKind,
-      identityName: observability.identityName,
-      model: request.model,
-      details: {
-        provider: request.provider,
-        configuredModel: observability.configuredModel,
-        requestModel: request.model,
-        wireApi: adapter.wireApi,
-        baseUrl: resolvedBaseUrl,
-      },
-    });
-  }
+  await recordProviderRequestEvent({
+    observability,
+    request,
+    wireApi: adapter.wireApi,
+    status: "started",
+  });
 
   try {
     const response = await withApiRetries(
@@ -146,26 +130,15 @@ async function tryFetch(
       },
     );
 
-    if (observability) {
-      await recordObservabilityEvent(observability.rootDir, {
-        event: "model.request",
-        status: "completed",
-        sessionId: observability.sessionId,
-        identityKind: observability.identityKind,
-        identityName: observability.identityName,
-        model: request.model,
-        durationMs: Date.now() - startedAt,
-        details: {
-          provider: request.provider,
-          configuredModel: observability.configuredModel,
-          requestModel: request.model,
-          wireApi: adapter.wireApi,
-          baseUrl: resolvedBaseUrl,
-          usage: latestMetric?.usage,
-          usageAvailable: hasProviderUsageSnapshot(latestMetric?.usage),
-        },
-      });
-    }
+    await recordProviderRequestEvent({
+      observability,
+      request,
+      wireApi: adapter.wireApi,
+      status: "completed",
+      startedAt,
+      baseUrl: resolvedBaseUrl,
+      usage: latestMetric?.usage,
+    });
     return response;
   } catch (error) {
     if (isAbortError(error)) {
@@ -173,27 +146,16 @@ async function tryFetch(
     }
 
     if (!isStreamingFallbackEligible(error)) {
-      if (observability) {
-        await recordObservabilityEvent(observability.rootDir, {
-          event: "model.request",
-          status: "failed",
-          sessionId: observability.sessionId,
-          identityKind: observability.identityKind,
-          identityName: observability.identityName,
-          model: request.model,
-          durationMs: Date.now() - startedAt,
-          error,
-          details: {
-            provider: request.provider,
-            configuredModel: observability.configuredModel,
-            requestModel: request.model,
-            wireApi: adapter.wireApi,
-            baseUrl: resolvedBaseUrl,
-            usage: latestMetric?.usage,
-            usageAvailable: hasProviderUsageSnapshot(latestMetric?.usage),
-          },
-        });
-      }
+      await recordProviderRequestEvent({
+        observability,
+        request,
+        wireApi: adapter.wireApi,
+        status: "failed",
+        startedAt,
+        baseUrl: resolvedBaseUrl,
+        usage: latestMetric?.usage,
+        error,
+      });
       throw error;
     }
 
@@ -227,67 +189,32 @@ async function tryFetch(
         },
       );
 
-      if (observability) {
-        await recordObservabilityEvent(observability.rootDir, {
-          event: "model.request",
-          status: "completed",
-          sessionId: observability.sessionId,
-          identityKind: observability.identityKind,
-          identityName: observability.identityName,
-          model: request.model,
-          durationMs: Date.now() - startedAt,
-          details: {
-            provider: request.provider,
-            configuredModel: observability.configuredModel,
-            requestModel: request.model,
-            wireApi: adapter.wireApi,
-            baseUrl: resolvedBaseUrl,
-            usage: latestMetric?.usage,
-            usageAvailable: hasProviderUsageSnapshot(latestMetric?.usage),
-          },
-        });
-      }
+      await recordProviderRequestEvent({
+        observability,
+        request,
+        wireApi: adapter.wireApi,
+        status: "completed",
+        startedAt,
+        baseUrl: resolvedBaseUrl,
+        usage: latestMetric?.usage,
+      });
       return response;
     } catch (fallbackError) {
-      if (!isAbortError(fallbackError) && observability) {
-        await recordObservabilityEvent(observability.rootDir, {
-          event: "model.request",
+      if (!isAbortError(fallbackError)) {
+        await recordProviderRequestEvent({
+          observability,
+          request,
+          wireApi: adapter.wireApi,
           status: "failed",
-          sessionId: observability.sessionId,
-          identityKind: observability.identityKind,
-          identityName: observability.identityName,
-          model: request.model,
-          durationMs: Date.now() - startedAt,
+          startedAt,
+          baseUrl: resolvedBaseUrl,
+          usage: latestMetric?.usage,
           error: fallbackError,
-          details: {
-            provider: request.provider,
-            configuredModel: observability.configuredModel,
-            requestModel: request.model,
-            wireApi: adapter.wireApi,
-            baseUrl: resolvedBaseUrl,
-            usage: latestMetric?.usage,
-            usageAvailable: hasProviderUsageSnapshot(latestMetric?.usage),
-          },
         });
       }
       throw fallbackError;
     }
   }
-}
-
-function isStreamingFallbackEligible(error: unknown): boolean {
-  const status = (error as { status?: unknown }).status;
-  if (typeof status === "number") {
-    return false;
-  }
-
-  const message = String((error as { message?: unknown }).message ?? error).toLowerCase();
-  return (
-    message.includes("stream ended unexpectedly") ||
-    message.includes("unexpected end of stream") ||
-    message.includes("invalid sse") ||
-    message.includes("event stream parse")
-  );
 }
 
 function formatRetryDelay(ms: number): string {
@@ -309,7 +236,14 @@ async function invokeWithProviderClients<T>(
   operation: (client: OpenAI, baseUrl: string | undefined) => Promise<T>,
 ): Promise<T> {
   if (!isProviderClientPool(client)) {
-    return operation(client, undefined);
+    try {
+      return await operation(client, undefined);
+    } catch (error) {
+      if (isAbortError(error)) {
+        throw error;
+      }
+      throw normalizeProviderError(error);
+    }
   }
 
   let lastError: unknown;
@@ -321,24 +255,18 @@ async function invokeWithProviderClients<T>(
       client.markHealthy(candidate.baseUrl);
       return result;
     } catch (error) {
-      lastError = error;
       if (isAbortError(error)) {
         throw error;
       }
+      const providerError = normalizeProviderError(error);
+      lastError = providerError;
 
       const hasMoreCandidates = index < candidates.length - 1;
-      if (!hasMoreCandidates || !canRetryWithAlternateBaseUrl(error)) {
-        throw error;
+      if (!hasMoreCandidates || !canRetryWithAlternateBaseUrl(providerError)) {
+        throw providerError;
       }
     }
   }
 
   throw lastError;
-}
-
-function canRetryWithAlternateBaseUrl(error: unknown): boolean {
-  const status = (error as { status?: unknown }).status;
-  const message = String((error as { message?: unknown }).message ?? error).toLowerCase();
-
-  return status === 404 || status === 405 || message.includes("404") || message.includes("not found");
 }

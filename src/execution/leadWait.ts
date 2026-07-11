@@ -1,5 +1,5 @@
 import { ExecutionStore, type ExecutionRecord } from "./store.js";
-import { isLeadBlockingPolicy, isLeadWaitTerminalStatus } from "../protocol/leadWait.js";
+import { isLeadBlockingPolicy, isLeadWaitTerminalStatus } from "./leadWaitPolicy.js";
 import { createInternalReminder } from "../session/turnFrame.js";
 import { throwIfAborted } from "../utils/abort.js";
 
