@@ -8,6 +8,7 @@ export type ModelCacheMode = "prompt-cache-key" | "provider-automatic" | "none";
 export type ChatReasoningRequestMode =
   | "none"
   | "deepseek-thinking"
+  | "agnes-thinking"
   | "nvidia-reasoning-effort"
   | "reasoning-effort";
 
@@ -124,6 +125,15 @@ export const PROVIDER_CATALOG: readonly ProviderInfo[] = [
     doctorProbeTimeoutMs: DEFAULT_DOCTOR_PROBE_TIMEOUT_MS,
   },
   {
+    id: "agnes",
+    label: "Agnes AI",
+    apiKind: "openai-compatible",
+    transport: "standard",
+    defaultBaseUrl: "https://apihub.agnes-ai.com/v1",
+    requestTimeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
+    doctorProbeTimeoutMs: DEFAULT_DOCTOR_PROBE_TIMEOUT_MS,
+  },
+  {
     id: "groq",
     label: "Groq",
     apiKind: "openai-compatible",
@@ -173,8 +183,8 @@ const DEEPSEEK_MODEL_BASE = {
     },
   },
   limit: {
-    context: 128_000,
-    output: 8_000,
+    context: 1_000_000,
+    output: 384_000,
   },
 };
 
@@ -218,6 +228,27 @@ const NVIDIA_DEEPSEEK_MODEL_BASE = {
       toolChoice: "auto" as const,
       streamUsage: "include_usage" as const,
     },
+  },
+};
+
+const AGNES_MODEL_BASE = {
+  ...OPENAI_COMPATIBLE_CHAT_MODEL_BASE,
+  capabilities: {
+    ...OPENAI_COMPATIBLE_CHAT_MODEL_BASE.capabilities,
+    reasoning: true,
+  },
+  request: {
+    thinkingDefault: "enabled" as const,
+    maxOutputTokensParam: "max_tokens" as const,
+    chat: {
+      reasoning: "agnes-thinking" as const,
+      toolChoice: "auto" as const,
+      streamUsage: "include_usage" as const,
+    },
+  },
+  limit: {
+    context: 512_000,
+    output: 65_500,
   },
 };
 
@@ -321,6 +352,12 @@ export const MODEL_CATALOG: readonly ModelInfo[] = [
     providerId: "nvidia",
     label: "DeepSeek V4 Flash via NVIDIA NIM",
     ...NVIDIA_DEEPSEEK_MODEL_BASE,
+  },
+  {
+    id: "agnes-2.0-flash",
+    providerId: "agnes",
+    label: "Agnes 2.0 Flash",
+    ...AGNES_MODEL_BASE,
   },
   {
     id: "openai/gpt-oss-120b",

@@ -4,7 +4,7 @@
 
 ## 1. 产品与规则
 
-Kitty 是本地编程智能体。它接收用户任务，构建上下文，调用模型，执行工具，保存工作状态，并能在同一任务现场继续工作。
+Kitty 是一个智能体。它接收用户任务，构建上下文，调用模型，执行工具，保存工作状态，并能在同一任务现场继续工作。
 
 产品目标是持久化的智能体工作能力：
 
@@ -78,7 +78,7 @@ Kitty 是本地编程智能体。它接收用户任务，构建上下文，调�
 
 未知 provider、不支持的 provider/model 组合、缺失必填项和非法值必须显式失败。运行时不能静默猜测 model 或 provider。
 
-当前具名 provider profile 包括 NVIDIA NIM、Groq、Cerebras、Gemini、DeepSeek、OpenAI、YLS 和 TTAPI。`openai-compatible` 仅用于用户明确配置的高级兼容 endpoint；它不是任何具名 provider 的别名。
+当前具名 provider profile 包括 NVIDIA NIM、Agnes AI、Groq、Cerebras、Gemini、DeepSeek、OpenAI、YLS 和 TTAPI。`openai-compatible` 仅用于用户明确配置的高级兼容 endpoint；它不是任何具名 provider 的别名。
 
 `kitty init` 创建项目状态模板。`kitty doctor` 展示配置和 provider 连接事实。
 
@@ -144,7 +144,7 @@ Context 优先保留可见的近场对话。超过配置预算后，它摘要较
 
 Provider replay 是 wire contract。DeepSeek 兼容工具调用历史必须保留所需 reasoning content；无法 replay 的历史工具批次必须转换成明确的摘要事实，不能发送无效请求。
 
-Context budget 记录 limit、estimate、remaining、compression mode、source、prompt hotspot 和 cache layout 事实。它只测量，不替模型决定任务路线。
+Context budget 记录当前有效 limit、estimate、remaining、compression mode、source、prompt hotspot 和 cache layout 事实。有效 limit 由用户配置的最大上下文字符数和当前 model catalog 的上下文/输出上限共同收束；展示层只显示当前可用预算，不重新计算 provider 能力。它只测量，不替模型决定任务路线。
 
 ## 6. Provider 层
 
@@ -154,6 +154,8 @@ Context budget 记录 limit、estimate、remaining、compression mode、source�
 - `src/provider/capabilities.ts`：请求期 capability 投影。
 - `src/provider/client.ts`、`transport.ts`、`connection.ts`：client、base URL、probe。
 - `src/provider/request.ts`：请求生命周期、streaming fallback、retry 接入和 observability。
+- `src/provider/chatRequestBody.ts`：Chat Completions 通用 request body 装配。
+- `src/provider/chatRequestDialect.ts`：Chat Completions provider/model 请求方言投影。
 - `src/provider/*Adapter.ts`：Responses 与 Chat Completions wire adapter。
 
 Provider 与 model 是独立事实。Provider 决定 transport、endpoint 行为、认证形态和 probe 行为；model 决定 wire API、限制、工具、usage、cache、reasoning replay 和 Chat Completions 请求方言。方言包括 reasoning 参数、tool choice、stream usage 和输出 token 参数名；request body 只能投影这些事实，不能按 provider 名称散落特判。

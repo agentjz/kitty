@@ -60,7 +60,7 @@
 工具结果回来后，模型知道：
 
 ```text
-README：项目叫 Kitty，是本地编程 agent。
+README：项目叫 Kitty，是一个智能体。
 spec：核心链路是输入、上下文、模型、工具、状态、输出。
 npm test：测试通过。
 ```
@@ -72,7 +72,7 @@ npm test：测试通过。
 模型调用过：read README.md、read spec.md、bash npm test。
 工具结果：README 说明项目用途，spec 说明核心链路，测试通过。
 活跃文件：README.md、spec.md。
-最后回答：这个项目是一个本地编程 agent。
+最后回答：这个项目是一个智能体。
 ```
 
 session 就是当前对话的工作现场。它把工具结果、活跃文件和最后回答留下来，下一轮可以接着这个现场继续。

@@ -27,9 +27,11 @@ test("context compression keeps full current turn while under budget", () => {
     "system prompt",
     messages,
     {
+      provider: "deepseek",
       contextWindowMessages: 6,
       model: "deepseek-v4-flash",
       maxContextChars: 900_000,
+      maxOutputTokens: 384_000,
       contextSummaryChars: 120_000,
     },
   );
@@ -38,10 +40,33 @@ test("context compression keeps full current turn while under budget", () => {
   assert.equal(request.summary, undefined);
   assert.equal(request.messages.length, 1 + messages.length);
   assert.equal(request.budget.compressed, false);
-  assert.equal(request.budget.limitChars, 900_000);
+  assert.equal(request.budget.limitChars, 616_000);
   assert.equal(request.budget.compressionReason, "within_budget");
   assert.ok(request.budget.remainingChars > 0);
   assert.equal(request.budget.promptHotspots[0]?.title, "static_1");
+});
+
+test("context budget reports the current model-capped usable window", () => {
+  const request = buildCompressedContextRequest(
+    "system prompt",
+    [{
+      role: "user",
+      content: "hello",
+      createdAt: "2026-05-20T00:00:00.000Z",
+    }],
+    {
+      provider: "agnes",
+      model: "agnes-2.0-flash",
+      contextWindowMessages: 120,
+      maxContextChars: 900_000,
+      maxOutputTokens: 384_000,
+      contextSummaryChars: 120_000,
+    },
+  );
+
+  assert.equal(request.compressed, false);
+  assert.equal(request.budget.limitChars, 446_500);
+  assert.ok(request.budget.estimatedChars < request.budget.limitChars);
 });
 
 test("context compression exposes budget facts when the request is compacted", () => {

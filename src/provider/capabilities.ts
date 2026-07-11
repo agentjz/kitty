@@ -8,6 +8,7 @@ export interface ProviderCapabilities {
   defaultReasoningEnabled: boolean;
   defaultReasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
   maxOutputTokensParam: "max_tokens" | "max_completion_tokens" | "max_output_tokens";
+  maxOutputTokensLimit: number;
   chat: {
     reasoning: ChatReasoningRequestMode;
     toolChoice: "auto" | "omit";
@@ -32,6 +33,7 @@ export function resolveProviderCapabilities(input: ProviderProfileInput): Provid
     defaultReasoningEnabled: profile.model.capabilities.reasoning,
     defaultReasoningEffort: profile.model.request.reasoningEffortDefault,
     maxOutputTokensParam: profile.model.request.maxOutputTokensParam,
+    maxOutputTokensLimit: profile.model.limit.output,
     chat: profile.model.request.chat ?? {
       reasoning: "none",
       toolChoice: "auto",

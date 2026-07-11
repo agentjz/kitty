@@ -4,6 +4,7 @@ import { measurePromptLayers } from "../../../agent/prompt/metrics.js";
 import { isInternalMessage } from "../../../session/turnFrame.js";
 import { buildVisibleConversationWindow } from "../conversationWindow.js";
 import { buildContextBudgetReport } from "../budget.js";
+import { resolveEffectiveMaxContextChars } from "../effectiveBudget.js";
 import type { ProviderMessage } from "../../../provider/contract.js";
 import type { PromptLayerMetrics, PromptLayers } from "../../../agent/prompt/types.js";
 import type { RuntimeConfig, StoredMessage } from "../../../types.js";
@@ -20,9 +21,10 @@ export function buildCompressedContextRequest(
   messages: StoredMessage[],
   config: Pick<RuntimeConfig, "contextWindowMessages" | "model" | "maxContextChars" | "contextSummaryChars"> & {
     provider?: RuntimeConfig["provider"];
+    maxOutputTokens?: RuntimeConfig["maxOutputTokens"];
   },
 ): ContextRuntimeRequest {
-  const safeMaxChars = Math.max(8_000, config.maxContextChars);
+  const safeMaxChars = resolveEffectiveMaxContextChars(config);
   const conversation = buildVisibleConversationWindow(messages);
   const conversationMessages = conversation.messages;
   const provider = config.provider ?? "openai-compatible";

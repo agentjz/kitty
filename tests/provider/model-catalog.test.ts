@@ -29,6 +29,8 @@ test("deepseek model owns reasoning replay capability", () => {
   assert.equal(profile.model.wireApi, "chat.completions");
   assert.equal(profile.model.capabilities.reasoningContentReplay, "tool-call-required");
   assert.equal(profile.model.request.reasoningEffortDefault, "max");
+  assert.equal(profile.model.limit.context, 1_000_000);
+  assert.equal(profile.model.limit.output, 384_000);
 });
 
 test("relay providers are explicit provider facts", () => {
@@ -37,6 +39,7 @@ test("relay providers are explicit provider facts", () => {
   assert.equal(findProviderInfo("openai")?.transport, "standard");
   assert.equal(findProviderInfo("openai-compatible")?.transport, "standard");
   assert.equal(findProviderInfo("nvidia")?.defaultBaseUrl, "https://integrate.api.nvidia.com/v1");
+  assert.equal(findProviderInfo("agnes")?.defaultBaseUrl, "https://apihub.agnes-ai.com/v1");
   assert.equal(findProviderInfo("groq")?.defaultBaseUrl, "https://api.groq.com/openai/v1");
   assert.equal(findProviderInfo("cerebras")?.defaultBaseUrl, "https://api.cerebras.ai/v1");
   assert.equal(findProviderInfo("gemini")?.defaultBaseUrl, "https://generativelanguage.googleapis.com/v1beta/openai");
@@ -47,6 +50,14 @@ test("named compatible provider profiles use explicit current model facts", () =
     provider: "nvidia",
     model: "deepseek-ai/deepseek-v4-flash",
   }).model.request.chat?.reasoning, "nvidia-reasoning-effort");
+  assert.equal(resolveModelProfile({
+    provider: "agnes",
+    model: "agnes-2.0-flash",
+  }).model.request.chat?.reasoning, "agnes-thinking");
+  assert.equal(resolveModelProfile({
+    provider: "agnes",
+    model: "agnes-2.0-flash",
+  }).model.limit.output, 65_500);
   assert.equal(resolveModelProfile({
     provider: "groq",
     model: "openai/gpt-oss-120b",

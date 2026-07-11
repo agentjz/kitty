@@ -1,6 +1,7 @@
 import { resolveProviderCapabilities } from "./capabilities.js";
 import { resolveProviderCachePolicy } from "./cachePolicy.js";
 import type { ProviderAdapterRequest, ProviderMessage } from "./contract.js";
+import { normalizeProviderMaxOutputTokens } from "./maxOutputTokens.js";
 
 export function buildResponsesRequestBody(request: ProviderAdapterRequest): Record<string, unknown> {
   const capabilities = resolveProviderCapabilities({
@@ -22,7 +23,10 @@ export function buildResponsesRequestBody(request: ProviderAdapterRequest): Reco
   };
 
   if (typeof request.maxOutputTokens === "number" && Number.isFinite(request.maxOutputTokens)) {
-    body.max_output_tokens = Math.max(1, Math.trunc(request.maxOutputTokens));
+    body.max_output_tokens = normalizeProviderMaxOutputTokens(
+      request.maxOutputTokens,
+      capabilities.maxOutputTokensLimit,
+    );
   }
 
   const cachePolicy = resolveProviderCachePolicy({

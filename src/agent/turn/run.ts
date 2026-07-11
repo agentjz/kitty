@@ -93,6 +93,7 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
           model: requestModel,
           contextWindowMessages: options.config.contextWindowMessages,
           maxContextChars: options.config.maxContextChars,
+          maxOutputTokens: options.config.maxOutputTokens,
           contextSummaryChars: options.config.contextSummaryChars,
         },
       });

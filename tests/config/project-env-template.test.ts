@@ -102,8 +102,16 @@ function assertMentioned(content: string, keys: readonly string[]): void {
 
 function assertProviderPresets(content: string): void {
   for (const preset of PROVIDER_PRESETS) {
-    assert.match(content, new RegExp(escapeRegExp(`Provider preset: ${preset.label}`), "u"));
-    assert.match(content, new RegExp(escapeRegExp(`${KITTY_ENV.baseUrl}=${preset.baseUrl}`), "u"));
+    assert.equal(
+      new RegExp(escapeRegExp(`Provider preset: ${preset.label}`), "u").test(content),
+      true,
+      `provider preset label should be present: ${preset.label}`,
+    );
+    assert.equal(
+      new RegExp(escapeRegExp(`${KITTY_ENV.baseUrl}=${preset.baseUrl}`), "u").test(content),
+      true,
+      `provider preset base URL should be present: ${preset.label}`,
+    );
   }
 }
 

@@ -32,3 +32,17 @@ test("OpenAI responses request keeps default reasoning when thinking is not disa
     summary: "detailed",
   });
 });
+
+test("OpenAI responses request caps max output tokens to model limit", () => {
+  const body = buildResponsesRequestBody({
+    provider: "openai",
+    model: "gpt-5.5",
+    messages: [{ role: "user", content: "hello" }],
+    tools: undefined,
+    callbacks: undefined,
+    forceReasoning: false,
+    maxOutputTokens: 384_000,
+  });
+
+  assert.equal(body.max_output_tokens, 128_000);
+});

@@ -78,13 +78,13 @@ TUI 复用同一套 session、driver、工具和斜杠命令。主区显示用�
 | `/reset` | 清空当前项目运行状态并退出 |
 | `/exit`、`quit`、`q` | 退出当前会话 |
 
-交给 Kitty 一个真实开发目标：
+交给 Kitty 一个真实目标：
 
 ```bash
 kitty "用 Spring Boot 3、MySQL、Redis 和 Vue 3 做一个考试管理平台，包含题库、试卷、考试发布、在线作答和成绩归档"
 ```
 
-这类任务会触发 Kitty 的完整工作方式：先调查仓库结构和当前事实，再判断边界、修改代码、运行验证，并把现场留给下一轮继续。
+这类任务会触发 Kitty 的完整工作方式：先调查当前资料和事实，再判断边界、调用工具、运行验证，并把现场留给下一轮继续。
 
 ## ⌨️ 常用命令
 
@@ -125,7 +125,7 @@ kitty config show
 
 `kitty init` 创建 `.kitty/.env`、`.kitty/.env.example` 和 `.kitty/.kittyignore`，并输出本地配置 preflight 和下一步。`kitty doctor` 先检查这些本地事实，再加载 runtime，最后在 API key 存在时探测 provider 连接；失败时说明该补什么，成功时说明可以启动 Kitty。
 
-`.kitty/.env` 放当前启用的 provider 和 API key，同时保留 NVIDIA、Groq、Cerebras、Gemini、YLS、TTAPI、DeepSeek provider preset 注释块，方便直接切换。Telegram、扩展开关和运行时配置也在 `.kitty/.env` 与 `.kitty/.env.example` 中保持同一结构。
+`.kitty/.env` 放当前启用的 provider 和 API key，同时保留 NVIDIA、Agnes AI、Gemini、TTAPI、DeepSeek provider preset 注释块，方便直接切换。Telegram、扩展开关和运行时配置也在 `.kitty/.env` 与 `.kitty/.env.example` 中保持同一结构。
 
 当前支持的主要环境配置包括：
 

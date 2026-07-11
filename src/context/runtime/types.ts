@@ -53,6 +53,7 @@ export interface ContextRuntimeRequestInput {
   session: Pick<SessionRecord, "messages">;
   config: Pick<RuntimeConfig, "contextWindowMessages" | "model" | "maxContextChars" | "contextSummaryChars"> & {
     provider?: RuntimeConfig["provider"];
+    maxOutputTokens?: RuntimeConfig["maxOutputTokens"];
   };
 }
 

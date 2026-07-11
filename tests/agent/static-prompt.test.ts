@@ -32,6 +32,7 @@ test("agent static prompt names the lead loop without hardcoding the tool surfac
 
   assert.match(text, /lead agent/);
   assert.match(text, /active tool surface is supplied by the current runtime/);
+  assert.match(text, /agent workbench/);
   assert.match(text, /exposed tool definitions as the active capability boundary/);
   assert.match(text, /extra blocks define the active workflow/);
   assert.match(text, /Always reply in Simplified Chinese/);
