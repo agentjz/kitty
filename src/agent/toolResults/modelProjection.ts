@@ -5,7 +5,6 @@ const DEFAULT_MAX_CHARS = 4_000;
 const DIFF_MAX_CHARS = 3_000;
 const OUTPUT_MAX_CHARS = 1_500;
 const SKILL_BODY_MAX_CHARS = 16_000;
-
 export function projectToolResultForModel(input: {
   toolName: string;
   result: ToolExecutionResult;

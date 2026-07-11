@@ -2,6 +2,7 @@ import type {
   SessionRecord,
   StoredMessage,
   ToolCallRecord,
+  ToolResultEnvelope,
 } from "../types.js";
 import { normalizeSessionCheckpoint } from "./checkpoint.js";
 import { normalizeSessionMemory } from "./memory.js";
@@ -10,14 +11,11 @@ import { normalizeSessionWorkset } from "./workset.js";
 import {
   createInvalidSessionJsonError,
   createSessionCorruptError,
-  createUnsupportedSessionSchemaError,
 } from "./errors.js";
 import { deriveTaskState, normalizeSessionRecord as normalizeTaskStateSessionRecord } from "./taskState.js";
 import { deriveTodoItems, normalizeSessionTodos, normalizeTodoItems } from "./todos.js";
 
-const CURRENT_SESSION_SCHEMA_VERSION = 1;
 const SESSION_SNAPSHOT_KEYS = new Set([
-  "schemaVersion",
   "id",
   "createdAt",
   "updatedAt",
@@ -35,14 +33,10 @@ const SESSION_SNAPSHOT_KEYS = new Set([
 ]);
 
 type SessionSnapshotCandidate = Partial<SessionRecord> & {
-  schemaVersion?: unknown;
 };
 
 export function serializeSessionSnapshot(session: SessionRecord): string {
-  return `${JSON.stringify({
-    schemaVersion: CURRENT_SESSION_SCHEMA_VERSION,
-    ...session,
-  }, null, 2)}\n`;
+  return `${JSON.stringify(session, null, 2)}\n`;
 }
 
 export function parseSessionSnapshot(raw: string, sessionPath: string): SessionRecord {
@@ -58,11 +52,6 @@ export function parseSessionSnapshot(raw: string, sessionPath: string): SessionR
 
   const record = expectRecord(parsed, sessionPath, "Session snapshot");
   rejectUnknownSessionKeys(record, sessionPath);
-  const schemaVersion = record.schemaVersion;
-  if (schemaVersion !== CURRENT_SESSION_SCHEMA_VERSION) {
-    throw createUnsupportedSessionSchemaError(sessionPath, schemaVersion, CURRENT_SESSION_SCHEMA_VERSION);
-  }
-
   const candidate: SessionSnapshotCandidate = {
     id: readRequiredString(record, "id", sessionPath),
     createdAt: readRequiredString(record, "createdAt", sessionPath),
@@ -140,16 +129,11 @@ function readContextBudget(value: unknown, sessionPath: string): SessionRecord["
     return undefined;
   }
   const record = expectRecord(value, sessionPath, "contextBudget");
-  const version = record.version;
-  if (version !== 1) {
-    throw createSessionCorruptError(sessionPath, "contextBudget.version must be 1");
-  }
   const compressionMode = readRequiredString(record, "compressionMode", sessionPath, "contextBudget");
   if (compressionMode !== "none" && compressionMode !== "normal" && compressionMode !== "aggressive" && compressionMode !== "hard") {
     throw createSessionCorruptError(sessionPath, "contextBudget.compressionMode must be one of none|normal|aggressive|hard");
   }
   return {
-    version,
     limitChars: readRequiredNumber(record, "limitChars", sessionPath, "contextBudget"),
     estimatedChars: readRequiredNumber(record, "estimatedChars", sessionPath, "contextBudget"),
     remainingChars: readRequiredNumber(record, "remainingChars", sessionPath, "contextBudget"),
@@ -248,8 +232,39 @@ function readMessage(value: unknown, index: number, sessionPath: string): Stored
     tool_call_id: readOptionalString(record.tool_call_id, "tool_call_id", sessionPath, `messages[${index}]`),
     tool_calls: readToolCalls(record.tool_calls, sessionPath, index),
     reasoningContent: readOptionalString(record.reasoningContent, "reasoningContent", sessionPath, `messages[${index}]`),
+    toolResult: readToolResultEnvelope(record.toolResult, sessionPath, index),
     createdAt: readRequiredString(record, "createdAt", sessionPath, `messages[${index}]`),
   };
+}
+
+function readToolResultEnvelope(
+  value: unknown,
+  sessionPath: string,
+  messageIndex: number,
+): ToolResultEnvelope | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const scope = `messages[${messageIndex}].toolResult`;
+  const record = expectRecord(value, sessionPath, scope);
+  const status = readRequiredString(record, "status", sessionPath, scope);
+  if (status !== "success" && status !== "error") {
+    throw createSessionCorruptError(sessionPath, `${scope}.status must be success or error`);
+  }
+
+  // Validate the stable spine; nested deterministic facts remain JSON-shaped.
+  const envelope = record as unknown as ToolResultEnvelope;
+  readRequiredString(record, "callId", sessionPath, scope);
+  readRequiredString(record, "toolName", sessionPath, scope);
+  readRequiredString(record, "summary", sessionPath, scope);
+  readRequiredString(record, "modelView", sessionPath, scope);
+  readRequiredString(record, "compactView", sessionPath, scope);
+  expectRecord(record.facts, sessionPath, `${scope}.facts`);
+  if (!Array.isArray(record.artifacts)) {
+    throw createSessionCorruptError(sessionPath, `${scope}.artifacts must be an array`);
+  }
+  expectRecord(record.truncation, sessionPath, `${scope}.truncation`);
+  return envelope;
 }
 
 function readMessageContent(
@@ -393,5 +408,3 @@ function readOptionalString(
 
   return value;
 }
-
-export { CURRENT_SESSION_SCHEMA_VERSION };

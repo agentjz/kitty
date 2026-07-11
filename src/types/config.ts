@@ -16,7 +16,6 @@ export interface AppPaths {
 }
 
 export interface AppConfig {
-  schemaVersion: 1;
   provider: string;
   baseUrl: string;
   model: string;

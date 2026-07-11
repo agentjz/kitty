@@ -51,6 +51,16 @@ export type {
   ToolCallRecord,
 } from "./types/session.js";
 export type {
+  ToolResultArtifact,
+  ToolResultEnvelope,
+  ToolResultErrorEvidence,
+  ToolResultFactValue,
+  ToolResultProvenance,
+  ToolResultRecoveryAction,
+  ToolResultStatus,
+  ToolResultTruncation,
+} from "./types/toolEvidence.js";
+export type {
   RuntimeContinueEmptyAssistantResponseReason,
   RuntimeContinueReason,
   RuntimeContinueToolBatchReason,

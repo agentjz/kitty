@@ -16,12 +16,10 @@ test("runtime status projects the current project runtime facts", async (t) => {
     ...(await sessionStore.create(root)),
     title: "Investigate runtime",
     sessionMemory: {
-      version: 1,
       summary: "User wants durable runtime visibility.",
       updatedAt: "2026-05-22T00:00:00.000Z",
     },
     contextBudget: {
-      version: 1,
       limitChars: 900_000,
       estimatedChars: 45_000,
       remainingChars: 855_000,
@@ -49,7 +47,6 @@ test("runtime status projects the current project runtime facts", async (t) => {
       },
     },
     workset: {
-      version: 1,
       updatedAt: "2026-05-22T00:00:00.000Z",
       files: [{
         path: "src/runtime/status.ts",
@@ -122,7 +119,6 @@ test("runtime status surfaces recent model request cache facts", async (t) => {
   await fs.writeFile(
     path.join(paths, "2026-06-16.jsonl"),
     JSON.stringify({
-      version: 1,
       timestamp: "2026-06-16T00:00:00.000Z",
       event: "model.request",
       status: "completed",
@@ -159,7 +155,6 @@ test("runtime status surfaces recent tool output governance facts", async (t) =>
   await fs.writeFile(
     path.join(paths, "2026-06-22.jsonl"),
     JSON.stringify({
-      version: 1,
       timestamp: "2026-06-22T00:00:00.000Z",
       event: "tool.output",
       status: "completed",

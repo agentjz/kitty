@@ -5,8 +5,6 @@ import { normalizeExtensions } from "./extensions.js";
 import { invalidConfigValue, missingConfigValue } from "./errors.js";
 import type { AppConfig } from "../types.js";
 
-export const CURRENT_CONFIG_SCHEMA_VERSION = 1 as const;
-
 export function normalizeRuntimeConfig(
   config: AppConfig,
   runtime: {
@@ -16,7 +14,6 @@ export function normalizeRuntimeConfig(
   } = {},
 ): AppConfig {
   const normalized = {
-    schemaVersion: CURRENT_CONFIG_SCHEMA_VERSION,
     provider: requireTextConfig(config.provider, "provider"),
     baseUrl: requireTextConfig(config.baseUrl, "baseUrl"),
     model: requireTextConfig(config.model, "model"),

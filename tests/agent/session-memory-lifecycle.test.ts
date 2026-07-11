@@ -293,7 +293,6 @@ test("next turn injects model-written session memory while raw provider messages
       },
     ],
     sessionMemory: {
-      version: 1,
       summary: [
         "## Current Focus",
         "比较 luckymaomi/777f 和 luckymaomi/ohmyflight。",
@@ -438,7 +437,6 @@ test("previous session memory is passed to the model for structured rewrite", as
   const session = await sessionStore.save({
     ...(await sessionStore.create(root)),
     sessionMemory: {
-      version: 1,
       summary: "用户要求用 txt 回答；当前任务是整理 memory。",
       updatedAt: "2026-05-22T00:00:00.000Z",
     },

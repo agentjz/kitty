@@ -13,6 +13,7 @@ export type FunctionToolDefinition = Extract<ChatCompletionTool, { type: "functi
 
 export type ToolOriginKind = "builtin" | "host";
 export type ToolChangeSignal = "none" | "required";
+export type ToolEffect = "read" | "write" | "process" | "external" | "state";
 
 export interface ToolOrigin {
   kind: ToolOriginKind;
@@ -23,6 +24,8 @@ export interface RegisteredTool {
   definition: FunctionToolDefinition;
   execute: (rawArgs: string, context: ToolContext) => Promise<ToolExecutionResult>;
   changeSignal?: ToolChangeSignal;
+  effect?: ToolEffect;
+  parallelSafe?: boolean;
   origin?: ToolOrigin;
 }
 
@@ -30,6 +33,8 @@ export interface ToolRegistryEntry {
   name: string;
   definition: FunctionToolDefinition;
   changeSignal?: ToolChangeSignal;
+  effect: ToolEffect;
+  parallelSafe: boolean;
   origin: ToolOrigin;
   tool: RegisteredTool;
 }

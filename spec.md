@@ -142,6 +142,8 @@ Session memory 使用以下固定 Markdown 区块：
 
 Context 优先保留可见的近场对话。超过配置预算后，它摘要较早消息，并压缩早期 tool/user/assistant 内容，同时保留安全的近期 tail 和工具边界。
 
+近期 canonical tool evidence 使用 model view；较旧 tool evidence 在 normal/aggressive/hard compression 中直接切换为自身 compact view。compact view 已有严格边界，context 不再对它进行第二次无语义字符串截断。状态与 memory 读取 compact evidence，而不是再次解析 model-facing 文本。
+
 Provider replay 是 wire contract。DeepSeek 兼容工具调用历史必须保留所需 reasoning content；无法 replay 的历史工具批次必须转换成明确的摘要事实，不能发送无效请求。
 
 Context budget 记录当前有效 limit、estimate、remaining、compression mode、source、prompt hotspot 和 cache layout 事实。有效 limit 由用户配置的最大上下文字符数和当前 model catalog 的上下文/输出上限共同收束；展示层只显示当前可用预算，不重新计算 provider 能力。它只测量，不替模型决定任务路线。
@@ -177,6 +179,14 @@ Provider request 边界把 adapter、transport 和 SDK 失败归一为 `Provider
 - `send_file`
 
 工具执行真实操作，返回有界证据，记录 changed path，并在需要时保留可恢复的原始输出。每次 tool call 无论成功或失败都必须持久为下一次模型请求可见的非空 tool result；成功但没有文本输出时，机器明确记录该事实。Tool output projection 限制上下文成本，但不伪造语义结论。
+
+每个 tool result 同时保存当前唯一的 typed evidence：call id、tool、status、summary、provenance、facts、error、artifact、truncation、model view 和 compact view。工具实现拥有原始结果；evidence builder 拥有模型证据合同；session 保存 canonical evidence；context 只选择 full 或 compact view；宿主展示继续读取 display/raw result。任何状态模块都不得从展示字符串反推工具事实。
+
+模型证据遵循最小充分原则：必须足以判断本次操作是否成功、作用于哪里、产生了什么关键事实、失败根因是什么、下一步如何恢复。工作区内目标使用相对路径；工作区外目标保留绝对路径。read 返回实际行区间和 continuation；edit/write 返回目标和变更范围；bash 返回 cwd、exit code、duration、头尾输出和 artifact recovery。大输出保留头尾，明确省略规模，并提供可执行的 `read` 恢复参数。
+
+`bash` 只有正常零退出才返回成功。非零退出、超时、停滞和中断都是失败 tool result；payload、evidence、callbacks、session blocker、observability 和模型视图必须使用同一状态。
+
+同一模型批次只对连续、声明为 read effect 且 parallel-safe 的工具并发执行。write、process、external 和 state effect 保持模型给出的顺序。并发读取产生的 session/workset 事实必须归并后持久化，不能用吞掉状态更新换延迟。
 
 ### Extensions
 
@@ -310,6 +320,8 @@ npm.cmd run eval:production
 ```
 
 `eval:production` 使用当前 `.kitty/.env`，可能消耗真实 API；它不能进入普通确定性测试。
+
+Production tool acceptance 是真实修复任务，不是固定字符串工具演示。隔离工作区先处于失败状态；真实模型必须检查文件、运行失败验证、从长输出尾部读取根因、修改目标、重新验证通过，并在最终回答中引用成功 sentinel。缺少失败证据、真实变更、复验通过或最终消费中的任一项都判失败。
 
 ## 12. Agent 修改纪律
 

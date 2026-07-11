@@ -26,7 +26,6 @@ export interface ToolOutputSource {
 }
 
 export interface ToolOutputGovernance {
-  version: 1;
   kind: ToolOutputKind;
   mode: ToolOutputProjectionMode;
   projection: string;

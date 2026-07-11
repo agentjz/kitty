@@ -15,7 +15,6 @@ export function buildContextBudgetReport(input: {
   const estimatedChars = Math.max(0, Math.trunc(input.estimatedChars));
   const remainingChars = limitChars - estimatedChars;
   return {
-    version: 1,
     limitChars,
     estimatedChars,
     remainingChars,

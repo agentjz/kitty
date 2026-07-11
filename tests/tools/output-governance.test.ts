@@ -26,7 +26,6 @@ test("tool output governance projects test failures into compact evidence", () =
     truncated: true,
   });
 
-  assert.equal(governance.version, 1);
   assert.equal(governance.kind, "test");
   assert.equal(governance.mode, "structured");
   assert.equal(governance.truncated, true);
@@ -53,7 +52,8 @@ test("tool output governance projects search output with match counts", () => {
   assert.equal(governance.kind, "search");
   assert.match(governance.projection, /matches shown: 24, omitted: 16/);
   assert.match(governance.projection, /src\/file0\.ts/);
-  assert.doesNotMatch(governance.projection, /src\/file39\.ts/);
+  assert.match(governance.projection, /src\/file39\.ts/);
+  assert.doesNotMatch(governance.projection, /src\/file20\.ts/);
 });
 
 test("tool output governance projects git diff files and hunks", () => {
@@ -103,5 +103,28 @@ test("tool output governance keeps huge generic output model-facing projection b
   assert.ok(governance.projectedChars < 4_000);
   assert.ok(governance.savedTokens > 1_000_000);
   assert.ok(governance.savingsRatio > 0.99);
-  assert.doesNotMatch(governance.projection, /line 119999/);
+  assert.match(governance.projection, /line 119999/);
+  assert.match(governance.projection, /characters omitted/);
+  assert.match(governance.projection, /inspect with read/);
+});
+
+test("tool output governance preserves a failure root cause that appears only at the tail", () => {
+  const raw = [
+    ...Array.from({ length: 500 }, (_, index) => `progress ${index}`),
+    "ROOT_CAUSE_SENTINEL: database migration checksum mismatch",
+  ].join("\n");
+
+  const governance = governToolOutput({
+    toolName: "bash",
+    command: "node migrate.js",
+    status: "failed",
+    exitCode: 1,
+    output: raw,
+    outputPath: ".kitty/observability/command-output/session/migrate.txt",
+    truncated: true,
+  });
+
+  assert.match(governance.projection, /ROOT_CAUSE_SENTINEL/);
+  assert.match(governance.projection, /exit=1/);
+  assert.match(governance.projection, /inspect with read/);
 });

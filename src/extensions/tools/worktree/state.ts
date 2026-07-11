@@ -10,14 +10,12 @@ export interface WorktreeEventRecord {
 }
 
 export interface WorktreeState {
-  schemaVersion: 1;
   keptPaths: string[];
   events: WorktreeEventRecord[];
 }
 
 export async function readWorktreeState(rootDir: string): Promise<WorktreeState> {
   return normalizeWorktreeState(await readJsonFile(await stateFile(rootDir), {
-    schemaVersion: 1,
     keptPaths: [],
     events: [],
   }));
@@ -48,7 +46,6 @@ async function stateFile(rootDir: string): Promise<string> {
 
 function normalizeWorktreeState(value: WorktreeState): WorktreeState {
   return {
-    schemaVersion: 1,
     keptPaths: Array.isArray(value.keptPaths) ? value.keptPaths.map(String) : [],
     events: Array.isArray(value.events) ? value.events.map(normalizeEvent) : [],
   };

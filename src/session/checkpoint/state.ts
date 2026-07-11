@@ -38,7 +38,6 @@ export function normalizeCheckpoint(
   const status = checkpoint.status === "completed" ? "completed" : "active";
 
   return {
-    version: 1,
     focus,
     focusFingerprint:
       normalizeText(checkpoint.focusFingerprint) || (focus ? fingerprintFocus(focus) : undefined),

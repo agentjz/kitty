@@ -2,7 +2,7 @@ import type { ChatCompletionMessageParam } from "openai/resources/chat/completio
 
 import { listModelInfos } from "../provider/catalog.js";
 import { resolveProviderCapabilities } from "../provider/capabilities.js";
-import type { StoredMessage, ToolCallRecord } from "../types.js";
+import type { StoredMessage, ToolCallRecord, ToolResultEnvelope } from "../types.js";
 
 export function buildChatMessages(
   systemPrompt: string,
@@ -52,12 +52,14 @@ export function createToolMessage(
   toolCallId: string,
   content: string,
   name: string,
+  toolResult?: ToolResultEnvelope,
 ): StoredMessage {
   return {
     role: "tool",
     content,
     tool_call_id: toolCallId,
     name,
+    toolResult,
     createdAt: new Date().toISOString(),
   };
 }
@@ -92,7 +94,7 @@ export function toChatMessage(
   if (message.role === "tool") {
     return {
       role: "tool",
-      content: message.content ?? "",
+      content: message.toolResult?.modelView ?? message.content ?? "",
       tool_call_id: message.tool_call_id ?? "",
     };
   }

@@ -27,3 +27,27 @@ export function dedupeProjectedLines(lines: string[]): string[] {
   }
   return result;
 }
+
+export function selectHeadTail<T>(values: T[], limit: number): T[] {
+  if (values.length <= limit) {
+    return values;
+  }
+  const headCount = Math.ceil(limit / 2);
+  const tailCount = Math.floor(limit / 2);
+  return [...values.slice(0, headCount), ...values.slice(-tailCount)];
+}
+
+export function buildHeadTailPreview(value: string, maxChars: number): string {
+  const trimmed = value.trim();
+  if (trimmed.length <= maxChars) {
+    return trimmed;
+  }
+  const headChars = Math.floor(maxChars * 0.35);
+  const tailChars = maxChars - headChars;
+  const omitted = trimmed.length - headChars - tailChars;
+  return [
+    trimmed.slice(0, headChars),
+    `... ${omitted} characters omitted ...`,
+    trimmed.slice(-tailChars),
+  ].join("\n");
+}

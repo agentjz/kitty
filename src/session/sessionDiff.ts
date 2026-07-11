@@ -7,7 +7,6 @@ const MAX_DIFF_PREVIEW_CHARS = 2_000;
 
 export function createEmptySessionDiff(timestamp = new Date().toISOString()): SessionDiffState {
   return {
-    version: 1,
     changedPaths: [],
     changes: [],
     updatedAt: timestamp,
@@ -23,7 +22,6 @@ export function normalizeSessionDiff(
     .filter((change): change is SessionDiffChange => Boolean(change));
 
   return {
-    version: 1,
     changedPaths: takeLastUniquePaths(sessionDiff?.changedPaths ?? []),
     changes: normalizedChanges.slice(-MAX_SESSION_DIFF_CHANGES),
     updatedAt: normalizeTimestamp(sessionDiff?.updatedAt, timestamp),
@@ -58,7 +56,6 @@ export function noteSessionDiff(
   return {
     ...session,
     sessionDiff: {
-      version: 1,
       changedPaths: takeLastUniquePaths([...current.changedPaths, ...normalizedChange.changedPaths]),
       changes: [...current.changes, normalizedChange].slice(-MAX_SESSION_DIFF_CHANGES),
       updatedAt: timestamp,

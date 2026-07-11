@@ -1,7 +1,6 @@
-import { truncateText } from "../../../utils/fs.js";
 import type { ProjectionResult } from "../projection.js";
 import type { ToolOutputSource } from "../types.js";
-import { buildHeader } from "./shared.js";
+import { buildHeadTailPreview, buildHeader } from "./shared.js";
 
 const GENERIC_MAX_CHARS = 1_500;
 
@@ -48,6 +47,6 @@ export function projectStructuredOutput(
 function buildGenericPreview(source: ToolOutputSource): string {
   return [
     buildHeader(source, "output"),
-    truncateText(source.output.trim(), GENERIC_MAX_CHARS),
+    buildHeadTailPreview(source.output, GENERIC_MAX_CHARS),
   ].filter(Boolean).join("\n");
 }

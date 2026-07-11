@@ -41,7 +41,6 @@ export function formatSessionMemorySectionList(): string {
 
 export function createSessionMemoryState(summary: string, timestamp = new Date().toISOString()): SessionMemoryState {
   return {
-    version: 1,
     summary: normalizeSummary(summary),
     updatedAt: timestamp,
   };
@@ -77,12 +76,11 @@ export function normalizeSessionMemory(value: unknown, timestamp = new Date().to
   }
 
   const record = value as Partial<SessionMemoryState>;
-  if (record.version !== 1 || typeof record.summary !== "string") {
+  if (typeof record.summary !== "string") {
     return undefined;
   }
 
   return {
-    version: 1,
     summary: normalizeSummary(record.summary),
     updatedAt: typeof record.updatedAt === "string" && record.updatedAt.trim()
       ? record.updatedAt

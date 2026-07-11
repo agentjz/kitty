@@ -32,12 +32,10 @@ export async function runProductionSceneCheck(id: EvaluationCheckId, rootDir: st
     ...(await sessionStore.create(workspace)),
     title: "Production scene check",
     sessionMemory: {
-      version: 1,
       summary: "User needs production runtime visibility.",
       updatedAt: "2026-06-18T00:00:00.000Z",
     },
     contextBudget: {
-      version: 1,
       limitChars: 100_000,
       estimatedChars: 50_000,
       remainingChars: 50_000,
@@ -63,7 +61,6 @@ export async function runProductionSceneCheck(id: EvaluationCheckId, rootDir: st
   await fs.writeFile(
     path.join(eventsDir, "2026-06-18.jsonl"),
     JSON.stringify({
-      version: 1,
       timestamp: "2026-06-18T00:00:00.000Z",
       event: "model.request",
       status: "completed",

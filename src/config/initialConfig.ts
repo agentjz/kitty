@@ -6,7 +6,6 @@ import type { AppConfig } from "../types.js";
 export function getInitialRuntimeConfig(): AppConfig {
   const preset = getDefaultProviderPreset();
   return {
-    schemaVersion: 1,
     provider: preset.provider,
     baseUrl: getProviderPresetBaseUrl(preset),
     model: preset.model,

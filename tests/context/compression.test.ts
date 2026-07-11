@@ -524,3 +524,47 @@ test("large old tool output is compacted without changing the stable prefix", ()
   assert.notEqual(first.cacheLayout?.volatileTailFingerprint, second.cacheLayout?.volatileTailFingerprint);
   assert.ok((first.cacheLayout?.volatileTailChars ?? 0) < 20_000);
 });
+
+test("context compression uses canonical compact tool evidence without truncating it again", () => {
+  const compactView = [
+    "bash: error",
+    "ROOT_CAUSE_SENTINEL",
+    "exitCode=1",
+    "artifact=.kitty/output.txt; recover with read {\"path\":\".kitty/output.txt\"}",
+  ].join("\n");
+  const messages: StoredMessage[] = [
+    { role: "user", content: "run it", createdAt: "2026-07-11T00:00:00.000Z" },
+    {
+      role: "tool",
+      name: "bash",
+      tool_call_id: "call-1",
+      content: `full model view ${"x".repeat(8_000)}`,
+      toolResult: {
+        callId: "call-1",
+        toolName: "bash",
+        status: "error",
+        summary: "bash failed",
+        modelView: `full model view ${"x".repeat(8_000)}`,
+        compactView,
+        facts: { exitCode: 1 },
+        error: { message: "ROOT_CAUSE_SENTINEL" },
+        artifacts: [{ kind: "command_output", path: ".kitty/output.txt" }],
+        truncation: { truncated: true, strategy: "artifact", originalChars: 20_000, projectedChars: 8_016 },
+      },
+      createdAt: "2026-07-11T00:00:01.000Z",
+    },
+    { role: "user", content: "continue", createdAt: "2026-07-11T00:00:02.000Z" },
+  ];
+
+  const request = buildCompressedContextRequest("system", messages, {
+    contextWindowMessages: 3,
+    model: "gpt-5.5",
+    maxContextChars: 1_200,
+    contextSummaryChars: 200,
+  });
+  const wire = request.messages.map((message) => String(message.content ?? "")).join("\n");
+
+  assert.match(wire, /ROOT_CAUSE_SENTINEL/);
+  assert.match(wire, /recover with read/);
+  assert.doesNotMatch(wire, /full model view x{100}/);
+});

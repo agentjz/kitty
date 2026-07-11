@@ -24,7 +24,6 @@ export function buildSessionConversationBrief(
     .filter((turn): turn is VisibleTurnFact => Boolean(turn));
 
   return {
-    version: 1,
     modelSummary,
     modelSummaryUpdatedAt: input.sessionMemory?.updatedAt,
     userTurnCount: visibleTurns.filter((turn) => turn.role === "user").length,

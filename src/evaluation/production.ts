@@ -8,7 +8,6 @@ import path from "node:path";
 import { probeProviderConnection } from "../provider/connection.js";
 import { buildRuntimeStatus } from "../runtime/status.js";
 import { passed } from "./types.js";
-import type { RegisteredTool } from "../tools/core/types.js";
 import type {
   EvaluationCheckResult,
   EvaluationRunResult,
@@ -16,6 +15,7 @@ import type {
   ProductionEvaluationCheckId,
 } from "./types.js";
 import { summarizeChecks } from "./types.js";
+import { runProductionRepairCheck } from "./productionRepair.js";
 
 export const PRODUCTION_EVALUATION_CHECK_IDS: readonly ProductionEvaluationCheckId[] = [
   "production-config-preflight",
@@ -50,9 +50,9 @@ export const PRODUCTION_EVALUATION_SCENARIOS: readonly EvaluationScenario[] = [
   {
     id: "production-tool-turn",
     suite: "production",
-    title: "真实 provider 工具调用可完成",
-    userPath: "维护者显式运行生产验收时，Kitty 用当前 provider 跑一次真实工具调用，验证工具调用、工具结果回传和后续回答闭环。",
-    evidence: "创建隔离 eval workspace，暴露一个只读 eval 工具，运行 runHostTurn，并确认 assistant tool call、tool result、最终 assistant answer 和 turn events 都存在。",
+    title: "真实 provider 修复任务可完成",
+    userPath: "维护者显式运行生产验收时，Kitty 在隔离缺陷工作区中真实读文件、运行失败验证、修改目标、复验通过并完成收口。",
+    evidence: "确认失败根因来自工具结果尾部、真实修改落盘、第二次验证通过、最终回答消费 sentinel，且 tool.failed/tool.completed/turn.completed 事件闭环。",
   },
   {
     id: "production-runtime-status",
@@ -149,7 +149,7 @@ async function runProductionEvaluationCheck(
         return await runProductionRealTurnCheck(id, rootDir);
       }
       case "production-tool-turn": {
-        return await runProductionToolTurnCheck(id, rootDir);
+        return await runProductionRepairCheck(id, rootDir);
       }
       case "production-runtime-status": {
         const status = await buildRuntimeStatus(rootDir);
@@ -167,89 +167,6 @@ async function runProductionEvaluationCheck(
       error: error instanceof Error ? error.message : String(error),
     };
   }
-}
-
-async function runProductionToolTurnCheck(
-  id: ProductionEvaluationCheckId,
-  rootDir: string,
-): Promise<EvaluationCheckResult> {
-  const sourceConfig = await resolveRuntimeConfig({ cwd: rootDir });
-  if (!sourceConfig.apiKey.trim()) {
-    return {
-      id,
-      status: "failed",
-      fact: "production tool turn blocked: KITTY_API_KEY is missing",
-    };
-  }
-
-  const workspace = await prepareProductionEvalWorkspace(rootDir, "tool-turn");
-  const config = {
-    ...sourceConfig,
-    paths: {
-      ...sourceConfig.paths,
-      dataDir: path.join(workspace, ".kitty"),
-      sessionsDir: path.join(workspace, ".kitty", "sessions"),
-      memoryDir: path.join(workspace, ".kitty", "memory"),
-      sessionMemoryDir: path.join(workspace, ".kitty", "memory", "sessions"),
-      changesDir: path.join(workspace, ".kitty", "changes"),
-      eventsDir: path.join(workspace, ".kitty", "events"),
-    },
-    maxOutputTokens: Math.min(sourceConfig.maxOutputTokens, 768),
-    contextWindowMessages: Math.min(sourceConfig.contextWindowMessages, 20),
-    maxContextChars: Math.min(sourceConfig.maxContextChars, 80_000),
-    contextSummaryChars: Math.min(sourceConfig.contextSummaryChars, 8_000),
-  };
-  const sessionStore = new SessionStore(config.paths.sessionsDir, {
-    memorySessionsDir: config.paths.sessionMemoryDir,
-  });
-  const session = await sessionStore.save(await sessionStore.create(workspace));
-  const evalTool = createProductionEvalFactTool();
-
-  const outcome = await runHostTurn({
-    host: "eval-production",
-    input: "Use the kitty_eval_fact tool exactly once, then answer in one short plain English sentence with the secret value.",
-    cwd: workspace,
-    stateRootDir: workspace,
-    config,
-    session,
-    sessionStore,
-    extraTools: [evalTool],
-  });
-  if (outcome.status !== "completed") {
-    return {
-      id,
-      status: "failed",
-      fact: `production tool turn failed: status=${outcome.status}, message=${outcome.errorMessage ?? "none"}`,
-    };
-  }
-
-  const reloaded = await sessionStore.load(outcome.session.id);
-  const events = await new SessionEventStore(config.paths.eventsDir).list(outcome.session.id, 30);
-  const assistantToolCalls = reloaded.messages.filter((message) => message.role === "assistant" && message.tool_calls?.length);
-  const assistantReasoningReplay = assistantToolCalls.filter((message) => message.reasoningContent);
-  const toolMessages = reloaded.messages.filter((message) => message.role === "tool" && message.name === "kitty_eval_fact");
-  const finalAssistant = [...reloaded.messages].reverse().find((message) => message.role === "assistant" && message.content?.trim());
-  const eventTypes = events.map((event) => event.type);
-
-  if (
-    assistantToolCalls.length < 1 ||
-    toolMessages.length < 1 ||
-    !finalAssistant ||
-    !String(finalAssistant.content).toLowerCase().includes("deepseek-tool-ok") ||
-    !eventTypes.includes("tool.completed") ||
-    !eventTypes.includes("turn.completed")
-  ) {
-    return {
-      id,
-      status: "failed",
-      fact: `production tool turn incomplete: assistantToolCalls=${assistantToolCalls.length}, reasoningReplay=${assistantReasoningReplay.length}, toolMessages=${toolMessages.length}, final=${finalAssistant?.content ?? "none"}, events=${eventTypes.join(",") || "none"}`,
-    };
-  }
-
-  return passed(
-    id,
-    `production tool turn ready: assistantToolCalls=${assistantToolCalls.length}, reasoningReplay=${assistantReasoningReplay.length}, toolMessages=${toolMessages.length}, final="${finalAssistant.content}"`,
-  );
 }
 
 async function runProductionRealTurnCheck(
@@ -345,25 +262,4 @@ async function prepareProductionEvalWorkspace(rootDir: string, name = "real-turn
   await fs.rm(workspace, { recursive: true, force: true });
   await fs.mkdir(workspace, { recursive: true });
   return workspace;
-}
-
-function createProductionEvalFactTool(): RegisteredTool {
-  return {
-    definition: {
-      type: "function",
-      function: {
-        name: "kitty_eval_fact",
-        description: "Return the fixed production evaluation secret value.",
-        parameters: {
-          type: "object",
-          additionalProperties: false,
-          properties: {},
-        },
-      },
-    },
-    execute: async () => ({
-      ok: true,
-      output: "deepseek-tool-ok",
-    }),
-  };
 }

@@ -1,7 +1,4 @@
-export {
-  CURRENT_CONFIG_SCHEMA_VERSION,
-  normalizeRuntimeConfig,
-} from "./schema.js";
+export { normalizeRuntimeConfig } from "./schema.js";
 
 export {
   ensureAppDirectories,

@@ -1,6 +1,7 @@
 import type { RuntimeTransition } from "./runtimeTransitions.js";
 import type { ToolDiagnosticsReport } from "./diagnostics.js";
 import type { ContextBudgetReport } from "./contextBudget.js";
+import type { ToolResultEnvelope } from "./toolEvidence.js";
 
 export interface ToolCallRecord {
   id: string;
@@ -19,6 +20,7 @@ export interface StoredMessage {
   tool_call_id?: string;
   tool_calls?: ToolCallRecord[];
   reasoningContent?: string;
+  toolResult?: ToolResultEnvelope;
   createdAt: string;
 }
 
@@ -51,13 +53,11 @@ export interface SessionWorksetEntry {
 }
 
 export interface SessionWorksetState {
-  version: 1;
   files: SessionWorksetEntry[];
   updatedAt: string;
 }
 
 export interface SessionMemoryState {
-  version: 1;
   summary: string;
   updatedAt: string;
 }
@@ -74,7 +74,6 @@ export interface SessionDiffChange {
 }
 
 export interface SessionDiffState {
-  version: 1;
   changedPaths: string[];
   changes: SessionDiffChange[];
   updatedAt: string;
@@ -110,7 +109,6 @@ export interface SessionCheckpointFlow {
 }
 
 export interface SessionCheckpoint {
-  version: 1;
   focus?: string;
   focusFingerprint?: string;
   status: SessionCheckpointStatus;

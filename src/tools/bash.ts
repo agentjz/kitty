@@ -2,7 +2,7 @@
 import { runCommandWithPolicy } from "../utils/commandRunner.js";
 import { getShellRuntimeInfo } from "../utils/commandRunner/shellRuntime.js";
 import { resolveUserPath, truncateText } from "../utils/fs.js";
-import { clampNumber, okResult, parseArgs, readString } from "../tools/core/shared.js";
+import { clampNumber, parseArgs, readString } from "../tools/core/shared.js";
 import type { RegisteredTool } from "../tools/core/types.js";
 import { governToolOutput } from "./outputGovernance/index.js";
 
@@ -92,8 +92,7 @@ export const bashToolDefinition: RegisteredTool = {
       outputGovernance,
     };
 
-    return okResult(
-      JSON.stringify(
+    const output = JSON.stringify(
         {
           command: result.command,
           cwd: resolvedCwd,
@@ -121,8 +120,11 @@ export const bashToolDefinition: RegisteredTool = {
         },
         null,
         2,
-      ),
+      );
+    return {
+      ok: status === "completed",
+      output,
       metadata,
-    );
+    };
   },
 };

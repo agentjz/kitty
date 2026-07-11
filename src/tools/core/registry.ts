@@ -25,6 +25,8 @@ export function createToolRegistry(options: ToolRegistryOptions = {}): ToolRegis
       name: tool.definition.function.name,
       definition: tool.definition,
       changeSignal: tool.changeSignal,
+      effect: tool.effect ?? "state",
+      parallelSafe: tool.parallelSafe === true,
       origin: tool.origin ?? { kind: source.kind, sourceId: source.id },
       tool,
     })),
@@ -188,6 +190,8 @@ function assertNoDuplicateToolNames(selectedTools: readonly { tool: RegisteredTo
 function applySourceDefaults(source: ToolRegistrySource, tool: RegisteredTool): RegisteredTool {
   return {
     ...tool,
+    effect: tool.effect ?? "state",
+    parallelSafe: tool.parallelSafe === true,
     origin: {
       kind: tool.origin?.kind ?? source.kind,
       sourceId: tool.origin?.sourceId ?? source.id,

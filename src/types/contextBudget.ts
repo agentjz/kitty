@@ -1,5 +1,4 @@
 export interface ContextBudgetReport {
-  version: 1;
   limitChars: number;
   estimatedChars: number;
   remainingChars: number;

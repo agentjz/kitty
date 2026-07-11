@@ -24,7 +24,6 @@ export function buildAgentWorkingMemory(input: BuildWorkingMemoryInput): AgentWo
   const checkpoint = normalizeCurrentFocusCheckpoint(input.checkpoint, focus, timestamp);
 
   return {
-    version: 1,
     focus,
     focusFingerprint: focus ? fingerprintFocus(focus) : undefined,
     activeFiles: takeLastUnique(input.taskState?.activeFiles ?? [], MAX_ACTIVE_FILES),

@@ -1,5 +1,3 @@
-export const OBSERVABILITY_VERSION = 1 as const;
-
 export interface ObservabilityErrorSummary {
   message: string;
   code?: string;
@@ -7,7 +5,6 @@ export interface ObservabilityErrorSummary {
 }
 
 export interface ObservabilityEventRecord {
-  version: typeof OBSERVABILITY_VERSION;
   timestamp: string;
   event: string;
   status: string;
@@ -39,7 +36,6 @@ export interface ObservabilityEventInput {
 }
 
 export interface CrashReportRecord {
-  version: typeof OBSERVABILITY_VERSION;
   timestamp: string;
   pid: number;
   argv: string[];
@@ -55,7 +51,6 @@ export interface CrashReportRecord {
 
 export function buildObservabilityEventRecord(input: ObservabilityEventInput): ObservabilityEventRecord {
   return {
-    version: OBSERVABILITY_VERSION,
     timestamp: new Date().toISOString(),
     event: normalizeText(input.event, "unknown"),
     status: normalizeText(input.status, "unknown"),
@@ -81,7 +76,6 @@ export function buildCrashReportRecord(input: {
   details?: Record<string, unknown>;
 }): CrashReportRecord {
   return {
-    version: OBSERVABILITY_VERSION,
     timestamp: new Date().toISOString(),
     pid: process.pid,
     argv: [...process.argv],

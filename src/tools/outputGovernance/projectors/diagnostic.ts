@@ -1,16 +1,12 @@
 import type { ToolOutputSource } from "../types.js";
-import { buildHeader, dedupeProjectedLines, splitOutputLines } from "./shared.js";
+import { buildHeader, dedupeProjectedLines, selectHeadTail, splitOutputLines } from "./shared.js";
 
 const STRUCTURED_MAX_LINES = 28;
 
 export function buildDiagnosticProjection(source: ToolOutputSource, label: string): string {
   const lines = splitOutputLines(source.output);
-  const evidence = lines
-    .filter(isDiagnosticEvidenceLine)
-    .slice(0, STRUCTURED_MAX_LINES);
-  const summaryLines = lines
-    .filter(isSummaryLine)
-    .slice(0, 8);
+  const evidence = selectHeadTail(lines.filter(isDiagnosticEvidenceLine), STRUCTURED_MAX_LINES);
+  const summaryLines = selectHeadTail(lines.filter(isSummaryLine), 8);
 
   return dedupeProjectedLines([
     buildHeader(source, label),

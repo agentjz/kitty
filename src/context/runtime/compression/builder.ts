@@ -211,7 +211,10 @@ function compactTailMessages(messages: StoredMessage[], mode: "normal" | "aggres
     if (message.role === "tool") {
       return {
         ...message,
-        content: truncate(message.content ?? "", mode === "hard" ? 120 : mode === "aggressive" ? 320 : 700),
+        content: message.toolResult?.compactView ?? truncate(
+          message.content ?? "",
+          mode === "hard" ? 120 : mode === "aggressive" ? 320 : 700,
+        ),
       };
     }
 
@@ -292,7 +295,10 @@ function summarizeStoredMessage(message: StoredMessage): string {
   }
 
   if (message.role === "tool") {
-    return `Tool ${message.name ?? "unknown"} returned: ${truncate(oneLine(message.content ?? ""), 220)}`;
+    return `Tool ${message.name ?? "unknown"} returned: ${truncate(
+      oneLine(message.toolResult?.compactView ?? message.content ?? ""),
+      220,
+    )}`;
   }
 
   return "";
@@ -375,6 +381,10 @@ function buildCacheLayoutReport(
     role: message.role,
     name: message.name,
     content: message.content,
+    toolResult: message.toolResult ? {
+      status: message.toolResult.status,
+      compactView: message.toolResult.compactView,
+    } : undefined,
     toolCallId: message.tool_call_id,
     toolCalls: message.tool_calls,
     source: message.source,

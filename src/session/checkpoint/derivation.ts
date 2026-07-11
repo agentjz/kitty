@@ -66,6 +66,13 @@ export function buildToolBatch(
 }
 
 function readPathFromMessage(message: StoredMessage): string | undefined {
+  const changedPaths = message.toolResult?.facts.changedPaths;
+  if (Array.isArray(changedPaths) && changedPaths.length > 0) {
+    return changedPaths[0];
+  }
+  if (message.toolResult?.provenance?.targetPath) {
+    return message.toolResult.provenance.targetPath;
+  }
   const payload = safeParseObject(message.content);
   return readString(payload?.path) ?? readString(payload?.requestedPath);
 }

@@ -4,6 +4,12 @@ import type { StoredMessage } from "../types.js";
 
 export function collectActiveFiles(messages: StoredMessage[]): string[] {
   const files: string[] = [];
+  const completedCallIds = new Set(
+    messages
+      .filter((message) => message.role === "tool" && message.toolResult)
+      .map((message) => message.tool_call_id)
+      .filter((callId): callId is string => Boolean(callId)),
+  );
 
   for (const message of messages) {
     if (!message) {
@@ -12,6 +18,9 @@ export function collectActiveFiles(messages: StoredMessage[]): string[] {
 
     if (message.role === "assistant" && message.tool_calls?.length) {
       for (const toolCall of message.tool_calls) {
+        if (completedCallIds.has(toolCall.id)) {
+          continue;
+        }
         const parsed = safeParseObject(toolCall.function.arguments);
         collectPathsFromValue(parsed, files);
       }
@@ -19,6 +28,15 @@ export function collectActiveFiles(messages: StoredMessage[]): string[] {
     }
 
     if (message.role === "tool") {
+      if (message.toolResult?.provenance?.targetPath) {
+        files.push(message.toolResult.provenance.targetPath);
+      }
+      for (const changedPath of readChangedPaths(message)) {
+        files.push(changedPath);
+      }
+      if (message.toolResult) {
+        continue;
+      }
       const parsed = safeParseObject(message.content ?? "");
       collectPathsFromValue(parsed, files);
     }
@@ -52,12 +70,17 @@ export function collectCompletedActions(messages: StoredMessage[]): string[] {
       continue;
     }
 
-    const content = message.content ?? "";
-    const parsed = safeParseObject(content);
+    if (message.toolResult?.status === "error") {
+      continue;
+    }
+    if (message.toolResult) {
+      actions.push(formatEnvelopeCompletedAction(message));
+      continue;
+    }
+    const parsed = safeParseObject(message.content ?? "");
     if (parsed && typeof parsed.error === "string" && parsed.error.length > 0) {
       continue;
     }
-
     actions.push(formatCompletedAction(message.name, parsed));
   }
 
@@ -67,20 +90,51 @@ export function collectCompletedActions(messages: StoredMessage[]): string[] {
 export function collectBlockers(messages: StoredMessage[]): string[] {
   const blockers: string[] = [];
 
-  for (const message of messages) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
     if (message?.role !== "tool") {
+      continue;
+    }
+
+    if (message.toolResult?.status === "success") {
+      break;
+    }
+    if (message.toolResult?.error) {
+      blockers.unshift(`${message.name ?? "tool"}: ${truncate(oneLine(message.toolResult.error.message), 180)}`);
       continue;
     }
 
     const parsed = safeParseObject(message.content ?? "");
     if (!parsed || typeof parsed.error !== "string" || parsed.error.length === 0) {
+      break;
+    }
+    if (parsed.ok === true) {
       continue;
     }
 
-    blockers.push(`${message.name ?? "tool"}: ${truncate(oneLine(parsed.error), 180)}`);
+    blockers.unshift(`${message.name ?? "tool"}: ${truncate(oneLine(parsed.error), 180)}`);
   }
 
   return blockers;
+}
+
+function formatEnvelopeCompletedAction(message: StoredMessage): string {
+  const evidence = message.toolResult;
+  if (!evidence) {
+    return message.name ?? "tool";
+  }
+  if (evidence.toolName === "bash") {
+    const command = evidence.provenance?.command ?? "command";
+    const exitCode = evidence.facts.exitCode ?? "unknown";
+    return `bash ${truncate(oneLine(command), 120)} (exit ${String(exitCode)})`;
+  }
+  const target = evidence.provenance?.targetPath;
+  return target ? `${evidence.toolName} ${truncate(target, 160)}` : evidence.summary;
+}
+
+function readChangedPaths(message: StoredMessage): string[] {
+  const value = message.toolResult?.facts.changedPaths;
+  return Array.isArray(value) ? value : [];
 }
 
 export function oneLine(value: string): string {
@@ -135,7 +189,7 @@ function collectPathsFromValue(value: unknown, bucket: string[]): void {
 }
 
 function isPathLikeKey(key: string): boolean {
-  return key === "path" || key === "cwd" || key.endsWith("Path");
+  return key === "path" || key === "filePath" || key === "requestedPath" || key === "targetPath";
 }
 
 function readPath(value: unknown): string | undefined {

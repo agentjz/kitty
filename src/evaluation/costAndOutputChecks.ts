@@ -33,6 +33,18 @@ export async function runToolOutputGovernanceCheck(id: EvaluationCheckId): Promi
     outputPath: ".kitty/observability/command-output/eval/huge.txt",
     truncated: true,
   });
+  const tailFailure = governToolOutput({
+    toolName: "bash",
+    command: "node verify.js",
+    status: "failed",
+    exitCode: 1,
+    output: [
+      ...Array.from({ length: 500 }, (_, index) => `progress ${index}`),
+      "EVIDENCE_ROOT_CAUSE: expected READY but received BROKEN",
+    ].join("\n"),
+    outputPath: ".kitty/observability/command-output/eval/tail-failure.txt",
+    truncated: true,
+  });
 
   const ready =
     testOutput.kind === "test" &&
@@ -43,19 +55,22 @@ export async function runToolOutputGovernanceCheck(id: EvaluationCheckId): Promi
     hugeOutput.kind === "generic" &&
     hugeOutput.projectedChars < 4_000 &&
     hugeOutput.savedTokens > 100_000 &&
-    hugeOutput.outputPath === ".kitty/observability/command-output/eval/huge.txt";
+    hugeOutput.outputPath === ".kitty/observability/command-output/eval/huge.txt" &&
+    tailFailure.projection.includes("EVIDENCE_ROOT_CAUSE") &&
+    tailFailure.projection.includes("inspect with read") &&
+    tailFailure.projection.includes("exit=1");
 
   if (!ready) {
     return {
       id,
       status: "failed",
-      fact: `tool output governance incomplete: test=${testOutput.kind}/${testOutput.savedTokens}, search=${searchOutput.kind}/${searchOutput.savedTokens}, huge=${hugeOutput.projectedChars}/${hugeOutput.savedTokens}`,
+      fact: `tool output governance incomplete: test=${testOutput.kind}/${testOutput.savedTokens}, search=${searchOutput.kind}/${searchOutput.savedTokens}, huge=${hugeOutput.projectedChars}/${hugeOutput.savedTokens}, tail=${tailFailure.projectedChars}`,
     };
   }
 
   return passed(
     id,
-    `tool output governance ready: testSaved=${testOutput.savedTokens}, searchSaved=${searchOutput.savedTokens}, hugeProjected=${hugeOutput.projectedChars}, hugeSaved=${hugeOutput.savedTokens}`,
+    `tool output governance ready: testSaved=${testOutput.savedTokens}, searchSaved=${searchOutput.savedTokens}, hugeProjected=${hugeOutput.projectedChars}, hugeSaved=${hugeOutput.savedTokens}, tailRootCause=preserved`,
   );
 }
 

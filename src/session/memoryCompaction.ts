@@ -81,7 +81,10 @@ function formatToolEvidence(messages: StoredMessage[]): string | undefined {
   return toolMessages
     .map((message) => {
       const name = message.name ?? "unknown";
-      const content = truncateOneLine(message.content ?? "", MAX_TOOL_RESULT_CHARS);
+      const content = truncateOneLine(
+        message.toolResult?.compactView ?? message.content ?? "",
+        MAX_TOOL_RESULT_CHARS,
+      );
       return `- ${name}: ${content || "(empty result)"}`;
     })
     .join("\n");

@@ -28,7 +28,6 @@ test("session store preserves context cache layout facts", async (t) => {
   await store.save({
     ...session,
     contextBudget: {
-      version: 1,
       limitChars: 900_000,
       estimatedChars: 12_000,
       remainingChars: 888_000,
@@ -74,7 +73,6 @@ test("session store projects model-written session memory into a readable asset"
   await store.save({
     ...session,
     sessionMemory: {
-      version: 1,
       summary: [
         "## Current Focus",
         "None",

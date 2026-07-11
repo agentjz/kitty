@@ -7,7 +7,6 @@ import { fingerprintFocus, normalizeText } from "./shared.js";
 
 export function createEmptyCheckpoint(timestamp = new Date().toISOString()): SessionCheckpoint {
   return {
-    version: 1,
     status: "active",
     completedSteps: [],
     flow: {

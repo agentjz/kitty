@@ -21,7 +21,6 @@ export interface WorkingMemoryFile {
 }
 
 export interface AgentWorkingMemory {
-  version: 1;
   focus?: string;
   focusFingerprint?: string;
   activeFiles: string[];

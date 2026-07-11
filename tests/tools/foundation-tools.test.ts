@@ -65,7 +65,7 @@ test("bash reports missing commands as failed machine facts", async (t) => {
   }), context);
   const payload = parseToolJson(result.output);
 
-  assert.equal(result.ok, true);
+  assert.equal(result.ok, false);
   assert.equal(payload.command, "kitty_missing_command_for_bash_fact --version");
   assert.equal(payload.status, "failed");
   assert.notEqual(payload.exitCode, 0);

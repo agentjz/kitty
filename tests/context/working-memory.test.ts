@@ -14,7 +14,6 @@ test("working memory keeps current focus facts compact", () => {
       lastUpdatedAt: "2026-01-01T00:00:00.000Z",
     },
     workset: {
-      version: 1,
       updatedAt: "2026-01-01T00:00:02.000Z",
       files: [{
         path: "src/app.ts",

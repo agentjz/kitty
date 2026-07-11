@@ -20,7 +20,6 @@ test("runtime memory assets can be listed, read, and searched", async (t) => {
   const session = await sessionStore.save({
     ...(await sessionStore.create(root)),
     sessionMemory: {
-      version: 1,
       summary: [
         "## Current Focus",
         "Review runtime memory assets.",
@@ -124,7 +123,6 @@ test("runtime memory assets expose asset kinds and evidence references", async (
   const session = await sessionStore.save({
     ...(await sessionStore.create(root)),
     sessionMemory: {
-      version: 1,
       summary: [
         "## Current Focus",
         "Keep memory assets traceable.",
@@ -184,7 +182,6 @@ test("runtime memory assets can be appended to runtime skill references", async 
   const session = await sessionStore.save({
     ...(await sessionStore.create(root)),
     sessionMemory: {
-      version: 1,
       summary: [
         "## Current Focus",
         "None",

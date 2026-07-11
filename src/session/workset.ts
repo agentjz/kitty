@@ -16,7 +16,6 @@ export interface RecordWorksetFileInput {
 
 export function createEmptySessionWorkset(timestamp = new Date().toISOString()): SessionWorksetState {
   return {
-    version: 1,
     files: [],
     updatedAt: timestamp,
   };
@@ -30,7 +29,7 @@ export function normalizeSessionWorkset(value: unknown): SessionWorksetState | u
     return createEmptySessionWorkset();
   }
   const record = value as Record<string, unknown>;
-  if (record.version !== 1 || !Array.isArray(record.files)) {
+  if (!Array.isArray(record.files)) {
     return createEmptySessionWorkset();
   }
   const files = record.files
@@ -38,7 +37,6 @@ export function normalizeSessionWorkset(value: unknown): SessionWorksetState | u
     .filter((entry): entry is SessionWorksetEntry => Boolean(entry))
     .slice(-MAX_WORKSET_FILES);
   return {
-    version: 1,
     files,
     updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : latestWorksetTimestamp(files),
   };
@@ -81,7 +79,6 @@ export function recordSessionWorksetFile(
   return {
     ...session,
     workset: {
-      version: 1,
       files,
       updatedAt: timestamp,
     },

@@ -1,7 +1,7 @@
 ﻿import { noteSessionDiff } from "../../session/sessionDiff.js";
 import { createMessage, createToolMessage } from "../../session/messages.js";
 import { collectNewLeadWaitExecutionIds, listLeadWaitExecutions } from "../../execution/leadWait.js";
-import { projectToolResultForModel } from "../toolResults/modelProjection.js";
+import { buildToolResultEnvelope } from "../toolResults/evidenceBuilder.js";
 import { ControlPlaneLedger } from "../../control/ledger.js";
 import { buildRunTurnResult, createExecutionWaitYieldTransition } from "../runtimeTransition.js";
 import { persistToolBatchCheckpoint } from "./persistence.js";
@@ -155,14 +155,37 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
     } else {
       options.callbacks?.onToolError?.(toolCall.function.name, result.output);
     }
-    const modelOutput = projectToolResultForModel({
+    const toolResult = buildToolResultEnvelope({
+      callId: toolCall.id,
       toolName: toolCall.function.name,
+      rawArguments: toolCall.function.arguments,
+      cwd: options.cwd,
       result,
     });
+    const modelOutput = toolResult.modelView;
     batchModelOutputs.push(modelOutput);
-    const storedToolMessage = createToolMessage(toolCall.id, modelOutput, toolCall.function.name);
+    const storedToolMessage = createToolMessage(toolCall.id, modelOutput, toolCall.function.name, toolResult);
     batchToolMessages.push(storedToolMessage);
     session = await options.sessionStore.appendMessages(session, [storedToolMessage]);
+    await recordObservabilityEvent(projectContext.stateRootDir, {
+      event: "tool.evidence",
+      status: toolResult.status === "success" ? "completed" : "failed",
+      sessionId: session.id,
+      identityKind: identity.kind,
+      identityName: identity.name,
+      toolName: toolResult.toolName,
+      durationMs,
+      details: {
+        callId: toolResult.callId,
+        modelChars: toolResult.modelView.length,
+        compactChars: toolResult.compactView.length,
+        artifactCount: toolResult.artifacts.length,
+        truncated: toolResult.truncation.truncated,
+        omittedChars: toolResult.truncation.omittedChars,
+        targetPath: toolResult.provenance?.targetPath,
+        errorCode: toolResult.error?.code,
+      },
+    });
   }
 
   session = await persistToolBatchCheckpoint({

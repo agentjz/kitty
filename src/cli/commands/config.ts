@@ -42,7 +42,6 @@ export function registerConfigCommands(
 
 function toDisplayConfig(config: RuntimeConfig): Record<string, unknown> {
   return {
-    schemaVersion: config.schemaVersion,
     provider: config.provider,
     model: config.model,
     profile: config.profile,
