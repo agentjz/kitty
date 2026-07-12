@@ -1,12 +1,13 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import { diffLines } from "diff";
-
+import { structuredPatch } from "diff";
 import { truncateText } from "../../utils/fs.js";
 import { decodeTextBuffer } from "../../utils/text.js";
 import type { RegisteredTool } from "./types.js";
 import type { ToolExecutionMetadata, ToolExecutionResult } from "../../types.js";
+
+const UNIFIED_DIFF_CONTEXT_LINES = 3;
 
 export function register(
   registry: Map<string, RegisteredTool>,
@@ -77,28 +78,17 @@ export function okResult(output: string, metadata?: ToolExecutionMetadata): Tool
 }
 
 export function buildDiffPreview(before: string, after: string): string {
-  const lines: string[] = [];
+  const patch = structuredPatch("before", "after", before, after, "", "", {
+    context: UNIFIED_DIFF_CONTEXT_LINES,
+  });
+  return patch.hunks.flatMap((hunk) => [
+    `@@ -${formatDiffRange(hunk.oldStart, hunk.oldLines)} +${formatDiffRange(hunk.newStart, hunk.newLines)} @@`,
+    ...hunk.lines,
+  ]).join("\n");
+}
 
-  for (const part of diffLines(before, after)) {
-    const marker = part.added ? "+" : part.removed ? "-" : " ";
-    const partLines = part.value.split(/\r?\n/);
-    if (partLines[partLines.length - 1] === "") {
-      partLines.pop();
-    }
-
-    for (const line of partLines) {
-      if (line.length === 0 && marker === " ") {
-        continue;
-      }
-
-      lines.push(`${marker} ${line}`);
-      if (lines.length >= 200) {
-        return `${lines.join("\n")}\n... [diff truncated]`;
-      }
-    }
-  }
-
-  return lines.join("\n");
+function formatDiffRange(start: number, lines: number): string {
+  return lines === 1 ? String(start) : `${start},${lines}`;
 }
 
 export async function walkDirectory(

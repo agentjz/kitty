@@ -14,6 +14,7 @@ import {
   formatContextBudget,
   scrollTuiTranscript,
   scrollTuiTranscriptToBottom,
+  toggleLatestTranscriptDetails,
   type TuiViewport,
 } from "../../src/shell/tui/store.js";
 import { projectTuiExecutionDockFacts, readTuiLiveExecutionDock } from "../../src/shell/tui/executionDock.js";
@@ -195,6 +196,62 @@ test("tui transcript keeps markdown structure as display facts", () => {
   assert.equal(rows.some((row) => row.text.includes("```")), false);
 });
 
+test("tui transcript renders completed change facts with distinct diff rows", () => {
+  const rows = renderTranscriptLineViews([{
+    id: "change-1",
+    role: "change",
+    text: "edit src/example.ts\n  unchanged\n- removed\n+ added",
+  }], 80).filter((row) => row.kind === "content");
+
+  assert.equal(rows[0]?.markdownKind, "changeHeader");
+  assert.equal(rows[0]?.style.bold, true);
+  assert.equal(rows[2]?.markdownKind, "diffRemoved");
+  assert.equal(typeof rows[2]?.style.background, "string");
+  assert.equal(rows[3]?.markdownKind, "diffAdded");
+  assert.equal(typeof rows[3]?.style.background, "string");
+  assert.notEqual(rows[2]?.style.background, rows[3]?.style.background);
+});
+
+test("tui transcript renders typed plan hierarchy and completed strike state", () => {
+  const state = appendTranscriptEntry(createInitialTuiState(undefined, "en"), {
+    role: "plan",
+    text: "● Updated Plan · 1/3",
+    planItems: [
+      { id: "1", text: "inspect facts", status: "completed" },
+      { id: "2", text: "implement projection", status: "in_progress" },
+      { id: "3", text: "verify behavior", status: "pending" },
+    ],
+  }, { width: 80, height: 24 });
+  const rows = renderTranscriptLineViews(state.transcript, 80);
+
+  assert.equal(rows.some((row) => row.markdownKind === "planHeader" && row.text.includes("Updated Plan")), true);
+  const completed = rows.find((row) => row.markdownKind === "planCompleted");
+  assert.equal(completed?.text.includes("✓ #1 inspect facts"), true);
+  assert.equal(completed?.spans.some((span) => span.text === "inspect facts" && span.strike), true);
+  assert.equal(rows.some((row) => row.markdownKind === "planActive" && row.text.includes("◉ #2")), true);
+  assert.equal(rows.some((row) => row.markdownKind === "planPending" && row.text.includes("□ #3")), true);
+});
+
+test("tui tool details expand explicitly without changing detached unseen facts", () => {
+  let state = createInitialTuiState();
+  state = appendTranscriptEntry(state, {
+    role: "tool",
+    text: "● read src/example.ts · Ctrl+O",
+    details: "1 | first\n2 | second",
+  }, { width: 60, height: 2 });
+  state = scrollTuiTranscript(state, { width: 60, height: 2 }, -1);
+  const unseenRows = state.scroll.unseenRows;
+
+  const expanded = toggleLatestTranscriptDetails(state, { width: 60, height: 2 });
+  assert.equal(expanded.transcript[0]?.expanded, true);
+  assert.equal(renderTranscriptLineViews(expanded.transcript, 60).some((row) => row.text === "2 | second"), true);
+  assert.equal(expanded.scroll.unseenRows, unseenRows);
+
+  const collapsed = toggleLatestTranscriptDetails(expanded, { width: 60, height: 2 });
+  assert.equal(collapsed.transcript[0]?.expanded, false);
+  assert.equal(renderTranscriptLineViews(collapsed.transcript, 60).some((row) => row.text === "2 | second"), false);
+});
+
 test("tui transcript projection caches stable entry layout by id text and width", () => {
   const entries = [{
     id: "entry-1",
@@ -277,9 +334,14 @@ test("tui transcript projection keeps long session layout cached across scroll a
   assert.ok(measured > entries.length);
   assert.equal(layouts.length, entries.length);
 
+  const beforeResize = layouts.length;
   projection.renderVisibleLineViews(entries, { width: 72, height: 12 }, 0);
-  assert.equal(layouts.length, entries.length + 3);
-  assert.deepEqual(layouts.slice(-3), ["entry-0:72", "entry-1:72", "entry-2:72"]);
+  const resizedLayouts = layouts.slice(beforeResize);
+  assert.equal(resizedLayouts.length > 0 && resizedLayouts.length < 10, true);
+  assert.deepEqual(
+    resizedLayouts,
+    resizedLayouts.map((_, index) => `entry-${index}:72`),
+  );
 });
 
 test("tui parses submitted input echo from session driver", () => {

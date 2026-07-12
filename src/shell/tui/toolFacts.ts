@@ -1,6 +1,13 @@
-import { buildToolResultDisplay } from "../../runtime-ui/toolDisplay.js";
-import { tryParseJson } from "../../utils/json.js";
+import type { ToolCallProgress } from "../../agent/types.js";
+import { DEFAULT_LOCALE, translate, type KittyLocale } from "../../i18n/index.js";
+import {
+  projectToolCallPresentation,
+  projectToolResultPresentation,
+  readToolResultLifecycleStatus,
+  type ToolPlanItem,
+} from "../../runtime-ui/toolPresentation.js";
 import { createFailedActivity, createRunningActivity, type TuiActivity, type TuiActivityKind } from "./activity.js";
+import type { TuiTranscriptRole } from "./transcriptTypes.js";
 
 export interface TuiToolCallFact {
   readonly activity: TuiActivity;
@@ -10,14 +17,22 @@ export interface TuiToolCallFact {
 export interface TuiToolResultFact {
   readonly activity: TuiActivity | undefined;
   readonly background?: string;
-  readonly transcript?: string;
+  readonly transcript?: {
+    readonly role: TuiTranscriptRole;
+    readonly text: string;
+    readonly details?: string;
+    readonly planItems?: readonly ToolPlanItem[];
+  };
 }
 
-export function projectTuiToolCallFact(name: string, _rawArgs: string, options: { now?: number } = {}): TuiToolCallFact {
+export function projectTuiToolCallFact(name: string, rawArgs: string, options: { now?: number } = {}): TuiToolCallFact {
+  const presentation = projectToolCallPresentation(name, rawArgs);
+  const target = "target" in presentation ? presentation.target : undefined;
+  const summary = target ? `${name} ${target}` : name;
   return {
     activity: createRunningActivity({
       kind: readActivityKind(name),
-      summary: name,
+      summary,
       toolName: name,
       now: options.now,
     }),
@@ -25,12 +40,36 @@ export function projectTuiToolCallFact(name: string, _rawArgs: string, options: 
   };
 }
 
-export function projectTuiToolResultFact(name: string, rawOutput: string): TuiToolResultFact {
-  const display = buildToolResultDisplay(name, rawOutput);
+export function projectTuiToolCallProgressFact(
+  progress: ToolCallProgress,
+  options: { now?: number } = {},
+): TuiToolCallFact | undefined {
+  const name = progress.name.toLowerCase();
+  if (name !== "write" && name !== "edit") {
+    return undefined;
+  }
+
+  return {
+    activity: createRunningActivity({
+      kind: "tool",
+      summary: progress.name,
+      detail: formatProgressBytes(progress.argumentBytesReceived),
+      toolName: progress.name,
+      now: options.now,
+    }),
+  };
+}
+
+export function projectTuiToolResultFact(
+  name: string,
+  rawOutput: string,
+  locale: KittyLocale = DEFAULT_LOCALE,
+): TuiToolResultFact {
+  const presentation = projectToolResultPresentation(name, rawOutput);
   return {
     activity: undefined,
     ...projectLiveBackgroundFact(name, readRunningSummary(name, rawOutput)),
-    transcript: name === "todo_write" ? display.preview : undefined,
+    transcript: projectToolTranscript(presentation, locale),
   };
 }
 
@@ -55,8 +94,62 @@ function readActivityKind(name: string): TuiActivityKind {
 }
 
 function readRunningSummary(name: string, rawOutput: string): string | undefined {
-  const parsed = tryParseJson(rawOutput);
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
-  const status = (parsed as Record<string, unknown>).status;
+  const status = readToolResultLifecycleStatus(rawOutput);
   return status === "running" || status === "created" ? name : undefined;
+}
+
+function projectToolTranscript(
+  presentation: ReturnType<typeof projectToolResultPresentation>,
+  locale: KittyLocale,
+): TuiToolResultFact["transcript"] {
+  switch (presentation.kind) {
+    case "change":
+      return {
+        role: "change",
+        text: [
+          `● ${translate(locale, presentation.action === "created" ? "tui.tool.created" : "tui.tool.updated")} ${presentation.path}`,
+          `  +${presentation.addedLines} -${presentation.removedLines}`,
+          ...presentation.diffLines.map((line) => `  ${line}`),
+        ].join("\n"),
+      };
+    case "read": {
+      const range = presentation.startLine !== undefined && presentation.endLine !== undefined
+        ? ` · ${presentation.startLine}-${presentation.endLine}`
+        : "";
+      return {
+        role: "tool",
+        text: `● ${translate(locale, "tui.tool.read")} ${presentation.path}${range}${presentation.content ? ` · ${translate(locale, "tui.tool.expand")}` : ""}`,
+        details: presentation.content,
+      };
+    }
+    case "command": {
+      const facts = [
+        presentation.status,
+        presentation.durationMs === undefined ? undefined : `${presentation.durationMs}ms`,
+      ].filter(Boolean).join(" · ");
+      return {
+        role: "tool",
+        text: `● ${translate(locale, "tui.tool.ran")} ${presentation.command}${facts ? ` · ${facts}` : ""}${presentation.output ? ` · ${translate(locale, "tui.tool.expand")}` : ""}`,
+        details: presentation.output,
+      };
+    }
+    case "plan":
+      return {
+        role: "plan",
+        text: `● ${translate(locale, "tui.tool.updatedPlan")} · ${presentation.completed}/${presentation.items.length}`,
+        planItems: presentation.items,
+      };
+    case "none":
+      return undefined;
+  }
+}
+
+function formatProgressBytes(bytes: number): string {
+  if (bytes < 1_000) return `${bytes} B`;
+  if (bytes < 1_000_000) return `${formatDecimal(bytes / 1_000)} kB`;
+  return `${formatDecimal(bytes / 1_000_000)} MB`;
+}
+
+function formatDecimal(value: number): string {
+  return value >= 10 ? value.toFixed(0) : value.toFixed(1);
 }

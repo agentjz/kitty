@@ -1,142 +1,63 @@
-# Kitty 生命周期主干重建 Plan
+# Kitty TUI 多行粘贴 Plan
 
 ## 1. 需求文档
 
-Kitty 必须让每个 session 只有一个有效 agent loop，并在 CLI、TUI、Telegram 和 Local API 中保持同一套持久化、并发、中断、后台执行和恢复语义。
+用户在 Windows Terminal 等终端复制多行提示词、代码或日志后，确认终端自己的安全提示即可把整段内容一次性粘贴到 Kitty 输入框。粘贴中的换行只能成为草稿内容，不能被当成 Enter 提交，也不能把后续行散落为新的输入。粘贴后用户可以继续编辑，再主动提交。
 
-用户关闭终端、杀死宿主、重复发送信号、打开多个窗口或重启服务后，已经接受的输入、正在执行的副作用、后台进程和最终结果都必须落入可判断的状态；不得出现旧 owner 继续写入、工具重复执行、进程失去归属、完成态倒退或无限等待。
-
-本次范围包含 turn、session、steer、tool effect、foreground/background process、host shutdown、reset 和 Telegram ingress/outbox 的统一生命周期。当前 schema 直接重建，不迁移旧数据，不保留兼容路径。
-
-本次不以 UI 投影、输出刷新、测试脚手架或一般性 I/O 健壮性为交付目标。只有当它们直接阻断核心生命周期验收时，才修改必要接线。
-
-业务完成标准：所有入口复用同一 ownership 与 supervisor 主干；故障注入证明没有 stale write、无声重复副作用、永久 active 记录、孤儿进程或无界 shutdown；完整验证和真实生产验收通过。
+本次只解决 TUI 文本粘贴。完成标准是中英日韩、代码、CRLF/CR/LF 和尾随换行都能进入同一草稿，光标与持久草稿一致，过程中没有 turn 或命令被意外触发。
 
 ## 2. 当前事实
 
-- 基线为 `0a4b78f refactor agent lifecycle around session background work`，本地领先远端一个提交。
-- 工作区原有未跟踪 `audit.md`；本计划由当前任务恢复。
-- `spec.md` 已声明 session 唯一 turn owner、execution lease/heartbeat、`cancelling`、进程树终止和原子 terminal+wake。
-- Execution 已持有 controller token、generation、lease、heartbeat、process identity 与 cancelling 状态。
-- Turn/session/steer/tool 写入已在同一 SQLite transaction 校验 owner generation。
-- Tool journal 使用 `(turn_id, call_id)` 与 planned/running/terminal 状态。
-- Foreground/background 已接入 durable process supervision、launch-time watchdog 与 tree termination。
-- CLI/TUI/Telegram shutdown 已有 abort、deadline 与升级合同。
-- Telegram inbox/outbox/service lease 已进入 SQLite 主干。
-- 第二轮仓库调查、成熟实现调查、实现与定向故障测试已完成。
-- 当前定向故障集 25 项：24 通过、0 失败、1 项平台跳过；完整验收待执行。
+- Kitty 使用 Ink 7.1；该版本提供正式 `usePaste`，负责启用 bracketed paste 并把完整 payload 送入独立 paste channel。
+- 当前 `Composer` 只注册 `useInput`，没有注册 `usePaste`，因此没有开启 bracketed paste。
+- Composer 状态本身已支持多行、宽字符、上下移动、持久草稿和显式组合键插入换行。
+- Input gateway 使用 UTF-8 `StringDecoder` 并过滤鼠标序列；它没有把 paste marker 当业务输入处理，Ink parser 可以跨 chunk 组装 marker 和 payload。
+- OpenCode 在 paste 边界把 Windows CRLF 和裸 CR 统一为 LF；Codex 把 paste 作为独立事件，并只对不可靠终端增加复杂 burst fallback。
+- 当前目标 Windows Terminal 支持 bracketed paste；没有证据要求在 Kitty 重建计时式 burst 猜测器。
 
 ## 3. 失败测试
 
-实施前必须补齐并确认以下测试在旧实现失败：
-
-- owner 校验后转移 turn lease，旧 owner 的 session append、steer consume、tool transition 和 terminal commit 全部不得落盘。
-- output/complete、terminate/complete 和双 close 并发时，execution terminal 不得倒退，wake 只能出现一次。
-- tool batch 在 abort 或 lease loss 后不得启动下一个副作用工具；已跨越副作用边界但未结算的工具进入 `uncertain`。
-- create、spawn、supervision、PID identity、running commit 和 settlement 各点硬杀后，不得留下永久 active row 或孤儿进程树。
-- PID 被复用时不得向新进程发送终止信号。
-- EOF、单次信号、重复信号、忽略 AbortSignal 的 provider/tool 均在 deadline 内退出并记录原因。
-- 双终端争用同一 session 时只能有一个 generation 写入；session message 必须严格 append-only。
-- active turn/background 存在时 reset 必须先排空或失败，不得先删除 control plane。
-- Telegram 重复 update 只能绑定同一 durable turn；双 service acquire 只能一个成功；shutdown 不启动排队 turn。
-- Telegram 远端发送成功但本地未提交时进入可见 `uncertain`，不得无声自动重发。
+- Composer 收到 `first\r\nsecond\rthird\n` 的 paste event 后，草稿必须是 `first\nsecond\nthird\n`，光标位于末尾，不能调用 submit。
+- 在已有草稿光标中间粘贴多行时，前后文本必须原样保留。
+- 空 paste 不改变草稿，也不提交。
+- Bracketed paste marker 与 UTF-8 payload 被任意拆 chunk 后，input gateway 必须原样交给 Ink parser，不能被鼠标过滤器吞掉或改写。
+- TUI 组件必须注册 Ink `usePaste`，不能依赖 `useInput` 猜测多字符输入。
 
 ## 4. 目标
 
-- 一个 SQLite control plane 保存 session、turn、steer、tool effect、execution、service ownership 和恢复事实。
-- 所有可变 owner 使用显式 token、单调 generation、lease 和条件状态转换。
-- session append、turn fencing、steer consumption、closing/terminal commit 使用同一事务边界。
-- tool effect 使用 `planned -> running -> success/error/interrupted/uncertain`。
-- execution 使用 `created -> running -> cancelling -> completed/failed/aborted/lost`。
-- foreground 和 background process 共用 launch、identity、watchdog、tree termination、settlement 和 recovery。
-- 所有 host 使用同一有界 shutdown supervisor；reset 是项目级 exclusive lifecycle operation。
-- Telegram 使用 durable inbox、outbox 和 service lease，不以 PID 文件或内存队列作为事实主干。
-- `spec.md`、代码、测试和 `audit.md` 描述同一当前事实。
+- `InkRuntime` 暴露当前依赖自带的 `usePaste`。
+- `Composer` 注册独立 paste handler；`useInput` 继续只处理键盘事件。
+- `TuiComposerInteraction` 成为粘贴写入草稿的唯一 owner：归一化换行、按当前光标插入、关闭临时 overlay、持久化草稿、同步 slash menu。
+- 粘贴事件不进入 session、turn 或模型，直到用户显式提交。
+- `spec.md`、自动测试与正式构建描述同一行为。
 
 ## 5. 不做范围
 
-- 不修复仅影响 background 尾部刷新、TUI cwd 投影、空态 watcher、cleanup stack、session picker 或通用 HTTP body 限制的问题。
-- 不为旧 SQLite schema 写 migration、兼容读取、旧字段推断或 legacy wrapper。
-- 不承诺外部 Telegram API 的严格 exactly-once；只保证本地 ownership、可见 uncertain 和禁止无声盲重试。
-- 不恢复子代理、leader/worker 或第二条 agent loop。
-- 未经用户明确要求不 push。
+- 不自绘 Windows Terminal 的“仍然粘贴/取消”弹窗；该确认属于终端，Kitty 只正确消费确认后的 payload。
+- 不读取系统剪贴板，不接管 `Ctrl+V`，不绕过终端安全设置。
+- 不把大段粘贴替换成 `[Pasted N lines]`，不裁剪、不设魔法长度。
+- 不实现无证据的计时式 paste-burst 猜测器。
 
 ## 6. 设计
 
-### 6.1 调查合同
+终端确认粘贴后，在 bracketed paste 模式下发送 `ESC[200~ payload ESC[201~`。Input gateway 只保持字节、UTF-8 与控制序列完整；Ink parser 识别 marker，通过 `usePaste` 一次发出 payload。Composer 把 payload交给 controller，controller 交给 `TuiComposerInteraction.handlePaste()`。
 
-先完成当前仓库主链、历史实现、Codex 官方事实和成熟开源实现调查。参考只用于验证 ownership、supervision、cancellation、process tree 和 durable recovery 边界，不直接复制产品结构。
-
-### 6.2 生命周期内核
-
-业务归属与运行 controller 分离。Turn、execution、service lock 均保存随机 owner token、单调 generation、lease deadline 和 heartbeat。Token 防猜测，generation 防旧 owner 的幂等误判，lease 负责失联判定。任何写操作都用 `WHERE token + generation + active state + lease > now` 证明 owner；affected rows 为零即停止旧执行。
-
-Recovery 只能由显式 coordinator 在取得新 generation 后执行。普通 load、status 和 UI projection 永远只读。
-
-### 6.3 原子持久化
-
-`ControlPlaneLedger` 持有唯一 SQLite connection 与 transaction。Turn-scoped session store 不再调用另一份 SessionStore 保存，而是直接执行 `saveOwned()`；该方法在同一事务校验 turn fencing、revision 和 canonical message prefix。
-
-Steer consumption 使用 `consumeOwnedSteerAndSaveSession()`：append message 与 consumed generation 同一提交。Terminal 使用 `finishOwnedTurn()`；提交失败是 host outcome 失败，不能先返回 completed。禁止在 wrapper 中使用“写前 assert、写后 assert”代替原子 fencing。
-
-Tool key 为 `(turn_id, call_id)`。计划批次只插入 planned；紧邻真实调用前由 `activateOwned()` 切 running；settle 只接受同 generation 的 running。副作用已经开始但 owner 丢失时由 recovery coordinator 标记 uncertain。
-
-### 6.4 Process supervisor
-
-`ExecutionSupervisor` 独占 create、claim、spawn、identity inspection、watchdog、heartbeat、output、cancel 和 settle。前台 bash 与后台命令都通过 supervisor，区别仅是调用者是否等待 terminal。
-
-POSIX child 建立独立 process group；Linux parent-death helper采用 Goose 的 parent PID 复查原则。Windows 使用隐藏进程和完整 tree termination，kill 后复查；持久身份至少包含 PID、平台和 creation marker。状态转换全部携带 controller generation。取消先写 cancelling，再终止并确认身份退出，最后提交 aborted+wake。
-
-### 6.5 Host 与 Telegram
-
-Host 只负责准入、信号和呈现，生命周期事实进入统一 supervisor。Shutdown coordinator 先关闭准入，同时 abort turn 和 cancel execution；grace deadline 后 detach/force；重复信号直接升级。Reset 使用项目级 exclusive lease。
-
-Telegram inbox/outbox/service ownership 使用 SQLite durable state，不保留 update commit JSON、delivery JSON 或 PID 文件平行主干。Update admission 与 turn ID 同一事务；outbox 对远端已调用但本地未确认的记录使用 uncertain，不承诺外部 exactly-once。
-
-### 6.6 成熟实现取舍
-
-- 采用 Codex 的单一 process manager、live process 先登记、interrupt/output drain/exit watcher共享状态。
-- 采用 Goose 的 POSIX process group、Linux parent-death signal和 parent PID 竞态复查。
-- 采用 OpenCode control-plane 的 sequence/fence思想，以 SQLite generation实现。
-- 不采用 Codex 进程内 session 作为 durable owner，不采用 OpenCode JSON storage/进程内锁，不把 PID 当 ownership。
+`handlePaste()` 先把 `CRLF` 和裸 `CR` 归一为 `LF`，再按当前 UTF-16 cursor 插入草稿。该路径不接受 `Key.return`，因此不可能触发 submit。草稿更新复用当前持久化与布局链路；失败或空 payload 不产生额外状态。
 
 ## 7. 实施任务
 
-- [x] 完成第二轮全局语义调查，按输入 -> turn -> tool -> process -> record -> host output 记录事实。
-- [x] 调查 Codex 官方行为及成熟开源实现，提炼可复用边界并记录不采用项。
-- [x] 重写 `audit.md`：删除外围项，合并派生症状，保留核心证据与失败测试。
-- [x] 更新本计划的最终 schema、状态机、模块职责和逐文件任务。
-- [x] 增加并发、硬杀、重复信号、PID 复用和 ownership 故障测试。
-- [x] 重建 control-plane schema 与原子 transaction API。
-- [x] 重建 turn/session/steer ownership 与 terminal commit。
-- [x] 重建 tool effect journal 与执行前 fencing。
-- [x] 重建统一 process supervisor，并接入 foreground/background。
-- [x] 重建 CLI/TUI/Local API shutdown 与 project reset 生命周期。
-- [x] 重建 Telegram durable inbox/outbox/service lease 与有限 shutdown。
-- [x] 同步 `spec.md` 与核心审查事实。
-- [x] 运行局部测试、完整验证、故障演练、Evaluation 和真实模型验收。
-- [x] 清理测试状态和残留进程，完成收口；按用户要求 commit，不 push。
+- [x] 增加失败测试，覆盖多行、CRLF/CR、光标中插入、空粘贴和 gateway 分块。
+- [x] 接入 Ink `usePaste`，增加 controller / interaction 的显式 paste API。
+- [x] 同步 `spec.md` 与组件测试，不增加自定义提示或隐藏裁剪。
+- [x] 运行定向测试、`npm.cmd run verify` 与工作区卫生检查。
 
 ## 8. 验证计划
 
-- 类型检查与构建：`npm.cmd run check`。
-- 核心完整验证：`npm.cmd run verify`。
-- Evaluation：`npm.cmd run test:eval`。
-- 本地验收：`npm.cmd run eval:local`。
-- 生产验收：使用现有真实 provider 配置执行 `npm.cmd run eval:production`。
-- Windows 实测：parent -> shell -> grandchild，覆盖正常退出、abort、timeout、宿主硬杀和 PID identity mismatch。
-- 并发实测：双进程 session claim、tool settle、execution close、Telegram service lock、reset exclusion 和 SQLite busy。
-- 卫生检查：`git diff --check`、`.test*`、Kitty/test Node 进程、control-plane active row 和临时文件。
+- 运行 composer interaction、gateway、render 定向测试。
+- 运行 `npm.cmd run verify`，确认 typecheck、CLI/TUI build 与全部核心测试。
+- 确认 `git diff --check`、`.test*` 和 Kitty Node 进程为零。
+- 不需要真实 provider：粘贴在模型请求前完成，真实 API 不参与该输入边界。
 
 ## 9. 收口
 
-实现与实践验收已完成：
-
-- `npm.cmd run verify`：317 项，316 通过，0 失败，1 项平台跳过。
-- `npm.cmd run test:eval`：12/12。
-- `npm.cmd run eval:local`：13/13。
-- DeepSeek `deepseek-v4-flash` 真实生产验收：5/5；真实两轮 turn、失败证据、文件修复、复验和最终回答闭环。
-- 定向生命周期故障集：25 项，24 通过，0 失败，1 项平台跳过。
-- `.kitty/.env`、`.kitty/.env.example` 与动态 env template 的现行 subagent 引用均为 0。
-
-卫生检查通过：`git diff --check` 无错误，`.test*` 0，eval 隔离目录 0，control-plane SQLite 0，Kitty/test Node 进程 0，现行 subagent 引用 0。等待本地 commit；不 push。
+目标已完成。多行 paste 失败测试全部转绿；定向输入、gateway 与 render 测试 46/46 通过；`npm.cmd run verify` 完成 typecheck、CLI/TUI 正式构建和 339 项核心测试，其中 338 通过、0 失败、1 项仅因 Windows 跳过 POSIX。该能力位于模型请求前，不需要真实 provider。未经用户明确要求不 commit、不 push。

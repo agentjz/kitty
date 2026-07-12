@@ -1,6 +1,7 @@
 import { tryParseJson } from "../../utils/json.js";
 import { normalizeDisplayPath } from "../pathDisplay.js";
 import { truncate } from "../previewPolicy.js";
+import { projectToolCallPresentation } from "../toolPresentation.js";
 import { readStringField } from "./shared.js";
 import type { ToolDisplay } from "./types.js";
 
@@ -10,6 +11,10 @@ export function buildToolCallDisplay(
   maxChars: number,
   cwd?: string,
 ): ToolDisplay {
+  const sharedDisplay = buildSharedToolCallDisplay(projectToolCallPresentation(name, rawArgs), cwd);
+  if (sharedDisplay) {
+    return sharedDisplay;
+  }
   const parsed = tryParseJson(rawArgs);
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     return {
@@ -21,39 +26,6 @@ export function buildToolCallDisplay(
   const path = normalizeDisplayPath(readStringField(args, "path"), cwd);
 
   switch (name) {
-    case "read": {
-      const offset = typeof args.offset === "number" ? Math.trunc(args.offset) : undefined;
-      const limit = typeof args.limit === "number" ? Math.trunc(args.limit) : undefined;
-      const range = offset === undefined
-        ? ""
-        : limit === undefined
-          ? `:${offset}`
-          : `:${offset}-${Math.max(offset, offset + limit - 1)}`;
-      return {
-        summary: `${name} ${path ?? "(missing path)"}${range}`,
-      };
-    }
-    case "write":
-      return {
-        summary: `${name} ${path ?? "(missing path)"}`,
-      };
-    case "edit": {
-      const edits = Array.isArray(args.edits) ? args.edits : [];
-      return {
-        summary:
-          `${name} ${path ?? "(missing path)"}` +
-          (edits.length > 0 ? ` edits=${edits.length}` : ""),
-      };
-    }
-    case "bash": {
-      const command = readStringField(args, "command");
-      const runCwd = readStringField(args, "cwd");
-      return {
-        summary:
-          `${name} ${command ?? ""}`.trim() +
-          (runCwd ? ` cwd=${runCwd}` : ""),
-      };
-    }
     case "download_url":
       return {
         summary: `${name} ${readStringField(args, "url") ?? "(missing url)"} -> ${path ?? "(missing path)"}`,
@@ -128,5 +100,36 @@ export function buildToolCallDisplay(
       return {
         summary: `${name} ${truncate(rawArgs, maxChars)}`,
       };
+  }
+}
+
+function buildSharedToolCallDisplay(
+  presentation: ReturnType<typeof projectToolCallPresentation>,
+  cwd?: string,
+): ToolDisplay | undefined {
+  switch (presentation.kind) {
+    case "change": {
+      const target = normalizeDisplayPath(presentation.target, cwd) ?? "(missing path)";
+      const operations = presentation.operationCount && presentation.operationCount > 0
+        ? ` edits=${presentation.operationCount}`
+        : "";
+      return { summary: `${presentation.name} ${target}${operations}` };
+    }
+    case "read": {
+      const target = normalizeDisplayPath(presentation.target, cwd) ?? "(missing path)";
+      const range = presentation.offset === undefined
+        ? ""
+        : presentation.limit === undefined
+          ? `:${presentation.offset}`
+          : `:${presentation.offset}-${Math.max(presentation.offset, presentation.offset + presentation.limit - 1)}`;
+      return { summary: `read ${target}${range}` };
+    }
+    case "command":
+      return {
+        summary: `bash ${presentation.command ?? ""}`.trim()
+          + (presentation.cwd ? ` cwd=${presentation.cwd}` : ""),
+      };
+    case "tool":
+      return undefined;
   }
 }

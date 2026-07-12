@@ -91,6 +91,29 @@ test("bash reports missing commands as failed machine facts", async (t) => {
   assert.match(envelope.compactView, new RegExp(`runtime shell: ${shell.shell}`));
 });
 
+test("write result preserves every relevant hunk beyond the former preview boundary", async (t) => {
+  const root = await createTempWorkspace("foundation-write-diff", t);
+  const context = createToolContext(root);
+  const registry = await createDefaultAgentToolRegistry(context.config);
+  const before = Array.from({ length: 1_200 }, (_, index) => `line ${index + 1}`);
+  const after = before.map((line, index) => index % 12 === 0 ? `${line} changed` : line);
+
+  await registry.execute("write", JSON.stringify({
+    path: "large.txt",
+    content: before.join("\n"),
+  }), context);
+  const result = await registry.execute("write", JSON.stringify({
+    path: "large.txt",
+    content: after.join("\n"),
+  }), context);
+  const diff = String(parseToolJson(result.output).diff);
+
+  assert.equal(result.ok, true);
+  assert.equal(diff.length > 6_000, true);
+  assert.match(diff, /\+line 1189 changed/);
+  assert.doesNotMatch(diff, /\[truncated\]/i);
+});
+
 test("send_file returns error when host does not support file delivery", async (t) => {
   const root = await createTempWorkspace("send-file-nohost", t);
   const context = createToolContext(root);

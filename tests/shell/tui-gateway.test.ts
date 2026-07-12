@@ -95,6 +95,24 @@ test("tui input gateway preserves UTF-8 IME text split across byte chunks", asyn
   assert.doesNotMatch(chunks.join(""), /�/u);
 });
 
+test("tui input gateway preserves split bracketed paste markers and multiline UTF-8 payload", async () => {
+  const source = new PassThrough();
+  const gateway = createTuiInputGateway({
+    source: source as unknown as NodeJS.ReadStream,
+  });
+  const chunks: string[] = [];
+  gateway.stdin.on("data", (chunk) => chunks.push(chunk.toString()));
+
+  source.write("\x1b[2");
+  source.write("00~第一行\r");
+  source.write("\n第二行\x1b[");
+  source.write("201~");
+  await new Promise((resolve) => setImmediate(resolve));
+
+  gateway.dispose();
+  assert.equal(chunks.join(""), "\x1b[200~第一行\r\n第二行\x1b[201~");
+});
+
 test("tui input gateway reports source EOF once and closes its filtered stream", async () => {
   const source = new PassThrough();
   let closeCount = 0;

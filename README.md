@@ -90,7 +90,7 @@ kitty "用 Spring Boot 3、MySQL、Redis 和 Vue 3 做一个考试管理平台�
 - `KITTY_PROFILE`
 - `KITTY_LOCALE`
 
-`KITTY_LOCALE` 支持 `zh-CN`、`zh-TW`、`en`、`ja`、`ko`、`es`、`pt-BR`、`fr`、`de`、`ru`、`ar` 和 `hi`。它只改变界面文案，不改变命令名、模型回复或工具证据。
+`KITTY_LOCALE` 支持 `zh-CN`、`en`、`ja` 和 `ko`。它只改变界面文案，不改变命令名、模型回复或工具证据。
 
 ## 📜 文档
 

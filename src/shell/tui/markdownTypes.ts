@@ -5,7 +5,17 @@ export type TuiMarkdownLineKind =
   | "code"
   | "quote"
   | "table"
-  | "rule";
+  | "rule"
+  | "changeHeader"
+  | "diffAdded"
+  | "diffRemoved"
+  | "diffContext"
+  | "toolHeader"
+  | "toolDetail"
+  | "planHeader"
+  | "planCompleted"
+  | "planActive"
+  | "planPending";
 
 export interface TuiMarkdownSpan {
   readonly text: string;

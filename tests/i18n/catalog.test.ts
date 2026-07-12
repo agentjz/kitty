@@ -17,12 +17,12 @@ import { formatTelegramHelp } from "../../src/telegram/helpText.js";
 test("locale parsing accepts only the declared presentation locales", () => {
   assert.equal(DEFAULT_LOCALE, "zh-CN");
   assert.deepEqual(SUPPORTED_LOCALES, [
-    "zh-CN", "zh-TW", "en", "ja", "ko", "es", "pt-BR", "fr", "de", "ru", "ar", "hi",
+    "zh-CN", "en", "ja", "ko",
   ]);
   assert.equal(parseKittyLocale("ja"), "ja");
   assert.equal(parseKittyLocale(" zh-CN "), "zh-CN");
-  assert.equal(parseKittyLocale("pt-BR"), "pt-BR");
-  assert.equal(parseKittyLocale("fr"), "fr");
+  assert.equal(parseKittyLocale("zh-TW"), undefined);
+  assert.equal(parseKittyLocale("fr"), undefined);
   assert.equal(parseKittyLocale("en-US"), undefined);
 });
 
@@ -59,7 +59,7 @@ test("TUI command discovery and keyboard help use the selected locale", () => {
 });
 
 test("CLI, preflight, and Telegram presenters use the selected locale", () => {
-  const locale = "es";
+  const locale = "ko";
   const help = buildCliProgram({}, locale).helpInformation();
   assert.equal(help.includes(translate(locale, "cli.program.description")), true);
   assert.equal(formatTelegramHelp(locale).includes(translate(locale, "telegram.help.stop")), true);

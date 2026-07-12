@@ -30,12 +30,42 @@ test("tui markdown aligns tables by terminal display width", () => {
 
   const tableRows = rows.filter((row) => row.kind === "table").map((row) => row.text);
 
-  assert.deepEqual(tableRows, [
-    "名称 │ Value",
-    "─────┼──────",
-    "猫猫 │ 1    ",
-    "a    │ 22   ",
+  assert.equal(tableRows[0]?.startsWith("┌"), true);
+  assert.equal(tableRows[1], "│ 名称 │ Value │");
+  assert.equal(tableRows.some((row) => row === "│ 猫猫 │ 1     │"), true);
+  assert.equal(tableRows.at(-1)?.startsWith("└"), true);
+});
+
+test("tui markdown degrades wide tables to readable records at narrow widths", () => {
+  const rows = renderMarkdownLines(
+    "| File | Result |\n| --- | --- |\n| src/a-very-long-file-name.ts | completed successfully |",
+    { width: 24 },
+  );
+
+  assert.deepEqual(rows.map((row) => row.text), [
+    "File: src/a-very-long-file-name.ts",
+    "Result: completed successfully",
   ]);
+  assert.equal(rows.every((row) => row.kind === "table"), true);
+});
+
+test("tui markdown preserves nested and task list structure", () => {
+  const rows = renderMarkdownLines("- parent\n  - [x] finished\n  - [ ] pending");
+  const listRows = rows.filter((row) => row.kind === "list").map((row) => row.text);
+
+  assert.equal(listRows[0], "• parent");
+  assert.equal(listRows.some((row) => row.includes("• [x] finished")), true);
+  assert.equal(listRows.some((row) => row.includes("• [ ] pending")), true);
+  assert.equal(listRows[1]?.startsWith("  "), true);
+});
+
+test("tui markdown expands a markdown fence only when it contains a parsed table", () => {
+  const table = renderMarkdownLines("```markdown\n| A | B |\n| --- | --- |\n| 1 | 2 |\n```");
+  const prose = renderMarkdownLines("```markdown\n**literal markdown example**\n```");
+
+  assert.equal(table.some((row) => row.kind === "table"), true);
+  assert.equal(table.some((row) => row.kind === "code"), false);
+  assert.equal(prose.every((row) => row.kind === "code"), true);
 });
 
 test("tui transcript wraps inline spans with one display width model", () => {

@@ -12,7 +12,7 @@ test("plain runtime renderer reads typed tool result state instead of formatted 
     toolName: "bash",
     payload: JSON.stringify({ ok: true, output: "done" }),
     ok: true,
-  }), { locale: "es" });
+  }), { locale: "ja" });
   assert.equal(success, "");
 
   const failed = formatRuntimeUiEventLine(createRuntimeUiEvent({
@@ -21,8 +21,8 @@ test("plain runtime renderer reads typed tool result state instead of formatted 
     toolName: "bash",
     payload: JSON.stringify({ ok: true, output: "done" }),
     ok: false,
-  }), { locale: "es" });
-  assert.match(failed, /^\[resultado\]/i);
-  assert.equal(failed.includes(translate("es", "common.failed")), true);
+  }), { locale: "ja" });
+  assert.match(failed, /^\[結果\]/);
+  assert.equal(failed.includes(translate("ja", "common.failed")), true);
   assert.doesNotMatch(failed, / failed/i);
 });

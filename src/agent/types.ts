@@ -15,12 +15,20 @@ export interface AgentCallbacks {
   onAssistantText?: (text: string) => void;
   onReasoningDelta?: (delta: string) => void;
   onReasoning?: (text: string) => void;
+  onToolCallProgress?: (progress: ToolCallProgress) => void;
   onToolCall?: (name: string, args: string) => void;
   onToolResult?: (name: string, output: string) => void;
   onToolError?: (name: string, error: string) => void;
 
   /** Optional host callback to send a file back to the conversation (e.g. Telegram sendDocument). */
   enqueueFile?: (filePath: string, fileName?: string, caption?: string) => Promise<string | undefined>;
+}
+
+export interface ToolCallProgress {
+  readonly index: number;
+  readonly id: string;
+  readonly name: string;
+  readonly argumentBytesReceived: number;
 }
 
 export interface RunTurnOptions {

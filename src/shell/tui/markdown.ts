@@ -12,12 +12,12 @@ export type {
 
 const MARKED_OPTIONS = { gfm: true };
 
-export function renderMarkdownLines(markdown: string): TuiMarkdownLine[] {
+export function renderMarkdownLines(markdown: string, options: { width?: number } = {}): TuiMarkdownLine[] {
   try {
     const tokens = marked.lexer(markdown, MARKED_OPTIONS);
     const lines: TuiMarkdownLine[] = [];
     for (const token of tokens) {
-      appendToken(lines, token);
+      appendToken(lines, token, options);
     }
     return trimOuterBlankLines(lines);
   } catch {
@@ -25,7 +25,7 @@ export function renderMarkdownLines(markdown: string): TuiMarkdownLine[] {
   }
 }
 
-function appendToken(lines: TuiMarkdownLine[], token: Token): void {
+function appendToken(lines: TuiMarkdownLine[], token: Token, options: { width?: number }): void {
   switch (token.type) {
     case "heading":
       appendInlineLine(lines, "heading", (token as Tokens.Heading).tokens);
@@ -36,15 +36,15 @@ function appendToken(lines: TuiMarkdownLine[], token: Token): void {
       pushBlank(lines);
       return;
     case "list":
-      appendList(lines, token as Tokens.List);
+      appendList(lines, token as Tokens.List, options);
       pushBlank(lines);
       return;
     case "code":
-      appendCode(lines, token as Tokens.Code);
+      appendCode(lines, token as Tokens.Code, options);
       pushBlank(lines);
       return;
     case "blockquote":
-      appendBlockquote(lines, token as Tokens.Blockquote);
+      appendBlockquote(lines, token as Tokens.Blockquote, options);
       pushBlank(lines);
       return;
     case "hr":
@@ -58,6 +58,7 @@ function appendToken(lines: TuiMarkdownLine[], token: Token): void {
       lines.push(...renderMarkdownTableLines(
         (token as Tokens.Table).header,
         (token as Tokens.Table).rows,
+        options,
       ));
       pushBlank(lines);
       return;
@@ -72,32 +73,44 @@ function appendInlineLine(lines: TuiMarkdownLine[], kind: TuiMarkdownLineKind, t
   push(lines, line(kind, text, trimEndSpans(spans)));
 }
 
-function appendList(lines: TuiMarkdownLine[], token: Tokens.List): void {
+function appendList(lines: TuiMarkdownLine[], token: Tokens.List, options: { width?: number }): void {
   const start = typeof token.start === "number" ? token.start : Number.parseInt(String(token.start || 1), 10);
   const orderedStart = Number.isFinite(start) ? start : 1;
   token.items.forEach((item, index) => {
     const marker = token.ordered ? `${orderedStart + index}.` : "•";
-    const markerSpans = textSpan(`${marker} `, { bold: true });
-    const bodySpans = readListItemSpans(item);
-    const rows = splitSpansOnNewline([...markerSpans, ...bodySpans]);
-    rows.forEach((spans, rowIndex) => {
-      const prefix = rowIndex === 0 ? "" : "  ";
-      const lineSpans = prefix ? [...textSpan(prefix), ...spans] : spans;
-      push(lines, line("list", spansText(lineSpans), lineSpans));
+    const task = item.task ? (item.checked ? "[x] " : "[ ] ") : "";
+    const markerText = `${marker} ${task}`;
+    const rendered = renderNestedLines(item.tokens, options);
+    const nested = token.loose || item.loose ? rendered : rendered.filter((itemLine) => itemLine.text.length > 0);
+    const itemLines = nested.length > 0
+      ? nested
+      : [line("text", renderInlineText(item.text), renderInlineSpans(item.text))];
+    itemLines.forEach((itemLine, rowIndex) => {
+      const prefix = rowIndex === 0 ? markerText : " ".repeat(markerText.length);
+      const lineSpans = itemLine.text
+        ? [...textSpan(prefix, { bold: rowIndex === 0 }), ...itemLine.spans]
+        : [];
+      push(lines, line(
+        itemLine.kind === "text" ? "list" : itemLine.kind,
+        spansText(lineSpans),
+        lineSpans,
+        itemLine.language,
+      ));
     });
   });
 }
 
-function readListItemSpans(item: Tokens.ListItem): TuiMarkdownSpan[] {
-  const paragraph = item.tokens.find((token): token is Tokens.Paragraph => token.type === "paragraph");
-  if (paragraph) {
-    return renderInlineSpans(paragraph.tokens);
-  }
-  return renderInlineSpans(item.text);
-}
-
-function appendCode(lines: TuiMarkdownLine[], token: Tokens.Code): void {
+function appendCode(lines: TuiMarkdownLine[], token: Tokens.Code, options: { width?: number }): void {
   const language = normalizeLanguage(token.lang);
+  if (language === "md" || language === "markdown") {
+    const nestedTokens = marked.lexer(token.text, MARKED_OPTIONS);
+    if (nestedTokens.some((nested) => nested.type === "table")) {
+      for (const nested of nestedTokens) {
+        appendToken(lines, nested, options);
+      }
+      return;
+    }
+  }
   if (language) {
     const text = ` ${language} `;
     push(lines, line("code", text, textSpan(text, { code: true }), language));
@@ -107,8 +120,8 @@ function appendCode(lines: TuiMarkdownLine[], token: Tokens.Code): void {
   }
 }
 
-function appendBlockquote(lines: TuiMarkdownLine[], token: Tokens.Blockquote): void {
-  const nested = token.tokens.length > 0 ? renderNestedLines(token.tokens) : renderMarkdownLines(token.text);
+function appendBlockquote(lines: TuiMarkdownLine[], token: Tokens.Blockquote, options: { width?: number }): void {
+  const nested = token.tokens.length > 0 ? renderNestedLines(token.tokens, options) : renderMarkdownLines(token.text, options);
   for (const nestedLine of nested) {
     const prefix = nestedLine.text ? "│ " : "│";
     const spans = nestedLine.text
@@ -118,10 +131,10 @@ function appendBlockquote(lines: TuiMarkdownLine[], token: Tokens.Blockquote): v
   }
 }
 
-function renderNestedLines(tokens: readonly Token[]): TuiMarkdownLine[] {
+function renderNestedLines(tokens: readonly Token[], options: { width?: number }): TuiMarkdownLine[] {
   const lines: TuiMarkdownLine[] = [];
   for (const token of tokens) {
-    appendToken(lines, token);
+    appendToken(lines, token, options);
   }
   return trimOuterBlankLines(lines);
 }
@@ -141,22 +154,6 @@ function appendUnknownToken(lines: TuiMarkdownLine[], token: Token): void {
     push(lines, line("text", text, textSpan(text)));
     pushBlank(lines);
   }
-}
-
-function splitSpansOnNewline(spans: readonly TuiMarkdownSpan[]): TuiMarkdownSpan[][] {
-  const rows: TuiMarkdownSpan[][] = [[]];
-  for (const span of spans) {
-    const parts = span.text.split("\n");
-    parts.forEach((part, index) => {
-      if (index > 0) {
-        rows.push([]);
-      }
-      if (part) {
-        rows[rows.length - 1]!.push({ ...span, text: part });
-      }
-    });
-  }
-  return rows.length > 0 ? rows : [[]];
 }
 
 function trimEndSpans(spans: readonly TuiMarkdownSpan[]): TuiMarkdownSpan[] {

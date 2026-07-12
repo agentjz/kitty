@@ -207,6 +207,41 @@ test("composer refuses submission when durable draft clearing is unavailable", (
   assert.match(controller.getState().transcript.at(-1)?.text ?? "", /SQLite 正在忙/);
 });
 
+test("composer paste inserts normalized multiline text at the cursor without submitting", () => {
+  const saved: Array<{ cursor: number; value: string }> = [];
+  const session = createSession([]);
+  const controller = new TuiController(session, {
+    draftStore: {
+      load: () => undefined,
+      save(_sessionId, draft) {
+        saved.push(draft);
+      },
+      clear: () => true,
+    },
+  });
+  controller.handleComposerInput("prefixsuffix", {});
+  for (let index = 0; index < "suffix".length; index += 1) {
+    controller.handleComposerInput("", { leftArrow: true });
+  }
+  controller.handleComposerInput("p", { ctrl: true });
+  assert.equal(controller.getState().overlay.kind, "commandPalette");
+
+  controller.handleComposerPaste("first\r\nsecond\rthird\n");
+
+  assert.equal(controller.getState().overlay.kind, "closed");
+  assert.equal(controller.getState().composer.value, "prefixfirst\nsecond\nthird\nsuffix");
+  assert.equal(controller.getState().composer.cursor, "prefixfirst\nsecond\nthird\n".length);
+  assert.deepEqual(saved.at(-1), {
+    cursor: "prefixfirst\nsecond\nthird\n".length,
+    value: "prefixfirst\nsecond\nthird\nsuffix",
+  });
+
+  const savedCount = saved.length;
+  controller.handleComposerPaste("");
+  assert.equal(controller.getState().composer.value, "prefixfirst\nsecond\nthird\nsuffix");
+  assert.equal(saved.length, savedCount);
+});
+
 test("external editor failure preserves the current composer draft", async () => {
   const controller = new TuiController();
   controller.handleComposerInput("keep this", {});

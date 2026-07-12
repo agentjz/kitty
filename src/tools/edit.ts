@@ -1,6 +1,6 @@
 ﻿import fs from "node:fs/promises";
 
-import { atomicWriteFile, resolveUserPath, sha256Content, truncateText } from "../utils/fs.js";
+import { atomicWriteFile, resolveUserPath, sha256Content } from "../utils/fs.js";
 import { decodeTextFileEnvelope, encodeTextFileEnvelope } from "../utils/text.js";
 import { recordToolChange } from "../tools/core/changeTracking.js";
 import { ToolExecutionError } from "../tools/core/errors.js";
@@ -120,7 +120,7 @@ export const editToolDefinition: RegisteredTool = {
         toolName: "edit",
         changeId: changeRecord.change?.id,
         changedPaths: [resolved],
-        diff: truncateText(diff, 6_000),
+        diff,
         diagnostics,
       });
       await context.recordWorksetFile?.({

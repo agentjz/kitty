@@ -87,6 +87,7 @@ export async function startTuiChat(options: StartTuiChatOptions): Promise<void> 
     Box: ink.Box,
     Text: ink.Text,
     useInput: ink.useInput,
+    usePaste: ink.usePaste,
     useStdin: ink.useStdin,
     useBoxMetrics: ink.useBoxMetrics,
     useCursor: ink.useCursor,

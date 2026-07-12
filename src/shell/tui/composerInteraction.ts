@@ -65,6 +65,23 @@ export class TuiComposerInteraction {
     this.synchronizeSlashMenu();
   }
 
+  handlePaste(text: string): void {
+    if (this.host.isDisposed() || this.externalEditorActive || text.length === 0) return;
+    const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    const state = this.host.getState();
+    if (state.overlay.kind !== "closed") {
+      this.host.setState(updateOverlayState(state, { kind: "closed" }));
+    }
+    const current = this.host.getState().composer;
+    const action = applyComposerInput(
+      { cursor: current.cursor, value: current.value },
+      normalized,
+      {},
+    );
+    this.setDraft(action.state, true);
+    this.synchronizeSlashMenu();
+  }
+
   async editExternally(editor: (value: string) => Promise<string>): Promise<void> {
     if (this.host.isDisposed() || this.externalEditorActive) return;
     this.externalEditorActive = true;

@@ -1,6 +1,7 @@
 import { tryParseJson } from "../../utils/json.js";
 import { normalizeDisplayPath, rewriteAbsolutePaths } from "../pathDisplay.js";
 import { truncateBlock, truncateVisiblePreview } from "../previewPolicy.js";
+import { projectToolResultPresentation } from "../toolPresentation.js";
 import { readStringField } from "./shared.js";
 import type { ToolDisplay } from "./types.js";
 
@@ -18,6 +19,11 @@ export function buildToolResultDisplay(name: string, rawOutput: string, cwd?: st
   const output = parsed as Record<string, unknown>;
   const ok = readResultOk(output);
   const tracked = typeof output.outputPath === "string";
+  const shared = projectToolResultPresentation(name, rawOutput);
+  const sharedDisplay = buildSharedToolResultDisplay(shared, cwd);
+  if (sharedDisplay) {
+    return { ...sharedDisplay, ok, tracked };
+  }
   if (name === "task") {
     const description = readStringField(output, "description");
     const agentType = readStringField(output, "agentType");
@@ -45,6 +51,43 @@ export function buildToolResultDisplay(name: string, rawOutput: string, cwd?: st
     ok,
     tracked,
   };
+}
+
+function buildSharedToolResultDisplay(
+  presentation: ReturnType<typeof projectToolResultPresentation>,
+  cwd?: string,
+): Pick<ToolDisplay, "summary" | "preview"> | undefined {
+  switch (presentation.kind) {
+    case "change":
+      return {
+        summary: `${presentation.name} ${normalizeDisplayPath(presentation.path, cwd) ?? presentation.path}`,
+        preview: truncateBlock(presentation.diffLines.join("\n"), 1_600),
+      };
+    case "read":
+      return {
+        summary: `read ${normalizeDisplayPath(presentation.path, cwd) ?? presentation.path}`,
+        preview: presentation.content
+          ? truncateBlock(rewriteAbsolutePaths(presentation.content, cwd), 1_600)
+          : undefined,
+      };
+    case "command":
+      return {
+        summary: `bash ${presentation.command}`,
+        preview: presentation.output
+          ? truncateBlock(rewriteAbsolutePaths(presentation.output, cwd), 1_600)
+          : undefined,
+      };
+    case "plan":
+      return {
+        summary: `todo_write items=${presentation.items.length}`,
+        preview: [...presentation.items.map((item) => {
+          const marker = item.status === "completed" ? "[x]" : item.status === "in_progress" ? "[>]" : "[ ]";
+          return `${marker} #${item.id}: ${item.text}`;
+        }), `- Progress: ${presentation.completed}/${presentation.items.length} completed`].join("\n"),
+      };
+    case "none":
+      return undefined;
+  }
 }
 
 export function buildToolResultVisiblePreview(name: string, rawOutput: string, cwd?: string): string | null {

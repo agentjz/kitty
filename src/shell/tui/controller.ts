@@ -9,6 +9,7 @@ import {
   scrollTuiTranscript,
   scrollTuiTranscriptToBottom,
   scrollTuiTranscriptToTop,
+  toggleLatestTranscriptDetails,
   updateComposerState,
   updateOverlayState,
   updateRuntimeDock,
@@ -16,6 +17,7 @@ import {
   createInitialTuiState,
   formatContextBudget,
   type TuiTranscriptLineView,
+  type TuiTranscriptEntry,
   type TuiRuntimeDockState,
   type TuiState,
   type TuiTranscriptRole,
@@ -157,6 +159,10 @@ export class TuiController {
     this.composerInteraction.handleInput(input, key);
   }
 
+  handleComposerPaste(text: string): void {
+    this.composerInteraction.handlePaste(text);
+  }
+
   async editComposerExternally(editor: (value: string) => Promise<string>): Promise<void> {
     await this.composerInteraction.editExternally(editor);
   }
@@ -182,11 +188,19 @@ export class TuiController {
     this.interruptHandler?.();
   }
 
-  append(role: TuiTranscriptRole, text: string): void {
+  append(role: TuiTranscriptRole, text: string, options: {
+    details?: string;
+    planItems?: TuiTranscriptEntry["planItems"];
+  } = {}): void {
     if (!text) {
       return;
     }
-    this.setState(appendTranscriptEntry(this.state, { role, text }, this.viewport, this.projectionOptions()));
+    this.setState(appendTranscriptEntry(this.state, {
+      role,
+      text,
+      details: options.details,
+      planItems: options.planItems,
+    }, this.viewport, this.projectionOptions()));
   }
 
   appendStreaming(role: Extract<TuiTranscriptRole, "assistant" | "reasoning">, text: string): void {
@@ -254,6 +268,15 @@ export class TuiController {
     }
     return projectSelectedLineViews(this.renderAllTranscriptRows(), this.state.selection)
       .slice(this.state.scroll.offset, this.state.scroll.offset + viewport.height);
+  }
+
+  toggleLatestToolDetails(): boolean {
+    const next = toggleLatestTranscriptDetails(this.state, this.viewport, this.projectionOptions());
+    if (next === this.state) {
+      return false;
+    }
+    this.setState(next);
+    return true;
   }
 
   handleMouseEvent(event: TuiMouseEvent): void {

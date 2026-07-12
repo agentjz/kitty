@@ -69,7 +69,7 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 
 主要用户配置：
 
-- `KITTY_LOCALE`：`zh-CN`、`zh-TW`、`en`、`ja`、`ko`、`es`、`pt-BR`、`fr`、`de`、`ru`、`ar` 或 `hi`，默认 `zh-CN`；只影响 presentation。
+- `KITTY_LOCALE`：`zh-CN`、`en`、`ja` 或 `ko`，默认 `zh-CN`；只影响 presentation。其他值直接拒绝，不提供旧 locale 迁移或别名。
 - `KITTY_PROVIDER`
 - `KITTY_MODEL`
 - `KITTY_BASE_URL`
@@ -293,19 +293,26 @@ TUI 规则：
 - `Ctrl+R` 搜索当前 session 的外部用户输入历史。普通 Up/Down 先在多行草稿内移动，到首尾边界后才遍历历史；历史条目不可被原地修改。
 - 空草稿输入 `?` 打开真实键位帮助。Home/End 按当前行移动，Ctrl+Home/End 同时定位 transcript 和整个草稿；Delete 向前删除，Backspace 向后删除；Ctrl+K/U/W/Y 使用 composer kill buffer。
 - `Ctrl+G` 释放 TUI raw input 并启动 `$VISUAL`、`$EDITOR` 或平台默认编辑器；编辑成功后替换草稿，失败时保留原草稿并显示错误，临时文件必须清理。
+- Composer 通过 Ink `usePaste` 启用标准 bracketed paste。终端拥有多行粘贴确认；确认后的完整 payload 通过独立 paste event 一次进入草稿，Windows `CRLF` 与裸 `CR` 在边界归一为 `LF`。粘贴换行不得触发 submit、命令执行或 turn admission，也不得裁剪或替换成摘要占位符。
 - 未提交草稿同步写入 SQLite `interaction_drafts`，以 session ID 和 shell 为 owner；只有数据库短暂占用时才进入待写重试。草稿不属于 session message 或模型上下文；提交时清除，正常退出时 flush，恢复时 clamp cursor。
 - 命令、历史和帮助共享一个判别式 overlay 状态；同一时刻只能有一个顶层交互，响应式行预算不能覆盖 composer、dock 或 transcript。
 - Transcript 滚动状态只能是 `follow` 或 `detached`。Detached 状态保存稳定 row anchor 和 unseen row count；流式追加、工具状态更新与 resize 不能把阅读位置拉回底部。
 - Input gateway 使用有状态 UTF-8 decoder 保留跨 chunk 的中文与 IME 提交，并对跨 chunk 的 SGR/X10 mouse press、drag、release 和 wheel 做完整 framing；鼠标序列不得进入 composer 键盘流。stdin EOF、close 或错误必须幂等关闭 controller 输入，让 active turn 进入 recoverable detach，并由 session driver 终止当前 root session tree 的进程。Selection 使用渲染 row ID 与字符列，支持宽字符、跨行选择、边缘自动滚动和字符级高亮。
 - 有 selection 时 `Ctrl+C` 复制，不触发 turn interrupt；无 selection 时才中断。Esc 清除 selection。Clipboard 优先使用平台 native provider，失败后在 TTY 使用 OSC52；复制失败必须保留 selection 并显示错误。
-- Session picker、TUI chrome、CLI/doctor/status/runtime UI、command/help、interaction 与 Telegram 提示读取 runtime locale 的 typed catalog。十二份 catalog 必须拥有完全一致的 key 与占位符集合，运行时不做语言 fallback。Locale 不能进入 prompt、session message、tool evidence 或 control-plane 状态；命令名、路径、provider/model、机器 JSON 和模型回复保持原文。
+- Session picker、TUI chrome、CLI/doctor/status/runtime UI、command/help、interaction 与 Telegram 提示读取 runtime locale 的 typed catalog。简体中文、英文、日文、韩文四份 catalog 必须拥有完全一致的 key 与占位符集合，运行时不做语言 fallback。Locale 不能进入 prompt、session message、tool evidence 或 control-plane 状态；命令名、路径、provider/model、机器 JSON 和模型回复保持原文。
+- Welcome 品牌版本直接读取发布包版本；作者建议由 typed locale catalog 提供。窄终端可以隐藏建议，但不得挤压 session choice 或 composer。
 
-- Transcript 的 user、assistant、reasoning、system 使用同一个正文框架。Role 可以改变 gutter、颜色和强调，但不能改变正文起始列。
+- Transcript 的 user、assistant、reasoning、system、tool、change、plan 使用同一个正文框架。Role 可以改变 gutter、颜色和强调，但不能改变正文起始列；user、tool、change 与 plan 不绘制仿 OpenCode 的左侧竖线。
+- Assistant Markdown 以 `marked` GFM AST 为语法事实，并在当前正文宽度重新投影；嵌套/任务列表必须保留层级，宽表格降级为 key/value records，确认含表格的 `md` / `markdown` fence 才展开。Resize 必须从原始 source 重排，不能缓存旧换行。
+- `runtime-ui/toolPresentation.ts` 把核心工具调用和结果规范化为宿主无关的 typed presentation facts。CLI、TUI、Telegram 和 Local API 只消费这些事实；壳不能重新解析工具 JSON、猜测状态或定义第二份工具语义。
+- `write` / `edit` 成功后，共享投影从工具结果的 path 与标准 unified diff hunk 生成 change fact；所有 hunk 都保留，未修改的文件区段不进入该事实。TUI 仅为新增、删除和上下文行添加样式，不做第二次隐式裁剪；上游若限制证据，必须携带显式 truncation/artifact recovery。不得从未完成的流式参数推断变更结果。
+- `read` / `bash` 完成后展示紧凑工具摘要；存在详情时显示 `Ctrl+O`，由用户显式展开或收起最近详情。折叠只改变 projection，不能删除原始工具结果或改变 detached scroll anchor/unseen count。
+- `todo_write` 完成后直接消费共享 fact 中的 typed items，显示计划完成数与 pending / in_progress / completed 层级；完成项使用删除线。TUI 不解析 `preview` 文本推断计划状态。
 - Footer 的 model 标签与 Runtime Dock 的 activity/background 标签使用同一个左侧内容 inset。
 - Model metadata 位于 composer 下方左侧；context budget 位于右侧。Footer 不显示分隔点、斜杠命令或命令面板教学。
 - Context budget 必须属于当前选中的 session。项目全局 runtime status 不能用另一条最近已保存 session 的 budget 覆盖新建或已选 session。
 - 用户提交后到最终模型回答完成期间，TUI 在 Runtime Dock 第一行右侧显示本轮持续时间；思考、工具调用和后续模型请求不重置它。
-- Runtime Dock 保持稳定两行结构；第一行左侧展示当前 activity，右侧展示本轮持续时间；第二行展示 live background lane。activity 只显示工具名，不显示参数、命令或路径。
+- Runtime Dock 保持稳定两行结构；第一行左侧展示当前 activity，右侧展示本轮持续时间；第二行展示 live background lane。activity 不显示参数正文或命令；`write` / `edit` 工具开始时显示共享调用事实中的目标路径，参数流式生成期间显示 provider 已实际接收的累计 UTF-8 字节数。
 - TUI 只显示 control-plane 状态为 `created`、`running` 或 `cancelling` 的 background lane。
 - 存在 live execution lane 时，TUI 轻量刷新 execution 账本。Execution 进入终态后必须清除 lane；启动时的 `running` 文案不能成为错误的当前状态。
 - 首屏 transcript 保持空白。User message 使用紧凑的低对比整行背景。Reasoning 是低强调信息。

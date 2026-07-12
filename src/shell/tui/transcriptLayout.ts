@@ -68,7 +68,7 @@ export function renderTranscriptEntryLineViews(
 ): TuiTranscriptLineView[] {
   const frame = readTranscriptRoleFrame(entry.role, viewportWidth);
   const style = readTranscriptRoleStyle(entry.role, theme);
-  const sourceRows = readEntryDisplayRows(entry);
+  const sourceRows = readEntryDisplayRows(entry, frame.bodyWidth);
   const contentRows = wrapTranscriptEntryRows(entry, sourceRows, frame.bodyWidth, locale);
   const wrappedRows = contentRows.length > 0
     ? contentRows
@@ -120,9 +120,61 @@ function createEmptyWrappedRow(): TuiTranscriptWrappedRow {
   };
 }
 
-function readEntryDisplayRows(entry: TuiTranscriptEntry): TuiTranscriptSourceRow[] {
+function readEntryDisplayRows(entry: TuiTranscriptEntry, width: number): TuiTranscriptSourceRow[] {
+  if (entry.role === "plan") {
+    return [
+      {
+        markdownKind: "planHeader",
+        text: entry.text,
+        spans: [{ text: entry.text }],
+        language: undefined,
+      },
+      ...(entry.planItems ?? []).map((item): TuiTranscriptSourceRow => {
+        const marker = item.status === "completed" ? "✓" : item.status === "in_progress" ? "◉" : "□";
+        const prefix = `  ${marker} #${item.id} `;
+        return {
+          markdownKind: item.status === "completed"
+            ? "planCompleted"
+            : item.status === "in_progress"
+              ? "planActive"
+              : "planPending",
+          text: `${prefix}${item.text}`,
+          spans: [
+            { text: prefix },
+            { text: item.text, strike: item.status === "completed" },
+          ],
+          language: undefined,
+        };
+      }),
+    ];
+  }
+  if (entry.role === "tool") {
+    const text = entry.expanded && entry.details
+      ? `${entry.text}\n${entry.details}`
+      : entry.text;
+    return text.split(/\r?\n/).map((row, index) => ({
+      markdownKind: index === 0 ? "toolHeader" : "toolDetail",
+      text: row,
+      spans: [{ text: row }],
+      language: undefined,
+    }));
+  }
+  if (entry.role === "change") {
+    return entry.text.split(/\r?\n/).map((text, index) => ({
+      markdownKind: index === 0
+        ? "changeHeader"
+        : index > 1 && text.trimStart().startsWith("+")
+          ? "diffAdded"
+          : index > 1 && text.trimStart().startsWith("-")
+            ? "diffRemoved"
+            : "diffContext",
+      text,
+      spans: [{ text }],
+      language: undefined,
+    }));
+  }
   if (entry.role === "assistant" || entry.role === "reasoning") {
-    const markdownRows = renderMarkdownLines(entry.text);
+    const markdownRows = renderMarkdownLines(entry.text, { width });
     return markdownRows.length > 0
       ? markdownRows.map((row) => ({
         markdownKind: row.kind as TuiMarkdownLineKind,

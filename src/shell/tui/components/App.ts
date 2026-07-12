@@ -19,6 +19,7 @@ import { createFooterMetaComponent } from "./FooterMeta.js";
 import { createRuntimeDockComponent } from "./RuntimeDock.js";
 import { createTranscriptComponent } from "./Transcript.js";
 import { createWelcomeWordmarkComponent } from "./WelcomeWordmark.js";
+import { createWelcomeTipComponent } from "./WelcomeTip.js";
 
 export function createTuiAppComponent(kit: InkRuntime) {
   const { React, Box, useStdout } = kit;
@@ -28,6 +29,7 @@ export function createTuiAppComponent(kit: InkRuntime) {
   const RuntimeDock = createRuntimeDockComponent(kit);
   const Transcript = createTranscriptComponent(kit);
   const WelcomeWordmark = createWelcomeWordmarkComponent(kit);
+  const WelcomeTip = createWelcomeTipComponent(kit);
 
   return function TuiApp(props: {
     controller: TuiController;
@@ -83,8 +85,14 @@ export function createTuiAppComponent(kit: InkRuntime) {
         React.createElement(
           Box,
           { flexDirection: "column", alignItems: "center", width: "100%" },
-          React.createElement(WelcomeWordmark),
-          React.createElement(Box, { height: 2 }),
+          React.createElement(WelcomeWordmark, {}),
+          React.createElement(Box, { height: 1 }),
+          React.createElement(
+            Box,
+            { width: welcomeWidth, paddingX: TUI_FOOTER_CONTENT_INSET_X },
+            React.createElement(WelcomeTip, { locale: state.locale }),
+          ),
+          React.createElement(Box, { height: 1 }),
           React.createElement(
             Box,
             {

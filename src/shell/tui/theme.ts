@@ -17,4 +17,8 @@ export const TUI_COLORS = {
   success: "#82bd95",
   warning: "#d6bd86",
   error: "#d98282",
+  diffAdded: "#9ac7a6",
+  diffAddedBackground: "#13241a",
+  diffRemoved: "#e0a0a0",
+  diffRemovedBackground: "#291719",
 } as const;

@@ -9,6 +9,7 @@ import {
 import { TUI_COLORS } from "./theme.js";
 import type { InkRuntime } from "./components/kit.js";
 import { createWelcomeWordmarkComponent } from "./components/WelcomeWordmark.js";
+import { createWelcomeTipComponent } from "./components/WelcomeTip.js";
 import { DEFAULT_LOCALE, translate, type KittyLocale } from "../../i18n/index.js";
 
 export interface TuiSessionSelection {
@@ -93,6 +94,7 @@ export function createTuiSessionPickerComponent(
 ) {
   const { React, Box, Text, useInput, useStdout } = kit;
   const WelcomeWordmark = createWelcomeWordmarkComponent(kit);
+  const WelcomeTip = createWelcomeTipComponent(kit);
   return function TuiSessionPicker(props: {
     locale?: KittyLocale;
     sessions: readonly SessionRecord[];
@@ -153,19 +155,12 @@ export function createTuiSessionPickerComponent(
       React.createElement(
         Box,
         { flexDirection: "column", flexShrink: 0, width: contentWidth },
-        compact
-          ? React.createElement(
-            Box,
-            { justifyContent: "center", width: "100%" },
-            React.createElement(Text, { color: TUI_COLORS.text, bold: true }, "kitty agent"),
-          )
-          : React.createElement(
-            Box,
-            { justifyContent: "center", width: "100%" },
-            React.createElement(WelcomeWordmark),
-          ),
-        React.createElement(Box, { height: 1 }),
-        React.createElement(Text, { color: TUI_COLORS.text, bold: true }, translate(locale, "tui.sessionTitle")),
+        React.createElement(
+          Box,
+          { justifyContent: "center", width: "100%" },
+          React.createElement(WelcomeWordmark, { compact }),
+        ),
+        dense ? null : React.createElement(WelcomeTip, { locale }),
         React.createElement(Box, { height: 1 }),
         React.createElement(
           Box,

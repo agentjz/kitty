@@ -1,6 +1,6 @@
 ﻿import fs from "node:fs/promises";
 
-import { atomicWriteFile, ensureParentDirectory, fileExists, resolveUserPath, sha256Content, truncateText } from "../utils/fs.js";
+import { atomicWriteFile, ensureParentDirectory, fileExists, resolveUserPath, sha256Content } from "../utils/fs.js";
 import { recordToolChange } from "../tools/core/changeTracking.js";
 import { toToolRelativePath } from "../tools/core/pathDisplay.js";
 import { buildDiffPreview, okResult, parseArgs, readBoolean, readPossiblyEmptyString, readString } from "../tools/core/shared.js";
@@ -73,7 +73,7 @@ export const writeToolDefinition: RegisteredTool = {
       toolName: "write",
       changeId: changeRecord.change?.id,
       changedPaths: [resolved],
-      diff: truncateText(preview, 6_000),
+      diff: preview,
       diagnostics,
     });
     await context.recordWorksetFile?.({

@@ -1,11 +1,15 @@
 import type { TuiMarkdownLineKind } from "./markdown.js";
+import type { ToolPlanItem } from "../../runtime-ui/toolPresentation.js";
 
-export type TuiTranscriptRole = "user" | "assistant" | "reasoning" | "system";
+export type TuiTranscriptRole = "user" | "assistant" | "reasoning" | "system" | "change" | "tool" | "plan";
 
 export interface TuiTranscriptEntry {
   id: string;
   role: TuiTranscriptRole;
   text: string;
+  details?: string;
+  expanded?: boolean;
+  planItems?: readonly ToolPlanItem[];
 }
 
 export interface TuiTranscriptLineView {
@@ -63,4 +67,8 @@ export interface TuiTranscriptTheme {
   reasoning: string;
   thought: string;
   system: string;
+  diffAdded: string;
+  diffAddedBackground: string;
+  diffRemoved: string;
+  diffRemovedBackground: string;
 }

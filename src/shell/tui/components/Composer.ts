@@ -11,8 +11,8 @@ import { measureAbsoluteBox } from "../inkGeometry.js";
 import type { InkRuntime } from "./kit.js";
 import { translate } from "../../../i18n/index.js";
 
-export function createComposerComponent(kit: Pick<InkRuntime, "React" | "Box" | "Text" | "useCursor" | "useInput" | "useStdin">) {
-  const { React, Box, Text, useCursor, useInput, useStdin } = kit;
+export function createComposerComponent(kit: Pick<InkRuntime, "React" | "Box" | "Text" | "useCursor" | "useInput" | "usePaste" | "useStdin">) {
+  const { React, Box, Text, useCursor, useInput, usePaste, useStdin } = kit;
   return function Composer(props: {
     controller: TuiController;
     editExternally: (value: string) => Promise<string>;
@@ -60,6 +60,10 @@ export function createComposerComponent(kit: Pick<InkRuntime, "React" | "Box" | 
 
     setCursorPosition(layout.cursor);
 
+    usePaste((text) => {
+      props.controller.handleComposerPaste(text);
+    });
+
     useInput((input, key) => {
       if (key.ctrl && input.toLowerCase() === "c") {
         if (props.controller.copySelection()) return;
@@ -79,6 +83,10 @@ export function createComposerComponent(kit: Pick<InkRuntime, "React" | "Box" | 
       if (key.ctrl && key.end) props.controller.scrollBottom();
       if (key.ctrl && input.toLowerCase() === "l") {
         props.redraw();
+        return;
+      }
+      if (key.ctrl && input.toLowerCase() === "o") {
+        props.controller.toggleLatestToolDetails();
         return;
       }
       if (key.ctrl && input.toLowerCase() === "g") {

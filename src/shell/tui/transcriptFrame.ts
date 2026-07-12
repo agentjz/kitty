@@ -69,6 +69,25 @@ export function readTranscriptRoleStyle(role: TuiTranscriptRole, theme: TuiTrans
         dim: false,
         italicPrefix: false,
       };
+    case "change":
+      return {
+        accent: theme.border,
+        background: undefined,
+        text: theme.system,
+        bold: false,
+        dim: false,
+        italicPrefix: false,
+      };
+    case "tool":
+    case "plan":
+      return {
+        accent: theme.border,
+        background: undefined,
+        text: theme.system,
+        bold: false,
+        dim: false,
+        italicPrefix: false,
+      };
   }
 }
 
@@ -96,6 +115,63 @@ export function applyTranscriptMarkdownStyle(
         text: theme.reasoning,
         dim: true,
       };
+    case "changeHeader":
+      return {
+        ...base,
+        text: theme.user,
+        bold: true,
+      };
+    case "diffAdded":
+      return {
+        ...base,
+        background: theme.diffAddedBackground,
+        text: theme.diffAdded,
+      };
+    case "diffRemoved":
+      return {
+        ...base,
+        background: theme.diffRemovedBackground,
+        text: theme.diffRemoved,
+      };
+    case "diffContext":
+      return {
+        ...base,
+        text: theme.muted,
+      };
+    case "toolHeader":
+      return {
+        ...base,
+        text: theme.system,
+        bold: true,
+      };
+    case "toolDetail":
+      return {
+        ...base,
+        text: theme.muted,
+      };
+    case "planHeader":
+      return {
+        ...base,
+        text: theme.user,
+        bold: true,
+      };
+    case "planCompleted":
+      return {
+        ...base,
+        text: theme.muted,
+        dim: true,
+      };
+    case "planActive":
+      return {
+        ...base,
+        text: theme.diffAdded,
+        bold: true,
+      };
+    case "planPending":
+      return {
+        ...base,
+        text: theme.system,
+      };
     case "rule":
     case "table":
       return {
@@ -112,6 +188,10 @@ export function applyTranscriptMarkdownStyle(
 function readRoleFrameBase(role: TuiTranscriptRole): Omit<TuiTranscriptLineFrame, "bodyWidth"> {
   switch (role) {
     case "user":
+      return {
+        ...TRANSCRIPT_CONTENT_FRAME,
+        gutter: " ",
+      };
     case "reasoning":
       return {
         ...TRANSCRIPT_CONTENT_FRAME,
@@ -123,6 +203,9 @@ function readRoleFrameBase(role: TuiTranscriptRole): Omit<TuiTranscriptLineFrame
         gutter: "│",
       };
     case "assistant":
+    case "change":
+    case "tool":
+    case "plan":
       return {
         ...TRANSCRIPT_CONTENT_FRAME,
         gutter: " ",

@@ -10,6 +10,12 @@ import {
   readResponsesReasoning,
   readResponsesToolCalls,
 } from "./responsesResponse.js";
+import {
+  appendToolCallArguments,
+  createToolCallProgressReporter,
+  replaceToolCallArguments,
+  type StreamingToolCallState,
+} from "./toolCallProgress.js";
 
 export { buildResponsesRequestBody } from "./responsesRequest.js";
 
@@ -37,7 +43,8 @@ export const responsesAdapter: ProviderWireAdapter = {
 
       let content = "";
       let reasoningContent = "";
-      const toolCalls = new Map<number, { id: string; name: string; arguments: string }>();
+      const toolCalls = new Map<number, StreamingToolCallState>();
+      const toolCallProgress = createToolCallProgressReporter(request.callbacks);
 
       for await (const event of stream as unknown as AsyncIterable<{
         type?: string;
@@ -79,15 +86,35 @@ export const responsesAdapter: ProviderWireAdapter = {
           continue;
         }
 
+        if (event.type === "response.output_item.added" && event.item?.type === "function_call") {
+          const index = typeof event.output_index === "number" ? event.output_index : 0;
+          const existing = toolCalls.get(index) ?? {
+            id: event.item.call_id ?? event.item.id ?? event.item_id ?? `tool-${index}`,
+            name: "",
+            arguments: "",
+            argumentBytesReceived: 0,
+          };
+          existing.id = event.item.call_id ?? event.item.id ?? existing.id;
+          existing.name = event.item.name ?? existing.name;
+          if (typeof event.item.arguments === "string" && event.item.arguments.length > 0) {
+            replaceToolCallArguments(existing, event.item.arguments);
+          }
+          toolCalls.set(index, existing);
+          toolCallProgress.report(index, existing);
+          continue;
+        }
+
         if (event.type === "response.function_call_arguments.delta" && typeof event.delta === "string") {
           const index = typeof event.output_index === "number" ? event.output_index : 0;
           const existing = toolCalls.get(index) ?? {
             id: event.item_id ?? `tool-${index}`,
             name: "",
             arguments: "",
+            argumentBytesReceived: 0,
           };
-          existing.arguments += event.delta;
+          appendToolCallArguments(existing, event.delta);
           toolCalls.set(index, existing);
+          toolCallProgress.report(index, existing);
           continue;
         }
 
@@ -97,25 +124,39 @@ export const responsesAdapter: ProviderWireAdapter = {
             id: event.item_id ?? `tool-${index}`,
             name: "",
             arguments: "",
+            argumentBytesReceived: 0,
           };
           if (typeof event.name === "string") {
             existing.name = event.name;
           }
           if (typeof event.arguments === "string" && event.arguments.length > 0) {
-            existing.arguments = event.arguments;
+            replaceToolCallArguments(existing, event.arguments);
           }
           toolCalls.set(index, existing);
+          toolCallProgress.report(index, existing);
           continue;
         }
 
         if (event.type === "response.output_item.done" && event.item?.type === "function_call") {
           const index = typeof event.output_index === "number" ? event.output_index : 0;
-          toolCalls.set(index, {
+          const existing = toolCalls.get(index) ?? {
             id: event.item.call_id ?? event.item.id ?? `tool-${index}`,
-            name: event.item.name ?? "",
-            arguments: event.item.arguments ?? "",
-          });
+            name: "",
+            arguments: "",
+            argumentBytesReceived: 0,
+          };
+          existing.id = event.item.call_id ?? event.item.id ?? existing.id;
+          existing.name = event.item.name ?? existing.name;
+          if (typeof event.item.arguments === "string") {
+            replaceToolCallArguments(existing, event.item.arguments);
+          }
+          toolCalls.set(index, existing);
+          toolCallProgress.report(index, existing);
         }
+      }
+
+      for (const [index, toolCall] of toolCalls) {
+        toolCallProgress.report(index, toolCall);
       }
 
       return {

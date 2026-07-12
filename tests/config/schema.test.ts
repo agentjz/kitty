@@ -74,11 +74,11 @@ test("runtime config schema rejects missing required values instead of hiding de
 test("runtime config schema defaults a missing locale but rejects an explicit unknown locale", () => {
   const config = getInitialRuntimeConfig();
   assert.equal(normalizeRuntimeConfig({ ...config, locale: undefined }).locale, "zh-CN");
-  for (const locale of ["zh-CN", "zh-TW", "en", "ja", "ko", "es", "pt-BR", "fr", "de", "ru", "ar", "hi"] as const) {
+  for (const locale of ["zh-CN", "en", "ja", "ko"] as const) {
     assert.equal(normalizeRuntimeConfig({ ...config, locale }).locale, locale);
   }
   assert.throws(
-    () => normalizeRuntimeConfig({ ...config, locale: "en-US" }),
+    () => normalizeRuntimeConfig({ ...config, locale: "fr" }),
     /KITTY_LOCALE must be one of/,
   );
 });

@@ -11,6 +11,11 @@ import type { ProviderAdapterRequest, ProviderMessage, ProviderWireAdapter } fro
 import type { ProviderUsageSnapshot } from "./metrics.js";
 import { normalizeProviderUsage } from "./usageNormalizer.js";
 import { createAbortError, throwIfAborted } from "../utils/abort.js";
+import {
+  appendToolCallArguments,
+  createToolCallProgressReporter,
+  type StreamingToolCallState,
+} from "./toolCallProgress.js";
 
 export const chatCompletionsAdapter: ProviderWireAdapter = {
   wireApi: "chat.completions",
@@ -43,7 +48,8 @@ export const chatCompletionsAdapter: ProviderWireAdapter = {
 
       let content = "";
       let reasoningContent = "";
-      const toolCallParts = new Map<number, { id: string; name: string; arguments: string }>();
+      const toolCallParts = new Map<number, StreamingToolCallState>();
+      const toolCallProgress = createToolCallProgressReporter(request.callbacks);
 
       for await (const chunk of stream as unknown as AsyncIterable<{
         usage?: unknown;
@@ -91,6 +97,7 @@ export const chatCompletionsAdapter: ProviderWireAdapter = {
               id: toolCall.id ?? `tool-${index}`,
               name: "",
               arguments: "",
+              argumentBytesReceived: 0,
             };
 
             if (toolCall.id) {
@@ -102,12 +109,17 @@ export const chatCompletionsAdapter: ProviderWireAdapter = {
             }
 
             if (toolCall.function?.arguments) {
-              existing.arguments += toolCall.function.arguments;
+              appendToolCallArguments(existing, toolCall.function.arguments);
             }
 
             toolCallParts.set(index, existing);
+            toolCallProgress.report(index, existing);
           }
         }
+      }
+
+      for (const [index, toolCall] of toolCallParts) {
+        toolCallProgress.report(index, toolCall);
       }
 
       return {

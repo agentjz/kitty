@@ -170,6 +170,34 @@ export function updateRuntimeDock(state: TuiState, dock: Partial<TuiRuntimeDockS
   };
 }
 
+export function toggleLatestTranscriptDetails(
+  state: TuiState,
+  viewport: TuiViewport,
+  options: TuiProjectionOptions = {},
+): TuiState {
+  let index = -1;
+  for (let candidate = state.transcript.length - 1; candidate >= 0; candidate -= 1) {
+    if (state.transcript[candidate]?.details) {
+      index = candidate;
+      break;
+    }
+  }
+  if (index < 0) {
+    return state;
+  }
+  const entry = state.transcript[index]!;
+  const transcript = state.transcript.slice();
+  transcript[index] = { ...entry, expanded: !entry.expanded };
+  const changed = applyContentChange(state, { ...state, transcript }, viewport, options);
+  return {
+    ...changed,
+    scroll: {
+      ...changed.scroll,
+      unseenRows: state.scroll.unseenRows,
+    },
+  };
+}
+
 export function updateComposerState(
   state: TuiState,
   composer: Partial<TuiState["composer"]>,

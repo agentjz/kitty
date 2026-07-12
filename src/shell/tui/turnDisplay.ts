@@ -7,6 +7,7 @@ import { translate, type KittyLocale } from "../../i18n/index.js";
 import {
   projectTuiRuntimeStatusActivity,
   projectTuiToolCallFact,
+  projectTuiToolCallProgressFact,
   projectTuiToolErrorFact,
   projectTuiToolResultFact,
 } from "./toolFacts.js";
@@ -72,6 +73,15 @@ export function createTuiTurnDisplay(options: {
         activity: undefined,
       });
     },
+    onToolCallProgress(progress) {
+      if (isAborted()) {
+        return;
+      }
+      const fact = projectTuiToolCallProgressFact(progress);
+      if (fact) {
+        options.controller.updateDock(toDockPatch(fact));
+      }
+    },
     onToolCall(name, args) {
       if (isAborted()) {
         return;
@@ -83,10 +93,13 @@ export function createTuiTurnDisplay(options: {
       if (isAborted()) {
         return;
       }
-      const fact = projectTuiToolResultFact(name, output);
+      const fact = projectTuiToolResultFact(name, output, options.config.locale);
       options.controller.updateDock(toDockPatch(fact));
       if (fact.transcript) {
-        options.controller.append("system", fact.transcript);
+        options.controller.append(fact.transcript.role, fact.transcript.text, {
+          details: fact.transcript.details,
+          planItems: fact.transcript.planItems,
+        });
       }
     },
     onToolError(name, error) {
