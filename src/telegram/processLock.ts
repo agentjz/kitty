@@ -1,67 +1,56 @@
-import fs from "node:fs/promises";
 import path from "node:path";
 
+import { ControlPlaneLedger } from "../control/ledger.js";
+import { inspectProcessIdentity } from "../execution/process.js";
+import type { ServiceLeaseRecord } from "../control/telegram.js";
+
 export interface TelegramProcessLock {
-  pidFilePath: string;
+  leaseName: string;
+  signal: AbortSignal;
   release(): Promise<void>;
 }
 
 export async function acquireTelegramProcessLock(options: {
   stateDir: string;
   processId?: number;
-  isProcessAlive?: (processId: number) => Promise<boolean> | boolean;
 }): Promise<TelegramProcessLock> {
   const processId = options.processId ?? process.pid;
-  const pidFilePath = path.join(options.stateDir, "service.pid");
-  const isProcessAlive = options.isProcessAlive ?? defaultIsProcessAlive;
-
-  await fs.mkdir(options.stateDir, { recursive: true });
-
-  const existingPid = await readPidFile(pidFilePath);
-  if (existingPid && existingPid !== processId && await isProcessAlive(existingPid)) {
-    throw new Error(
-      `Telegram service already running with PID ${existingPid}. Stop the existing process before starting a new one.`,
-    );
+  const rootDir = path.dirname(path.dirname(path.resolve(options.stateDir)));
+  const ledger = new ControlPlaneLedger(rootDir);
+  let lease: ServiceLeaseRecord;
+  try {
+    lease = ledger.serviceLeases.acquire({
+      name: "telegram",
+      processId,
+      processIdentity: inspectProcessIdentity(processId),
+    });
+  } finally {
+    ledger.close();
   }
 
-  await fs.writeFile(pidFilePath, `${processId}\n`, "utf8");
+  const heartbeat = setInterval(() => {
+    const current = new ControlPlaneLedger(rootDir);
+    try { lease = current.serviceLeases.heartbeat(lease); }
+    catch (error) {
+      clearInterval(heartbeat);
+      leaseLost.abort(error);
+    }
+    finally { current.close(); }
+  }, 10_000);
+  heartbeat.unref();
+  const leaseLost = new AbortController();
+  let released = false;
 
   return {
-    pidFilePath,
+    leaseName: lease.name,
+    signal: leaseLost.signal,
     async release() {
-      const currentPid = await readPidFile(pidFilePath);
-      if (currentPid !== processId) {
-        return;
-      }
-
-      await fs.rm(pidFilePath, { force: true });
+      if (released) return;
+      released = true;
+      clearInterval(heartbeat);
+      const current = new ControlPlaneLedger(rootDir);
+      try { current.serviceLeases.release(lease); }
+      finally { current.close(); }
     },
   };
-}
-
-async function readPidFile(filePath: string): Promise<number | null> {
-  try {
-    const raw = await fs.readFile(filePath, "utf8");
-    const parsed = Number.parseInt(raw.trim(), 10);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return null;
-    }
-
-    throw error;
-  }
-}
-
-async function defaultIsProcessAlive(targetPid: number): Promise<boolean> {
-  if (!Number.isFinite(targetPid) || targetPid <= 0) {
-    return false;
-  }
-
-  try {
-    process.kill(targetPid, 0);
-    return true;
-  } catch {
-    return false;
-  }
 }

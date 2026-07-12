@@ -37,6 +37,9 @@ function createTuiInputPort(controller: TuiController): ShellInputPort {
     bindInterrupt(handler) {
       return controller.bindInterrupt(handler);
     },
+    close() {
+      controller.closeInput();
+    },
   };
 }
 

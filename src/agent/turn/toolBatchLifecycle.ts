@@ -35,6 +35,9 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
   let session = input.session;
   let changedPaths = new Set(input.changedPaths);
   const { response, options, toolRegistry, projectContext, changeStore } = input;
+  const durableOwnership = options.turnId
+    ? requireDurableTurnOwnership(options)
+    : undefined;
 
   if (response.content && !response.streamedAssistantContent) {
     options.callbacks?.onAssistantStage?.(response.content);
@@ -93,7 +96,23 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
     options,
     projectContext,
     changeStore,
-    onItemSettled: options.turnId
+    onItemStarting: durableOwnership
+      ? async (toolCall) => {
+          throwIfAborted(options.abortSignal, "Turn aborted by user.");
+          const ledger = new ControlPlaneLedger(projectContext.stateRootDir);
+          try {
+            ledger.toolCalls.activate({
+              callId: toolCall.id,
+              turnId: durableOwnership.turnId,
+              ownerToken: durableOwnership.ownerToken,
+              ownerGeneration: durableOwnership.ownerGeneration,
+            });
+          } finally {
+            ledger.close();
+          }
+        }
+      : undefined,
+    onItemSettled: durableOwnership
       ? async (item) => {
           const result = buildToolResultEnvelope({
             callId: item.toolCall.id,
@@ -106,6 +125,9 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
           try {
             ledger.toolCalls.settle({
               callId: item.toolCall.id,
+              turnId: durableOwnership.turnId,
+              ownerToken: durableOwnership.ownerToken,
+              ownerGeneration: durableOwnership.ownerGeneration,
               result,
               beforeHash: typeof result.facts.beforeHash === "string" ? result.facts.beforeHash : undefined,
               afterHash: typeof result.facts.afterHash === "string" ? result.facts.afterHash : undefined,
@@ -232,6 +254,21 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
       modelOutputs: batchModelOutputs,
       changedPaths: [...batchChangedPaths],
     },
+  };
+}
+
+function requireDurableTurnOwnership(options: RunTurnOptions): {
+  turnId: string;
+  ownerToken: string;
+  ownerGeneration: number;
+} {
+  if (!options.turnId || !options.turnOwnerToken || options.turnOwnerGeneration === undefined) {
+    throw new Error("Durable tool execution requires turn id, owner token, and owner generation.");
+  }
+  return {
+    turnId: options.turnId,
+    ownerToken: options.turnOwnerToken,
+    ownerGeneration: options.turnOwnerGeneration,
   };
 }
 

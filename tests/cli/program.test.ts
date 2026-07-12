@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { executionOwnership } from "../../src/control/types.js";
 
 import { buildCliProgram } from "../../src/cli/program.js";
 import { formatSessionEventForCli, readSessionEventsForCli } from "../../src/cli/commands/events.js";
@@ -65,7 +66,7 @@ test("background command lists, reads, waits, and stops executions", async () =>
     cwd: root,
     requestedBy: "test",
   });
-  store.close(completed.id, {
+  store.close(completed.id, executionOwnership(completed), {
     status: "completed",
     exitCode: 0,
     output: "done",
@@ -77,7 +78,7 @@ test("background command lists, reads, waits, and stops executions", async () =>
     cwd: root,
     requestedBy: "test",
   });
-  store.markRunning(running.id, { pid: process.pid });
+  store.markRunning(running.id, executionOwnership(running), { pid: process.pid });
 
   program.exitOverride();
   await program.parseAsync(["-C", root, "background"], { from: "user" });

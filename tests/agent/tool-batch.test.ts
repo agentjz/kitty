@@ -76,6 +76,44 @@ test("tool batch preserves order for tools with side effects", async (t) => {
   assert.deepEqual(order, ["write_a:start", "write_a:end", "write_b:start", "write_b:end"]);
 });
 
+test("tool batch never starts the next side effect after abort", async (t) => {
+  const root = await createTempWorkspace("aborted-tool-batch", t);
+  const sessionStore = new InProcessSessionStore();
+  const session = await sessionStore.create(root);
+  const controller = new AbortController();
+  let secondStarted = false;
+  const first: RegisteredTool = {
+    definition: definition("first_write"),
+    effect: "write",
+    async execute() {
+      controller.abort();
+      return { ok: true, output: "first done" };
+    },
+  };
+  const second: RegisteredTool = {
+    definition: definition("second_write"),
+    effect: "write",
+    async execute() {
+      secondStarted = true;
+      return { ok: true, output: "must not run" };
+    },
+  };
+  const registry = createToolRegistry({
+    sources: [{ kind: "host", id: "test:abort", tools: [first, second] }],
+    onlyNames: ["first_write", "second_write"],
+  });
+
+  await assert.rejects(() => executeToolBatch({
+    session,
+    toolCalls: [call("a", "first_write"), call("b", "second_write")],
+    toolRegistry: registry,
+    options: { ...options(root, session, sessionStore), abortSignal: controller.signal },
+    projectContext: projectContext(root),
+    changeStore: new ChangeStore(createTestRuntimeConfig(root).paths.changesDir),
+  }));
+  assert.equal(secondStarted, false);
+});
+
 function definition(name: string): RegisteredTool["definition"] {
   return {
     type: "function",

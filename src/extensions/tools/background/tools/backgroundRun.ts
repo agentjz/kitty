@@ -2,8 +2,9 @@ import { launchCommand } from "../../../../utils/commandRunner/launch.js";
 import { normalizeCommandOutput } from "../../../../utils/commandRunner/output.js";
 import { resolveUserPath } from "../../../../utils/fs.js";
 import { clampNumber, okResult, parseArgs, readString } from "../../../../tools/core/shared.js";
-import { BackgroundExecutionStore, registerBackgroundProcess } from "../../../../execution/background.js";
+import { BackgroundExecutionStore, registerBackgroundProcess, terminateBackgroundExecution } from "../../../../execution/background.js";
 import type { RegisteredTool } from "../../../../tools/core/types.js";
+import { executionOwnership } from "../../../../control/types.js";
 
 export const backgroundRunTool: RegisteredTool = {
   definition: {
@@ -39,46 +40,102 @@ export const backgroundRunTool: RegisteredTool = {
       originToolCallId: context.toolCallId,
       timeoutMs,
     });
-    const { subprocess } = await launchCommand(command, cwd, timeoutMs);
-    registerBackgroundProcess(job.id, subprocess);
-    store.markRunning(job.id, { pid: subprocess.pid ?? 0 });
+    const ownership = executionOwnership(job);
+    let launched: Awaited<ReturnType<typeof launchCommand>>;
+    try {
+      launched = await launchCommand(command, cwd, timeoutMs);
+    } catch (error) {
+      store.close(job.id, ownership, {
+        status: "failed",
+        summary: "Background command failed before process registration.",
+        closeReason: "launch_error",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+    const { subprocess, processIdentity, stopParentDeathWatchdog } = launched;
+    registerBackgroundProcess(job.id, subprocess, stopParentDeathWatchdog);
+    try {
+      if (typeof subprocess.pid !== "number" || subprocess.pid <= 0) {
+        throw new Error("Background command started without a process identifier.");
+      }
+      store.markRunning(job.id, ownership, { pid: subprocess.pid, processIdentity });
+    } catch (error) {
+      try { terminateBackgroundExecution(context.projectContext.stateRootDir, job.id, context.ownerSessionId); }
+      catch { /* durable recovery owns the remaining uncertain launch */ }
+      throw error;
+    }
+    const heartbeat = setInterval(() => {
+      try { store.heartbeat(job.id, ownership); }
+      catch (error) {
+        clearInterval(heartbeat);
+        if (!isStaleControllerError(error) && !(error instanceof Error && /no longer owns/i.test(error.message))) {
+          try { terminateBackgroundExecution(context.projectContext.stateRootDir, job.id, context.ownerSessionId); }
+          catch { /* durable recovery will reconcile an unconfirmed termination */ }
+        }
+      }
+    }, 10_000);
+    heartbeat.unref();
     const outputTracker = createBackgroundOutputTracker((output) => {
       const normalizedOutput = normalizeCommandOutput(output);
-      store.updateRunningOutput(job.id, {
-        output: normalizedOutput,
-        summary: summarizeBackgroundOutput(normalizedOutput),
-        lastOutputAt: new Date().toISOString(),
-      });
+      try {
+        store.updateRunningOutput(job.id, ownership, {
+          output: normalizedOutput,
+          summary: summarizeBackgroundOutput(normalizedOutput),
+          lastOutputAt: new Date().toISOString(),
+        });
+      } catch (error) {
+        if (!isStaleControllerError(error)) {
+          try { terminateBackgroundExecution(context.projectContext.stateRootDir, job.id, context.ownerSessionId); }
+          catch { /* expired lease recovery will settle an unconfirmed controller */ }
+        }
+      }
     });
     subprocess.all?.on("data", (chunk) => {
       outputTracker.append(Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk));
     });
 
     void subprocess.then(async (result) => {
+      clearInterval(heartbeat);
       outputTracker.flush();
       const running = store.load(job.id);
       const resultOutput = normalizeCommandOutput(typeof result.all === "string" ? result.all : "");
       const output = resultOutput || running?.output || "";
-      store.close(job.id, {
-        status: result.exitCode === 0 ? "completed" : "failed",
-        exitCode: result.exitCode,
-        output,
-        summary: summarizeBackgroundOutput(output) ?? (result.exitCode === 0 ? "Background command completed." : "Background command failed."),
-        closeReason: result.exitCode === 0 ? "completed" : "exit_code",
-      });
+      try {
+        store.close(job.id, ownership, {
+          status: result.exitCode === 0 ? "completed" : "failed",
+          exitCode: result.exitCode,
+          output,
+          summary: summarizeBackgroundOutput(output) ?? (result.exitCode === 0 ? "Background command completed." : "Background command failed."),
+          closeReason: result.exitCode === 0 ? "completed" : "exit_code",
+        });
+      } catch (error) {
+        if (!isStaleControllerError(error)) {
+          try { terminateBackgroundExecution(context.projectContext.stateRootDir, job.id, context.ownerSessionId); }
+          catch { /* expired lease recovery will settle an unconfirmed controller */ }
+        }
+      }
     }, async (error) => {
+      clearInterval(heartbeat);
       outputTracker.flush();
       const running = store.load(job.id);
       const errorOutput = normalizeCommandOutput(typeof (error as { all?: unknown }).all === "string" ? (error as { all: string }).all : "");
       const output = errorOutput || running?.output || String((error as Error).message);
-      store.close(job.id, {
-        status: "failed",
-        exitCode: typeof (error as { exitCode?: unknown }).exitCode === "number" ? (error as { exitCode: number }).exitCode : null,
-        output,
-        summary: summarizeBackgroundOutput(output) ?? "Background command failed.",
-        closeReason: Boolean((error as { timedOut?: unknown }).timedOut) ? "timeout" : "error",
-        error: error instanceof Error ? error.message : String(error),
-      });
+      try {
+        store.close(job.id, ownership, {
+          status: "failed",
+          exitCode: typeof (error as { exitCode?: unknown }).exitCode === "number" ? (error as { exitCode: number }).exitCode : null,
+          output,
+          summary: summarizeBackgroundOutput(output) ?? "Background command failed.",
+          closeReason: Boolean((error as { timedOut?: unknown }).timedOut) ? "timeout" : "error",
+          error: error instanceof Error ? error.message : String(error),
+        });
+      } catch (settlementError) {
+        if (!isStaleControllerError(settlementError)) {
+          try { terminateBackgroundExecution(context.projectContext.stateRootDir, job.id, context.ownerSessionId); }
+          catch { /* expired lease recovery will settle an unconfirmed controller */ }
+        }
+      }
     });
 
     const running = store.load(job.id);
@@ -147,4 +204,8 @@ function summarizeBackgroundOutput(output: string): string | undefined {
 
 function truncateHead(value: string, maxChars: number): string {
   return value.length <= maxChars ? value : value.slice(value.length - maxChars);
+}
+
+function isStaleControllerError(error: unknown): boolean {
+  return error instanceof Error && /stale (?:output|controller)|previous controller/i.test(error.message);
 }

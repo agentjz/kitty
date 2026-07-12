@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { executionOwnership } from "../../src/control/types.js";
 
 import { readExecutionOutput } from "../../src/execution/output.js";
 import { ExecutionStore } from "../../src/execution/store.js";
@@ -14,7 +15,7 @@ test("execution output reader is the shared contract for summary, tail, full, an
     cwd: root,
     requestedBy: "agent",
   });
-  store.close(execution.id, {
+  store.close(execution.id, executionOwnership(execution), {
     status: "completed",
     output: "one\ntwo\nthree\nfour\n",
     summary: "four",

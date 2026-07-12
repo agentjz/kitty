@@ -32,7 +32,7 @@ export interface CliProgramDependencies {
     sessionStore: SessionStore;
   }) => Promise<OneShotPromptRunResult>;
   acquireProcessLock?: (options: { stateDir: string }) => Promise<{
-    pidFilePath: string;
+    leaseName: string;
     release(): Promise<void>;
   }>;
   probeProviderConnection?: typeof probeProviderConnection;

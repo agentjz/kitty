@@ -5,6 +5,7 @@ import type { ChangeRecord, RuntimeConfig, SessionRecord } from "../types.js";
 import { resolveProjectRoots } from "../context/repoRoots.js";
 import { getProjectStatePaths, PRESERVED_PROJECT_STATE_ENTRY_NAMES } from "./statePaths.js";
 import { isSameOrDescendant, waitForRemovedPaths } from "./resetSupport.js";
+import { ControlPlaneLedger } from "../control/ledger.js";
 
 const PRESERVED_PROJECT_STATE_ENTRIES = new Set<string>(PRESERVED_PROJECT_STATE_ENTRY_NAMES);
 
@@ -27,6 +28,13 @@ export async function resetProjectRuntime(input: ResetProjectRuntimeInput): Prom
   const roots = await resolveProjectRoots(input.cwd);
   const statePaths = getProjectStatePaths(roots.stateRootDir);
   const kittyDir = statePaths.kittyDir;
+
+  const ledger = new ControlPlaneLedger(roots.stateRootDir);
+  try {
+    ledger.resetRuntimeState();
+  } finally {
+    ledger.close();
+  }
 
   const removedSessionIds = await removeProjectSessions({
     sessionsDir: input.config.paths.sessionsDir,
@@ -144,6 +152,10 @@ async function clearProjectKittyDirectory(kittyDir: string): Promise<{
     for (const entry of entries) {
       const absolutePath = path.join(kittyDir, entry.name);
       if (PRESERVED_PROJECT_STATE_ENTRIES.has(entry.name)) {
+        preservedEntries.push(entry.name);
+        continue;
+      }
+      if (entry.name === "control-plane.sqlite" || entry.name === "control-plane.sqlite-wal" || entry.name === "control-plane.sqlite-shm") {
         preservedEntries.push(entry.name);
         continue;
       }

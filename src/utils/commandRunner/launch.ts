@@ -1,6 +1,8 @@
 import { loadExeca } from "../execa.js";
 import type { ResultPromise } from "execa";
 import { getShellRuntimeInfo } from "./shellRuntime.js";
+import { inspectProcessIdentity, type ProcessIdentity } from "../../execution/process.js";
+import { watchProcessUntilParentExit } from "../../execution/parentDeathWatchdog.js";
 
 type LaunchedCommand = ResultPromise<{
   cwd: string;
@@ -10,10 +12,13 @@ type LaunchedCommand = ResultPromise<{
   buffer: false;
   reject: false;
   env: NodeJS.ProcessEnv;
+  detached: boolean;
 }>;
 
 export interface LaunchedCommandHandle {
   subprocess: LaunchedCommand;
+  processIdentity?: ProcessIdentity;
+  stopParentDeathWatchdog: () => void;
 }
 
 export async function launchCommand(
@@ -33,6 +38,7 @@ export async function launchCommand(
         buffer: false,
         reject: false,
         env: buildCommandEnvironment(),
+        detached: process.platform !== "win32",
       })
     : execa(shell.executable, ["-lc", command], {
         cwd,
@@ -42,8 +48,14 @@ export async function launchCommand(
         buffer: false,
         reject: false,
         env: buildCommandEnvironment(),
+        detached: process.platform !== "win32",
       });
-  return { subprocess: subprocess as LaunchedCommand };
+  const pid = subprocess.pid;
+  const processIdentity = typeof pid === "number" ? inspectProcessIdentity(pid) : undefined;
+  const stopParentDeathWatchdog = typeof pid === "number"
+    ? watchProcessUntilParentExit({ parentPid: process.pid, targetPid: pid, targetIdentity: processIdentity })
+    : () => undefined;
+  return { subprocess: subprocess as LaunchedCommand, processIdentity, stopParentDeathWatchdog };
 }
 
 function encodePowerShellCommand(command: string): string {

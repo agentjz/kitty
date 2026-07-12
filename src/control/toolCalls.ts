@@ -3,7 +3,7 @@ import type Database from "better-sqlite3";
 import type { ToolEffect } from "../tools/core/types.js";
 import type { ToolResultEnvelope } from "../types.js";
 
-export type ToolCallStatus = "running" | "success" | "error" | "interrupted";
+export type ToolCallStatus = "planned" | "running" | "success" | "error" | "interrupted" | "uncertain";
 
 export interface DurableToolCall {
   callId: string;
@@ -13,6 +13,7 @@ export interface DurableToolCall {
   argumentsJson: string;
   effect: ToolEffect;
   status: ToolCallStatus;
+  ownerGeneration?: number;
   result?: ToolResultEnvelope;
   beforeHash?: string;
   afterHash?: string;
@@ -29,6 +30,7 @@ interface ToolCallRow {
   arguments_json: string;
   effect: string;
   status: string;
+  owner_generation: number | null;
   result_json: string | null;
   before_hash: string | null;
   after_hash: string | null;
@@ -55,16 +57,42 @@ export class ToolCallLedgerRepo {
         call_id, turn_id, session_id, tool_name, arguments_json, effect, status,
         before_hash, started_at, updated_at
       ) VALUES (
-        @callId, @turnId, @sessionId, @toolName, @argumentsJson, @effect, 'running',
-        @beforeHash, @now, @now
+        @callId, @turnId, @sessionId, @toolName, @argumentsJson, @effect, 'planned',
+        @beforeHash, NULL, @now
       )
-      ON CONFLICT(call_id) DO NOTHING
+      ON CONFLICT(turn_id, call_id) DO NOTHING
     `).run({ ...input, beforeHash: input.beforeHash ?? null, now });
-    return this.require(input.callId);
+    const existing = this.require(input.turnId, input.callId);
+    if (existing.sessionId !== input.sessionId || existing.toolName !== input.toolName ||
+      existing.argumentsJson !== input.argumentsJson || existing.effect !== input.effect) {
+      throw new Error(`Tool call ${input.turnId}/${input.callId} conflicts with a different planned effect.`);
+    }
+    return existing;
+  }
+
+  activate(input: { callId: string; turnId: string; ownerToken: string; ownerGeneration: number }): DurableToolCall {
+    const now = new Date().toISOString();
+    const result = this.db.prepare(`
+      UPDATE tool_calls
+      SET status='running', owner_generation=(
+            SELECT owner_generation FROM session_turns WHERE id=@turnId
+          ), started_at=@now, updated_at=@now
+      WHERE turn_id=@turnId AND call_id=@callId AND status='planned'
+        AND EXISTS (
+          SELECT 1 FROM session_turns
+          WHERE id=@turnId AND owner_token=@ownerToken AND status='running' AND lease_expires_at > @now
+            AND owner_generation=@ownerGeneration
+        )
+    `).run({ ...input, now });
+    if (result.changes !== 1) throw new Error(`Tool call ${input.turnId}/${input.callId} cannot start without the active turn lease.`);
+    return this.require(input.turnId, input.callId);
   }
 
   settle(input: {
     callId: string;
+    turnId: string;
+    ownerToken: string;
+    ownerGeneration: number;
     result: ToolResultEnvelope;
     beforeHash?: string;
     afterHash?: string;
@@ -75,9 +103,19 @@ export class ToolCallLedgerRepo {
       UPDATE tool_calls
       SET status=@status, result_json=@resultJson, before_hash=COALESCE(@beforeHash, before_hash), after_hash=@afterHash,
           updated_at=@now, finished_at=@now
-      WHERE call_id=@callId AND status='running'
+      WHERE turn_id=@turnId AND call_id=@callId AND status='running'
+        AND owner_generation=(SELECT owner_generation FROM session_turns WHERE id=@turnId)
+        AND EXISTS (
+          SELECT 1 FROM session_turns
+          WHERE id=@turnId AND owner_token=@ownerToken AND status IN ('running', 'closing')
+            AND lease_expires_at > @now
+            AND owner_generation=@ownerGeneration
+        )
     `).run({
       callId: input.callId,
+      turnId: input.turnId,
+      ownerToken: input.ownerToken,
+      ownerGeneration: input.ownerGeneration,
       status,
       resultJson: JSON.stringify(input.result),
       beforeHash: input.beforeHash ?? null,
@@ -85,12 +123,12 @@ export class ToolCallLedgerRepo {
       now,
     });
     if (update.changes !== 1) {
-      const current = this.require(input.callId);
+      const current = this.require(input.turnId, input.callId);
       if (current.status !== status || JSON.stringify(current.result) !== JSON.stringify(input.result)) {
-        throw new Error(`Tool call ${input.callId} cannot be settled from ${current.status}.`);
+        throw new Error(`Tool call ${input.turnId}/${input.callId} cannot be settled from ${current.status}.`);
       }
     }
-    return this.require(input.callId);
+    return this.require(input.turnId, input.callId);
   }
 
   interruptRecoverable(sessionId: string): DurableToolCall[] {
@@ -98,19 +136,19 @@ export class ToolCallLedgerRepo {
     const rows = this.db.prepare(`
       SELECT tool_calls.* FROM tool_calls
       JOIN session_turns ON session_turns.id=tool_calls.turn_id
-      WHERE tool_calls.session_id=? AND tool_calls.status='running'
-        AND (session_turns.status != 'running' OR session_turns.lease_expires_at <= ?)
-      ORDER BY tool_calls.started_at ASC
+      WHERE tool_calls.session_id=? AND tool_calls.status IN ('planned', 'running')
+        AND (session_turns.status NOT IN ('running', 'closing') OR session_turns.lease_expires_at <= ?)
+      ORDER BY COALESCE(tool_calls.started_at, tool_calls.updated_at) ASC
     `).all(sessionId, now) as ToolCallRow[];
     return rows.map((row) => {
       const result = buildInterruptedResult(row);
       const now = new Date().toISOString();
       this.db.prepare(`
         UPDATE tool_calls
-        SET status='interrupted', result_json=?, updated_at=?, finished_at=?
-        WHERE call_id=? AND status='running'
-      `).run(JSON.stringify(result), now, now, row.call_id);
-      return this.require(row.call_id);
+        SET status=?, result_json=?, updated_at=?, finished_at=?
+        WHERE turn_id=? AND call_id=? AND status IN ('planned', 'running')
+      `).run(row.status === "running" && row.effect !== "read" ? "uncertain" : "interrupted", JSON.stringify(result), now, now, row.turn_id, row.call_id);
+      return this.require(row.turn_id, row.call_id);
     });
   }
 
@@ -120,14 +158,14 @@ export class ToolCallLedgerRepo {
     `).all(sessionId) as ToolCallRow[]).map(fromRow);
   }
 
-  load(callId: string): DurableToolCall | undefined {
-    const row = this.db.prepare("SELECT * FROM tool_calls WHERE call_id=?").get(callId) as ToolCallRow | undefined;
+  load(turnId: string, callId: string): DurableToolCall | undefined {
+    const row = this.db.prepare("SELECT * FROM tool_calls WHERE turn_id=? AND call_id=?").get(turnId, callId) as ToolCallRow | undefined;
     return row ? fromRow(row) : undefined;
   }
 
-  private require(callId: string): DurableToolCall {
-    const record = this.load(callId);
-    if (!record) throw new Error(`Unknown tool call: ${callId}`);
+  private require(turnId: string, callId: string): DurableToolCall {
+    const record = this.load(turnId, callId);
+    if (!record) throw new Error(`Unknown tool call: ${turnId}/${callId}`);
     return record;
   }
 }
@@ -186,6 +224,7 @@ function fromRow(row: ToolCallRow): DurableToolCall {
     argumentsJson: row.arguments_json,
     effect: row.effect as ToolEffect,
     status: row.status as ToolCallStatus,
+    ownerGeneration: row.owner_generation ?? undefined,
     result: row.result_json ? JSON.parse(row.result_json) as ToolResultEnvelope : undefined,
     beforeHash: row.before_hash ?? undefined,
     afterHash: row.after_hash ?? undefined,

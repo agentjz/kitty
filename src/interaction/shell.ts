@@ -8,6 +8,7 @@ export type ShellInputResult =
 export interface ShellInputPort {
   readInput(promptLabel?: string): Promise<ShellInputResult>;
   bindInterrupt(handler: () => void): () => void;
+  close?(): void;
 }
 
 export interface ShellOutputPort {

@@ -14,8 +14,6 @@ export class WakeSignalLedgerRepo {
   constructor(private readonly db: Database.Database) {}
 
   publish(input: { executionId: string; reason: WakeSignalReason; createdAt?: string }): WakeSignalRecord {
-    const existing = this.loadByExecution(input.executionId);
-    if (existing) return existing;
     const record: WakeSignalRecord = {
       id: createControlPlaneId("wake"),
       executionId: input.executionId,
@@ -23,10 +21,10 @@ export class WakeSignalLedgerRepo {
       createdAt: input.createdAt ?? new Date().toISOString(),
     };
     this.db.prepare(`
-      INSERT INTO wake_signals (id, execution_id, reason, created_at)
+      INSERT OR IGNORE INTO wake_signals (id, execution_id, reason, created_at)
       VALUES (@id, @executionId, @reason, @createdAt)
     `).run(record);
-    return record;
+    return this.loadByExecution(input.executionId)!;
   }
 
   loadByExecution(executionId: string): WakeSignalRecord | undefined {

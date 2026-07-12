@@ -42,7 +42,9 @@ export async function runProductionRepairCheck(
     host: "eval-production",
     input: [
       "Fix this workspace production defect end to end.",
-      "Inspect the relevant files, run `node verify.cjs`, use the failure evidence to repair status.txt,",
+      "Before modifying any file, you MUST run `node verify.cjs` while status.txt is still broken.",
+      "That first run must fail and expose EVIDENCE_ROOT_CAUSE in its tool result; reading the source is not a substitute.",
+      "Use that observed failure evidence to repair status.txt,",
       "then rerun `node verify.cjs` until it passes.",
       "Finish with one short plain English sentence containing PRODUCTION_REPAIR_SENTINEL.",
       "Do not stop after explaining the failure.",

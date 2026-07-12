@@ -15,6 +15,7 @@ export async function consumePendingTurnSteers(input: {
   rootDir: string;
   turnId: string;
   ownerToken: string;
+  ownerGeneration: number;
   session: SessionRecord;
   sessionStore: SessionStoreLike;
 }): Promise<ConsumedTurnSteers> {
@@ -30,34 +31,45 @@ export async function consumePendingTurnSteers(input: {
   let session = input.session;
   const consumed: TurnSteerRecord[] = [];
   for (const steer of pending) {
-    session = await persistSteerMessage({
+    const committed = await persistAndConsumeSteer({
+      rootDir: input.rootDir,
+      turnId: input.turnId,
+      ownerToken: input.ownerToken,
+      ownerGeneration: input.ownerGeneration,
       session,
-      sessionStore: input.sessionStore,
       steer,
     });
-    const ledger = new ControlPlaneLedger(input.rootDir);
-    try {
-      consumed.push(ledger.turnSteers.markConsumed({
-        steerId: steer.id,
-        turnId: input.turnId,
-        ownerToken: input.ownerToken,
-      }));
-    } finally {
-      ledger.close();
-    }
+    session = committed.session;
+    consumed.push(committed.steer);
   }
   return { session, steers: consumed };
 }
 
-async function persistSteerMessage(input: {
+async function persistAndConsumeSteer(input: {
+  rootDir: string;
+  turnId: string;
+  ownerToken: string;
+  ownerGeneration: number;
   session: SessionRecord;
-  sessionStore: SessionStoreLike;
   steer: TurnSteerRecord;
-}): Promise<SessionRecord> {
+}): Promise<{ session: SessionRecord; steer: TurnSteerRecord }> {
   let candidate = input.session;
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const existing = candidate.messages.some((message) => message.id === input.steer.messageId);
-    if (existing) return candidate;
+    const ledger = new ControlPlaneLedger(input.rootDir);
+    if (existing) {
+      try {
+        const consumed = ledger.transaction(() => ledger.turnSteers.markConsumed({
+          steerId: input.steer.id,
+          turnId: input.turnId,
+          ownerToken: input.ownerToken,
+          ownerGeneration: input.ownerGeneration,
+        }));
+        return { session: candidate, steer: consumed };
+      } finally {
+        ledger.close();
+      }
+    }
 
     const message: StoredMessage = {
       id: input.steer.messageId,
@@ -72,10 +84,26 @@ async function persistSteerMessage(input: {
     };
     const framed = applyCurrentTurnFrame(withMessage, input.steer.input, input.steer.createdAt, "external");
     try {
-      return await input.sessionStore.save(noteCheckpointTurnInput(framed, input.steer.input));
+      return ledger.transaction(() => {
+        const session = ledger.sessions.saveOwned({
+          session: noteCheckpointTurnInput(framed, input.steer.input),
+          turnId: input.turnId,
+          ownerToken: input.ownerToken,
+          ownerGeneration: input.ownerGeneration,
+        });
+        const steer = ledger.turnSteers.markConsumed({
+          steerId: input.steer.id,
+          turnId: input.turnId,
+          ownerToken: input.ownerToken,
+          ownerGeneration: input.ownerGeneration,
+        });
+        return { session, steer };
+      });
     } catch (error) {
       if (!(error instanceof SessionRevisionConflictError)) throw error;
-      candidate = await input.sessionStore.load(candidate.id);
+      candidate = ledger.sessions.load(candidate.id)!;
+    } finally {
+      ledger.close();
     }
   }
   throw new Error(`Could not persist steer ${input.steer.id} after session revision conflicts.`);

@@ -1,6 +1,6 @@
 import type { ExecutionKind } from "../execution/kinds.js";
 
-export type ExecutionStatus = "created" | "running" | "completed" | "failed" | "aborted" | "lost";
+export type ExecutionStatus = "created" | "running" | "cancelling" | "completed" | "failed" | "aborted" | "lost";
 export type WakeSignalReason = "completed" | "failed" | "aborted" | "lost";
 
 export interface ExecutionRecord {
@@ -14,7 +14,13 @@ export interface ExecutionRecord {
   createdBySessionId: string;
   parentTurnId: string;
   originToolCallId: string;
+  version: number;
+  controllerToken: string;
+  controllerGeneration: number;
+  controllerLeaseExpiresAt: string;
+  controllerHeartbeatAt: string;
   pid?: number;
+  processIdentity?: Record<string, unknown>;
   exitCode?: number | null;
   output?: string;
   summary?: string;
@@ -28,6 +34,17 @@ export interface ExecutionRecord {
   updatedAt: string;
   finishedAt?: string;
   timeoutMs?: number;
+}
+
+export type ExecutionOwnership = Pick<ExecutionRecord,
+  "controllerToken" | "controllerGeneration"
+>;
+
+export function executionOwnership(record: ExecutionRecord): ExecutionOwnership {
+  return {
+    controllerToken: record.controllerToken,
+    controllerGeneration: record.controllerGeneration,
+  };
 }
 
 export interface WakeSignalRecord {

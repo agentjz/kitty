@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { executionOwnership } from "../../src/control/types.js";
 
 import { BackgroundExecutionStore } from "../../src/execution/background.js";
 import { ExecutionStore } from "../../src/execution/store.js";
@@ -15,7 +16,7 @@ test("exit guard collects running background executions from the control plane",
     cwd: root,
     requestedBy: "agent",
   });
-  store.markRunning(job.id, { pid: process.pid });
+  store.markRunning(job.id, executionOwnership(job), { pid: process.pid });
 
   const running = await collectRunningProcesses(root, TEST_EXECUTION_OWNER.ownerSessionId);
 
@@ -33,7 +34,7 @@ test("exit guard termination closes background executions even when pid is alrea
     cwd: root,
     requestedBy: "agent",
   });
-  store.markRunning(job.id, { pid: 999_999_999 });
+  store.markRunning(job.id, executionOwnership(job), { pid: 999_999_999 });
 
   const result = await terminateProcesses([{ kind: "background", id: job.id, pid: 999_999_999, summary: "gone" }], root);
   const reloaded = store.load(job.id);

@@ -9,7 +9,6 @@ import { createEmptyTaskState } from "./taskState.js";
 import { createEmptySessionDiff } from "./sessionDiff.js";
 import { createSessionNotFoundError } from "./errors.js";
 import { prepareSessionRecordForSave } from "./snapshot.js";
-import { createToolMessage } from "./messages.js";
 
 export interface SkippedSessionSnapshot {
   path?: string;
@@ -54,9 +53,8 @@ export class SessionStore implements SessionStoreLike {
   async load(id: string): Promise<SessionRecord> {
     const ledger = new ControlPlaneLedger(this.rootDir);
     try {
-      let session = ledger.sessions.load(id);
+      const session = ledger.sessions.load(id);
       if (!session) throw createSessionNotFoundError(id, `sqlite:${id}`);
-      session = recoverDurableToolResults(ledger, session);
       return prepareSessionRecordForSave(session, false);
     } finally {
       ledger.close();
@@ -170,28 +168,6 @@ export async function createSessionRecord(cwd: string): Promise<SessionRecord> {
 function resolveLedgerRoot(sessionsDir: string): string {
   const parent = path.dirname(path.resolve(sessionsDir));
   return path.basename(parent).toLowerCase() === ".kitty" ? path.dirname(parent) : parent;
-}
-
-function recoverDurableToolResults(ledger: ControlPlaneLedger, session: SessionRecord): SessionRecord {
-  ledger.toolCalls.interruptRecoverable(session.id);
-  const recordedToolCallIds = new Set(
-    session.messages
-      .filter((message) => message.role === "tool" && message.tool_call_id)
-      .map((message) => message.tool_call_id!),
-  );
-  const recoveredMessages = ledger.toolCalls.listBySession(session.id)
-    .filter((toolCall) => toolCall.result && !recordedToolCallIds.has(toolCall.callId))
-    .map((toolCall) => createToolMessage(
-      toolCall.callId,
-      toolCall.result!.modelView,
-      toolCall.toolName,
-      toolCall.result,
-    ));
-  if (recoveredMessages.length === 0) return session;
-  return ledger.sessions.save(prepareSessionRecordForSave({
-    ...session,
-    messages: [...session.messages, ...recoveredMessages],
-  }));
 }
 
 function createSessionId(): string {

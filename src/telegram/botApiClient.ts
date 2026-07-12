@@ -13,6 +13,7 @@ export interface TelegramGetUpdatesRequest {
 export interface TelegramSendMessageRequest {
   chatId: number;
   text: string;
+  signal?: AbortSignal;
 }
 
 export interface TelegramSentMessage {
@@ -23,17 +24,20 @@ export interface TelegramSentMessage {
 export interface TelegramSendChatActionRequest {
   chatId: number;
   action: "typing";
+  signal?: AbortSignal;
 }
 
 export interface TelegramEditMessageTextRequest {
   chatId: number;
   messageId: number;
   text: string;
+  signal?: AbortSignal;
 }
 
 export interface TelegramDeleteMessageRequest {
   chatId: number;
   messageId: number;
+  signal?: AbortSignal;
 }
 
 export interface TelegramSendDocumentRequest {
@@ -41,10 +45,12 @@ export interface TelegramSendDocumentRequest {
   filePath: string;
   fileName?: string;
   caption?: string;
+  signal?: AbortSignal;
 }
 
 export interface TelegramGetFileRequest {
   fileId: string;
+  signal?: AbortSignal;
 }
 
 export interface TelegramFileDescriptor {
@@ -60,7 +66,7 @@ export interface TelegramBotApiClient {
   deleteMessage(request: TelegramDeleteMessageRequest): Promise<void>;
   sendDocument(request: TelegramSendDocumentRequest): Promise<void>;
   getFile(request: TelegramGetFileRequest): Promise<TelegramFileDescriptor>;
-  downloadFile(request: TelegramFileDescriptor): Promise<Buffer>;
+  downloadFile(request: TelegramFileDescriptor & { signal?: AbortSignal }): Promise<Buffer>;
 }
 
 export class FetchTelegramBotApiClient implements TelegramBotApiClient {
@@ -105,7 +111,7 @@ export class FetchTelegramBotApiClient implements TelegramBotApiClient {
     }>("sendMessage", {
       chat_id: request.chatId,
       text: request.text,
-    });
+    }, request.signal ?? AbortSignal.timeout(15_000));
 
     return {
       messageId: Math.trunc(message?.message_id ?? 0),
@@ -117,7 +123,7 @@ export class FetchTelegramBotApiClient implements TelegramBotApiClient {
     await this.post("sendChatAction", {
       chat_id: request.chatId,
       action: request.action,
-    });
+    }, request.signal ?? AbortSignal.timeout(15_000));
   }
 
   async editMessageText(request: TelegramEditMessageTextRequest): Promise<void> {
@@ -125,14 +131,14 @@ export class FetchTelegramBotApiClient implements TelegramBotApiClient {
       chat_id: request.chatId,
       message_id: request.messageId,
       text: request.text,
-    });
+    }, request.signal ?? AbortSignal.timeout(15_000));
   }
 
   async deleteMessage(request: TelegramDeleteMessageRequest): Promise<void> {
     await this.post("deleteMessage", {
       chat_id: request.chatId,
       message_id: request.messageId,
-    });
+    }, request.signal ?? AbortSignal.timeout(15_000));
   }
 
   async sendDocument(request: TelegramSendDocumentRequest): Promise<void> {
@@ -148,6 +154,7 @@ export class FetchTelegramBotApiClient implements TelegramBotApiClient {
     const response = await this.fetchImpl(`${this.baseUrl}/sendDocument`, {
       method: "POST",
       body: form,
+      signal: request.signal ?? AbortSignal.timeout(30_000),
     });
 
     const payload = await response.json() as {
@@ -165,7 +172,7 @@ export class FetchTelegramBotApiClient implements TelegramBotApiClient {
       file_size?: number;
     }>("getFile", {
       file_id: request.fileId,
-    });
+    }, request.signal ?? AbortSignal.timeout(15_000));
 
     const filePath = String(result?.file_path ?? "").trim();
     if (!filePath) {
@@ -181,9 +188,10 @@ export class FetchTelegramBotApiClient implements TelegramBotApiClient {
     };
   }
 
-  async downloadFile(request: TelegramFileDescriptor): Promise<Buffer> {
+  async downloadFile(request: TelegramFileDescriptor & { signal?: AbortSignal }): Promise<Buffer> {
     const response = await this.fetchImpl(`${this.fileBaseUrl}/${request.filePath.replace(/^\/+/u, "")}`, {
       method: "GET",
+      signal: request.signal ?? AbortSignal.timeout(30_000),
     });
     if (!response.ok) {
       throw new Error(`Telegram file download failed with status ${response.status}`);

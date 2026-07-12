@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { executionOwnership } from "../../src/control/types.js";
 
 import { BackgroundExecutionStore, waitForRegisteredBackgroundProcess } from "../../src/execution/background.js";
 import { createBackgroundTools } from "../../src/extensions/tools/background/index.js";
@@ -41,7 +42,7 @@ test("background read returns summary, tail, and full output from recorded execu
     cwd: root,
     requestedBy: "agent",
   });
-  store.close(job.id, {
+  store.close(job.id, executionOwnership(job), {
     status: "completed",
     exitCode: 0,
     output: "one\ntwo\nthree\nfour\n",
@@ -135,7 +136,7 @@ test("background wait returns settled execution facts", async (t) => {
     cwd: root,
     requestedBy: "agent",
   });
-  store.close(job.id, {
+  store.close(job.id, executionOwnership(job), {
     status: "completed",
     exitCode: 0,
     output: "wait-ok",
@@ -165,7 +166,7 @@ test("background stop closes a running execution", async (t) => {
     cwd: root,
     requestedBy: "agent",
   });
-  store.markRunning(job.id, { pid: process.pid });
+  store.markRunning(job.id, executionOwnership(job), { pid: process.pid });
   const tools = createBackgroundTools();
   const context = createToolContext(root);
   const stop = tools.find((tool) => tool.definition.function.name === "background_stop");

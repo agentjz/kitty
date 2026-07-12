@@ -55,10 +55,15 @@ export async function executeToolCallWithRecovery(
 }
 
 function assertExplicitOwnership(options: RunTurnOptions, session: SessionRecord): void {
-  if (options.turnId && options.turnOwnerToken && options.stateRootDir) {
+  const hasDurableOwnership = options.turnId !== undefined || options.turnOwnerToken !== undefined ||
+    options.turnOwnerGeneration !== undefined;
+  if (hasDurableOwnership) {
+    if (!options.turnId || !options.turnOwnerToken || options.turnOwnerGeneration === undefined || !options.stateRootDir) {
+      throw new Error("Durable tool execution requires state root, turn id, owner token, and owner generation.");
+    }
     const ledger = new ControlPlaneLedger(options.stateRootDir);
     try {
-      ledger.turns.assertOwner(options.turnId, options.turnOwnerToken);
+      ledger.turns.assertOwner(options.turnId, options.turnOwnerToken, options.turnOwnerGeneration);
     } finally {
       ledger.close();
     }

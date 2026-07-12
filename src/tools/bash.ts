@@ -54,6 +54,14 @@ export const bashToolDefinition: RegisteredTool = {
         stateRootDir: context.projectContext.stateRootDir,
         sessionId: context.sessionId,
       },
+      execution: {
+        stateRootDir: context.projectContext.stateRootDir,
+        requestedBy: "agent",
+        ownerSessionId: context.ownerSessionId,
+        createdBySessionId: context.sessionId,
+        parentTurnId: context.turnId,
+        originToolCallId: context.toolCallId,
+      },
     });
     const status = result.aborted
       ? "aborted"

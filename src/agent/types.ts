@@ -26,6 +26,7 @@ export interface AgentCallbacks {
 export interface RunTurnOptions {
   turnId?: string;
   turnOwnerToken?: string;
+  turnOwnerGeneration?: number;
   ownerSessionId?: string;
   input: string;
   inputSource?: "external" | "internal";

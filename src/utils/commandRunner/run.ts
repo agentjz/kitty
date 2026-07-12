@@ -2,6 +2,11 @@ import { isAbortError } from "../abort.js";
 import { createBashOutputCapture } from "../../tools/outputCapture.js";
 import { launchCommand } from "./launch.js";
 import { normalizeCommandOutput } from "./output.js";
+import { inspectProcessIdentity, terminatePid } from "../../execution/process.js";
+import {
+  ForegroundExecutionController,
+  type ForegroundExecutionInput,
+} from "../../execution/foreground.js";
 
 export interface CommandRunOptions {
   command: string;
@@ -14,6 +19,7 @@ export interface CommandRunOptions {
     sessionId?: string;
     maxPreviewChars?: number;
   };
+  execution?: Omit<ForegroundExecutionInput, "command" | "cwd" | "timeoutMs">;
 }
 
 export interface CommandRunResult {
@@ -43,9 +49,47 @@ async function runCommandOnce(options: CommandRunOptions): Promise<CommandRunRes
   let stallTimer: NodeJS.Timeout | null = null;
   let forceKillTimer: NodeJS.Timeout | null = null;
 
-  const launched = await launchCommand(options.command, options.cwd, options.timeoutMs, options.abortSignal);
+  const execution = options.execution
+    ? new ForegroundExecutionController({
+        ...options.execution,
+        command: options.command,
+        cwd: options.cwd,
+        timeoutMs: options.timeoutMs,
+      })
+    : undefined;
+
+  const outputCapture = await createBashOutputCapture(options.outputCapture ?? {}).catch((error) => {
+    execution?.failBeforeStart(error);
+    throw error;
+  });
+  const launched = await launchCommand(options.command, options.cwd, options.timeoutMs, options.abortSignal).catch((error) => {
+    execution?.failBeforeStart(error);
+    throw error;
+  });
   const { subprocess } = launched;
-  const outputCapture = await createBashOutputCapture(options.outputCapture ?? {});
+  if (subprocess.all) {
+    subprocess.all.on("data", (chunk) => {
+      outputCapture.append(Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk));
+    });
+  }
+  const pid = subprocess.pid;
+  const identity = launched.processIdentity ?? (typeof pid === "number" ? inspectProcessIdentity(pid) : undefined);
+  if (typeof pid === "number") {
+    try {
+      execution?.start(pid, identity);
+    } catch (error) {
+      try { terminatePid(pid, identity); } catch { /* launch failure remains authoritative */ }
+      execution?.failBeforeStart(error);
+      throw error;
+    }
+  }
+  const stopWatchdog = launched.stopParentDeathWatchdog;
+  const terminateTree = () => {
+    if (typeof pid !== "number") return;
+    try { terminatePid(pid, identity); } catch { /* process settlement exposes failure */ }
+  };
+  const onAbort = () => terminateTree();
+  options.abortSignal?.addEventListener("abort", onAbort, { once: true });
 
   const clearTimers = () => {
     if (stallTimer) {
@@ -71,7 +115,7 @@ async function runCommandOnce(options: CommandRunOptions): Promise<CommandRunRes
       stallTimer = setTimeout(() => {
         stalled = true;
         try {
-          subprocess.kill("SIGTERM");
+          terminateTree();
         } catch {
           // ignore
         }
@@ -82,7 +126,7 @@ async function runCommandOnce(options: CommandRunOptions): Promise<CommandRunRes
           forceKillTimer = setTimeout(() => {
             try {
               if (typeof subprocess.exitCode !== "number") {
-                subprocess.kill("SIGKILL");
+                terminateTree();
               }
             } catch {
               // ignore
@@ -96,9 +140,8 @@ async function runCommandOnce(options: CommandRunOptions): Promise<CommandRunRes
   resetStallTimer();
 
   if (subprocess.all) {
-    subprocess.all.on("data", (chunk) => {
+    subprocess.all.on("data", () => {
       resetStallTimer();
-      outputCapture.append(Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk));
     });
   }
 
@@ -108,7 +151,7 @@ async function runCommandOnce(options: CommandRunOptions): Promise<CommandRunRes
     const shellOutput = await outputCapture.finalize();
     const output = normalizeCommandOutput(shellOutput.outputPreview);
 
-    return {
+    const commandResult: CommandRunResult = {
       command: options.command,
       exitCode: typeof result.exitCode === "number" ? result.exitCode : null,
       output,
@@ -122,6 +165,8 @@ async function runCommandOnce(options: CommandRunOptions): Promise<CommandRunRes
       attempts: 1,
       durationMs: Date.now() - start,
     };
+    execution?.settle(commandResult);
+    return commandResult;
   } catch (error) {
     const timedOut = isTimedOutError(error);
     clearTimers();
@@ -129,7 +174,7 @@ async function runCommandOnce(options: CommandRunOptions): Promise<CommandRunRes
     const fallbackOutput = shellOutput.outputChars > 0 ? shellOutput.outputPreview : readProcessOutput(error);
     const output = normalizeCommandOutput(fallbackOutput);
 
-    return {
+    const commandResult: CommandRunResult = {
       command: options.command,
       exitCode: readExitCode(error),
       output,
@@ -143,6 +188,14 @@ async function runCommandOnce(options: CommandRunOptions): Promise<CommandRunRes
       attempts: 1,
       durationMs: Date.now() - start,
     };
+    execution?.settle(commandResult);
+    return commandResult;
+  } finally {
+    clearTimers();
+    execution?.settleUnexpectedExit();
+    execution?.dispose();
+    stopWatchdog();
+    options.abortSignal?.removeEventListener("abort", onAbort);
   }
 }
 

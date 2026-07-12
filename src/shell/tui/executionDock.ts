@@ -1,4 +1,3 @@
-import { reconcileExecutions } from "../../execution/lifecycle.js";
 import { ExecutionStore } from "../../execution/store.js";
 import type { TuiController } from "./controller.js";
 import type { TuiRuntimeDockState } from "./store.js";
@@ -27,7 +26,6 @@ export function readTuiLiveExecutionDock(input: {
   cwd: string;
   ownerSessionId: string;
 }): Pick<TuiRuntimeDockState, "background"> {
-  reconcileExecutions(input.rootDir, { ownerSessionId: input.ownerSessionId });
   const executions = new ExecutionStore(input.rootDir).list({
     statuses: ["created", "running"],
     cwd: input.cwd,

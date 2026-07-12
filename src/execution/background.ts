@@ -1,5 +1,6 @@
 import { ControlPlaneLedger, type ExecutionRecord, type WakeSignalReason } from "../control/ledger.js";
-import { isProcessAlive, terminatePid } from "./process.js";
+import { executionOwnership, type ExecutionOwnership } from "../control/types.js";
+import { inspectProcessIdentity, isProcessAlive, isSameProcess, terminatePid, type ProcessIdentity } from "./process.js";
 import { unknownExecution } from "./errors.js";
 import { sleepWithSignal, throwIfAborted } from "../utils/abort.js";
 import { watchProcessUntilParentExit } from "./parentDeathWatchdog.js";
@@ -63,7 +64,7 @@ export class BackgroundExecutionStore {
         statuses: ["running"],
         cwd: input.cwd,
         ownerSessionId: input.ownerSessionId,
-      });
+      }).filter((execution) => execution.kind === "background");
     } finally {
       ledger.close();
     }
@@ -72,22 +73,32 @@ export class BackgroundExecutionStore {
   listAll(ownerSessionId?: string): ExecutionRecord[] {
     const ledger = new ControlPlaneLedger(this.rootDir);
     try {
-      return ledger.executions.list({ ownerSessionId });
+      return ledger.executions.list({ ownerSessionId })
+        .filter((execution) => execution.kind === "background");
     } finally {
       ledger.close();
     }
   }
 
-  markRunning(id: string, input: { pid: number }): ExecutionRecord {
+  markRunning(id: string, ownership: ExecutionOwnership, input: { pid: number; processIdentity?: ProcessIdentity }): ExecutionRecord {
     const ledger = new ControlPlaneLedger(this.rootDir);
     try {
-      return ledger.executions.markRunning(id, input);
+      return ledger.executions.markRunning(id, ownership, {
+        ...input,
+        processIdentity: input.processIdentity ?? inspectProcessIdentity(input.pid),
+      });
     } finally {
       ledger.close();
     }
   }
 
-  updateRunningOutput(id: string, input: {
+  heartbeat(id: string, ownership: ExecutionOwnership): ExecutionRecord {
+    const ledger = new ControlPlaneLedger(this.rootDir);
+    try { return ledger.executions.heartbeat(id, ownership); }
+    finally { ledger.close(); }
+  }
+
+  updateRunningOutput(id: string, ownership: ExecutionOwnership, input: {
     output?: string;
     summary?: string;
     lastOutputAt?: string;
@@ -97,6 +108,9 @@ export class BackgroundExecutionStore {
       const execution = ledger.executions.load(id);
       if (!execution) {
         throw unknownExecution(id);
+      }
+      if (execution.controllerToken !== ownership.controllerToken || execution.controllerGeneration !== ownership.controllerGeneration) {
+        throw new Error(`Execution ${id} rejected stale output from a previous controller.`);
       }
       if (execution.status !== "running") {
         return execution;
@@ -113,7 +127,7 @@ export class BackgroundExecutionStore {
     }
   }
 
-  close(id: string, input: {
+  close(id: string, ownership: ExecutionOwnership, input: {
     status: "completed" | "failed" | "aborted" | "lost";
     exitCode?: number | null;
     output?: string;
@@ -125,7 +139,7 @@ export class BackgroundExecutionStore {
     const ledger = new ControlPlaneLedger(this.rootDir);
     try {
       return ledger.transaction(() => {
-        const closed = ledger.executions.close(id, input);
+        const closed = ledger.executions.close(id, ownership, input);
         ledger.wakeSignals.publish({
           executionId: id,
           reason: toWakeReason(closed.status),
@@ -147,17 +161,43 @@ export class BackgroundExecutionStore {
   }
 }
 
-export function reconcileBackgroundExecutions(rootDir: string, ownerSessionId?: string): { lostExecutions: ExecutionRecord[] } {
+export function reconcileBackgroundExecutions(
+  rootDir: string,
+  ownerSessionId?: string,
+  now = new Date(),
+): { lostExecutions: ExecutionRecord[] } {
   const store = new BackgroundExecutionStore(rootDir);
   const lostExecutions: ExecutionRecord[] = [];
-  for (const execution of store.listRunning({ ownerSessionId })) {
-    if (typeof execution.pid !== "number" || isProcessAlive(execution.pid)) {
+  for (const execution of store.listAll(ownerSessionId).filter((candidate) =>
+    candidate.status === "created" || candidate.status === "running" || candidate.status === "cancelling")) {
+    const recoveryLedger = new ControlPlaneLedger(rootDir);
+    let recovered: ExecutionRecord | undefined;
+    try {
+      recovered = recoveryLedger.executions.claimRecovery(execution.id, now);
+    } finally {
+      recoveryLedger.close();
+    }
+    if (!recovered) continue;
+    const ownership = executionOwnership(recovered);
+    const identity = execution.processIdentity as ProcessIdentity | undefined;
+    if (identity && !isSameProcess(identity)) {
+      lostExecutions.push(store.close(execution.id, ownership, {
+        status: "lost",
+        summary: `Background process identity changed before completion: pid=${execution.pid}`,
+        closeReason: "process_identity_changed",
+      }));
       continue;
     }
-    lostExecutions.push(store.close(execution.id, {
+    if (typeof execution.pid === "number" && isProcessAlive(execution.pid)) {
+      try { terminatePid(execution.pid, identity); }
+      catch { /* terminal record remains lost even if OS confirmation is unavailable */ }
+    }
+    lostExecutions.push(store.close(execution.id, ownership, {
       status: "lost",
-      summary: `Background process disappeared before reporting completion: pid=${execution.pid}`,
-      closeReason: "process_disappeared",
+      summary: typeof execution.pid === "number"
+        ? `Background controller lease expired before completion: pid=${execution.pid}`
+        : "Background controller lease expired before process registration.",
+      closeReason: typeof execution.pid === "number" ? "controller_lease_expired" : "launch_unconfirmed",
     }));
   }
   return { lostExecutions };
@@ -202,11 +242,35 @@ export function terminateBackgroundExecution(rootDir: string, id: string, ownerS
   if (execution.status === "completed" || execution.status === "failed" || execution.status === "aborted" || execution.status === "lost") {
     return execution;
   }
+
+  const identity = execution.processIdentity as ProcessIdentity | undefined;
+  if (identity && !isSameProcess(identity)) {
+    const ledger = new ControlPlaneLedger(rootDir);
+    try {
+      const claimed = ledger.executions.claimCancellation(id, ownerSessionId);
+      if (!claimed) return store.load(id, ownerSessionId)!;
+      return store.close(id, executionOwnership(claimed), {
+        status: "lost",
+        summary: `Process identity changed before termination: pid=${execution.pid}`,
+        closeReason: "process_identity_changed",
+      });
+    } finally {
+      ledger.close();
+    }
+  }
+  const cancellingLedger = new ControlPlaneLedger(rootDir);
+  let cancelling: ExecutionRecord | undefined;
+  try {
+    cancelling = cancellingLedger.executions.claimCancellation(id, ownerSessionId);
+  } finally {
+    cancellingLedger.close();
+  }
+  if (!cancelling) return store.load(id, ownerSessionId)!;
   terminateRegisteredBackgroundProcess(id);
   if (typeof execution.pid === "number") {
-    terminatePid(execution.pid);
+    terminatePid(execution.pid, identity);
   }
-  return store.close(id, {
+  return store.close(id, executionOwnership(cancelling), {
     status: "aborted",
     summary: "Background execution terminated by host lifecycle.",
     closeReason: "terminated",
@@ -217,15 +281,20 @@ export function terminateBackgroundExecution(rootDir: string, id: string, ownerS
 export function isBackgroundExecutionActive(execution: ExecutionRecord): boolean {
   return execution.kind === "background" && (
     execution.status === "created" ||
-    execution.status === "running"
+    execution.status === "running" ||
+    execution.status === "cancelling"
   );
 }
 
-export function registerBackgroundProcess(id: string, subprocess: BackgroundProcessHandle): void {
+export function registerBackgroundProcess(
+  id: string,
+  subprocess: BackgroundProcessHandle,
+  stopParentDeathWatchdog?: () => void,
+): void {
   const pid = (subprocess as BackgroundProcessHandle & { pid?: number }).pid;
-  const stopWatchdog = typeof pid === "number" && pid > 0
-    ? watchProcessUntilParentExit({ parentPid: process.pid, targetPid: pid })
-    : () => undefined;
+  const stopWatchdog = stopParentDeathWatchdog ?? (typeof pid === "number" && pid > 0
+    ? watchProcessUntilParentExit({ parentPid: process.pid, targetPid: pid, targetIdentity: inspectProcessIdentity(pid) })
+    : () => undefined);
   const settled = Promise.resolve(subprocess)
     .then(() => undefined, () => undefined)
     .finally(() => {

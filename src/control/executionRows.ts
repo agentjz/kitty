@@ -11,7 +11,13 @@ export interface ExecutionRow {
   created_by_session_id: string;
   parent_turn_id: string;
   origin_tool_call_id: string;
+  version: number;
+  controller_token: string;
+  controller_generation: number;
+  controller_lease_expires_at: string;
+  controller_heartbeat_at: string;
   pid: number | null;
+  process_identity_json: string | null;
   exit_code: number | null;
   output: string | null;
   summary: string | null;
@@ -39,7 +45,13 @@ export function toExecutionRow(record: ExecutionRecord): Record<string, unknown>
     createdBySessionId: record.createdBySessionId,
     parentTurnId: record.parentTurnId,
     originToolCallId: record.originToolCallId,
+    version: record.version,
+    controllerToken: record.controllerToken,
+    controllerGeneration: record.controllerGeneration,
+    controllerLeaseExpiresAt: record.controllerLeaseExpiresAt,
+    controllerHeartbeatAt: record.controllerHeartbeatAt,
     pid: record.pid,
+    processIdentityJson: record.processIdentity ? JSON.stringify(record.processIdentity) : undefined,
     exitCode: record.exitCode,
     output: record.output,
     summary: record.summary,
@@ -59,7 +71,7 @@ export function toExecutionRow(record: ExecutionRecord): Record<string, unknown>
 export function fromExecutionRow(row: ExecutionRow): ExecutionRecord {
   return {
     id: row.id,
-    kind: "background",
+    kind: row.kind as ExecutionRecord["kind"],
     status: row.status as ExecutionStatus,
     command: row.command,
     cwd: row.cwd,
@@ -68,7 +80,13 @@ export function fromExecutionRow(row: ExecutionRow): ExecutionRecord {
     createdBySessionId: row.created_by_session_id,
     parentTurnId: row.parent_turn_id,
     originToolCallId: row.origin_tool_call_id,
+    version: row.version,
+    controllerToken: row.controller_token,
+    controllerGeneration: row.controller_generation,
+    controllerLeaseExpiresAt: row.controller_lease_expires_at,
+    controllerHeartbeatAt: row.controller_heartbeat_at,
     pid: row.pid ?? undefined,
+    processIdentity: row.process_identity_json ? JSON.parse(row.process_identity_json) as Record<string, unknown> : undefined,
     exitCode: row.exit_code,
     output: row.output ?? undefined,
     summary: row.summary ?? undefined,

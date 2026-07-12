@@ -131,6 +131,7 @@ async function createSteeringFixture(name: string, t: Parameters<typeof createTe
     sessionId: session.id,
     turnId: claimed.id,
     ownerToken: claimed.ownerToken!,
+    ownerGeneration: claimed.ownerGeneration,
   };
   const scopedSessionStore = createTurnScopedSessionStore(sessionStore, ownership);
   return {
@@ -141,6 +142,7 @@ async function createSteeringFixture(name: string, t: Parameters<typeof createTe
     options: {
       turnId: claimed.id,
       turnOwnerToken: claimed.ownerToken,
+      turnOwnerGeneration: claimed.ownerGeneration,
       input: "start the task",
       cwd: root,
       stateRootDir: root,
@@ -153,6 +155,7 @@ async function createSteeringFixture(name: string, t: Parameters<typeof createTe
             rootDir: root,
             turnId: claimed.id,
             ownerToken: claimed.ownerToken!,
+            ownerGeneration: claimed.ownerGeneration,
             session: currentSession,
             sessionStore: scopedSessionStore,
           });
@@ -161,7 +164,7 @@ async function createSteeringFixture(name: string, t: Parameters<typeof createTe
         beginClosing: async () => {
           const closing = new ControlPlaneLedger(root);
           try {
-            return closing.turns.beginClosing(claimed.id, claimed.ownerToken!);
+            return closing.turns.beginClosing(claimed.id, claimed.ownerToken!, claimed.ownerGeneration);
           } finally {
             closing.close();
           }

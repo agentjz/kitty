@@ -1,5 +1,6 @@
 import { passed, type EvaluationCheckId, type EvaluationCheckResult } from "./types.js";
 import { prepareCheckWorkspace } from "./workspace.js";
+import { executionOwnership } from "../control/types.js";
 
 const EVAL_EXECUTION_OWNER = {
   ownerSessionId: "eval-session",
@@ -131,8 +132,8 @@ export async function runRecoveryDrillsCheck(id: EvaluationCheckId, rootDir: str
     cwd: workspace,
     requestedBy: "eval",
   });
-  backgroundStore.markRunning(lostBackground.id, { pid: 999_999_999 });
-  const lost = reconcileBackgroundExecutions(workspace);
+  backgroundStore.markRunning(lostBackground.id, executionOwnership(lostBackground), { pid: 999_999_999 });
+  const lost = reconcileBackgroundExecutions(workspace, undefined, new Date(Date.now() + 60_000));
 
   const active = backgroundStore.create({
     ...EVAL_EXECUTION_OWNER,
@@ -141,7 +142,7 @@ export async function runRecoveryDrillsCheck(id: EvaluationCheckId, rootDir: str
     requestedBy: "eval",
   });
   const missingPid = 999_999_998;
-  backgroundStore.markRunning(active.id, { pid: missingPid });
+  backgroundStore.markRunning(active.id, executionOwnership(active), { pid: missingPid });
   const terminated = terminateRunningExecutionProcesses(workspace, [{
     kind: "background",
     id: active.id,

@@ -56,12 +56,22 @@ export class SessionLedgerRepo {
         stateJson: JSON.stringify(state),
       });
 
-      const currentCount = this.messageCount(session.id);
-      const currentIds = new Set(this.listMessageIds(session.id));
+      const currentMessages = this.listMessages(session.id);
+      const currentCount = currentMessages.length;
+      if (persisted.messages.length < currentCount) {
+        throw new Error(`Session ${session.id} message history is not append-only: durable messages were removed.`);
+      }
+      for (let index = 0; index < currentCount; index += 1) {
+        const candidate = ensureMessageId(persisted.messages[index]!);
+        persisted.messages[index] = candidate;
+        if (JSON.stringify(candidate) !== JSON.stringify(currentMessages[index])) {
+          throw new Error(`Session ${session.id} message history is not append-only at index ${index}.`);
+        }
+      }
       for (let index = 0; index < persisted.messages.length; index += 1) {
         const message = ensureMessageId(persisted.messages[index]!);
         persisted.messages[index] = message;
-        if (currentIds.has(message.id)) continue;
+        if (index < currentCount) continue;
         if (index < currentCount) {
           throw new Error(`Session ${session.id} message history is not append-only at index ${index}.`);
         }
@@ -70,7 +80,27 @@ export class SessionLedgerRepo {
           VALUES (?, ?, ?, ?, ?)
         `).run(message.id, session.id, index, JSON.stringify(message), message.createdAt);
       }
-      return persisted;
+      return this.load(session.id)!;
+    })();
+  }
+
+  saveOwned(input: { session: SessionRecord; turnId: string; ownerToken: string; ownerGeneration: number }): SessionRecord {
+    return this.db.transaction(() => {
+      const now = new Date().toISOString();
+      const owner = this.db.prepare(`
+        SELECT 1 FROM session_turns
+        WHERE id=@turnId AND session_id=@sessionId AND owner_token=@ownerToken
+          AND owner_generation=@ownerGeneration
+          AND status IN ('running', 'closing') AND lease_expires_at > @now
+      `).get({
+        turnId: input.turnId,
+        sessionId: input.session.id,
+        ownerToken: input.ownerToken,
+        ownerGeneration: input.ownerGeneration,
+        now,
+      });
+      if (!owner) throw new Error(`Turn ${input.turnId} no longer owns its session lease.`);
+      return this.save(input.session);
     })();
   }
 
@@ -111,10 +141,10 @@ export class SessionLedgerRepo {
     ).get(sessionId) as { count: number }).count);
   }
 
-  private listMessageIds(sessionId: string): string[] {
+  private listMessages(sessionId: string): StoredMessage[] {
     return (this.db.prepare(
-      "SELECT id FROM session_messages WHERE session_id = ? ORDER BY sequence ASC",
-    ).all(sessionId) as Array<{ id: string }>).map((row) => row.id);
+      "SELECT message_json FROM session_messages WHERE session_id = ? ORDER BY sequence ASC",
+    ).all(sessionId) as MessageRow[]).map((row) => JSON.parse(row.message_json) as StoredMessage);
   }
 }
 

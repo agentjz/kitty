@@ -6,7 +6,7 @@ import process from "node:process";
 import { spawn } from "node:child_process";
 import test from "node:test";
 
-import { isProcessAlive, terminatePid } from "../../src/execution/process.js";
+import { inspectProcessIdentity, isProcessAlive, terminatePid } from "../../src/execution/process.js";
 import { watchProcessUntilParentExit } from "../../src/execution/parentDeathWatchdog.js";
 
 test("parent death watchdog kills a background process after abrupt host loss", async (t) => {
@@ -65,6 +65,18 @@ test("terminatePid kills a POSIX process tree", { skip: process.platform === "wi
   await waitForProcessExit(parent.pid);
   await waitForProcessExit(childPid);
   assert.equal(isProcessAlive(childPid), false);
+});
+
+test("terminatePid refuses a reused process identity", async (t) => {
+  const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore", windowsHide: true });
+  assert.ok(child.pid);
+  t.after(() => forceKillTestProcess(child.pid));
+  const identity = inspectProcessIdentity(child.pid);
+  assert.ok(identity);
+  assert.throws(() => terminatePid(child.pid!, { ...identity, creationMarker: `${identity.creationMarker}-reused` }), /identity changed/i);
+  assert.equal(isProcessAlive(child.pid), true);
+  terminatePid(child.pid, identity);
+  await waitForProcessExit(child.pid);
 });
 
 async function spawnProcessTree(platform: "windows" | "posix"): Promise<{

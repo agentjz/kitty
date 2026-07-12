@@ -98,7 +98,7 @@ Presenter 不能重新计算事实。UI 不能保存第二套生命周期。测�
 优先统一：
 
 - provider/model/request 方言：统一进 catalog、capabilities、dialect、request body。
-- execution output 读取：background、subagent、execution CLI 共用同一个 reader。
+- execution output 读取：background 与 execution CLI 共用同一个 reader。
 - runtime scene 投影：CLI/TUI 只读 runtime facts，不各自重算。
 - 错误分类：retry、fallback、CLI 展示共用错误 kind，不散落 message 猜测。
 - 配置 contract：init template、env example、doctor/preflight 读取同一个配置事实。
@@ -163,7 +163,7 @@ npm.cmd run verify
 
 - provider/catalog/request：provider contract 测试；
 - context/session：context 或 session 定向测试；
-- execution/background/subagent：execution lifecycle 测试；
+- execution/background：execution lifecycle 测试；
 - TUI：TUI render/store/shell 定向测试；
 - README/site 文案：不为纯文案增加核心测试。
 

@@ -14,6 +14,7 @@ import {
   runRemoteEntrypointsCheck,
 } from "./hostAndRecoveryChecks.js";
 import { prepareCheckWorkspace } from "./workspace.js";
+import { executionOwnership } from "../control/types.js";
 
 const EVAL_EXECUTION_OWNER = {
   ownerSessionId: "eval-session",
@@ -113,7 +114,7 @@ async function runBackgroundLifecycleCheck(id: EvaluationCheckId, projectRootDir
     cwd: rootDir,
     requestedBy: "eval",
   });
-  backgroundStore.close(background.id, {
+  backgroundStore.close(background.id, executionOwnership(background), {
     status: "completed",
     exitCode: 0,
     output: "alpha\nbeta\n",
@@ -136,8 +137,8 @@ async function runBackgroundLifecycleCheck(id: EvaluationCheckId, projectRootDir
     cwd: rootDir,
     requestedBy: "eval",
   });
-  backgroundStore.markRunning(running.id, { pid: process.pid });
-  const cancelled = backgroundStore.close(running.id, { status: "aborted", terminatedBy: "eval" });
+  backgroundStore.markRunning(running.id, executionOwnership(running), { pid: process.pid });
+  const cancelled = backgroundStore.close(running.id, executionOwnership(running), { status: "aborted", terminatedBy: "eval" });
   if (cancelled.status !== "aborted") {
     throw new Error("background cancel did not close execution as aborted");
   }

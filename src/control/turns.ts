@@ -10,6 +10,7 @@ export interface TurnRecord {
   inputSource: "external" | "internal";
   status: TurnStatus;
   ownerToken?: string;
+  ownerGeneration: number;
   leaseExpiresAt?: string;
   heartbeatAt?: string;
   error?: string;
@@ -26,6 +27,7 @@ interface TurnRow {
   input_source: string;
   status: string;
   owner_token: string | null;
+  owner_generation: number;
   lease_expires_at: string | null;
   heartbeat_at: string | null;
   error: string | null;
@@ -48,6 +50,7 @@ export class TurnLedgerRepo {
       input: input.input,
       inputSource: input.inputSource,
       status: "queued",
+      ownerGeneration: 0,
       createdAt: now,
       updatedAt: now,
     };
@@ -82,6 +85,7 @@ export class TurnLedgerRepo {
       const claimed = this.db.prepare(`
         UPDATE session_turns
         SET status='running', owner_token=@token, lease_expires_at=@lease,
+            owner_generation=owner_generation + 1,
             heartbeat_at=@now, started_at=COALESCE(started_at, @now), updated_at=@now, error=NULL
         WHERE id=@id AND status='queued'
       `).run({ id: row.id, token, lease, now: nowIso });
@@ -89,7 +93,7 @@ export class TurnLedgerRepo {
     })();
   }
 
-  heartbeat(id: string, ownerToken: string): TurnRecord {
+  heartbeat(id: string, ownerToken: string, ownerGeneration: number): TurnRecord {
     const now = new Date();
     const nowIso = now.toISOString();
     const lease = new Date(now.getTime() + LEASE_MS).toISOString();
@@ -97,21 +101,24 @@ export class TurnLedgerRepo {
       UPDATE session_turns
       SET heartbeat_at=@now, lease_expires_at=@lease, updated_at=@now
       WHERE id=@id AND status IN ('running', 'closing') AND owner_token=@ownerToken
-    `).run({ id, ownerToken, now: nowIso, lease });
+        AND owner_generation=@ownerGeneration
+        AND lease_expires_at > @now
+    `).run({ id, ownerToken, ownerGeneration, now: nowIso, lease });
     if (result.changes !== 1) throw new Error(`Turn ${id} no longer owns its lease.`);
     return this.load(id)!;
   }
 
-  assertOwner(id: string, ownerToken: string): void {
+  assertOwner(id: string, ownerToken: string, ownerGeneration: number): void {
     const now = new Date().toISOString();
     const row = this.db.prepare(`
       SELECT 1 FROM session_turns
       WHERE id=? AND status IN ('running', 'closing') AND owner_token=? AND lease_expires_at > ?
-    `).get(id, ownerToken, now);
+        AND owner_generation=?
+    `).get(id, ownerToken, now, ownerGeneration);
     if (!row) throw new Error(`Turn ${id} no longer owns its session lease.`);
   }
 
-  beginClosing(id: string, ownerToken: string): boolean {
+  beginClosing(id: string, ownerToken: string, ownerGeneration: number): boolean {
     return this.db.transaction(() => {
       const now = new Date().toISOString();
       const pending = this.db.prepare(`
@@ -126,21 +133,26 @@ export class TurnLedgerRepo {
         WHERE id = @id
           AND status = 'running'
           AND owner_token = @ownerToken
+          AND owner_generation = @ownerGeneration
           AND lease_expires_at > @now
-      `).run({ id, ownerToken, now });
+      `).run({ id, ownerToken, ownerGeneration, now });
       if (result.changes === 1) return true;
       const current = this.load(id);
-      return current?.status === "closing" && current.ownerToken === ownerToken;
+      return current?.status === "closing" && current.ownerToken === ownerToken &&
+        current.ownerGeneration === ownerGeneration &&
+        Boolean(current.leaseExpiresAt && current.leaseExpiresAt > now);
     })();
   }
 
-  finish(id: string, ownerToken: string, status: Exclude<TurnStatus, "queued" | "running" | "closing">, error?: string): TurnRecord {
+  finish(id: string, ownerToken: string, ownerGeneration: number, status: Exclude<TurnStatus, "queued" | "running" | "closing">, error?: string): TurnRecord {
     const now = new Date().toISOString();
     const result = this.db.prepare(`
       UPDATE session_turns
       SET status=@status, error=@error, updated_at=@now, finished_at=@now, lease_expires_at=NULL
       WHERE id=@id AND status IN ('running', 'closing') AND owner_token=@ownerToken
-    `).run({ id, ownerToken, status, error, now });
+        AND owner_generation=@ownerGeneration
+        AND lease_expires_at > @now
+    `).run({ id, ownerToken, ownerGeneration, status, error, now });
     if (result.changes !== 1) throw new Error(`Turn ${id} cannot finish without its active lease.`);
     return this.load(id)!;
   }
@@ -163,14 +175,16 @@ export class TurnLedgerRepo {
     })();
   }
 
-  detachForRecovery(id: string, ownerToken: string, reason: string): TurnRecord {
+  detachForRecovery(id: string, ownerToken: string, ownerGeneration: number, reason: string): TurnRecord {
     const now = new Date().toISOString();
     const result = this.db.prepare(`
       UPDATE session_turns
       SET status='queued', error=@reason, updated_at=@now,
           owner_token=NULL, heartbeat_at=NULL, lease_expires_at=NULL, finished_at=NULL
       WHERE id=@id AND status='running' AND owner_token=@ownerToken
-    `).run({ id, ownerToken, reason, now });
+        AND owner_generation=@ownerGeneration
+        AND lease_expires_at > @now
+    `).run({ id, ownerToken, ownerGeneration, reason, now });
     if (result.changes !== 1) throw new Error(`Turn ${id} cannot detach without its active lease.`);
     return this.load(id)!;
   }
@@ -224,6 +238,7 @@ function fromRow(row: TurnRow): TurnRecord {
     inputSource: row.input_source === "internal" ? "internal" : "external",
     status: row.status as TurnStatus,
     ownerToken: row.owner_token ?? undefined,
+    ownerGeneration: row.owner_generation,
     leaseExpiresAt: row.lease_expires_at ?? undefined,
     heartbeatAt: row.heartbeat_at ?? undefined,
     error: row.error ?? undefined,

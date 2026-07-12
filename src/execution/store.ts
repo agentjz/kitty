@@ -1,4 +1,5 @@
 import { ControlPlaneLedger, type ExecutionRecord, type ExecutionStatus } from "../control/ledger.js";
+import type { ExecutionOwnership } from "../control/types.js";
 import type { ExecutionKind } from "./kinds.js";
 
 export type { ExecutionKind, ExecutionRecord, ExecutionStatus };
@@ -7,6 +8,7 @@ export class ExecutionStore {
   constructor(private readonly rootDir: string) {}
 
   create(input: {
+    kind?: ExecutionKind;
     command: string;
     cwd: string;
     requestedBy: string;
@@ -47,12 +49,12 @@ export class ExecutionStore {
     try { return ledger.executions.list(input); } finally { ledger.close(); }
   }
 
-  markRunning(id: string, input: { pid: number }): ExecutionRecord {
+  markRunning(id: string, ownership: ExecutionOwnership, input: { pid: number; processIdentity?: Record<string, unknown> }): ExecutionRecord {
     const ledger = new ControlPlaneLedger(this.rootDir);
-    try { return ledger.executions.markRunning(id, input); } finally { ledger.close(); }
+    try { return ledger.executions.markRunning(id, ownership, input); } finally { ledger.close(); }
   }
 
-  close(id: string, input: {
+  close(id: string, ownership: ExecutionOwnership, input: {
     status: "completed" | "failed" | "aborted" | "lost";
     exitCode?: number | null;
     output?: string;
@@ -65,7 +67,7 @@ export class ExecutionStore {
     const ledger = new ControlPlaneLedger(this.rootDir);
     try {
       return ledger.transaction(() => {
-        const closed = ledger.executions.close(id, {
+        const closed = ledger.executions.close(id, ownership, {
           ...input,
           output: input.output ?? input.resultText,
         });

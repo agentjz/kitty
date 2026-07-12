@@ -1,10 +1,12 @@
 import { reconcileBackgroundExecutions, terminateBackgroundExecution } from "./background.js";
-import { isProcessAlive } from "./process.js";
+import { isProcessAlive, isSameProcess, terminatePid, type ProcessIdentity } from "./process.js";
 import { ExecutionStore, type ExecutionRecord } from "./store.js";
 import { unknownExecution } from "./errors.js";
+import { executionOwnership } from "../control/types.js";
+import { ControlPlaneLedger } from "../control/ledger.js";
 
 export interface RunningExecutionProcess {
-  kind: "background";
+  kind: "foreground" | "background";
   id: string;
   pid: number;
   summary: string;
@@ -17,10 +19,10 @@ export interface TerminationResult {
 
 export function collectRunningExecutionProcesses(rootDir: string, ownerSessionId: string): RunningExecutionProcess[] {
   reconcileExecutions(rootDir, { ownerSessionId });
-  return new ExecutionStore(rootDir).list({ statuses: ["running"], ownerSessionId })
+  return new ExecutionStore(rootDir).list({ statuses: ["running", "cancelling"], ownerSessionId })
     .filter((execution) => typeof execution.pid === "number" && execution.pid > 0)
     .map((execution) => ({
-      kind: "background",
+      kind: execution.kind,
       id: execution.id,
       pid: execution.pid!,
       summary: `background ${execution.id} pid=${execution.pid} ${execution.command}`,
@@ -61,16 +63,44 @@ export function reconcileExecutions(rootDir: string, input: {
 } = {}): { lostExecutions: ExecutionRecord[] } {
   const store = new ExecutionStore(rootDir);
   const lostExecutions: ExecutionRecord[] = [];
-  for (const execution of store.list({ statuses: ["running"], ownerSessionId: input.ownerSessionId })) {
-    if (typeof execution.pid !== "number" || isProcessAlive(execution.pid)) continue;
-    lostExecutions.push(store.close(execution.id, {
+  for (const execution of store.list({
+    statuses: ["created", "running", "cancelling"],
+    ownerSessionId: input.ownerSessionId,
+  })) {
+    const identity = execution.processIdentity as ProcessIdentity | undefined;
+    if (identity && !isSameProcess(identity)) {
+      const claimed = claimExecutionReconciliation(rootDir, execution.id);
+      if (!claimed) continue;
+      lostExecutions.push(store.close(execution.id, executionOwnership(claimed), {
+        status: "lost",
+        output: execution.output,
+        summary: `Process identity changed before completion: pid=${execution.pid}`,
+        closeReason: "process_identity_changed",
+      }));
+      continue;
+    }
+    const claimed = claimExecutionReconciliation(rootDir, execution.id);
+    if (!claimed) continue;
+    if (typeof execution.pid === "number" && isProcessAlive(execution.pid)) {
+      try { terminatePid(execution.pid, identity); }
+      catch { /* recovered generation below still records the lost controller */ }
+    }
+    lostExecutions.push(store.close(execution.id, executionOwnership(claimed), {
       status: "lost",
       output: execution.output,
-      summary: `Background process disappeared before reporting completion: pid=${execution.pid}`,
-      closeReason: "process_disappeared",
+      summary: typeof execution.pid === "number"
+        ? `Execution controller lease expired before completion: pid=${execution.pid}`
+        : "Execution controller lease expired before process registration.",
+      closeReason: typeof execution.pid === "number" ? "controller_lease_expired" : "launch_unconfirmed",
     }));
   }
   return { lostExecutions };
+}
+
+function claimExecutionReconciliation(rootDir: string, id: string): ExecutionRecord | undefined {
+  const ledger = new ControlPlaneLedger(rootDir);
+  try { return ledger.executions.claimRecovery(id); }
+  finally { ledger.close(); }
 }
 
 export function isSettled(execution: ExecutionRecord): boolean {

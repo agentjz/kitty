@@ -22,6 +22,7 @@ export interface BoundHostTurnOptions<TActiveTurn> {
   buildInput: () => Promise<string>;
   cwd: string;
   stateRootDir?: string;
+  admittedTurnId?: string;
   config: RuntimeConfig;
   session: SessionRecord;
   sessionStore: SessionStoreLike;
@@ -62,6 +63,7 @@ export async function runBoundHostTurn<TActiveTurn>(
         sessionStore: options.sessionStore,
         abortSignal: controller.signal,
         callbacks: options.callbacks,
+        admittedTurnId: options.admittedTurnId,
       },
       {
         ...dependencies,

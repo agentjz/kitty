@@ -101,10 +101,10 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 `runHostTurn()` 是统一 turn 边界。它：
 
 1. 将输入写入 durable turn queue。
-2. 按 session 队首原子 claim owner token，并维持 lease heartbeat。
+2. 按 session 队首原子 claim owner token 与单调 generation，并维持 lease heartbeat。
 3. 记录带 turn ID 的 `turn.started` 事实并创建工具注册表。
-4. 运行当前 session 的 agent turn；所有 session 写入和工具边界校验 owner token。
-5. 记录 completed、failed 或 aborted 终态并释放 lease。
+4. 运行当前 session 的 agent turn；所有 session、steer 与工具写入都校验 token、generation 和有效 lease。
+5. 在同一事务提交最终 session revision 与 completed、failed 或 aborted 终态。
 
 `runAgentTurn()` 负责模型/工具循环。每一轮循环：
 
@@ -118,7 +118,7 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 
 交互宿主在 active turn 期间收到的普通外部输入不是新 turn，而是写入 SQLite `turn_steers` 的 durable steer。Steer 按 turn 内 sequence 排序，状态为 `pending`、`consumed` 或 `rejected`；agent 在下一次 context 构建前消费，并以确定 message ID 写入同一 session。Final answer 进入持久化前必须通过 turn `closing` 事务边界确认没有 pending steer；若同时到达新 steer，则保存当前 assistant 输出并继续同一 turn。
 
-`Ctrl+C` 是显式 abort：当前 turn 进入 aborted，未消费 steer 进入 rejected。中断清理尚未结束时的新输入必须 admit 为下一 durable turn，不能写到即将 aborted 的 owner。`/exit`、终端 EOF/关闭和宿主终止信号把 active turn 放回 queued，同时只终止当前 session 的 background 进程；其他 session 不受影响。父进程被强杀时，background 的父死亡监护器负责终止目标进程树，重启后 lease reconcile 把未收口记录转成明确终态。任何时刻同一 session 只能有一个有效 turn owner。
+`Ctrl+C` 是显式 abort：当前 turn 进入 aborted，未消费 steer 进入 rejected。中断清理尚未结束时的新输入必须 admit 为下一 durable turn，不能写到即将 aborted 的 owner。`/exit`、终端 EOF/关闭和宿主终止信号把 active turn 放回 queued，同时终止当前 session 的 foreground/background 进程树；其他 session 不受影响。关闭有固定 deadline，重复信号升级为强制退出。父进程被强杀时，父死亡监护器负责终止目标进程树，重启后 lease reconcile 把未收口记录转成明确终态。任何时刻同一 session 只能有一个有效 turn owner generation。
 
 Provider request 是临时失败的唯一重试 owner：同一逻辑请求最多四次调用、总等待最多 90 秒，并优先采用服务端 `Retry-After`。Agent turn 不得重新发送已耗尽重试预算的请求。Abort 必须中断当前请求或等待，不能伪造正常完成。
 
@@ -179,7 +179,7 @@ Provider request 边界把 adapter、transport 和 SDK 失败归一为 `Provider
 
 工具执行真实操作，返回有界证据，记录 changed path，并在需要时保留可恢复的原始输出。每次 tool call 无论成功或失败都必须持久为下一次模型请求可见的非空 tool result；成功但没有文本输出时，机器明确记录该事实。Tool output projection 限制上下文成本，但不伪造语义结论。
 
-每个 tool result 同时保存当前唯一的 typed evidence：call id、tool、status、summary、provenance、facts、error、artifact、truncation、model view 和 compact view。Tool intent 在副作用前写入 `tool_calls`，每个 canonical result 在执行完成后立即落账；恢复时悬空 intent 变成明确 interrupted evidence，副作用工具不自动重放。工具实现拥有原始结果；evidence builder 拥有模型证据合同；session 保存 canonical evidence；context 只选择 full 或 compact view；宿主展示继续读取 display/raw result。
+每个 tool result 同时保存当前唯一的 typed evidence：call id、tool、status、summary、provenance、facts、error、artifact、truncation、model view 和 compact view。Tool intent 以 `(turn_id, call_id)` 写入 `tool_calls`，状态为 `planned -> running -> success/error/interrupted/uncertain`。每个工具紧邻真实调用前校验 turn token、generation、lease 与 abort，再从 planned 激活；恢复时未激活 intent 进入 interrupted，已激活但无法确认的副作用进入 uncertain，副作用工具不自动重放。工具实现拥有原始结果；evidence builder 拥有模型证据合同；session 保存 canonical evidence；context 只选择 full 或 compact view；宿主展示继续读取 display/raw result。
 
 模型证据遵循最小充分原则：必须足以判断本次操作是否成功、作用于哪里、产生了什么关键事实、失败根因是什么、下一步如何恢复。工作区内目标使用相对路径；工作区外目标保留绝对路径。read 返回实际行区间和 continuation；edit/write 返回目标和变更范围；bash 返回 cwd、exit code、duration、头尾输出和 artifact recovery。大输出保留头尾，明确省略规模，并提供可执行的 `read` 恢复参数。
 
@@ -206,7 +206,7 @@ Extension 只在配置启用时进入同一工具注册表。它们不是另一�
 ### 职责
 
 - `src/control/`：session、turn、tool call、context epoch、task lifecycle、execution、wake 和 runtime event 的 SQLite schema 与账本。
-- `src/execution/`：后台 execution 启动、输出读取、reconcile、取消和进程树终止。
+- `src/execution/`：前台与后台 execution 的启动、identity、watchdog、heartbeat、reconcile、取消和进程树终止。
 
 项目目录是持久化与管理员审阅边界；session 是运行所有权边界。每个 session 独立保存消息、turn、草稿和后台 execution，普通 session picker 只投影用户会话。
 
@@ -214,18 +214,18 @@ Extension 只在配置启用时进入同一工具注册表。它们不是另一�
 
 后台查询只读取当前 `ownerSessionId + parentTurnId + originToolCallIds` 创建的 execution，不能使用工具批次前后的全局集合差值。Turn/session 写入使用显式 turn-scoped store 与 lease token；execution lease 同样通过函数参数校验，不使用隐藏上下文提供业务事实。
 
-当前 control-plane schema 只支持当前数据模型。新项目重建不读取、不迁移、不修复旧数据库；旧 SQLite 文件直接删除后按当前 schema 创建。
+当前 control-plane schema 只支持当前数据模型。schema version 不匹配时在 SQLite exclusive transaction 中清空并按当前 schema 重建；不读取、不迁移、不修复旧数据。
 
 `.kitty/control-plane.sqlite` 是运行事实的唯一持久主干。Execution 保存 kind、state、command、工作目录、session/turn/tool-call ownership、pid、output/summary、timeout 和关闭事实。
 
 当前 execution kind：
 
 - `background`：非阻塞的本地命令执行。
+- `foreground`：当前 turn 等待完成的 bash 或 skill script。
 
 当前 state：
 
 - `created`
-- `claimed`
 - `running`
 - `cancelling`
 - `completed`
@@ -245,6 +245,8 @@ Execution stop/cancel 必须终止完整进程树：
 - POSIX：先终止进程组和子孙进程，短暂等待后升级为 `SIGKILL`。
 
 Reconcile 以 lease 和 heartbeat 判断 ownership；PID 只用于诊断和进程树终止。进程消失或 lease 丢失且无法确认正常终态时关闭为 `lost`。Execution 终态与 wake signal 在同一事务内幂等提交。
+
+每个 execution controller 持有随机 token、单调 generation 和有限 lease。PID 同时保存平台 creation identity；停止前必须确认 identity，避免 PID 复用误杀。普通 status、wait 和 UI projection 不取得 recovery ownership；只有 lease 过期后 recovery 才能提升 generation。
 
 ## 9. Runtime 事实与 Observability
 
@@ -277,6 +279,8 @@ Terminal log 使用 UTF-8，记录可读的用户输入、reasoning、assistant 
 
 `kitty`、`kitty tui`、`kitty agent`、Telegram 和本地 API 都进入同一条 host/agent turn 主链路。`status`、`events`、`background`、`doctor`、`eval` 等 CLI 命令暴露已存事实，不能创建平行生命周期语义。
 
+Telegram service 使用 SQLite service lease 的 token、generation 与 heartbeat 保证单 owner；lease 丢失立即停止 service。Update ID 进入 durable inbox，并与唯一 turn ID 绑定。回复进入 durable outbox，状态为 queued、sending、sent 或 uncertain；远端调用后无法确认本地提交时不得自动盲重试。
+
 ### TUI
 
 `src/shell/tui/` 是 Ink 宿主壳。它负责终端输入、滚动、resize、transcript layout、composer geometry、overlay/focus、runtime dock 渲染和清理；它不拥有 session 或 execution 事实。
@@ -302,7 +306,7 @@ TUI 规则：
 - Context budget 必须属于当前选中的 session。项目全局 runtime status 不能用另一条最近已保存 session 的 budget 覆盖新建或已选 session。
 - 用户提交后到最终模型回答完成期间，TUI 在 Runtime Dock 第一行右侧显示本轮持续时间；思考、工具调用和后续模型请求不重置它。
 - Runtime Dock 保持稳定两行结构；第一行左侧展示当前 activity，右侧展示本轮持续时间；第二行展示 live background lane。activity 只显示工具名，不显示参数、命令或路径。
-- TUI 只显示 control-plane 状态为 `created`、`claimed`、`running` 或 `cancelling` 的 background lane。
+- TUI 只显示 control-plane 状态为 `created`、`running` 或 `cancelling` 的 background lane。
 - 存在 live execution lane 时，TUI 轻量刷新 execution 账本。Execution 进入终态后必须清除 lane；启动时的 `running` 文案不能成为错误的当前状态。
 - 首屏 transcript 保持空白。User message 使用紧凑的低对比整行背景。Reasoning 是低强调信息。
 - Transcript 与 footer 之间使用一行空白背景，不使用显眼的分割线。

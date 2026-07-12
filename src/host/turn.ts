@@ -34,7 +34,7 @@ export async function runHostTurn(
   const sessionEvents = new SessionEventStore(options.config.paths.eventsDir);
   let toolRegistry: Awaited<ReturnType<typeof createToolRegistry>> | null = null;
   let session = options.session;
-  let turnRecord: { id: string; input: string; ownerToken?: string } | undefined;
+  let turnRecord: { id: string; input: string; ownerToken?: string; ownerGeneration: number } | undefined;
   let terminalStatus: "completed" | "failed" | "aborted" | undefined;
   let detachedForRecovery = false;
   let heartbeatTimer: NodeJS.Timeout | undefined;
@@ -106,7 +106,7 @@ export async function runHostTurn(
       heartbeatTimer = setInterval(() => {
         const ledger = new ControlPlaneLedger(stateRootDir);
         try {
-          ledger.turns.heartbeat(turnRecord!.id, turnRecord!.ownerToken!);
+          ledger.turns.heartbeat(turnRecord!.id, turnRecord!.ownerToken!, turnRecord!.ownerGeneration);
         } catch (error) {
           leaseAbortController.abort(error);
         } finally {
@@ -143,6 +143,7 @@ export async function runHostTurn(
           sessionId: session.id,
           turnId: turnRecord.id,
           ownerToken: turnRecord.ownerToken,
+          ownerGeneration: turnRecord.ownerGeneration,
         })
       : options.sessionStore;
     dependencies.onRunTurnStarted?.();
@@ -156,6 +157,7 @@ export async function runHostTurn(
       inputSource: "external",
       turnId: turnRecord.id,
       turnOwnerToken: turnRecord.ownerToken,
+      turnOwnerGeneration: turnRecord.ownerGeneration,
       ownerSessionId: session.id,
       abortSignal: turnAbortSignal,
       callbacks: options.callbacks,
@@ -167,6 +169,7 @@ export async function runHostTurn(
             rootDir: stateRootDir,
             turnId: turnRecord!.id,
             ownerToken: turnRecord!.ownerToken!,
+            ownerGeneration: turnRecord!.ownerGeneration,
             session: currentSession,
             sessionStore: turnSessionStore,
           });
@@ -174,7 +177,7 @@ export async function runHostTurn(
         },
         beginClosing: async () => {
           const ledger = new ControlPlaneLedger(stateRootDir);
-          try { return ledger.turns.beginClosing(turnRecord!.id, turnRecord!.ownerToken!); }
+          try { return ledger.turns.beginClosing(turnRecord!.id, turnRecord!.ownerToken!, turnRecord!.ownerGeneration); }
           finally { ledger.close(); }
         },
       } : undefined,
@@ -184,7 +187,7 @@ export async function runHostTurn(
     if (turnRecord.ownerToken) {
       const closingLedger = new ControlPlaneLedger(stateRootDir);
       try {
-        if (!closingLedger.turns.beginClosing(turnRecord.id, turnRecord.ownerToken)) {
+        if (!closingLedger.turns.beginClosing(turnRecord.id, turnRecord.ownerToken, turnRecord.ownerGeneration)) {
           throw new Error("Turn runner returned while user guidance was still pending.");
         }
       } finally {
@@ -220,6 +223,7 @@ export async function runHostTurn(
     };
   } catch (error) {
     const failedSession = error instanceof AgentTurnError ? error.session : session;
+    session = failedSession;
     if (error instanceof QueuedTurnDetachedError) {
       return {
         status: "aborted",
@@ -234,6 +238,7 @@ export async function runHostTurn(
         recoveryLedger.turns.detachForRecovery(
           turnRecord.id,
           turnRecord.ownerToken,
+          turnRecord.ownerGeneration,
           "Host detached while the turn was active. Resume from durable session and tool facts.",
         );
         detachedForRecovery = true;
@@ -291,17 +296,34 @@ export async function runHostTurn(
   } finally {
     if (heartbeatTimer) clearInterval(heartbeatTimer);
     if (turnRecord?.ownerToken && !detachedForRecovery) {
+      const ownedTurn = {
+        id: turnRecord.id,
+        ownerToken: turnRecord.ownerToken,
+        ownerGeneration: turnRecord.ownerGeneration,
+      };
       const ledger = new ControlPlaneLedger(stateRootDir);
       try {
-        if (terminalStatus === "aborted" || terminalStatus === "failed") {
-          ledger.turnSteers.rejectPending(
-            turnRecord.id,
-            terminalStatus === "aborted" ? "The current turn was interrupted." : "The current turn failed.",
+        ledger.transaction(() => {
+          const committedSession = ledger.sessions.saveOwned({
+            session,
+            turnId: ownedTurn.id,
+            ownerToken: ownedTurn.ownerToken,
+            ownerGeneration: ownedTurn.ownerGeneration,
+          });
+          Object.assign(session, committedSession);
+          if (terminalStatus === "aborted" || terminalStatus === "failed") {
+            ledger.turnSteers.rejectPending(
+              ownedTurn.id,
+              terminalStatus === "aborted" ? "The current turn was interrupted." : "The current turn failed.",
+            );
+          }
+          ledger.turns.finish(
+            ownedTurn.id,
+            ownedTurn.ownerToken,
+            ownedTurn.ownerGeneration,
+            terminalStatus ?? "failed",
           );
-        }
-        ledger.turns.finish(turnRecord.id, turnRecord.ownerToken, terminalStatus ?? "failed");
-      } catch {
-        // The lease may have expired and been recovered by another host.
+        });
       } finally {
         ledger.close();
       }
@@ -319,7 +341,7 @@ async function claimTurn(input: {
   admittedTurnId?: string;
   abortSignal?: AbortSignal;
   session: SessionRecord;
-}): Promise<{ id: string; input: string; ownerToken?: string }> {
+}): Promise<{ id: string; input: string; ownerToken?: string; ownerGeneration: number }> {
   const ledger = new ControlPlaneLedger(input.rootDir);
   let admitted;
   try {
@@ -354,11 +376,11 @@ async function claimTurn(input: {
     try {
       const claimed = current.turns.claim(admitted.id);
       if (claimed) {
-        return { id: claimed.id, input: claimed.input, ownerToken: claimed.ownerToken };
+        return { id: claimed.id, input: claimed.input, ownerToken: claimed.ownerToken, ownerGeneration: claimed.ownerGeneration };
       }
       const observed = current.turns.load(admitted.id);
       if (observed && ["completed", "failed", "aborted"].includes(observed.status)) {
-        return { id: observed.id, input: observed.input };
+        return { id: observed.id, input: observed.input, ownerGeneration: observed.ownerGeneration };
       }
     } finally {
       current.close();

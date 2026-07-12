@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import Database from "better-sqlite3";
 
 import {
   BackgroundExecutionStore,
@@ -7,7 +8,9 @@ import {
   waitForBackgroundExecution,
 } from "../../src/execution/background.js";
 import { isAbortError } from "../../src/utils/abort.js";
+import { executionOwnership } from "../../src/control/types.js";
 import { createTempWorkspace, TEST_EXECUTION_OWNER } from "../helpers.js";
+import { getProjectStatePaths } from "../../src/project/statePaths.js";
 
 test("background execution store creates, starts, closes, and emits wake facts", async (t) => {
   const root = await createTempWorkspace("background-store", t);
@@ -21,8 +24,9 @@ test("background execution store creates, starts, closes, and emits wake facts",
     timeoutMs: 10_000,
   });
 
-  store.markRunning(job.id, { pid: 4321 });
-  const closed = store.close(job.id, {
+  const ownership = executionOwnership(job);
+  store.markRunning(job.id, ownership, { pid: 4321 });
+  const closed = store.close(job.id, ownership, {
     status: "completed",
     exitCode: 0,
     output: "ok",
@@ -48,14 +52,34 @@ test("background reconcile marks dead running pid as stale", async (t) => {
     cwd: root,
     requestedBy: "agent",
   });
-  store.markRunning(job.id, { pid: 999_999_999 });
+  store.markRunning(job.id, executionOwnership(job), { pid: 999_999_999 });
+  const db = new Database(getProjectStatePaths(root).controlPlaneLedgerFile);
+  db.prepare("UPDATE executions SET controller_lease_expires_at = ? WHERE id = ?")
+    .run("2000-01-01T00:00:00.000Z", job.id);
+  db.close();
 
   const result = reconcileBackgroundExecutions(root);
   const reloaded = store.load(job.id);
 
   assert.equal(result.lostExecutions.length, 1);
   assert.equal(reloaded?.status, "lost");
-  assert.match(String(reloaded?.summary), /disappeared/i);
+  assert.match(String(reloaded?.summary), /lease expired/i);
+});
+
+test("background reconcile never steals a healthy controller lease", async (t) => {
+  const root = await createTempWorkspace("background-reconcile-healthy", t);
+  const store = new BackgroundExecutionStore(root);
+  const job = store.create({
+    ...TEST_EXECUTION_OWNER,
+    command: "healthy process",
+    cwd: root,
+    requestedBy: "agent",
+  });
+  store.markRunning(job.id, executionOwnership(job), { pid: process.pid });
+
+  assert.equal(reconcileBackgroundExecutions(root).lostExecutions.length, 0);
+  assert.equal(store.load(job.id)?.controllerGeneration, job.controllerGeneration);
+  assert.equal(store.load(job.id)?.status, "running");
 });
 
 test("background execution store records running output summaries", async (t) => {
@@ -67,9 +91,10 @@ test("background execution store records running output summaries", async (t) =>
     cwd: root,
     requestedBy: "agent",
   });
-  store.markRunning(job.id, { pid: process.pid });
+  const ownership = executionOwnership(job);
+  store.markRunning(job.id, ownership, { pid: process.pid });
 
-  store.updateRunningOutput(job.id, {
+  store.updateRunningOutput(job.id, ownership, {
     output: "step one\nstep two\n",
     summary: "step two",
     lastOutputAt: "2026-05-22T00:00:00.000Z",
@@ -91,7 +116,7 @@ test("background wait stops immediately when its caller aborts", async (t) => {
     cwd: root,
     requestedBy: "agent",
   });
-  store.markRunning(job.id, { pid: process.pid });
+  store.markRunning(job.id, executionOwnership(job), { pid: process.pid });
   const controller = new AbortController();
   controller.abort();
 

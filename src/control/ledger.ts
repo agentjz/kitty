@@ -13,9 +13,11 @@ import { ContextEpochLedgerRepo } from "./contextEpochs.js";
 import { RuntimeEventLedgerRepo } from "./runtimeEvents.js";
 import { InteractionDraftLedgerRepo } from "./interactionDrafts.js";
 import { TurnSteerLedgerRepo } from "./turnSteers.js";
+import { ServiceLeaseLedgerRepo, TelegramLedgerRepo } from "./telegram.js";
 
 export type {
   ExecutionRecord,
+  ExecutionOwnership,
   ExecutionStatus,
   TaskLifecycleRecord,
   TaskLifecycleStage,
@@ -38,6 +40,8 @@ export class ControlPlaneLedger {
   readonly runtimeEvents: RuntimeEventLedgerRepo;
   readonly interactionDrafts: InteractionDraftLedgerRepo;
   readonly turnSteers: TurnSteerLedgerRepo;
+  readonly serviceLeases: ServiceLeaseLedgerRepo;
+  readonly telegram: TelegramLedgerRepo;
   private readonly db: Database.Database;
 
   constructor(rootDir: string) {
@@ -47,8 +51,9 @@ export class ControlPlaneLedger {
     this.db.pragma("journal_mode = WAL");
     this.db.pragma("synchronous = FULL");
     this.db.pragma("busy_timeout = 5000");
-    this.db.pragma("foreign_keys = ON");
+    this.db.pragma("foreign_keys = OFF");
     initializeControlPlaneSchema(this.db);
+    this.db.pragma("foreign_keys = ON");
     this.executions = new ExecutionLedgerRepo(this.db);
     this.wakeSignals = new WakeSignalLedgerRepo(this.db);
     this.taskLifecycle = new TaskLifecycleLedgerRepo(this.db);
@@ -59,10 +64,37 @@ export class ControlPlaneLedger {
     this.runtimeEvents = new RuntimeEventLedgerRepo(this.db);
     this.interactionDrafts = new InteractionDraftLedgerRepo(this.db);
     this.turnSteers = new TurnSteerLedgerRepo(this.db);
+    this.serviceLeases = new ServiceLeaseLedgerRepo(this.db);
+    this.telegram = new TelegramLedgerRepo(this.db);
   }
 
   transaction<T>(operation: () => T): T {
     return this.db.transaction(operation)();
+  }
+
+  resetRuntimeState(): void {
+    const reset = this.db.transaction(() => {
+      const now = new Date().toISOString();
+      const activeTurn = this.db.prepare(`
+        SELECT id FROM session_turns
+        WHERE status IN ('running', 'closing') AND lease_expires_at > ? LIMIT 1
+      `).get(now) as { id: string } | undefined;
+      const activeExecution = this.db.prepare(`
+        SELECT id FROM executions
+        WHERE status IN ('created', 'running', 'cancelling') LIMIT 1
+      `).get() as { id: string } | undefined;
+      if (activeTurn || activeExecution) {
+        throw new Error(`Project reset refused while lifecycle owners are active: ${activeTurn?.id ?? activeExecution?.id}.`);
+      }
+      for (const table of [
+        "turn_steers", "tool_calls", "context_epochs", "interaction_drafts", "runtime_events",
+        "telegram_inbox", "telegram_outbox", "service_leases",
+        "task_lifecycle", "session_turns", "session_messages", "wake_signals", "executions", "sessions",
+      ]) {
+        this.db.prepare(`DELETE FROM ${table}`).run();
+      }
+    });
+    reset.exclusive();
   }
 
   close(): void {

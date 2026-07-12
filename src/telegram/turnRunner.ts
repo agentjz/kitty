@@ -16,6 +16,7 @@ import type { TelegramSessionBinding, TelegramSessionMapStoreLike } from "./sess
 import { TelegramTurnDisplay } from "./turnDisplay.js";
 import { createLoggedTelegramCallbacks } from "./turnLogging.js";
 import type { TelegramPrivateFileMessage, TelegramPrivateMessage } from "./types.js";
+import { ControlPlaneLedger } from "../control/ledger.js";
 
 export interface TelegramActiveTurn {
   controller: AbortController;
@@ -119,12 +120,26 @@ export async function runTelegramTurn(options: {
       inputKind: options.message.kind === "private_file_message" ? "file" : "text",
       fileName: options.message.kind === "private_file_message" ? options.message.fileName : undefined,
     });
+    const input = await buildTurnInput(options.message, session.id, options);
+    const stateRootDir = resolveHostStateRoot(options.config.telegram.stateDir, options.cwd);
+    const ledger = new ControlPlaneLedger(stateRootDir);
+    let admittedTurnId: string;
+    try {
+      admittedTurnId = ledger.telegram.bindTurn({
+        updateId: options.message.updateId,
+        sessionId: session.id,
+        text: input,
+      });
+    } finally {
+      ledger.close();
+    }
     session = await runBoundHostTurn<TelegramActiveTurn>(
       {
         host: "telegram",
-        buildInput: () => buildTurnInput(options.message, session.id, options),
+        buildInput: async () => input,
         cwd: options.cwd,
-        stateRootDir: resolveHostStateRoot(options.config.telegram.stateDir, options.cwd),
+        stateRootDir,
+        admittedTurnId,
         config: options.config,
         session,
         sessionStore: options.sessionStore,

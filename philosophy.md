@@ -40,9 +40,9 @@ Agent 应该更忠于用户，还是更忠于事实？
 
 小猫智能体的核心固定为 `read / edit / write / bash`。这四个工具负责基础编程闭环。
 
-复杂能力通过 extension 独立存在。当前 extension 是 `todo`、`worktree`、`network`、`background`、`subagent`、`skills`。它们可启用、可禁用，打开后进入同一个 agent 工具面，关闭后从工具面移除。
+复杂能力通过 extension 独立存在。当前 extension 是 `todo`、`worktree`、`network`、`background`、`skills`。它们可启用、可禁用，打开后进入同一个 agent 工具面，关闭后从工具面移除。
 
-默认 agent 打开 `todo`、`worktree`、`network`、`background`、`subagent`、`skills`。
+默认 agent 打开 `todo`、`worktree`、`network`、`background`、`skills`。
 
 扩展是工具集合。核心保持清楚，扩展保持独立。
 
@@ -90,13 +90,11 @@ Memory 搜索是候选召回，不是语义裁判。机器按文本 token、路�
 
 模型可以理解任务，但不能可靠地替代运行账本。长任务、后台进程、子执行和唤醒事实需要一个本地事实层。
 
-小猫智能体用 control plane 保存这些死事实：background、subagent execution、派工边界、pid、状态、退出码、输出摘要、wait policy 和 wake signal。
+小猫智能体用 control plane 保存这些死事实：turn、tool effect、foreground/background execution、pid identity、状态、退出码、输出摘要、lease 和 wake signal。
 
 `kitty status` 让用户看到运行现场：当前焦点、下一步、阻塞项、session、context budget、memory、skills、project map、execution、wake。它先呈现用户能理解的当前现场，再呈现机器账本细节；它只呈现事实，不替模型做判断。
 
-Background 是长任务现场。它记录运行输出摘要，能检查、终止、reconcile，也能在完成后把事实暴露给 lead。
-
-Subagent 是隔离上下文协作现场。lead 派出有边界的任务后让出当前轮；worker 完成后把 summary/output 写回 execution；host 用内部 wake facts 恢复 lead。wake 是内部事实，不是用户新要求。
+Background 是长任务现场。它记录运行输出摘要，能检查、终止、reconcile，也能在完成后把事实暴露给当前 session 的 Agent。
 
 ## ⚙️ 模型与机器
 
@@ -112,7 +110,7 @@ Task Lifecycle 保存当前任务阶段和运行事实：阶段、原因、activ
 
 Agent turn 生命周期负责把当前输入、工具批次、provider 恢复、checkpoint、session diff 和记忆更新串成可恢复的现场。生命周期只保存和暴露事实，不决定路线。
 
-Lead wait 必须有边界。阻塞型 subagent execution 会让 lead 让出当前轮；execution 完成或等待 deadline 到达后，host 用 internal wake facts 恢复 lead。wake 是运行事实，不是用户新要求。
+Execution wait 必须有边界。后台 execution 完成或等待 deadline 到达后，host 用 internal wake facts 恢复当前 session。wake 是运行事实，不是用户新要求。
 
 Session events 是宿主和未来入口共享的事件边界。它记录 session 创建、turn 开始、完成、失败和中断。事件是机器事实，不进入自然对话主轨，也不写成用户意图。
 
@@ -120,7 +118,7 @@ Session events 是宿主和未来入口共享的事件边界。它记录 session
 
 Agent 不能只靠单元测试证明成熟。
 
-小猫智能体用 evaluation harness 暴露真实体验场景：简单问题不疯狂工作、长会话不失忆、旧目标不回灌、项目地图帮助定向、memory 可审阅可追溯、background 可恢复可终止、subagent 能唤醒 lead、plan 能形成可验证执行合同。
+小猫智能体用 evaluation harness 暴露真实体验场景：简单问题不疯狂工作、长会话不失忆、旧目标不回灌、项目地图帮助定向、memory 可审阅可追溯、background 可恢复可终止、plan 能形成可验证执行合同。
 
 `kitty eval` 是产品验收合同。它列出关键用户路径和机器证据；`kitty eval --run-local` 运行本地可验证检查，也会用假 provider 跑真实 host turn golden 场景，检查工具、session、workset 和 events 的闭环。`kitty eval --run-production` 是显式生产路径验收入口，独立于普通 `npm test`，可以使用当前项目真实配置。它不替模型打分，也不把口号写成测试。
 

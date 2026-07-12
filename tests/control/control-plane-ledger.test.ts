@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { executionOwnership } from "../../src/control/types.js";
 
 import { ControlPlaneLedger } from "../../src/control/ledger.js";
 import { createSessionRecord } from "../../src/session/store.js";
@@ -35,8 +36,8 @@ test("control plane ledger persists execution lifecycle facts", async (t) => {
     requestedBy: "agent",
   });
 
-  ledger.executions.markRunning(created.id, { pid: 1234 });
-  ledger.executions.close(created.id, {
+  ledger.executions.markRunning(created.id, executionOwnership(created), { pid: 1234 });
+  ledger.executions.close(created.id, executionOwnership(created), {
     status: "completed",
     exitCode: 0,
     summary: "done",
@@ -130,8 +131,8 @@ test("session turns claim only the durable queue head and fence expired owners",
   const claimed = ledger.turns.claim(first.id);
   assert.equal(claimed?.status, "running");
   assert.ok(claimed?.ownerToken);
-  assert.throws(() => ledger.turns.assertOwner(first.id, "wrong-token"), /no longer owns/);
-  ledger.turns.finish(first.id, claimed!.ownerToken!, "completed");
+  assert.throws(() => ledger.turns.assertOwner(first.id, "wrong-token", claimed!.ownerGeneration), /no longer owns/);
+  ledger.turns.finish(first.id, claimed!.ownerToken!, claimed!.ownerGeneration, "completed");
   assert.equal(ledger.turns.claim(second.id)?.status, "running");
   ledger.close();
 });
@@ -152,16 +153,16 @@ test("turn steers remain ordered inside one active turn and block closing until 
     "first guidance",
     "second guidance",
   ]);
-  assert.equal(ledger.turns.beginClosing(turn.id, claimed.ownerToken!), false);
+  assert.equal(ledger.turns.beginClosing(turn.id, claimed.ownerToken!, claimed.ownerGeneration), false);
 
-  ledger.turnSteers.markConsumed({ steerId: first!.id, turnId: turn.id, ownerToken: claimed.ownerToken! });
-  ledger.turnSteers.markConsumed({ steerId: second!.id, turnId: turn.id, ownerToken: claimed.ownerToken! });
-  assert.equal(ledger.turns.beginClosing(turn.id, claimed.ownerToken!), true);
+  ledger.turnSteers.markConsumed({ steerId: first!.id, turnId: turn.id, ownerToken: claimed.ownerToken!, ownerGeneration: claimed.ownerGeneration });
+  ledger.turnSteers.markConsumed({ steerId: second!.id, turnId: turn.id, ownerToken: claimed.ownerToken!, ownerGeneration: claimed.ownerGeneration });
+  assert.equal(ledger.turns.beginClosing(turn.id, claimed.ownerToken!, claimed.ownerGeneration), true);
   assert.equal(
     ledger.turnSteers.admit({ turnId: turn.id, sessionId: session.id, text: "too late" }),
     undefined,
   );
-  ledger.turns.finish(turn.id, claimed.ownerToken!, "completed");
+  ledger.turns.finish(turn.id, claimed.ownerToken!, claimed.ownerGeneration, "completed");
   ledger.close();
 });
 
@@ -209,13 +210,40 @@ test("tool journal converts abandoned side effects into explicit recovery eviden
     argumentsJson: JSON.stringify({ path: "src/app.ts" }),
     effect: "write",
   });
-  ledger.turns.finish(turn.id, claimed.ownerToken!, "failed", "process crashed");
+  ledger.toolCalls.activate({
+    callId: "call-edit",
+    turnId: turn.id,
+    ownerToken: claimed.ownerToken!,
+    ownerGeneration: claimed.ownerGeneration,
+  });
+  ledger.turns.finish(turn.id, claimed.ownerToken!, claimed.ownerGeneration, "failed", "process crashed");
 
   const [recovered] = ledger.toolCalls.interruptRecoverable(session.id);
-  assert.equal(recovered?.status, "interrupted");
+  assert.equal(recovered?.status, "uncertain");
   assert.equal(recovered?.result?.error?.code, "TOOL_EXECUTION_INTERRUPTED");
   assert.equal(recovered?.result?.provenance?.targetPath, "src/app.ts");
   assert.match(recovered?.result?.error?.recoveryHint ?? "", /Inspect the target state/);
+  ledger.close();
+});
+
+test("tool journal settles effects aborted before activation as interrupted", async (t) => {
+  const root = await createTempWorkspace("control-tool-planned-abort", t);
+  const ledger = new ControlPlaneLedger(root);
+  const session = ledger.sessions.save(await createSessionRecord(root));
+  const turn = ledger.turns.admit({ sessionId: session.id, input: "edit", inputSource: "external" });
+  const claimed = ledger.turns.claim(turn.id)!;
+  ledger.toolCalls.start({
+    callId: "call-planned",
+    turnId: turn.id,
+    sessionId: session.id,
+    toolName: "edit",
+    argumentsJson: JSON.stringify({ path: "src/app.ts" }),
+    effect: "write",
+  });
+  ledger.turns.finish(turn.id, claimed.ownerToken!, claimed.ownerGeneration, "aborted", "stopped before tool start");
+
+  const [recovered] = ledger.toolCalls.interruptRecoverable(session.id);
+  assert.equal(recovered?.status, "interrupted");
   ledger.close();
 });
 
@@ -228,8 +256,9 @@ test("execution close publishes exactly one wake signal", async (t) => {
     cwd: root,
     requestedBy: "agent",
   });
-  store.close(execution.id, { status: "completed", summary: "done" });
-  store.close(execution.id, { status: "completed", summary: "done" });
+  const ownership = executionOwnership(execution);
+  store.close(execution.id, ownership, { status: "completed", summary: "done" });
+  store.close(execution.id, ownership, { status: "completed", summary: "done" });
   assert.equal(store.listWakeSignals().filter((signal) => signal.executionId === execution.id).length, 1);
 });
 

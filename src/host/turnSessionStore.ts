@@ -3,21 +3,26 @@ import type { SessionStoreLike } from "../session/store.js";
 
 export function createTurnScopedSessionStore(
   store: SessionStoreLike,
-  ownership: { rootDir: string; sessionId: string; turnId: string; ownerToken: string },
+  ownership: { rootDir: string; sessionId: string; turnId: string; ownerToken: string; ownerGeneration: number },
 ): SessionStoreLike {
-  const assertOwner = (): void => {
-    const ledger = new ControlPlaneLedger(ownership.rootDir);
-    try {
-      ledger.turns.assertOwner(ownership.turnId, ownership.ownerToken);
-    } finally {
-      ledger.close();
-    }
-  };
   const assertSession = (sessionId: string): void => {
     if (sessionId !== ownership.sessionId) {
       throw new Error(`Turn ${ownership.turnId} cannot write session ${sessionId}.`);
     }
-    assertOwner();
+  };
+  const saveOwned = async (session: Parameters<SessionStoreLike["save"]>[0]) => {
+    assertSession(session.id);
+    const ledger = new ControlPlaneLedger(ownership.rootDir);
+    try {
+      return ledger.sessions.saveOwned({
+        session,
+        turnId: ownership.turnId,
+        ownerToken: ownership.ownerToken,
+        ownerGeneration: ownership.ownerGeneration,
+      });
+    } finally {
+      ledger.close();
+    }
   };
   return {
     create: (cwd) => store.create(cwd),
@@ -26,16 +31,10 @@ export function createTurnScopedSessionStore(
     list: (limit) => store.list(limit),
     listReadable: store.listReadable ? (limit) => store.listReadable!(limit) : undefined,
     async save(session) {
-      assertSession(session.id);
-      const saved = await store.save(session);
-      assertOwner();
-      return saved;
+      return saveOwned(session);
     },
     async appendMessages(session, messages) {
-      assertSession(session.id);
-      const saved = await store.appendMessages(session, messages);
-      assertOwner();
-      return saved;
+      return saveOwned({ ...session, messages: [...session.messages, ...messages] });
     },
   };
 }

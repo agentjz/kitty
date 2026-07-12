@@ -46,9 +46,8 @@ export async function createTelegramService(options: {
     sessionMapStore: new FileTelegramSessionMapStore(path.join(stateDir, "session-map.json")),
     offsetStore: new FileTelegramOffsetStore(path.join(stateDir, "offset.json")),
     deliveryQueue: new TelegramDeliveryQueue({
-      storePath: path.join(stateDir, "delivery.json"),
+      rootDir: path.dirname(options.config.paths.dataDir),
       target: bot,
-      deliveryConfig: options.config.telegram.delivery,
       onDelivered(entry) {
         logger.info("delivery sent", {
           chatId: entry.chatId,
@@ -87,7 +86,8 @@ export function registerTelegramCommands(
       stop?(): void;
     }>;
     acquireProcessLock?: (options: { stateDir: string }) => Promise<{
-      pidFilePath: string;
+      leaseName: string;
+      signal?: AbortSignal;
       release(): Promise<void>;
     }>;
   },
@@ -113,23 +113,25 @@ export function registerTelegramCommands(
       const lock = await acquireProcessLock({
         stateDir: runtime.config.telegram.stateDir,
       });
-      const service = await serviceFactory({
-        cwd: runtime.cwd,
-        config: runtime.config,
-      });
-      console.log(
-        `[telegram] starting private chat service allowed=${runtime.config.telegram.allowedUserIds.join(",")} state=${runtime.config.telegram.stateDir} proxy=${runtime.config.telegram.proxyUrl || "direct"}`,
-      );
-      const controller = new AbortController();
-      const releaseSignals = bindShutdownSignals(() => {
-        controller.abort();
-        service.stop?.();
-      });
-
+      let releaseSignals: (() => void) | undefined;
       try {
-        await service.run(controller.signal);
+        const service = await serviceFactory({ cwd: runtime.cwd, config: runtime.config });
+        console.log(
+          `[telegram] starting private chat service allowed=${runtime.config.telegram.allowedUserIds.join(",")} state=${runtime.config.telegram.stateDir} proxy=${runtime.config.telegram.proxyUrl || "direct"}`,
+        );
+        const controller = new AbortController();
+        const stop = () => {
+          controller.abort();
+          service.stop?.();
+        };
+        releaseSignals = bindShutdownSignals(stop);
+        lock.signal?.addEventListener("abort", stop, { once: true });
+        const runSignal = lock.signal
+          ? AbortSignal.any([controller.signal, lock.signal])
+          : controller.signal;
+        await service.run(runSignal);
       } finally {
-        releaseSignals();
+        releaseSignals?.();
         await lock.release();
       }
     });

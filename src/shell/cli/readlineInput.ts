@@ -6,6 +6,7 @@ import type { ShellInputPort } from "../../interaction/shell.js";
 export async function readPersistentInput(
   promptLabel: string,
   onInterrupt: () => void,
+  abortSignal?: AbortSignal,
 ): Promise<string | null> {
   return new Promise((resolve) => {
     const rl = readline.createInterface({
@@ -20,6 +21,7 @@ export async function readPersistentInput(
       rl.removeAllListeners("line");
       rl.removeAllListeners("close");
       rl.removeAllListeners("SIGINT");
+      abortSignal?.removeEventListener("abort", onAbort);
     };
 
     const finish = (value: string | null): void => {
@@ -32,6 +34,9 @@ export async function readPersistentInput(
       rl.close();
       resolve(value);
     };
+
+    const onAbort = (): void => finish(null);
+    abortSignal?.addEventListener("abort", onAbort, { once: true });
 
     rl.on("line", (line) => {
       finish(line);
@@ -60,6 +65,7 @@ export async function readPersistentInput(
 export function createReadlineInputPort(): ShellInputPort {
   const listeners = new Set<() => void>();
   let releaseProcessInterrupt: (() => void) | null = null;
+  let activeRead: AbortController | undefined;
   const notifyInterrupt = (): void => {
     for (const listener of listeners) {
       listener();
@@ -92,7 +98,9 @@ export function createReadlineInputPort(): ShellInputPort {
 
   return {
     async readInput(promptLabel = "> ") {
-      const value = await readPersistentInput(promptLabel, notifyInterrupt);
+      activeRead = new AbortController();
+      const value = await readPersistentInput(promptLabel, notifyInterrupt, activeRead.signal);
+      activeRead = undefined;
       return value === null ? { kind: "closed" } : { kind: "submit", value };
     },
     bindInterrupt(handler) {
@@ -102,6 +110,9 @@ export function createReadlineInputPort(): ShellInputPort {
         listeners.delete(handler);
         maybeReleaseProcessInterruptBinding();
       };
+    },
+    close() {
+      activeRead?.abort();
     },
   };
 }

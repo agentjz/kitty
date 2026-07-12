@@ -1,5 +1,4 @@
 import { ControlPlaneLedger, type ExecutionRecord, type WakeSignalRecord } from "../control/ledger.js";
-import { reconcileExecutions } from "../execution/lifecycle.js";
 import type { TaskLifecycleRecord } from "../control/ledger.js";
 import { getProjectStatePaths } from "../project/statePaths.js";
 import { buildProjectMap } from "../project/map.js";
@@ -32,7 +31,6 @@ export async function buildRuntimeStatus(
   scope: { ownerSessionId?: string } = {},
 ): Promise<RuntimeStatus> {
   const paths = getProjectStatePaths(rootDir);
-  reconcileExecutions(paths.rootDir);
   const durable = readRuntimeLedgerSnapshot(paths.rootDir, scope.ownerSessionId);
 
   const [projectMap, projectContext] = await Promise.all([

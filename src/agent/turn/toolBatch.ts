@@ -30,6 +30,7 @@ export async function executeToolBatch(
     projectContext: ProjectContext;
     changeStore: ChangeStore;
     onItemSettled?: (item: BatchExecutionItem) => Promise<void>;
+    onItemStarting?: (toolCall: ToolCallRecord) => Promise<void>;
   },
 ): Promise<ExecuteToolBatchResult> {
   const items: BatchExecutionItem[] = [];
@@ -77,9 +78,14 @@ async function executeOne(
     projectContext: ProjectContext;
     changeStore: ChangeStore;
     onItemSettled?: (item: BatchExecutionItem) => Promise<void>;
+    onItemStarting?: (toolCall: ToolCallRecord) => Promise<void>;
   },
 ): Promise<BatchExecutionItem> {
   const startedAt = Date.now();
+  if (params.options.abortSignal?.aborted) {
+    throw params.options.abortSignal.reason ?? new Error("Turn aborted before tool execution.");
+  }
+  await params.onItemStarting?.(toolCall);
   const result = await executeToolCallWithRecovery(
     params.toolRegistry as ReturnType<typeof createToolRegistry>,
     toolCall,

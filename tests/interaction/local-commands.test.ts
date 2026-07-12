@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
+import { executionOwnership } from "../../src/control/types.js";
 
 import { BackgroundExecutionStore } from "../../src/execution/background.js";
 import {
@@ -76,7 +77,7 @@ test("runtime slash commands are handled locally", async (t) => {
     ownerSessionId: context.session.id,
     createdBySessionId: context.session.id,
   });
-  backgroundStore.close(execution.id, {
+  backgroundStore.close(execution.id, executionOwnership(execution), {
     status: "completed",
     output: "slash-background",
     summary: "slash-background",

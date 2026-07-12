@@ -60,15 +60,13 @@ test("telegram delivery queue sends queued files with sendDocument", async (t) =
   const sentFiles: TelegramSendDocumentRequest[] = [];
 
   const queue = new TelegramDeliveryQueue({
-    storePath: path.join(root, "delivery.json"),
-    deliveryConfig: config.telegram.delivery,
+    rootDir: root,
     target: {
       sendMessage: async (_request: TelegramSendMessageRequest) => undefined,
       sendDocument: async (request: TelegramSendDocumentRequest) => {
         sentFiles.push(request);
       },
     },
-    now: () => 1000,
   });
 
   const entry = await queue.enqueueFile({
@@ -83,7 +81,7 @@ test("telegram delivery queue sends queued files with sendDocument", async (t) =
 
   await queue.flushDue();
 
-  assert.deepEqual(sentFiles, [{
+  assert.deepEqual(sentFiles.map(({ signal: _signal, ...request }) => request), [{
     chatId: 42,
     filePath,
     fileName: "display.txt",

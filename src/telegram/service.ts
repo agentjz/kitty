@@ -25,6 +25,8 @@ import { QueuedHostMessageRecorder, resolveHostStateRoot } from "../observabilit
 import { TelegramTurnState } from "./service/turnState.js";
 import { describeIgnoredTelegramUpdate, isStopCommand } from "./service/updateClassification.js";
 import { translate } from "../i18n/index.js";
+import { ControlPlaneLedger } from "../control/ledger.js";
+import { collectRunningExecutionProcesses, terminateRunningExecutionProcesses } from "../execution/lifecycle.js";
 
 export interface TelegramServiceOptions {
   cwd: string;
@@ -107,7 +109,19 @@ export class TelegramService {
         }
       }
     } finally {
-      await this.waitForIdle();
+      const sessionIds = this.turnState.listActiveSessionIds();
+      await waitAtMost(this.waitForIdle(), 5_000);
+      const rootDir = resolveHostStateRoot(this.options.config.telegram.stateDir, this.options.cwd);
+      for (const sessionId of sessionIds) {
+        const running = collectRunningExecutionProcesses(rootDir, sessionId);
+        const result = terminateRunningExecutionProcesses(rootDir, running);
+        if (result.failedPids.length > 0) {
+          this.logger.error("shutdown process cleanup failed", {
+            sessionId,
+            detail: `pids=${result.failedPids.join(",")}`,
+          });
+        }
+      }
     }
   }
 
@@ -170,6 +184,18 @@ export class TelegramService {
     const classified = classifyTelegramUpdate(update, {
       allowedUserIds: this.options.config.telegram.allowedUserIds,
     });
+    const rootDir = resolveHostStateRoot(this.options.config.telegram.stateDir, this.options.cwd);
+    const inbox = new ControlPlaneLedger(rootDir);
+    let claimed: boolean;
+    try {
+      claimed = inbox.telegram.claimInbox(
+        update.update_id,
+        classified.kind === "ignore" ? undefined : classified.peerKey,
+      );
+    } finally {
+      inbox.close();
+    }
+    if (!claimed) return { task: null };
 
     if (classified.kind === "ignore") {
       this.logger.info("ignored inbound update", {
@@ -177,11 +203,13 @@ export class TelegramService {
         chatId: classified.chatId,
         detail: describeIgnoredTelegramUpdate(classified),
       });
+      markTelegramInbox(rootDir, update.update_id, "completed");
       return { task: null };
     }
 
     if (classified.kind === "private_message" && isStopCommand(classified.text)) {
       await this.handleStopCommand(classified);
+      markTelegramInbox(rootDir, update.update_id, "completed");
       return { task: null };
     }
 
@@ -203,7 +231,9 @@ export class TelegramService {
 
     this.turnState.incrementQueuedTurns(classified.peerKey);
     const task = this.commandQueue.enqueue(classified.peerKey, async () => {
-      await runTelegramTurn({
+      if (this.stopped) throw new Error("Telegram service stopped before queued update execution.");
+      try {
+        await runTelegramTurn({
         cwd: this.options.cwd,
         config: this.options.config,
         bot: this.options.bot,
@@ -219,7 +249,12 @@ export class TelegramService {
         consumePendingStop: (peerKey) => this.turnState.consumePendingStop(peerKey),
         onActiveTurnStart: (peerKey, activeTurn) => this.turnState.setActiveTurn(peerKey, activeTurn),
         onActiveTurnEnd: (peerKey) => this.turnState.clearActiveTurn(peerKey),
-      });
+        });
+        markTelegramInbox(rootDir, update.update_id, "completed");
+      } catch (error) {
+        markTelegramInbox(rootDir, update.update_id, "failed", error);
+        throw error;
+      }
     });
     return {
       task: this.trackTask(task, {
@@ -339,4 +374,23 @@ export class TelegramService {
     await new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+}
+
+function markTelegramInbox(rootDir: string, updateId: number, status: "completed" | "failed", error?: unknown): void {
+  const ledger = new ControlPlaneLedger(rootDir);
+  try {
+    ledger.telegram.markInbox(updateId, status, {
+      error: error instanceof Error ? error.message : error ? String(error) : undefined,
+    });
+  } finally {
+    ledger.close();
+  }
+}
+
+async function waitAtMost(promise: Promise<unknown>, timeoutMs: number): Promise<void> {
+  let timer: NodeJS.Timeout | undefined;
+  await Promise.race([
+    promise.then(() => undefined),
+    new Promise<void>((resolve) => { timer = setTimeout(resolve, timeoutMs); }),
+  ]).finally(() => { if (timer) clearTimeout(timer); });
 }

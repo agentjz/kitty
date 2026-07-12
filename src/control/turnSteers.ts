@@ -11,6 +11,7 @@ export interface TurnSteerRecord {
   input: string;
   messageId: string;
   status: TurnSteerStatus;
+  consumedGeneration?: number;
   rejectionReason?: string;
   createdAt: string;
   consumedAt?: string;
@@ -25,6 +26,7 @@ interface TurnSteerRow {
   input: string;
   message_id: string;
   status: string;
+  consumed_generation: number | null;
   rejection_reason: string | null;
   created_at: string;
   consumed_at: string | null;
@@ -94,11 +96,14 @@ export class TurnSteerLedgerRepo {
     `).all(turnId) as TurnSteerRow[]).map(fromRow);
   }
 
-  markConsumed(input: { steerId: string; turnId: string; ownerToken: string }): TurnSteerRecord {
+  markConsumed(input: { steerId: string; turnId: string; ownerToken: string; ownerGeneration: number }): TurnSteerRecord {
     const now = new Date().toISOString();
     const result = this.db.prepare(`
       UPDATE turn_steers
-      SET status = 'consumed', consumed_at = @now
+      SET status = 'consumed', consumed_at = @now,
+          consumed_generation = (
+            SELECT owner_generation FROM session_turns WHERE id = @turnId
+          )
       WHERE id = @steerId
         AND turn_id = @turnId
         AND status = 'pending'
@@ -106,13 +111,18 @@ export class TurnSteerLedgerRepo {
           SELECT 1 FROM session_turns
           WHERE id = @turnId
             AND owner_token = @ownerToken
+            AND owner_generation=@ownerGeneration
             AND status = 'running'
             AND lease_expires_at > @now
         )
     `).run({ ...input, now });
     if (result.changes !== 1) {
       const existing = this.load(input.steerId);
-      if (existing?.status === "consumed") return existing;
+      const owner = this.db.prepare(`
+        SELECT owner_generation AS generation FROM session_turns
+        WHERE id=@turnId AND owner_token=@ownerToken
+      `).get(input) as { generation: number } | undefined;
+      if (existing?.status === "consumed" && owner && existing.consumedGeneration === owner.generation) return existing;
       throw new Error(`Steer ${input.steerId} cannot be consumed without the active turn lease.`);
     }
     return this.load(input.steerId)!;
@@ -142,6 +152,7 @@ function fromRow(row: TurnSteerRow): TurnSteerRecord {
     input: row.input,
     messageId: row.message_id,
     status: row.status as TurnSteerStatus,
+    consumedGeneration: row.consumed_generation ?? undefined,
     rejectionReason: row.rejection_reason ?? undefined,
     createdAt: row.created_at,
     consumedAt: row.consumed_at ?? undefined,

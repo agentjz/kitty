@@ -50,4 +50,8 @@ export class TelegramTurnState {
       }
     }
   }
+
+  listActiveSessionIds(): string[] {
+    return [...new Set([...this.activeTurns.values()].map((turn) => turn.sessionId))];
+  }
 }

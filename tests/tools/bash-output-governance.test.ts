@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { createDefaultAgentToolRegistry } from "../../src/tools/registry.js";
+import { ControlPlaneLedger } from "../../src/control/ledger.js";
 import { createTempWorkspace, createToolContext, parseToolJson } from "../helpers.js";
 
 test("bash tool records governed output and recoverable raw output", async (t) => {
@@ -15,6 +16,12 @@ test("bash tool records governed output and recoverable raw output", async (t) =
     command: "node -e \"for (let i=0;i<900;i++) console.log('FAIL tests/demo.test.ts expected received line '+i)\"",
     timeout_ms: 30_000,
   }), context);
+  const ledger = new ControlPlaneLedger(context.projectContext.stateRootDir);
+  const executions = ledger.executions.list({ parentTurnId: context.turnId });
+  ledger.close();
+  assert.equal(executions.length, 1);
+  assert.equal(executions[0]?.kind, "foreground");
+  assert.equal(executions[0]?.status, "completed");
 
   assert.equal(result.ok, true);
   assert.ok(result.metadata?.outputGovernance);

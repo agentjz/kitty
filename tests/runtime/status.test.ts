@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
+import { executionOwnership } from "../../src/control/types.js";
 
 import { ControlPlaneLedger } from "../../src/control/ledger.js";
 import { appendObservabilityEvent } from "../../src/observability/writer.js";
@@ -221,7 +222,7 @@ test("runtime status marks lost background executions as blocked recovery work",
       cwd: root,
       requestedBy: "agent",
     });
-    ledger.executions.close(execution.id, {
+    ledger.executions.close(execution.id, executionOwnership(execution), {
       status: "lost",
       summary: "process disappeared",
     });

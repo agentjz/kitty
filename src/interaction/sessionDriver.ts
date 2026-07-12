@@ -46,6 +46,9 @@ interface ActiveTurnOperation {
   started: boolean;
 }
 
+const TURN_SHUTDOWN_GRACE_MS = 3_000;
+const HOST_SHUTDOWN_DEADLINE_MS = 8_000;
+
 export class InteractiveSessionDriver {
   private session: SessionRecord;
   private readonly activeTurns: ActiveTurnOperation[] = [];
@@ -69,9 +72,7 @@ export class InteractiveSessionDriver {
       while (true) {
         const prompt = await this.options.shell.input.readInput("> ");
         if (prompt.kind === "closed") {
-          this.abortActiveTurns(true);
-          await this.waitForActiveTurns();
-          await this.terminateOwnedProcesses();
+          await this.closeBounded();
           return this.session;
         }
 
@@ -82,9 +83,7 @@ export class InteractiveSessionDriver {
 
         const decision = await this.handleInput(input);
         if (decision === "quit") {
-          this.abortActiveTurns(true);
-          await this.waitForActiveTurns();
-          await this.terminateOwnedProcesses();
+          await this.closeBounded();
           return this.session;
         }
         if (this.exitRequested) {
@@ -116,6 +115,7 @@ export class InteractiveSessionDriver {
           return "handled";
         }
       }
+      if (command === "reset") await this.closeBounded();
     }
 
     let localCommandResult: LocalCommandResult;
@@ -160,6 +160,7 @@ export class InteractiveSessionDriver {
 
     if (active) {
       this.showInterruptNotice(this.t("interaction.interrupting"));
+      void this.detachForForcedExit().finally(() => this.options.shell.input.close?.());
       return;
     }
 
@@ -179,13 +180,18 @@ export class InteractiveSessionDriver {
   private bindProcessTerminationCleanup(): () => void {
     const signals: NodeJS.Signals[] = ["SIGHUP", "SIGTERM", "SIGBREAK"];
     const handler = (signal: NodeJS.Signals): void => {
+      const exitCode = signalExitCode(signal);
+      if (this.detachmentInProgress) process.exit(exitCode);
+      const deadline = setTimeout(() => process.exit(exitCode), HOST_SHUTDOWN_DEADLINE_MS);
+      deadline.unref();
       void this.detachForForcedExit().finally(() => {
-        process.exit(0);
+        clearTimeout(deadline);
+        process.exit(exitCode);
       });
     };
 
     for (const signal of signals) {
-      process.once(signal, handler);
+      process.on(signal, handler);
     }
 
     return () => {
@@ -202,9 +208,7 @@ export class InteractiveSessionDriver {
 
     this.detachmentInProgress = true;
     this.exitRequested = true;
-    this.abortActiveTurns(true);
-    await this.waitForActiveTurns();
-    await this.terminateOwnedProcesses();
+    await this.closeBounded();
     this.options.shell.output.info(this.t("interaction.sessionSaved"));
   }
 
@@ -215,8 +219,23 @@ export class InteractiveSessionDriver {
         this.session.id,
     );
     if (running.length > 0) {
-      await exitGuard.terminateProcesses(running, this.options.cwd);
+      const result = await exitGuard.terminateProcesses(running, this.options.cwd);
+      if (result.failedPids.length > 0) {
+        throw new Error(`Failed to terminate owned process trees: ${result.failedPids.join(", ")}`);
+      }
     }
+  }
+
+  private async closeBounded(): Promise<void> {
+    this.abortActiveTurns(true);
+    const activeTurns = this.waitForActiveTurns();
+    await Promise.allSettled([
+      waitAtMost(activeTurns, TURN_SHUTDOWN_GRACE_MS),
+      this.terminateOwnedProcesses(),
+    ]).then((results) => {
+      const cleanup = results[1];
+      if (cleanup?.status === "rejected") throw cleanup.reason;
+    });
   }
 
   private startTurn(input: string, admittedTurnId?: string): void {
@@ -433,4 +452,19 @@ function formatSubmittedInput(input: string): string {
     .split("\n")
     .map((line, index) => `${index === 0 ? "> " : "… "}${line}`)
     .join("\n");
+}
+
+async function waitAtMost(promise: Promise<unknown>, timeoutMs: number): Promise<void> {
+  let timer: NodeJS.Timeout | undefined;
+  await Promise.race([
+    promise.then(() => undefined),
+    new Promise<void>((resolve) => { timer = setTimeout(resolve, timeoutMs); }),
+  ]).finally(() => { if (timer) clearTimeout(timer); });
+}
+
+function signalExitCode(signal: NodeJS.Signals): number {
+  if (signal === "SIGHUP") return 129;
+  if (signal === "SIGTERM") return 143;
+  if (signal === "SIGBREAK") return 149;
+  return 1;
 }
