@@ -20,12 +20,16 @@ import type {
   RuntimeToolOutputSummary,
   RuntimeWakeSignalSummary,
 } from "./statusTypes.js";
+import { DEFAULT_LOCALE, type KittyLocale } from "../i18n/index.js";
 
 export type { RuntimeStatus } from "./statusTypes.js";
 
 const DEFAULT_RECENT_LIMIT = 10;
 
-export async function buildRuntimeStatus(rootDir: string): Promise<RuntimeStatus> {
+export async function buildRuntimeStatus(
+  rootDir: string,
+  locale: KittyLocale = DEFAULT_LOCALE,
+): Promise<RuntimeStatus> {
   const paths = getProjectStatePaths(rootDir);
   reconcileExecutions(paths.rootDir);
   const durable = readRuntimeLedgerSnapshot(paths.rootDir);
@@ -71,7 +75,7 @@ export async function buildRuntimeStatus(rootDir: string): Promise<RuntimeStatus
 
   return {
     ...statusWithoutScene,
-    scene: buildRuntimeScene(statusWithoutScene),
+    scene: buildRuntimeScene(statusWithoutScene, locale),
   };
 }
 

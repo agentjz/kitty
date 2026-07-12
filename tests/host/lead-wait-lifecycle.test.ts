@@ -360,7 +360,7 @@ test("host streams subagent runtime UI while lead waits then switches back to le
     [
       ["subagent", "tool_call", "read"],
       ["subagent", "assistant_text", "worker result visible"],
-      ["lead", "status", "Lead resumed after delegated execution settled."],
+      ["lead", "status", "委派执行已完成，切回主智能体。"],
     ],
   );
 });

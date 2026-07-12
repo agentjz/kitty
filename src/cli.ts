@@ -6,6 +6,9 @@ import packageJson from "../package.json";
 import { getErrorMessage } from "./agent/errors.js";
 import { formatCliSetupError } from "./cli/userFacingErrors.js";
 import type { CliProgramDependencies } from "./cli/program.js";
+import { loadDotEnvFiles } from "./config/env.js";
+import { KITTY_BASE_ENV } from "./config/envKeys.js";
+import { DEFAULT_LOCALE, parseKittyLocale, type KittyLocale } from "./i18n/index.js";
 import {
   PROJECT_STATE_DIR_NAME,
   PROJECT_STATE_ENV_FILE_NAME,
@@ -16,8 +19,8 @@ function loadCliProgramModule(): typeof import("./cli/program.js") {
   return require("./cli/program.js") as typeof import("./cli/program.js");
 }
 
-export function buildCliProgram(dependencies: CliProgramDependencies = {}) {
-  return loadCliProgramModule().buildCliProgram(dependencies);
+export function buildCliProgram(dependencies: CliProgramDependencies = {}, locale?: KittyLocale) {
+  return loadCliProgramModule().buildCliProgram(dependencies, locale);
 }
 
 export async function runCli(
@@ -25,7 +28,9 @@ export async function runCli(
   dependencies: CliProgramDependencies = {},
 ): Promise<void> {
   installStdioGuards();
-  const program = buildCliProgram(dependencies);
+  loadDotEnvFiles(readCliCwd(argv));
+  const locale = parseKittyLocale(process.env[KITTY_BASE_ENV.locale]) ?? DEFAULT_LOCALE;
+  const program = buildCliProgram(dependencies, locale);
   await program.parseAsync(argv);
 }
 
@@ -47,7 +52,8 @@ function maybeHandleEntryFastPath(argv: string[]): boolean {
 if (typeof require !== "undefined" && typeof module !== "undefined" && require.main === module) {
   if (!maybeHandleEntryFastPath(process.argv)) {
     void runCli().catch((error: unknown) => {
-      writeStderrLine(formatCliSetupError(error, readCliCwd(process.argv)) ?? getErrorMessage(error));
+      const locale = parseKittyLocale(process.env[KITTY_BASE_ENV.locale]) ?? DEFAULT_LOCALE;
+      writeStderrLine(formatCliSetupError(error, readCliCwd(process.argv), locale) ?? getErrorMessage(error));
       process.exitCode = 1;
     });
   }

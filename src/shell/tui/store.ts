@@ -3,6 +3,7 @@ import type { RuntimeStatus } from "../../runtime/status.js";
 import type { TuiActivity } from "./activity.js";
 import { projectTuiExecutionDockFacts } from "./executionDock.js";
 import { TUI_COLORS } from "./theme.js";
+import { DEFAULT_LOCALE, type KittyLocale } from "../../i18n/index.js";
 import {
   measureTranscriptRows as measureTranscriptLayoutRows,
   renderTranscriptLineViews as renderTranscriptLayoutLineViews,
@@ -31,18 +32,48 @@ export interface TuiRuntimeDockState {
 
 export interface TuiScrollState {
   offset: number;
-  stickToBottom: boolean;
-  newContentPending: boolean;
+  mode: "follow" | "detached";
+  unseenRows: number;
+  anchorLineId?: string;
+}
+
+export interface TuiSelectionPoint {
+  rowId: string;
+  column: number;
+}
+
+export interface TuiSelectionState {
+  anchor?: TuiSelectionPoint;
+  focus?: TuiSelectionPoint;
+  dragging: boolean;
+}
+
+export type TuiOverlayState =
+  | { kind: "closed" }
+  | { kind: "slashCommands"; query: string; selectedIndex: number }
+  | { kind: "commandPalette"; query: string; selectedIndex: number }
+  | { kind: "historySearch"; query: string; selectedIndex: number }
+  | { kind: "keyboardHelp"; offset: number };
+
+export interface TuiComposerState {
+  cursor: number;
+  history: string[];
+  historyIndex: number;
+  killBuffer: string;
+  promptLabel: string;
+  stashedDraft?: { cursor: number; value: string };
+  value: string;
+  visibleRows: number;
 }
 
 export interface TuiState {
+  locale: KittyLocale;
   transcript: TuiTranscriptEntry[];
   dock: TuiRuntimeDockState;
   scroll: TuiScrollState;
-  composer: {
-    promptLabel: string;
-    visibleRows: number;
-  };
+  composer: TuiComposerState;
+  overlay: TuiOverlayState;
+  selection: TuiSelectionState;
 }
 
 export interface TuiViewport {
@@ -63,8 +94,10 @@ const DEFAULT_DOCK: TuiRuntimeDockState = {
   context: "0%",
 };
 
-export function createInitialTuiState(session?: SessionRecord): TuiState {
+export function createInitialTuiState(session?: SessionRecord, locale: KittyLocale = DEFAULT_LOCALE): TuiState {
+  const history = collectSessionInputHistory(session);
   return {
+    locale,
     transcript: session ? session.messages.flatMap(toTranscriptEntry) : [],
     dock: {
       ...DEFAULT_DOCK,
@@ -72,13 +105,20 @@ export function createInitialTuiState(session?: SessionRecord): TuiState {
     },
     scroll: {
       offset: 0,
-      stickToBottom: true,
-      newContentPending: false,
+      mode: "follow",
+      unseenRows: 0,
     },
     composer: {
+      cursor: 0,
+      history,
+      historyIndex: history.length,
+      killBuffer: "",
       promptLabel: "> ",
+      value: "",
       visibleRows: 1,
     },
+    overlay: { kind: "closed" },
+    selection: { dragging: false },
   };
 }
 
@@ -94,9 +134,9 @@ export function appendTranscriptEntry(
 ): TuiState {
   const next = {
     ...state,
-    transcript: [...state.transcript, { ...entry, id: createEntryId(state.transcript.length) }],
+    transcript: [...state.transcript, { ...entry, id: createNextEntryId(state.transcript) }],
   };
-  return applyContentChange(next, viewport, options);
+  return applyContentChange(state, next, viewport, options);
 }
 
 export function appendTranscriptText(
@@ -118,7 +158,7 @@ export function appendTranscriptText(
       ...state,
       transcript: [...transcript, { ...last, text: `${last.text}${text}` }],
     };
-    return applyContentChange(next, viewport, options);
+    return applyContentChange(state, next, viewport, options);
   }
   return appendTranscriptEntry(state, { role, text }, viewport, options);
 }
@@ -154,23 +194,31 @@ export function scrollTuiTranscript(
 ): TuiState {
   const maxOffset = getMaxScrollOffset(state, viewport, options);
   const offset = clamp(state.scroll.offset + delta, 0, maxOffset);
+  const rows = renderProjectionRows(state, viewport.width, options);
+  const mode = offset >= maxOffset ? "follow" : "detached";
   return {
     ...state,
     scroll: {
       offset,
-      stickToBottom: offset >= maxOffset,
-      newContentPending: offset >= maxOffset ? false : state.scroll.newContentPending,
+      mode,
+      unseenRows: mode === "follow" ? 0 : state.scroll.unseenRows,
+      anchorLineId: mode === "detached" ? rows[offset]?.id : undefined,
     },
   };
 }
 
-export function scrollTuiTranscriptToTop(state: TuiState): TuiState {
+export function scrollTuiTranscriptToTop(
+  state: TuiState,
+  viewport: TuiViewport,
+  options: TuiProjectionOptions = {},
+): TuiState {
   return {
     ...state,
     scroll: {
       offset: 0,
-      stickToBottom: false,
-      newContentPending: state.scroll.newContentPending,
+      mode: "detached",
+      unseenRows: state.scroll.unseenRows,
+      anchorLineId: renderProjectionRows(state, viewport.width, options)[0]?.id,
     },
   };
 }
@@ -184,8 +232,9 @@ export function scrollTuiTranscriptToBottom(
     ...state,
     scroll: {
       offset: getMaxScrollOffset(state, viewport, options),
-      stickToBottom: true,
-      newContentPending: false,
+      mode: "follow",
+      unseenRows: 0,
+      anchorLineId: undefined,
     },
   };
 }
@@ -195,26 +244,36 @@ export function applyViewportResize(
   viewport: TuiViewport,
   options: TuiProjectionOptions = {},
 ): TuiState {
-  if (state.scroll.stickToBottom) {
+  if (state.scroll.mode === "follow") {
     return scrollTuiTranscriptToBottom(state, viewport, options);
   }
+  const rows = renderProjectionRows(state, viewport.width, options);
+  const anchoredOffset = state.scroll.anchorLineId
+    ? rows.findIndex((row) => row.id === state.scroll.anchorLineId)
+    : -1;
+  const offset = clamp(
+    anchoredOffset >= 0 ? anchoredOffset : state.scroll.offset,
+    0,
+    getMaxScrollOffset(state, viewport, options),
+  );
   return {
     ...state,
     scroll: {
       ...state.scroll,
-      offset: clamp(state.scroll.offset, 0, getMaxScrollOffset(state, viewport, options)),
+      offset,
+      anchorLineId: rows[offset]?.id,
     },
   };
 }
 
 export function getMaxScrollOffset(
-  state: Pick<TuiState, "transcript">,
+  state: Pick<TuiState, "transcript" | "locale">,
   viewport: TuiViewport,
   options: TuiProjectionOptions = {},
 ): number {
   const rows = options.projection
     ? options.projection.measureRows(state.transcript, viewport.width)
-    : measureTranscriptRows(state.transcript, viewport.width);
+    : measureTranscriptRows(state.transcript, viewport.width, state.locale);
   return Math.max(0, rows - viewport.height);
 }
 
@@ -225,25 +284,34 @@ export function getVisibleTranscriptRows(
 ): string[] {
   const rows = options.projection
     ? options.projection.renderLineViews(state.transcript, viewport.width)
-    : renderTranscriptLineViews(state.transcript, viewport.width);
+    : renderTranscriptLineViews(state.transcript, viewport.width, state.locale);
   return rows
     .slice(state.scroll.offset, state.scroll.offset + viewport.height)
     .map((line) => line.text);
 }
 
-export function renderTranscriptRows(entries: readonly TuiTranscriptEntry[], width: number): string[] {
-  return renderTranscriptLayoutRows(entries, width, TUI_COLORS);
+export function renderTranscriptRows(
+  entries: readonly TuiTranscriptEntry[],
+  width: number,
+  locale: KittyLocale = DEFAULT_LOCALE,
+): string[] {
+  return renderTranscriptLayoutRows(entries, width, TUI_COLORS, locale);
 }
 
-export function measureTranscriptRows(entries: readonly TuiTranscriptEntry[], width: number): number {
-  return measureTranscriptLayoutRows(entries, width, TUI_COLORS);
+export function measureTranscriptRows(
+  entries: readonly TuiTranscriptEntry[],
+  width: number,
+  locale: KittyLocale = DEFAULT_LOCALE,
+): number {
+  return measureTranscriptLayoutRows(entries, width, TUI_COLORS, locale);
 }
 
 export function renderTranscriptLineViews(
   entries: readonly TuiTranscriptEntry[],
   width: number,
+  locale: KittyLocale = DEFAULT_LOCALE,
 ): TuiTranscriptLineView[] {
-  return renderTranscriptLayoutLineViews(entries, width, TUI_COLORS);
+  return renderTranscriptLayoutLineViews(entries, width, TUI_COLORS, locale);
 }
 
 export function formatContextBudget(session: Pick<SessionRecord, "contextBudget"> | undefined): string {
@@ -253,6 +321,20 @@ export function formatContextBudget(session: Pick<SessionRecord, "contextBudget"
   }
   const percent = Math.round(budget.usageRatio * 100);
   return `${budget.estimatedChars}/${budget.limitChars} chars (${percent}%)`;
+}
+
+export function updateOverlayState(state: TuiState, overlay: TuiOverlayState): TuiState {
+  return {
+    ...state,
+    overlay,
+  };
+}
+
+export function updateSelectionState(state: TuiState, selection: TuiSelectionState): TuiState {
+  return {
+    ...state,
+    selection,
+  };
 }
 
 export function projectRuntimeStatusToDock(
@@ -266,18 +348,29 @@ export function projectRuntimeStatusToDock(
 }
 
 function applyContentChange(
+  previous: TuiState,
   state: TuiState,
   viewport: TuiViewport,
   options: TuiProjectionOptions,
 ): TuiState {
-  if (state.scroll.stickToBottom) {
+  if (previous.scroll.mode === "follow") {
     return scrollTuiTranscriptToBottom(state, viewport, options);
   }
+  const previousRows = renderProjectionRows(previous, viewport.width, options);
+  const rows = renderProjectionRows(state, viewport.width, options);
+  const anchoredOffset = previous.scroll.anchorLineId
+    ? rows.findIndex((row) => row.id === previous.scroll.anchorLineId)
+    : -1;
   return {
     ...state,
     scroll: {
-      ...state.scroll,
-      newContentPending: true,
+      ...previous.scroll,
+      offset: clamp(
+        anchoredOffset >= 0 ? anchoredOffset : previous.scroll.offset,
+        0,
+        Math.max(0, rows.length - viewport.height),
+      ),
+      unseenRows: previous.scroll.unseenRows + Math.max(1, rows.length - previousRows.length),
     },
   };
 }
@@ -295,6 +388,25 @@ function toTranscriptEntry(message: StoredMessage, index: number): TuiTranscript
   return [];
 }
 
+function renderProjectionRows(
+  state: Pick<TuiState, "transcript" | "locale">,
+  width: number,
+  options: TuiProjectionOptions,
+): TuiTranscriptLineView[] {
+  return options.projection
+    ? options.projection.renderLineViews(state.transcript, width)
+    : renderTranscriptLineViews(state.transcript, width, state.locale);
+}
+
+function collectSessionInputHistory(session: SessionRecord | undefined): string[] {
+  if (!session) {
+    return [];
+  }
+  return session.messages
+    .filter((message) => message.role === "user" && message.source !== "internal" && Boolean(message.content?.trim()))
+    .map((message) => message.content!.trim());
+}
+
 export function parseSubmittedInputEcho(text: string): string | undefined {
   const lines = text.split(/\r?\n/);
   if (lines.length === 0 || !lines[0]?.startsWith("> ")) {
@@ -309,6 +421,14 @@ export function parseSubmittedInputEcho(text: string): string | undefined {
 
 function createEntryId(index: number): string {
   return `entry-${index + 1}`;
+}
+
+function createNextEntryId(entries: readonly TuiTranscriptEntry[]): string {
+  const nextIndex = entries.reduce((maximum, entry) => {
+    const match = /^entry-(\d+)$/.exec(entry.id);
+    return match ? Math.max(maximum, Number(match[1])) : maximum;
+  }, 0) + 1;
+  return `entry-${nextIndex}`;
 }
 
 function clamp(value: number, min: number, max: number): number {

@@ -30,6 +30,8 @@ function formatCommonEnvSections(input: {
   const activeTelegramAllowedUsers = "";
   return [
     "# Agent profile",
+    "# Locale: zh-CN, zh-TW, en, ja, ko, es, pt-BR, fr, de, ru, ar, hi",
+    `${KITTY_ENV.locale}=${input.initialConfig.locale}`,
     `${KITTY_ENV.profile}=${input.initialConfig.profile}`,
     "",
     "# Active provider",

@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import { KITTY_BASE_ENV, KITTY_ENV } from "./envKeys.js";
 import { getProviderPresetBaseUrl, PROVIDER_PRESETS } from "./providerPresets.js";
 import { resolveModelProfile } from "../provider/catalog.js";
+import { DEFAULT_LOCALE, translate, type KittyLocale } from "../i18n/index.js";
 import {
   PROJECT_STATE_DIR_NAME,
   PROJECT_STATE_ENV_EXAMPLE_FILE_NAME,
@@ -30,8 +31,17 @@ export interface ConfigPreflightReport {
     apiKeyPresent: boolean;
   };
   ready: boolean;
-  nextSteps: string[];
+  nextSteps: ConfigPreflightNextStep[];
 }
+
+export type ConfigPreflightNextStep =
+  | "run_init"
+  | "fill_missing"
+  | "set_api_key"
+  | "rerun_doctor"
+  | "verify_provider"
+  | "start_kitty"
+  | "review_env";
 
 export interface ConfigPreflightFile {
   path: string;
@@ -86,25 +96,28 @@ export async function inspectConfigPreflight(rootDir: string): Promise<ConfigPre
   };
 }
 
-export function formatConfigPreflightReport(report: ConfigPreflightReport): string[] {
+export function formatConfigPreflightReport(
+  report: ConfigPreflightReport,
+  locale: KittyLocale = DEFAULT_LOCALE,
+): string[] {
   return [
-    `project: ${report.rootDir}`,
-    `state: ${report.kittyDir}`,
-    ...report.files.map((file) => `file: ${file.exists ? "ok" : "missing"} ${file.path}`),
-    `env keys: ${report.env.activeKeys.length} active / ${readExpectedEnvKeys().length} expected`,
-    report.env.missingKeys.length > 0 ? `missing keys: ${report.env.missingKeys.join(", ")}` : "missing keys: none",
-    `provider: ${report.env.provider || "(missing)"}`,
-    `model: ${report.env.model || "(missing)"}`,
-    `baseUrl: ${report.env.baseUrl || "(missing)"}`,
-    `provider preset: ${formatProviderPresetFact(report)}`,
-    `provider profile: ${report.env.providerProfile ?? "(unresolved)"}`,
-    `model profile: ${report.env.modelProfile ?? "(unresolved)"}`,
-    `wire API: ${report.env.wireApi ?? "(unresolved)"}`,
-    report.env.catalogError ? `catalog: ${report.env.catalogError}` : "catalog: ok",
-    `api key: ${report.env.apiKeyPresent ? "present" : "missing"}`,
-    `preflight: ${report.ready ? "ready" : "not_ready"}`,
-    "next:",
-    ...report.nextSteps.map((step) => `- ${step}`),
+    `${translate(locale, "preflight.project")}: ${report.rootDir}`,
+    `${translate(locale, "preflight.state")}: ${report.kittyDir}`,
+    ...report.files.map((file) => `${translate(locale, "preflight.file")}: ${translate(locale, file.exists ? "common.ok" : "common.missing")} ${file.path}`),
+    `${translate(locale, "preflight.envKeys")}: ${translate(locale, "preflight.activeExpected", { active: report.env.activeKeys.length, expected: readExpectedEnvKeys().length })}`,
+    `${translate(locale, "preflight.missingKeys")}: ${report.env.missingKeys.length > 0 ? report.env.missingKeys.join(", ") : translate(locale, "common.none")}`,
+    `${translate(locale, "preflight.provider")}: ${report.env.provider || translate(locale, "common.missing")}`,
+    `${translate(locale, "preflight.model")}: ${report.env.model || translate(locale, "common.missing")}`,
+    `${translate(locale, "preflight.baseUrl")}: ${report.env.baseUrl || translate(locale, "common.missing")}`,
+    `${translate(locale, "preflight.providerPreset")}: ${formatProviderPresetFact(report, locale)}`,
+    `${translate(locale, "preflight.providerProfile")}: ${report.env.providerProfile ?? translate(locale, "common.unresolved")}`,
+    `${translate(locale, "preflight.modelProfile")}: ${report.env.modelProfile ?? translate(locale, "common.unresolved")}`,
+    `${translate(locale, "preflight.wireApi")}: ${report.env.wireApi ?? translate(locale, "common.unresolved")}`,
+    `${translate(locale, "preflight.catalog")}: ${report.env.catalogError ?? translate(locale, "common.ok")}`,
+    `${translate(locale, "preflight.apiKey")}: ${translate(locale, report.env.apiKeyPresent ? "common.present" : "common.missing")}`,
+    `${translate(locale, "preflight.status")}: ${translate(locale, report.ready ? "common.ready" : "common.notReady")}`,
+    `${translate(locale, "preflight.next")}:`,
+    ...report.nextSteps.map((step) => `- ${formatPreflightNextStep(step, locale)}`),
   ];
 }
 
@@ -113,20 +126,20 @@ function buildPreflightNextSteps(input: {
   missingKeys: readonly string[];
   apiKeyPresent: boolean;
   ready: boolean;
-}): string[] {
+}): ConfigPreflightNextStep[] {
   if (!input.filesReady) {
-    return ["run `kitty init` to create the local .kitty files"];
+    return ["run_init"];
   }
   if (input.missingKeys.length > 0) {
-    return ["open `.kitty/.env` and fill the missing keys", "rerun `kitty doctor`"];
+    return ["fill_missing", "rerun_doctor"];
   }
   if (!input.apiKeyPresent) {
-    return ["set `KITTY_API_KEY` in `.kitty/.env`", "rerun `kitty doctor`"];
+    return ["set_api_key", "rerun_doctor"];
   }
   if (input.ready) {
-    return ["run `kitty doctor` to verify provider connectivity", "start Kitty with `kitty`"];
+    return ["verify_provider", "start_kitty"];
   }
-  return ["review `.kitty/.env`", "rerun `kitty doctor`"];
+  return ["review_env", "rerun_doctor"];
 }
 
 function readExpectedEnvKeys(): string[] {
@@ -193,14 +206,27 @@ function readCatalogProfile(input: {
   }
 }
 
-function formatProviderPresetFact(report: ConfigPreflightReport): string {
+function formatProviderPresetFact(report: ConfigPreflightReport, locale: KittyLocale): string {
   if (report.env.providerPreset) {
     return report.env.providerPreset;
   }
   if (report.env.provider || report.env.model || report.env.baseUrl) {
-    return "custom";
+    return translate(locale, "common.custom");
   }
-  return "missing";
+  return translate(locale, "common.missing");
+}
+
+function formatPreflightNextStep(step: ConfigPreflightNextStep, locale: KittyLocale): string {
+  const key = {
+    run_init: "preflight.runInit",
+    fill_missing: "preflight.fillMissing",
+    set_api_key: "preflight.setApiKey",
+    rerun_doctor: "preflight.rerunDoctor",
+    verify_provider: "preflight.verifyProvider",
+    start_kitty: "preflight.startKitty",
+    review_env: "preflight.reviewEnv",
+  } as const;
+  return translate(locale, key[step]);
 }
 
 async function exists(targetPath: string): Promise<boolean> {

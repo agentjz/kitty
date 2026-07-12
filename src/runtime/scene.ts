@@ -4,45 +4,49 @@ import type {
   RuntimeSceneSummary,
   RuntimeStatus,
 } from "./statusTypes.js";
+import { DEFAULT_LOCALE, translate, type KittyLocale } from "../i18n/index.js";
 
 type RuntimeStatusFacts = Omit<RuntimeStatus, "scene">;
 
-export function buildRuntimeScene(status: RuntimeStatusFacts): RuntimeSceneSummary {
-  const executions = readSceneExecutions(status);
+export function buildRuntimeScene(
+  status: RuntimeStatusFacts,
+  locale: KittyLocale = DEFAULT_LOCALE,
+): RuntimeSceneSummary {
+  const executions = readSceneExecutions(status, locale);
   const blockedExecutions = executions.filter((execution) => execution.risk === "blocked");
   const watchExecutions = executions.filter((execution) => execution.risk === "watch");
   const activeBackground = executions.filter((execution) => execution.kind === "background");
   const blockedBackground = activeBackground.filter((execution) => execution.risk !== "none");
 
   return {
-    headline: buildHeadline(status, blockedExecutions, watchExecutions),
-    focus: readFocus(status),
-    nextAction: readNextAction(status, blockedExecutions, watchExecutions),
-    blocked: readBlocked(blockedExecutions),
-    cost: readCost(status),
-    toolOutputs: readToolOutputs(status),
-    recovery: readRecovery(status, executions),
+    headline: buildHeadline(status, blockedExecutions, watchExecutions, locale),
+    focus: readFocus(status, locale),
+    nextAction: readNextAction(status, blockedExecutions, watchExecutions, locale),
+    blocked: readBlocked(blockedExecutions, locale),
+    cost: readCost(status, locale),
+    toolOutputs: readToolOutputs(status, locale),
+    recovery: readRecovery(status, executions, locale),
     skills: {
       ready: status.skills.ready,
       total: status.skills.total,
-      nextAction: readSkillsNextAction(status),
+      nextAction: readSkillsNextAction(status, locale),
     },
     background: {
       active: activeBackground.length,
       blocked: blockedBackground.length,
-      nextAction: readBackgroundNextAction(activeBackground),
+      nextAction: readBackgroundNextAction(activeBackground, locale),
     },
     executions,
   };
 }
 
-function readSceneExecutions(status: RuntimeStatusFacts): RuntimeExecutionSceneSummary[] {
+function readSceneExecutions(status: RuntimeStatusFacts, locale: KittyLocale): RuntimeExecutionSceneSummary[] {
   const byId = new Map<string, RuntimeExecutionSceneSummary>();
   for (const execution of status.executions.active) {
-    byId.set(execution.id, buildExecutionScene(execution));
+    byId.set(execution.id, buildExecutionScene(execution, locale));
   }
   for (const execution of status.executions.recent) {
-    const scene = buildExecutionScene(execution);
+    const scene = buildExecutionScene(execution, locale);
     if (scene.risk !== "none" && !byId.has(scene.id)) {
       byId.set(scene.id, scene);
     }
@@ -50,16 +54,19 @@ function readSceneExecutions(status: RuntimeStatusFacts): RuntimeExecutionSceneS
   return [...byId.values()];
 }
 
-export function buildExecutionScene(execution: RuntimeExecutionSummary): RuntimeExecutionSceneSummary {
+export function buildExecutionScene(
+  execution: RuntimeExecutionSummary,
+  locale: KittyLocale = DEFAULT_LOCALE,
+): RuntimeExecutionSceneSummary {
   const risk = readExecutionRisk(execution);
   return {
     id: execution.id,
     kind: execution.kind,
     status: execution.status,
-    health: execution.health?.message ?? `Execution is ${execution.status}.`,
+    health: execution.health?.message ?? translate(locale, "scene.executionState", { status: execution.status }),
     risk,
-    summary: readExecutionSummary(execution),
-    nextAction: readExecutionNextAction(execution, risk),
+    summary: readExecutionSummary(execution, locale),
+    nextAction: readExecutionNextAction(execution, risk, locale),
     lastOutput: execution.outputPreview ? truncateText(execution.outputPreview, 160) : undefined,
   };
 }
@@ -68,29 +75,30 @@ function buildHeadline(
   status: RuntimeStatusFacts,
   blockedExecutions: RuntimeExecutionSceneSummary[],
   watchExecutions: RuntimeExecutionSceneSummary[],
+  locale: KittyLocale,
 ): string {
   if (blockedExecutions.length > 0) {
     return blockedExecutions.length === 1
-      ? "One delegated task needs attention."
-      : `${blockedExecutions.length} delegated tasks need attention.`;
+      ? translate(locale, "scene.headline.blockedOne")
+      : translate(locale, "scene.headline.blockedMany", { count: blockedExecutions.length });
   }
   if (watchExecutions.length > 0) {
     return watchExecutions.length === 1
-      ? "One delegated task is running without output yet."
-      : `${watchExecutions.length} delegated tasks are running without output yet.`;
+      ? translate(locale, "scene.headline.watchOne")
+      : translate(locale, "scene.headline.watchMany", { count: watchExecutions.length });
   }
   if (status.executions.active.length > 0) {
     return status.executions.active.length === 1
-      ? "One delegated task is running."
-      : `${status.executions.active.length} delegated tasks are running.`;
+      ? translate(locale, "scene.headline.activeOne")
+      : translate(locale, "scene.headline.activeMany", { count: status.executions.active.length });
   }
   if (!status.sessions.latest) {
-    return "No session has started yet.";
+    return translate(locale, "scene.headline.noSession");
   }
-  return "Latest session is ready.";
+  return translate(locale, "scene.headline.ready");
 }
 
-function readFocus(status: RuntimeStatusFacts): string {
+function readFocus(status: RuntimeStatusFacts, locale: KittyLocale): string {
   const focus = status.sessions.latest?.focus;
   if (focus) {
     return truncateText(focus, 120);
@@ -99,59 +107,63 @@ function readFocus(status: RuntimeStatusFacts): string {
   if (title) {
     return truncateText(title, 120);
   }
-  return "No current focus yet.";
+  return translate(locale, "scene.noFocus");
 }
 
 function readNextAction(
   status: RuntimeStatusFacts,
   blockedExecutions: RuntimeExecutionSceneSummary[],
   watchExecutions: RuntimeExecutionSceneSummary[],
+  locale: KittyLocale,
 ): string {
   const urgent = blockedExecutions[0] ?? watchExecutions[0];
   if (urgent) {
     return urgent.nextAction;
   }
   if (status.executions.active.length > 0) {
-    return "Wait for the active task, or inspect it with `kitty status` / `kitty execution`.";
+    return translate(locale, "scene.next.wait");
   }
   if (!status.sessions.latest) {
-    return "Start a session with `kitty`.";
+    return translate(locale, "scene.next.start");
   }
-  return "Continue from the latest session.";
+  return translate(locale, "scene.next.continue");
 }
 
-function readBlocked(blockedExecutions: RuntimeExecutionSceneSummary[]): string {
+function readBlocked(blockedExecutions: RuntimeExecutionSceneSummary[], locale: KittyLocale): string {
   if (blockedExecutions.length === 0) {
-    return "No blockers visible.";
+    return translate(locale, "scene.noBlockers");
   }
   return blockedExecutions
     .slice(0, 3)
-    .map((execution) => `${readExecutionKindLabel(execution.kind)} ${execution.id}: ${execution.health}`)
+    .map((execution) => `${readExecutionKindLabel(execution.kind, locale)} ${execution.id}: ${execution.health}`)
     .join(" | ");
 }
 
-function readCost(status: RuntimeStatusFacts): string {
+function readCost(status: RuntimeStatusFacts, locale: KittyLocale): string {
   const budget = status.sessions.latest?.contextBudget;
   const latest = status.modelRequests.recent[0];
   const budgetText = budget
-    ? `${Math.round(budget.usageRatio * 100)}% context${budget.compressed ? ", compressed" : ""}`
-    : "Context has not been measured yet";
+    ? translate(locale, "scene.cost.context", {
+        percent: Math.round(budget.usageRatio * 100),
+        compressed: budget.compressed ? translate(locale, "scene.cost.compressed") : "",
+      })
+    : translate(locale, "scene.contextUnmeasured");
   const layout = budget?.cacheLayout;
   const layoutText = layout
-    ? `stable ${readStableRatio(layout.stablePrefixChars, layout.volatileTailChars)}`
+    ? translate(locale, "scene.cost.stable", { ratio: readStableRatio(layout.stablePrefixChars, layout.volatileTailChars) })
     : undefined;
   const usageText = latest?.usage
-    ? readUsageCost(latest.usage)
+    ? readUsageCost(latest.usage, locale)
     : latest
-      ? "provider usage unavailable"
-      : "No model request recorded yet";
+      ? translate(locale, "scene.providerUsageUnavailable")
+      : translate(locale, "scene.noModelRequest");
   return [budgetText, layoutText, usageText].filter(Boolean).join("; ");
 }
 
-function readToolOutputs(status: RuntimeStatusFacts): string {
+function readToolOutputs(status: RuntimeStatusFacts, locale: KittyLocale): string {
   const recent = status.toolOutputs.recent;
   if (recent.length === 0) {
-    return "Tool output has not needed projection yet";
+    return translate(locale, "scene.noToolProjection");
   }
 
   const saved = recent.reduce((total, item) => total + (item.savedTokens ?? 0), 0);
@@ -162,10 +174,10 @@ function readToolOutputs(status: RuntimeStatusFacts): string {
     .sort((a, b) => (b.savedTokens ?? 0) - (a.savedTokens ?? 0))[0];
 
   return [
-    `${recent.length} recent`,
-    `${saved} tokens saved est.`,
-    truncated > 0 ? `${truncated} recoverable` : undefined,
-    degraded > 0 ? `${degraded} degraded` : undefined,
+    translate(locale, "scene.tool.recent", { count: recent.length }),
+    translate(locale, "scene.tool.saved", { count: saved }),
+    truncated > 0 ? translate(locale, "scene.tool.recoverable", { count: truncated }) : undefined,
+    degraded > 0 ? translate(locale, "scene.tool.degraded", { count: degraded }) : undefined,
     best ? `top=${best.toolName ?? "tool"}:${best.kind ?? "output"}` : undefined,
   ].filter(Boolean).join("; ");
 }
@@ -175,44 +187,53 @@ function readStableRatio(stableChars: number, volatileChars: number): string {
   return total > 0 ? `${Math.round((stableChars / total) * 100)}%` : "not measured";
 }
 
-function readUsageCost(usage: NonNullable<RuntimeStatus["modelRequests"]["recent"][number]["usage"]>): string {
+function readUsageCost(
+  usage: NonNullable<RuntimeStatus["modelRequests"]["recent"][number]["usage"]>,
+  locale: KittyLocale,
+): string {
   const cached = usage.cacheHitTokens ?? usage.cacheReadTokens;
-  const hitRate = usage.cacheHitRate === undefined ? undefined : `${Math.round(usage.cacheHitRate * 100)}% hit`;
+  const hitRate = usage.cacheHitRate === undefined
+    ? undefined
+    : translate(locale, "scene.cost.cacheHit", { percent: Math.round(usage.cacheHitRate * 100) });
   return [
-    usage.totalTokens === undefined ? undefined : `${usage.totalTokens} tokens`,
-    cached === undefined ? "cache unknown" : `${cached} cached`,
+    usage.totalTokens === undefined ? undefined : translate(locale, "scene.cost.totalTokens", { count: usage.totalTokens }),
+    cached === undefined ? translate(locale, "scene.cost.cacheUnknown") : translate(locale, "scene.cost.cached", { count: cached }),
     hitRate,
   ].filter(Boolean).join(", ");
 }
 
-function readRecovery(status: RuntimeStatusFacts, executions: RuntimeExecutionSceneSummary[]): string {
+function readRecovery(
+  status: RuntimeStatusFacts,
+  executions: RuntimeExecutionSceneSummary[],
+  locale: KittyLocale,
+): string {
   const risky = executions.filter((execution) => execution.risk !== "none").length;
   if (risky > 0) {
     return risky === 1
-      ? "One delegated task needs recovery attention."
-      : `${risky} delegated tasks need recovery attention.`;
+      ? translate(locale, "scene.recoveryOne")
+      : translate(locale, "scene.recoveryMany", { count: risky });
   }
   if (status.wakeSignals.recent.length > 0) {
     return status.wakeSignals.recent.length === 1
-      ? "One wake signal is recorded."
-      : `${status.wakeSignals.recent.length} wake signals are recorded.`;
+      ? translate(locale, "scene.wakeOne")
+      : translate(locale, "scene.wakeMany", { count: status.wakeSignals.recent.length });
   }
-  return "Recovery is clear.";
+  return translate(locale, "scene.recoveryClear");
 }
 
-function readSkillsNextAction(status: RuntimeStatusFacts): string {
+function readSkillsNextAction(status: RuntimeStatusFacts, locale: KittyLocale): string {
   if (status.skills.total === 0) {
-    return "No runtime skills are discovered in this project.";
+    return translate(locale, "scene.noSkills");
   }
   if (status.skills.needsAttention.length > 0) {
-    return "Inspect skill issues before relying on those skills.";
+    return translate(locale, "scene.skillIssues");
   }
-  return "Skills are ready; load full skill content only when needed.";
+  return translate(locale, "scene.skillsReady");
 }
 
-function readBackgroundNextAction(backgrounds: RuntimeExecutionSceneSummary[]): string {
+function readBackgroundNextAction(backgrounds: RuntimeExecutionSceneSummary[], locale: KittyLocale): string {
   if (backgrounds.length === 0) {
-    return "No background work is running.";
+    return translate(locale, "scene.noBackground");
   }
   const blocked = backgrounds.find((execution) => execution.risk === "blocked");
   if (blocked) {
@@ -222,7 +243,7 @@ function readBackgroundNextAction(backgrounds: RuntimeExecutionSceneSummary[]): 
   if (watch) {
     return watch.nextAction;
   }
-  return "Background work is running; wait or inspect latest output.";
+  return translate(locale, "scene.backgroundRunning");
 }
 
 function readExecutionRisk(execution: RuntimeExecutionSummary): RuntimeExecutionSceneSummary["risk"] {
@@ -239,7 +260,7 @@ function readExecutionRisk(execution: RuntimeExecutionSummary): RuntimeExecution
   }
 }
 
-function readExecutionSummary(execution: RuntimeExecutionSummary): string {
+function readExecutionSummary(execution: RuntimeExecutionSummary, locale: KittyLocale): string {
   if (execution.assignment?.objective) {
     return truncateText(execution.assignment.objective, 120);
   }
@@ -249,42 +270,47 @@ function readExecutionSummary(execution: RuntimeExecutionSummary): string {
   if (execution.command) {
     return truncateText(execution.command, 120);
   }
-  return `${readExecutionKindLabel(execution.kind)} task`;
+  return translate(locale, "scene.executionTask", { kind: readExecutionKindLabel(execution.kind, locale) });
 }
 
 function readExecutionNextAction(
   execution: RuntimeExecutionSummary,
   risk: RuntimeExecutionSceneSummary["risk"],
+  locale: KittyLocale,
 ): string {
   if (execution.kind === "background") {
     if (risk === "blocked") {
-      return `Inspect output with \`kitty background read ${execution.id}\` or stop with \`kitty background stop ${execution.id}\`.`;
+      return translate(locale, "scene.execution.backgroundBlocked", { id: execution.id });
     }
     if (risk === "watch") {
-      return `Wait for first output or inspect with \`kitty background read ${execution.id}\`.`;
+      return translate(locale, "scene.execution.backgroundWatch", { id: execution.id });
     }
-    return `Inspect with \`kitty background read ${execution.id}\` or \`kitty background wait ${execution.id}\` if you need the result now.`;
+    return translate(locale, "scene.execution.backgroundActive", { id: execution.id });
   }
   if (risk === "blocked") {
-    return `Inspect ${readExecutionKindLabel(execution.kind)} ${execution.id} before continuing.`;
+    return translate(locale, "scene.execution.inspectBeforeContinue", {
+      kind: readExecutionKindLabel(execution.kind, locale), id: execution.id,
+    });
   }
   if (risk === "watch") {
-    return `Watch ${readExecutionKindLabel(execution.kind)} ${execution.id} for output or deadline.`;
+    return translate(locale, "scene.execution.watch", {
+      kind: readExecutionKindLabel(execution.kind, locale), id: execution.id,
+    });
   }
   if (execution.waitPolicy === "while_execution_active") {
-    return "Lead should wait for this task to finish.";
+    return translate(locale, "scene.leadWait");
   }
-  return "Task is active.";
+  return translate(locale, "scene.taskActive");
 }
 
-function readExecutionKindLabel(kind: string): string {
+function readExecutionKindLabel(kind: string, locale: KittyLocale): string {
   switch (kind) {
     case "background":
-      return "background";
+      return translate(locale, "scene.kind.background");
     case "subagent":
-      return "subagent";
+      return translate(locale, "scene.kind.subagent");
     default:
-      return "delegated";
+      return translate(locale, "scene.kind.delegated");
   }
 }
 

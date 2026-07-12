@@ -2,10 +2,12 @@ import type { Command } from "commander";
 
 import type { CliOverrides, RuntimeConfig } from "../../types.js";
 import { runExecutionWorker } from "../../execution/worker.js";
+import { translate, type KittyLocale } from "../../i18n/index.js";
 
 export function registerWorkerCommand(
   program: Command,
   options: {
+    locale: KittyLocale;
     getCliOverrides: () => CliOverrides;
     resolveRuntime: (overrides: CliOverrides) => Promise<{
       cwd: string;
@@ -19,7 +21,7 @@ export function registerWorkerCommand(
 
   worker
     .command("run")
-    .requiredOption("--execution-id <id>", "Execution id to run")
+    .requiredOption("--execution-id <id>", translate(options.locale, "cli.argument.executionId"))
     .action(async (commandOptions: { executionId: string }) => {
       const runtime = await options.resolveRuntime(options.getCliOverrides());
       await runExecutionWorker({

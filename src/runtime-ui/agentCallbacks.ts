@@ -6,7 +6,7 @@ import { createRuntimeUiTerminalRenderer } from "./terminalRenderer.js";
 export function createRuntimeUiAgentCallbacks(input: {
   channel: RuntimeUiChannel;
   cwd: string;
-  config: Pick<RuntimeConfig, "showReasoning"> & { terminalVerbosity?: "minimal" | "normal" | "verbose" };
+  config: Pick<RuntimeConfig, "locale" | "showReasoning"> & { terminalVerbosity?: "minimal" | "normal" | "verbose" };
   abortSignal?: AbortSignal;
   assistantLeadingBlankLine?: boolean;
   assistantTrailingNewlines?: string;
@@ -20,6 +20,7 @@ export function createRuntimeUiAgentCallbacks(input: {
   const renderer = createRuntimeUiTerminalRenderer({
     cwd: input.cwd,
     showReasoning: input.config.showReasoning,
+    locale: input.config.locale,
     terminalVerbosity: input.config.terminalVerbosity,
     assistantLeadingBlankLine: input.assistantLeadingBlankLine,
     assistantTrailingNewlines: input.assistantTrailingNewlines,

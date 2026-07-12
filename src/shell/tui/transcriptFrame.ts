@@ -50,7 +50,7 @@ export function readTranscriptRoleStyle(role: TuiTranscriptRole, theme: TuiTrans
         text: role === "subagent_reasoning" ? theme.subagent : theme.reasoning,
         bold: false,
         dim: false,
-        italicPrefix: true,
+        italicPrefix: false,
       };
     case "system":
       return {

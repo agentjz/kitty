@@ -3,6 +3,7 @@ import type { SessionStoreLike } from "../session/index.js";
 import type { RuntimeConfig, SessionRecord } from "../types.js";
 import { runHostTurn } from "./turn.js";
 import type { HostTurnDependencies } from "./types.js";
+import { translate } from "../i18n/index.js";
 
 export interface BoundHostTurnDisplay {
   noteTerminalState?(): void;
@@ -85,15 +86,16 @@ export async function runBoundHostTurn<TActiveTurn>(
 
     if (outcome.status === "aborted") {
       options.display.noteTerminalState?.();
-      options.output.warn(outcome.errorMessage ?? "Turn interrupted. You can keep chatting.");
+      options.output.warn(outcome.errorMessage ?? translate(options.config.locale, "interaction.turnInterrupted"));
       options.onAborted?.(session);
       return session;
     }
 
     options.display.noteTerminalState?.();
-    options.output.error(outcome.errorMessage ?? "The request failed.");
-    options.output.info("The request failed, but the session is still alive. You can keep chatting.");
-    options.onFailed?.(outcome.errorMessage ?? "The request failed.", session);
+    const requestFailed = translate(options.config.locale, "interaction.requestFailed");
+    options.output.error(outcome.errorMessage ?? requestFailed);
+    options.output.info(translate(options.config.locale, "interaction.sessionAlive"));
+    options.onFailed?.(outcome.errorMessage ?? requestFailed, session);
     return session;
   } finally {
     options.onActiveTurnEnd();

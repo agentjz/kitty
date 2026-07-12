@@ -98,17 +98,7 @@ function readActivityKind(name: string, channel: RuntimeUiChannel): TuiActivityK
 
 function normalizeStatusMessage(message: string): string | undefined {
   const trimmed = message.trim();
-  if (!trimmed) {
-    return undefined;
-  }
-  switch (trimmed) {
-    case "Lead yielded. Waiting for delegated execution wake signal.":
-      return "等待子代理完成";
-    case "Lead resumed after delegated execution settled.":
-      return "子代理已完成，切回 lead";
-    default:
-      return trimmed;
-  }
+  return trimmed || undefined;
 }
 
 function readRunningSummary(name: string, rawOutput: string, fallback: string): string | undefined {

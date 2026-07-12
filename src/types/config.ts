@@ -1,5 +1,6 @@
 import type { TelegramConfig, TelegramRuntimeConfig } from "../config/hosts.js";
 import type { ExtensionToggleConfig } from "../config/extensions.js";
+import type { KittyLocale } from "../i18n/index.js";
 
 export type ModelThinkingMode = "enabled" | "disabled";
 export type ModelReasoningEffort = "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
@@ -14,6 +15,7 @@ export interface AppPaths {
 }
 
 export interface AppConfig {
+  locale: KittyLocale;
   provider: string;
   baseUrl: string;
   model: string;

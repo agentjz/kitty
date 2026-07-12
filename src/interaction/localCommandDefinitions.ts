@@ -1,6 +1,7 @@
+import { DEFAULT_LOCALE, translate, type KittyLocale, type MessageKey } from "../i18n/index.js";
+
 export type LocalCommandId =
   | "background"
-  | "clear"
   | "config"
   | "copy"
   | "doctor"
@@ -21,9 +22,13 @@ export interface LocalCommandDefinition {
   category: LocalCommandCategory;
   aliases: readonly string[];
   slashName: string;
-  description: string;
+  descriptionKey: MessageKey;
   helpLabel: string;
-  helpText: string;
+  confirmation?: {
+    acceptedInput: string;
+    cancelledKey: MessageKey;
+    promptKey: MessageKey;
+  };
   showInIntro?: boolean;
 }
 
@@ -33,9 +38,8 @@ export const LOCAL_COMMAND_DEFINITIONS = [
     category: "system",
     aliases: ["q", "quit", "exit", "/q", "/quit", "/exit"],
     slashName: "exit",
-    description: "Exit the session",
+    descriptionKey: "command.exit.description",
     helpLabel: "quit",
-    helpText: "Exit the session",
     showInIntro: true,
   },
   {
@@ -43,9 +47,13 @@ export const LOCAL_COMMAND_DEFINITIONS = [
     category: "project",
     aliases: ["reset", "/reset"],
     slashName: "reset",
-    description: "Clear current project runtime state and exit",
+    descriptionKey: "command.reset.description",
     helpLabel: "/reset",
-    helpText: "Clear current project runtime state and exit",
+    confirmation: {
+      acceptedInput: "reset",
+      cancelledKey: "command.reset.cancelled",
+      promptKey: "command.reset.prompt",
+    },
     showInIntro: true,
   },
   {
@@ -53,9 +61,8 @@ export const LOCAL_COMMAND_DEFINITIONS = [
     category: "system",
     aliases: ["/help"],
     slashName: "help",
-    description: "Show slash commands",
+    descriptionKey: "command.help.description",
     helpLabel: "/help",
-    helpText: "Show slash commands",
     showInIntro: true,
   },
   {
@@ -63,99 +70,80 @@ export const LOCAL_COMMAND_DEFINITIONS = [
     category: "session",
     aliases: ["/session"],
     slashName: "session",
-    description: "Show current session ID",
+    descriptionKey: "command.session.description",
     helpLabel: "/session",
-    helpText: "Show current session ID",
   },
   {
     id: "sessions",
     category: "session",
     aliases: ["/sessions", "/resume", "/continue"],
     slashName: "sessions",
-    description: "List recent sessions",
+    descriptionKey: "command.sessions.description",
     helpLabel: "/sessions",
-    helpText: "List recent sessions",
   },
   {
     id: "config",
     category: "project",
     aliases: ["/config"],
     slashName: "config",
-    description: "Show current runtime config",
+    descriptionKey: "command.config.description",
     helpLabel: "/config",
-    helpText: "Show current runtime config",
   },
   {
     id: "status",
     category: "runtime",
     aliases: ["/status"],
     slashName: "status",
-    description: "Show current project scene",
+    descriptionKey: "command.status.description",
     helpLabel: "/status",
-    helpText: "Show current project scene",
   },
   {
     id: "background",
     category: "runtime",
     aliases: ["/background", "/bg"],
     slashName: "background",
-    description: "Show background task scene",
+    descriptionKey: "command.background.description",
     helpLabel: "/background",
-    helpText: "Show background task scene",
   },
   {
     id: "events",
     category: "runtime",
     aliases: ["/events"],
     slashName: "events",
-    description: "Show recent session events",
+    descriptionKey: "command.events.description",
     helpLabel: "/events",
-    helpText: "Show recent session events",
   },
   {
     id: "skills",
     category: "runtime",
     aliases: ["/skills"],
     slashName: "skills",
-    description: "List runtime skills",
+    descriptionKey: "command.skills.description",
     helpLabel: "/skills",
-    helpText: "List runtime skills",
   },
   {
     id: "doctor",
     category: "project",
     aliases: ["/doctor"],
     slashName: "doctor",
-    description: "Run local setup preflight",
+    descriptionKey: "command.doctor.description",
     helpLabel: "/doctor",
-    helpText: "Run local setup preflight",
   },
   {
     id: "copy",
     category: "session",
     aliases: ["/copy"],
     slashName: "copy",
-    description: "Print current session transcript",
+    descriptionKey: "command.copy.description",
     helpLabel: "/copy",
-    helpText: "Print current session transcript",
   },
   {
     id: "export",
     category: "session",
     aliases: ["/export"],
     slashName: "export",
-    description: "Print current session snapshot JSON",
+    descriptionKey: "command.export.description",
     helpLabel: "/export",
-    helpText: "Print current session snapshot JSON",
-  },
-  {
-    id: "clear",
-    category: "session",
-    aliases: ["/clear"],
-    slashName: "clear",
-    description: "Clear the current prompt in UI shells",
-    helpLabel: "/clear",
-    helpText: "Clear the current prompt in UI shells",
   },
 ] as const satisfies readonly LocalCommandDefinition[];
 
@@ -175,16 +163,39 @@ export function isLocalCommand(input: string, id: LocalCommandId): boolean {
   return normalizeLocalCommand(input) === id;
 }
 
-export function getLocalCommandDefinition(id: LocalCommandId): LocalCommandDefinition {
+export interface ResolvedLocalCommandDefinition extends Omit<LocalCommandDefinition, "descriptionKey" | "confirmation"> {
+  description: string;
+  helpText: string;
+  confirmation?: {
+    acceptedInput: string;
+    cancelledText: string;
+    prompt: string;
+  };
+}
+
+export function getLocalCommandDefinition(
+  id: LocalCommandId,
+  locale: KittyLocale = DEFAULT_LOCALE,
+): ResolvedLocalCommandDefinition {
   const definition = ALL_LOCAL_COMMAND_DEFINITIONS.find((item) => item.id === id);
   if (!definition) {
     throw new Error(`Unknown local command: ${id}`);
   }
-  return definition;
+  const description = translate(locale, definition.descriptionKey);
+  return {
+    ...definition,
+    description,
+    helpText: description,
+    confirmation: definition.confirmation ? {
+      acceptedInput: definition.confirmation.acceptedInput,
+      cancelledText: translate(locale, definition.confirmation.cancelledKey),
+      prompt: translate(locale, definition.confirmation.promptKey),
+    } : undefined,
+  };
 }
 
-export function formatLocalCommandHelpLine(id: LocalCommandId): string {
-  const definition = getLocalCommandDefinition(id);
+export function formatLocalCommandHelpLine(id: LocalCommandId, locale: KittyLocale = DEFAULT_LOCALE): string {
+  const definition = getLocalCommandDefinition(id, locale);
   return `${definition.helpLabel.padEnd(12)} ${definition.helpText}`;
 }
 
@@ -193,9 +204,10 @@ export interface SlashCommandMetadata {
   aliases: readonly string[];
   category: LocalCommandCategory;
   description: string;
+  requiresConfirmation: boolean;
 }
 
-export function listSlashCommands(): SlashCommandMetadata[] {
+export function listSlashCommands(locale: KittyLocale = DEFAULT_LOCALE): SlashCommandMetadata[] {
   return ALL_LOCAL_COMMAND_DEFINITIONS
     .filter((definition) => definition.slashName)
     .map((definition) => ({
@@ -203,19 +215,22 @@ export function listSlashCommands(): SlashCommandMetadata[] {
       aliases: definition.aliases
         .filter((alias) => alias.startsWith("/") && alias !== `/${definition.slashName}`),
       category: definition.category,
-      description: definition.description,
+      description: translate(locale, definition.descriptionKey),
+      requiresConfirmation: Boolean(definition.confirmation),
     }));
 }
 
-export function formatLocalCommandHelp(): string {
+export function formatLocalCommandHelp(locale: KittyLocale = DEFAULT_LOCALE): string {
   return [
-    "Slash commands:",
-    ...ALL_LOCAL_COMMAND_DEFINITIONS.map((definition) => formatLocalCommandHelpLine(definition.id)),
+    translate(locale, "command.help.header"),
+    ...ALL_LOCAL_COMMAND_DEFINITIONS.map((definition) => formatLocalCommandHelpLine(definition.id, locale)),
     "",
-    "Any other input is sent directly to kitty.",
+    translate(locale, "command.help.footer"),
   ].join("\n");
 }
 
-export function listIntroLocalCommands(): LocalCommandDefinition[] {
-  return ALL_LOCAL_COMMAND_DEFINITIONS.filter((definition) => definition.showInIntro);
+export function listIntroLocalCommands(locale: KittyLocale = DEFAULT_LOCALE): ResolvedLocalCommandDefinition[] {
+  return ALL_LOCAL_COMMAND_DEFINITIONS
+    .filter((definition) => definition.showInIntro)
+    .map((definition) => getLocalCommandDefinition(definition.id, locale));
 }

@@ -52,6 +52,7 @@ export async function startInteractiveChat(
       cwd: context.cwd,
       session: context.session,
       output: context.shell.output,
+      locale: context.config.locale,
     });
   }))({
     cwd: options.cwd,

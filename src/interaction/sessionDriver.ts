@@ -1,16 +1,21 @@
 import { getErrorMessage } from "../agent/errors.js";
 import process from "node:process";
 import type { SessionStoreLike } from "../session/index.js";
-import { PRESERVE_QUEUED_TURN_ABORT_REASON, runHostTurn } from "../host/turn.js";
+import {
+  PRESERVE_ACTIVE_TURN_ABORT_REASON,
+  PRESERVE_QUEUED_TURN_ABORT_REASON,
+  runHostTurn,
+} from "../host/turn.js";
 import type { HostTurnRunner } from "../host/types.js";
 import type { PromptRuntimeState } from "../agent/prompt/types.js";
 import type { RegisteredTool, ToolFilter } from "../tools/core/types.js";
 import type { RuntimeConfig, SessionRecord } from "../types.js";
 import { defaultInteractiveExitGuard, type InteractiveExitGuard, type InteractiveExitProcess } from "./exitGuard.js";
 import { handleLocalCommand, type LocalCommandResult } from "./localCommands.js";
-import { normalizeLocalCommand } from "./localCommandDefinitions.js";
+import { getLocalCommandDefinition, normalizeLocalCommand } from "./localCommandDefinitions.js";
 import type { InteractionShell } from "./shell.js";
 import { ControlPlaneLedger } from "../control/ledger.js";
+import { translate, type MessageKey } from "../i18n/index.js";
 
 export interface InteractiveTurnContext {
   cwd?: string;
@@ -35,6 +40,7 @@ export interface InteractiveSessionDriverOptions {
 
 interface ActiveTurnOperation {
   input: string;
+  turnId: string;
   controller: AbortController;
   promise: Promise<void>;
   started: boolean;
@@ -76,7 +82,7 @@ export class InteractiveSessionDriver {
 
         const decision = await this.handleInput(input);
         if (decision === "quit") {
-          this.abortActiveTurns(true);
+          this.abortActiveTurns(false);
           await this.waitForActiveTurns();
           return this.session;
         }
@@ -92,9 +98,23 @@ export class InteractiveSessionDriver {
   }
 
   private async handleInput(input: string): Promise<LocalCommandResult> {
-    if (!this.options.localCommandHandler && normalizeLocalCommand(input) === undefined) {
-      this.startTurn(input);
+    const command = normalizeLocalCommand(input);
+    if (!this.options.localCommandHandler && command === undefined) {
+      this.submitAgentInput(input);
       return "continue";
+    }
+
+    if (command) {
+      const confirmation = getLocalCommandDefinition(command, this.options.config.locale).confirmation;
+      if (confirmation) {
+        this.options.shell.output.warn(confirmation.prompt);
+        const response = await this.options.shell.input.readInput(confirmation.prompt);
+        if (response.kind === "closed") return "quit";
+        if (response.value.trim().toLowerCase() !== confirmation.acceptedInput) {
+          this.options.shell.output.info(confirmation.cancelledText);
+          return "handled";
+        }
+      }
     }
 
     let localCommandResult: LocalCommandResult;
@@ -116,7 +136,7 @@ export class InteractiveSessionDriver {
     }
 
     if (localCommandResult === "continue") {
-      this.startTurn(input);
+      this.submitAgentInput(input);
     } else if (localCommandResult === "quit") {
       return this.handleQuitRequest();
     }
@@ -131,24 +151,24 @@ export class InteractiveSessionDriver {
     try {
       runningProcesses = await exitGuard.collectRunningProcesses(this.options.cwd);
     } catch (error) {
-      this.options.shell.output.error(`Failed to inspect running background processes: ${getErrorMessage(error)}`);
+      this.options.shell.output.error(this.t("interaction.inspectProcessesFailed", { error: getErrorMessage(error) }));
       return "handled";
     }
 
     if (runningProcesses.length === 0) {
-      this.options.shell.output.info("Session saved.");
+      this.options.shell.output.info(this.t("interaction.sessionSaved"));
       return "quit";
     }
 
-    this.options.shell.output.warn("Running processes detected. Exiting now will kill them all.");
+    this.options.shell.output.warn(this.t("interaction.runningProcesses"));
     this.options.shell.output.plain(runningProcesses.map((process) => process.summary).join("\n"));
 
     const confirmation = await this.options.shell.input.readInput(
-      "Kill all running processes and exit? [y/N] ",
+      this.t("interaction.killProcessesPrompt"),
     );
 
     if (confirmation.kind !== "submit" || !isYes(confirmation.value)) {
-      this.options.shell.output.info("Exit cancelled. Background processes will keep running.");
+      this.options.shell.output.info(this.t("interaction.exitCancelled"));
       return "handled";
     }
 
@@ -156,16 +176,16 @@ export class InteractiveSessionDriver {
       const result = await exitGuard.terminateProcesses(runningProcesses, this.options.cwd);
       if (result.failedPids.length > 0) {
         this.options.shell.output.error(
-          `Could not stop all background processes. Still running: ${result.failedPids.join(", ")}. Exit cancelled.`,
+          this.t("interaction.stopProcessesPartial", { pids: result.failedPids.join(", ") }),
         );
         return "handled";
       }
 
-      this.options.shell.output.warn(`Stopped ${result.terminatedPids.length} background process(es).`);
-      this.options.shell.output.info("Session saved.");
+      this.options.shell.output.warn(this.t("interaction.stoppedProcesses", { count: result.terminatedPids.length }));
+      this.options.shell.output.info(this.t("interaction.sessionSaved"));
       return "quit";
     } catch (error) {
-      this.options.shell.output.error(`Failed to stop background processes: ${getErrorMessage(error)}`);
+      this.options.shell.output.error(this.t("interaction.stopProcessesFailed", { error: getErrorMessage(error) }));
       return "handled";
     }
   }
@@ -174,16 +194,16 @@ export class InteractiveSessionDriver {
     const active = this.activeTurns[0];
     if (active && !active.controller.signal.aborted) {
       active.controller.abort();
-      this.showInterruptNotice("Interrupted the current turn. You can continue typing.");
+      this.showInterruptNotice(this.t("interaction.interrupted"));
       return;
     }
 
     if (active) {
-      this.showInterruptNotice("Interrupt already in progress. Accepted inputs remain queued.");
+      this.showInterruptNotice(this.t("interaction.interrupting"));
       return;
     }
 
-    this.showInterruptNotice("This session will not exit automatically. Type quit or q to exit.");
+    this.showInterruptNotice(this.t("interaction.exitHint"));
   }
 
   private showInterruptNotice(message: string): void {
@@ -225,12 +245,13 @@ export class InteractiveSessionDriver {
     this.terminationInProgress = true;
     this.exitRequested = true;
     this.abortActiveTurns(true);
+    await this.waitForActiveTurns();
 
     const exitGuard = this.options.exitGuard ?? defaultInteractiveExitGuard;
     try {
       const runningProcesses = await exitGuard.collectRunningProcesses(this.options.cwd);
       if (runningProcesses.length === 0) {
-        this.options.shell.output.info("Session saved.");
+        this.options.shell.output.info(this.t("interaction.sessionSaved"));
         return;
       }
 
@@ -238,14 +259,14 @@ export class InteractiveSessionDriver {
       this.options.shell.output.plain(runningProcesses.map((processInfo) => processInfo.summary).join("\n"));
       const result = await exitGuard.terminateProcesses(runningProcesses, this.options.cwd);
       if (result.failedPids.length > 0) {
-        this.options.shell.output.error(`Could not stop all running processes. Still running: ${result.failedPids.join(", ")}.`);
+        this.options.shell.output.error(this.t("interaction.forcedStopPartial", { pids: result.failedPids.join(", ") }));
         return;
       }
 
-      this.options.shell.output.warn(`Stopped ${result.terminatedPids.length} running process(es).`);
-      this.options.shell.output.info("Session saved.");
+      this.options.shell.output.warn(this.t("interaction.forcedStopped", { count: result.terminatedPids.length }));
+      this.options.shell.output.info(this.t("interaction.sessionSaved"));
     } catch (error) {
-      this.options.shell.output.error(`Failed to stop running processes: ${getErrorMessage(error)}`);
+      this.options.shell.output.error(this.t("interaction.forcedStopFailed", { error: getErrorMessage(error) }));
     }
   }
 
@@ -267,7 +288,7 @@ export class InteractiveSessionDriver {
           ledger.close();
         }
       } catch (error) {
-        this.options.shell.output.error(`Input was not accepted: ${getErrorMessage(error)}`);
+        this.options.shell.output.error(this.t("interaction.inputRejected", { error: getErrorMessage(error) }));
         return;
       }
     }
@@ -275,6 +296,7 @@ export class InteractiveSessionDriver {
     const controller = new AbortController();
     const operation: ActiveTurnOperation = {
       input,
+      turnId: durableTurnId,
       controller,
       promise: Promise.resolve(),
       started: false,
@@ -285,6 +307,35 @@ export class InteractiveSessionDriver {
         const index = this.activeTurns.indexOf(operation);
         if (index >= 0) this.activeTurns.splice(index, 1);
       });
+  }
+
+  private submitAgentInput(input: string): void {
+    const active = [...this.activeTurns]
+      .reverse()
+      .find((operation) => !operation.controller.signal.aborted);
+    if (active) {
+      try {
+        const ledger = new ControlPlaneLedger(this.options.stateRootDir);
+        try {
+          const steer = ledger.turnSteers.admit({
+            turnId: active.turnId,
+            sessionId: this.session.id,
+            text: input,
+          });
+          if (steer) {
+            this.options.shell.output.plain(formatSubmittedInput(input));
+            this.options.shell.output.info(this.t("interaction.steerAccepted"));
+            return;
+          }
+        } finally {
+          ledger.close();
+        }
+      } catch (error) {
+        this.options.shell.output.error(this.t("interaction.inputRejected", { error: getErrorMessage(error) }));
+        return;
+      }
+    }
+    this.startTurn(input);
   }
 
   private async executeTurn(operation: ActiveTurnOperation, admittedTurnId?: string): Promise<void> {
@@ -325,15 +376,15 @@ export class InteractiveSessionDriver {
       if (outcome.status === "aborted") {
         turnDisplay.finish?.("aborted");
         turnDisplay.flush();
-        this.options.shell.output.warn(outcome.errorMessage ?? "Turn interrupted. You can keep chatting.");
+        this.options.shell.output.warn(outcome.errorMessage ?? this.t("interaction.turnInterrupted"));
         return;
       }
 
       if (outcome.status === "failed") {
         turnDisplay.finish?.("failed");
         turnDisplay.flush();
-        this.options.shell.output.error(outcome.errorMessage ?? "The request failed.");
-        this.options.shell.output.info("The request failed, but the session is still alive. You can keep chatting.");
+        this.options.shell.output.error(outcome.errorMessage ?? this.t("interaction.requestFailed"));
+        this.options.shell.output.info(this.t("interaction.sessionAlive"));
       } else {
         turnDisplay.finish?.("completed");
       }
@@ -341,7 +392,7 @@ export class InteractiveSessionDriver {
       turnDisplay.finish?.("failed");
       turnDisplay.flush();
       this.options.shell.output.error(getErrorMessage(error));
-      this.options.shell.output.info("The request failed, but the session is still alive. You can keep chatting.");
+      this.options.shell.output.info(this.t("interaction.sessionAlive"));
     } finally {
       turnDisplay.dispose();
     }
@@ -350,9 +401,9 @@ export class InteractiveSessionDriver {
   private resumePendingTurns(): void {
     const ledger = new ControlPlaneLedger(this.options.stateRootDir);
     try {
-      const pending = ledger.turns.listPending(this.session.id);
       const reconciled = ledger.turns.reconcileExpired(this.session.id);
       if (reconciled > 0) this.reportInterruptedTurnRecovery(reconciled);
+      const pending = ledger.turns.listPending(this.session.id);
       for (const turn of pending) {
         if (turn.status === "queued") this.startTurn(turn.input, turn.id);
         if (turn.status === "running") this.scheduleRunningTurnReconciliation(turn.id, turn.leaseExpiresAt);
@@ -372,6 +423,12 @@ export class InteractiveSessionDriver {
         const reconciled = ledger.turns.reconcileExpired(this.session.id);
         if (reconciled > 0) {
           this.reportInterruptedTurnRecovery(reconciled);
+          const recovered = ledger.turns.listPending(this.session.id);
+          for (const turn of recovered) {
+            if (turn.status === "queued" && !this.activeTurns.some((active) => active.turnId === turn.id)) {
+              this.startTurn(turn.input, turn.id);
+            }
+          }
           return;
         }
         const turn = ledger.turns.load(turnId);
@@ -388,7 +445,7 @@ export class InteractiveSessionDriver {
 
   private reportInterruptedTurnRecovery(count: number): void {
     this.options.shell.output.warn(
-      `Recovered ${count} interrupted turn(s). They were not replayed because tool side effects may already exist.`,
+      this.t("interaction.recoveredTurns", { count }),
     );
   }
 
@@ -400,12 +457,20 @@ export class InteractiveSessionDriver {
   private abortActiveTurns(preserveQueued = false): void {
     for (const turn of this.activeTurns) {
       if (turn.controller.signal.aborted) continue;
-      turn.controller.abort(preserveQueued && !turn.started ? PRESERVE_QUEUED_TURN_ABORT_REASON : undefined);
+      turn.controller.abort(
+        preserveQueued
+          ? turn.started ? PRESERVE_ACTIVE_TURN_ABORT_REASON : PRESERVE_QUEUED_TURN_ABORT_REASON
+          : undefined,
+      );
     }
   }
 
   private async waitForActiveTurns(): Promise<void> {
     await Promise.allSettled(this.activeTurns.map((turn) => turn.promise));
+  }
+
+  private t(key: MessageKey, values: Readonly<Record<string, string | number>> = {}): string {
+    return translate(this.options.config.locale, key, values);
   }
 }
 

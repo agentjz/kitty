@@ -10,12 +10,40 @@ import { getInitialRuntimeConfig } from "../src/config/initialConfig.js";
 import type { ToolContext } from "../src/tools/core/types.js";
 import type { RuntimeConfig } from "../src/types.js";
 
-export async function createTempWorkspace(prefix: string, t: TestContext): Promise<string> {
+export async function createTempWorkspace(
+  prefix: string,
+  t: TestContext,
+  options: { gitBoundary?: "valid" | "unavailable" } = {},
+): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), `Kitty-test-${prefix}-`));
+  if (options.gitBoundary === "unavailable") {
+    await fs.writeFile(path.join(dir, ".git"), "gitdir: unavailable\n", "utf8");
+  } else {
+    await createIsolatedGitBoundary(dir);
+  }
   t.after(async () => {
     await fs.rm(dir, { recursive: true, force: true });
   });
   return dir;
+}
+
+async function createIsolatedGitBoundary(root: string): Promise<void> {
+  const gitDir = path.join(root, ".git");
+  await Promise.all([
+    fs.mkdir(path.join(gitDir, "objects"), { recursive: true }),
+    fs.mkdir(path.join(gitDir, "refs", "heads"), { recursive: true }),
+  ]);
+  await Promise.all([
+    fs.writeFile(path.join(gitDir, "HEAD"), "ref: refs/heads/main\n", "utf8"),
+    fs.writeFile(path.join(gitDir, "config"), [
+      "[core]",
+      "\trepositoryformatversion = 0",
+      "\tfilemode = false",
+      "\tbare = false",
+      "\tlogallrefupdates = true",
+      "",
+    ].join("\n"), "utf8"),
+  ]);
 }
 
 export async function initGitRepo(root: string): Promise<void> {

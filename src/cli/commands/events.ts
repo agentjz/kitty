@@ -6,10 +6,12 @@ import type { CliOverrides, RuntimeConfig } from "../../types.js";
 import { ui } from "../../utils/console.js";
 import { writeStdoutLine } from "../../utils/stdio.js";
 import { createSessionStore } from "./sessionHelpers.js";
+import { DEFAULT_LOCALE, translate, type KittyLocale } from "../../i18n/index.js";
 
 export function registerEventsCommand(
   program: Command,
   options: {
+    locale: KittyLocale;
     getCliOverrides: () => CliOverrides;
     resolveRuntime: (overrides: CliOverrides) => Promise<{
       cwd: string;
@@ -21,10 +23,10 @@ export function registerEventsCommand(
 ): void {
   program
     .command("events")
-    .description("Show session event facts for the latest or selected session.")
-    .argument("[sessionId]", "Session id. Defaults to the latest session.")
-    .option("-n, --limit <count>", "Number of events to show", (value) => Number.parseInt(value, 10), 20)
-    .option("--json", "Print structured JSON.")
+    .description(translate(options.locale, "cli.command.events"))
+    .argument("[sessionId]", translate(options.locale, "cli.argument.sessionIdOptional"))
+    .option("-n, --limit <count>", translate(options.locale, "cli.option.limitEvents"), (value) => Number.parseInt(value, 10), 20)
+    .option("--json", translate(options.locale, "cli.option.json"))
     .action(async (sessionId: string | undefined, commandOptions: { json?: boolean; limit?: number }) => {
       const runtime = await options.resolveRuntime(options.getCliOverrides());
       const result = await readSessionEventsForCli({
@@ -39,7 +41,7 @@ export function registerEventsCommand(
           writeStdoutLine(JSON.stringify({ sessionId: null, events: [] }, null, 2));
           return;
         }
-        ui.info("No saved sessions yet.");
+        ui.info(translate(runtime.config.locale, "local.noSessions"));
         return;
       }
 
@@ -49,7 +51,7 @@ export function registerEventsCommand(
       }
 
       if (result.events.length === 0) {
-        ui.info(`No events recorded for session ${result.sessionId}.`);
+        ui.info(formatSessionEventsForCli(result, runtime.config.locale));
         return;
       }
 
@@ -80,12 +82,15 @@ export async function readSessionEventsForCli(input: {
   };
 }
 
-export function formatSessionEventsForCli(result: { sessionId: string | null; events: SessionEventRecord[] }): string {
+export function formatSessionEventsForCli(
+  result: { sessionId: string | null; events: SessionEventRecord[] },
+  locale: KittyLocale = DEFAULT_LOCALE,
+): string {
   if (!result.sessionId) {
-    return "No saved sessions yet.";
+    return translate(locale, "local.noSessions");
   }
   if (result.events.length === 0) {
-    return `No events recorded for session ${result.sessionId}.`;
+    return translate(locale, "local.noEvents", { id: result.sessionId });
   }
   return result.events.map(formatSessionEventForCli).join("\n");
 }

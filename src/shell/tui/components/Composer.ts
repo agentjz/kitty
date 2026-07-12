@@ -1,34 +1,29 @@
 import type { TuiController } from "../controller.js";
 import type { TuiState } from "../store.js";
 import { TUI_COLORS } from "../theme.js";
-import { applyComposerInput } from "../composerEditing.js";
 import {
   COMPOSER_FRAME,
-  composeInkCursorPosition,
   layoutComposer,
   measureComposerContentWidth,
   type ComposerFrameMetrics,
 } from "../composerLayout.js";
 import { measureAbsoluteBox } from "../inkGeometry.js";
 import type { InkRuntime } from "./kit.js";
+import { translate } from "../../../i18n/index.js";
 
-export function createComposerComponent(kit: Pick<InkRuntime, "React" | "Box" | "Text" | "useCursor" | "useInput">) {
-  const { React, Box, Text, useCursor, useInput } = kit;
+export function createComposerComponent(kit: Pick<InkRuntime, "React" | "Box" | "Text" | "useCursor" | "useInput" | "useStdin">) {
+  const { React, Box, Text, useCursor, useInput, useStdin } = kit;
   return function Composer(props: {
     controller: TuiController;
+    editExternally: (value: string) => Promise<string>;
     frame: ComposerFrameMetrics;
+    redraw: () => void;
     state: TuiState;
+    suspendInput: () => () => void;
   }): React.ReactNode {
-    const [draft, setDraft] = React.useState({ cursor: 0, value: "" });
+    const draft = props.state.composer;
     const contentRef = React.useRef<import("ink").DOMElement | null>(null);
-    const cursorRowRef = React.useRef<import("ink").DOMElement | null>(null);
     const [measuredFrame, setMeasuredFrame] = React.useState<ComposerFrameMetrics>({
-      hasMeasured: false,
-      left: 0,
-      top: 0,
-      width: props.frame.width,
-    });
-    const [measuredCursorRow, setMeasuredCursorRow] = React.useState<ComposerFrameMetrics>({
       hasMeasured: false,
       left: 0,
       top: 0,
@@ -45,15 +40,6 @@ export function createComposerComponent(kit: Pick<InkRuntime, "React" | "Box" | 
           ? previous
           : next
       ));
-      const nextCursorRow = measureAbsoluteBox(cursorRowRef.current);
-      setMeasuredCursorRow((previous) => (
-        previous.hasMeasured === nextCursorRow.hasMeasured
-          && previous.left === nextCursorRow.left
-          && previous.top === nextCursorRow.top
-          && previous.width === nextCursorRow.width
-          ? previous
-          : nextCursorRow
-      ));
     });
 
     const contentWidth = measuredFrame.hasMeasured
@@ -66,24 +52,49 @@ export function createComposerComponent(kit: Pick<InkRuntime, "React" | "Box" | 
       value: draft.value,
     });
     const { setCursorPosition } = useCursor();
-    const cursorPosition = composeInkCursorPosition({
-      cell: layout.cursorCell,
-      fallback: layout.cursor,
-      rowFrame: measuredCursorRow,
-    });
+    const { isRawModeSupported, setRawMode } = useStdin();
 
     React.useEffect(() => {
       props.controller.updateComposerVisibleRows(layout.visibleRows);
     }, [props.controller, layout.visibleRows]);
 
-    setCursorPosition(cursorPosition);
+    setCursorPosition(layout.cursor);
 
     useInput((input, key) => {
-      const action = applyComposerInput(draft, input, key);
-      setDraft(action.state);
-      if (action.kind === "submit") {
-        props.controller.submitInput(action.value);
+      if (key.ctrl && input.toLowerCase() === "c") {
+        if (props.controller.copySelection()) return;
+        props.controller.interrupt();
+        return;
       }
+      if (key.escape && props.controller.clearSelection()) return;
+      if (key.pageUp) {
+        props.controller.pageUp();
+        return;
+      }
+      if (key.pageDown) {
+        props.controller.pageDown();
+        return;
+      }
+      if (key.ctrl && key.home) props.controller.scrollTop();
+      if (key.ctrl && key.end) props.controller.scrollBottom();
+      if (key.ctrl && input.toLowerCase() === "l") {
+        props.redraw();
+        return;
+      }
+      if (key.ctrl && input.toLowerCase() === "g") {
+        void props.controller.editComposerExternally(async (value) => {
+          const resumeInput = props.suspendInput();
+          if (isRawModeSupported) setRawMode(false);
+          try {
+            return await props.editExternally(value);
+          } finally {
+            resumeInput();
+            if (isRawModeSupported) setRawMode(true);
+          }
+        });
+        return;
+      }
+      props.controller.handleComposerInput(input, key);
     });
 
     return React.createElement(
@@ -110,7 +121,6 @@ export function createComposerComponent(kit: Pick<InkRuntime, "React" | "Box" | 
             Box,
             {
               key: index,
-              ref: layout.cursorCell?.y === index ? cursorRowRef : undefined,
               height: 1,
               width: layout.contentWidth,
             },
@@ -124,14 +134,15 @@ export function createComposerComponent(kit: Pick<InkRuntime, "React" | "Box" | 
             Box,
             {
               key: "placeholder",
-              ref: cursorRowRef,
               height: 1,
               width: layout.contentWidth,
             },
             React.createElement(
               Text,
               { color: TUI_COLORS.muted, wrap: "truncate-end" },
-              "输入消息",
+              props.state.composer.promptLabel === "> "
+                ? translate(props.state.locale, "tui.inputPlaceholder")
+                : props.state.composer.promptLabel.trim(),
             ),
           )]),
       ),

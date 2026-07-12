@@ -26,7 +26,7 @@ test("cli terminal log does not duplicate shell output through process mirroring
 
   const logPath = await findTerminalLogPath(root, session.id);
   const log = await fs.readFile(logPath, "utf8");
-  assert.equal(countOccurrences(log, `session: ${session.id}`), 1);
+  assert.equal(countOccurrences(log, `会话: ${session.id}`), 1);
 });
 
 test("terminal log writes streamed assistant and reasoning text as readable blocks", () => {
@@ -93,7 +93,7 @@ test("terminal log fallback keeps tool call arguments reviewable", () => {
   display.callbacks.onToolCall?.("read", JSON.stringify({ path: "src/example.ts", offset: 2, limit: 3 }));
 
   const log = chunks.join("");
-  assert.match(log, /\[tool\] read src[\\/]example\.ts:2-4/);
+  assert.match(log, /\[工具\] read src[\\/]example\.ts:2-4/);
   assert.doesNotMatch(log, /\(missing path\)/);
 });
 

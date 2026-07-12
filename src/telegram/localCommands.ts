@@ -5,10 +5,7 @@ import {
 } from "../interaction/localCommands.js";
 import { normalizeLocalCommand } from "../interaction/localCommandDefinitions.js";
 import type { ShellOutputPort } from "../interaction/shell.js";
-import {
-  TELEGRAM_BLOCKED_LOCAL_COMMAND_TEXT,
-  TELEGRAM_HELP_TEXT,
-} from "./helpText.zh.js";
+import { formatTelegramBlockedLocalCommand, formatTelegramHelp } from "./helpText.js";
 
 export async function handleTelegramLocalCommand(
   input: string,
@@ -22,12 +19,12 @@ export async function handleTelegramLocalCommand(
   const command = normalizeLocalCommand(input);
 
   if (command === "help") {
-    output.plain(TELEGRAM_HELP_TEXT);
+    output.plain(formatTelegramHelp(context.config.locale));
     return "handled";
   }
 
   if (command === "exit" || command === "reset") {
-    output.warn(TELEGRAM_BLOCKED_LOCAL_COMMAND_TEXT);
+    output.warn(formatTelegramBlockedLocalCommand(context.config.locale));
     return "handled";
   }
 

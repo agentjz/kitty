@@ -7,10 +7,12 @@ import {
 } from "../../project/statePaths.js";
 import type { CliOverrides, RuntimeConfig } from "../../types.js";
 import { writeStdoutLine } from "../../utils/stdio.js";
+import { translate, type KittyLocale } from "../../i18n/index.js";
 
 export function registerConfigCommands(
   program: Command,
   options: {
+    locale: KittyLocale;
     getCliOverrides: () => CliOverrides;
     resolveRuntime: (overrides: CliOverrides) => Promise<{
       cwd: string;
@@ -20,11 +22,11 @@ export function registerConfigCommands(
     }>;
   },
 ): void {
-  const configCommand = program.command("config").description("Show Kitty runtime configuration from .kitty/.env.");
+  const configCommand = program.command("config").description(translate(options.locale, "cli.command.config"));
 
   configCommand
     .command("show")
-    .description("Show resolved runtime configuration and secret status.")
+    .description(translate(options.locale, "cli.command.configShow"))
     .action(async () => {
       const runtime = await options.resolveRuntime(options.getCliOverrides());
       writeStdoutLine(JSON.stringify(toDisplayConfig(runtime.config), null, 2));
@@ -32,7 +34,7 @@ export function registerConfigCommands(
 
   configCommand
     .command("path")
-    .description("Show the project .kitty/.env path.")
+    .description(translate(options.locale, "cli.command.configPath"))
     .action(() => {
       const overrides = options.getCliOverrides();
       const cwd = path.resolve(overrides.cwd ?? process.cwd());

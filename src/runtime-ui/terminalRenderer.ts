@@ -10,6 +10,7 @@ import { colorizeTodoMarkers } from "./todoStyling.js";
 import { writeStdout, writeStdoutLine } from "../utils/stdio.js";
 import type { RuntimeUiChannel, RuntimeUiEvent } from "./events.js";
 import { colorRuntimeUiText, formatRuntimeUiChannelHeader, formatRuntimeUiSemanticTag } from "./theme.js";
+import { DEFAULT_LOCALE, translate, type KittyLocale } from "../i18n/index.js";
 
 export interface RuntimeUiTerminalRenderer {
   render(event: RuntimeUiEvent): void;
@@ -18,12 +19,14 @@ export interface RuntimeUiTerminalRenderer {
 
 export interface RuntimeUiFormatOptions {
   cwd?: string;
+  locale?: KittyLocale;
   terminalVerbosity?: TerminalVerbosity;
   toolArgsMaxChars?: number;
 }
 
 export function createRuntimeUiTerminalRenderer(options: {
   cwd?: string;
+  locale?: KittyLocale;
   showReasoning?: boolean;
   terminalVerbosity?: TerminalVerbosity;
   assistantLeadingBlankLine?: boolean;
@@ -32,6 +35,7 @@ export function createRuntimeUiTerminalRenderer(options: {
   toolArgsMaxChars?: number;
 } = {}): RuntimeUiTerminalRenderer {
   const verbosity = normalizeTerminalVerbosity(options.terminalVerbosity);
+  const locale = options.locale ?? DEFAULT_LOCALE;
   const state = {
     assistantOpen: false,
     reasoningOpen: false,
@@ -53,7 +57,7 @@ export function createRuntimeUiTerminalRenderer(options: {
     }
     ensureChannel(channel);
     if (!state.reasoningOpen) {
-      const label = colorRuntimeUiText("system", "[reasoning]");
+      const label = colorRuntimeUiText("system", `[${translate(locale, "runtime.reasoning")}]`);
       writeStdout(options.reasoningLeadingBlankLine ? `\n${label}\n` : `${label}\n`);
       state.reasoningOpen = true;
     }
@@ -85,7 +89,7 @@ export function createRuntimeUiTerminalRenderer(options: {
     if (state.channel !== undefined) {
       writeStdout("\n");
     }
-    writeStdoutLine(formatRuntimeUiChannelHeader(channel));
+    writeStdoutLine(formatRuntimeUiChannelHeader(channel, locale));
     state.channel = channel;
   };
 
@@ -128,7 +132,7 @@ export function createRuntimeUiTerminalRenderer(options: {
 export function formatRuntimeUiEventLine(event: RuntimeUiEvent, options: RuntimeUiFormatOptions = {}): string {
   const verbosity = normalizeTerminalVerbosity(options.terminalVerbosity);
   const message = formatRuntimeUiEventMessage(event, options, verbosity);
-  return formatRuntimeUiEventPlainLine(event, message);
+  return formatRuntimeUiEventPlainLine(event, message, options.locale ?? DEFAULT_LOCALE);
 }
 
 export function finishRuntimeUiAssistantOutput(renderer: RuntimeUiTerminalRenderer, trailingNewlines = "\n"): void {
@@ -141,45 +145,48 @@ export function finishRuntimeUiAssistantOutput(renderer: RuntimeUiTerminalRender
 function renderToolCall(
   event: RuntimeUiEvent,
   state: { channel?: RuntimeUiChannel },
-  options: { cwd?: string; toolArgsMaxChars?: number },
+  options: { cwd?: string; locale?: KittyLocale; toolArgsMaxChars?: number },
   verbosity: TerminalVerbosity,
 ): void {
-  ensureRenderChannel(state, event.channel);
+  const locale = options.locale ?? DEFAULT_LOCALE;
+  ensureRenderChannel(state, event.channel, locale);
   const name = event.toolName ?? "tool";
   const display = buildToolCallDisplay(name, event.payload ?? "{}", options.toolArgsMaxChars ?? 160, options.cwd);
-  writeSemanticLine("tool", formatRuntimeUiEventMessage(event, options, verbosity));
+  writeSemanticLine("tool", formatRuntimeUiEventMessage(event, options, verbosity), undefined, locale);
   if (display.preview && shouldShowToolCallPreview(name, verbosity)) {
-    writePreview(event.channel, "content", display.preview, verbosity);
+    writePreview(event.channel, "content", display.preview, verbosity, locale);
   }
 }
 
 function renderToolResult(
   event: RuntimeUiEvent,
   state: { channel?: RuntimeUiChannel },
-  options: { cwd?: string },
+  options: { cwd?: string; locale?: KittyLocale },
   verbosity: TerminalVerbosity,
 ): void {
-  ensureRenderChannel(state, event.channel);
+  const locale = options.locale ?? DEFAULT_LOCALE;
+  ensureRenderChannel(state, event.channel, locale);
   const name = event.toolName ?? "tool";
   const display = buildToolResultDisplay(name, event.payload ?? event.message ?? "", options.cwd);
   const ok = event.ok ?? display.ok !== false;
   if (!ok) {
     const detail = buildToolFailureDetail(name, event.payload ?? event.message ?? "", options.cwd);
-    writeSemanticLine("result", formatRuntimeUiEventMessage(event, options, verbosity, detail), "failed");
+    writeSemanticLine("result", formatRuntimeUiEventMessage(event, options, verbosity, detail), "failed", locale);
   }
   if (display.preview && shouldShowToolResultPreview(name, verbosity)) {
     const preview = name === "todo_write"
       ? colorizeTodoMarkers(display.preview)
       : truncateVisiblePreview(display.preview);
-    writePreview(event.channel, "preview", preview, verbosity);
+    writePreview(event.channel, "preview", preview, verbosity, locale);
   }
 }
 
-function renderToolError(event: RuntimeUiEvent, state: { channel?: RuntimeUiChannel }, options: { cwd?: string }): void {
-  ensureRenderChannel(state, event.channel);
+function renderToolError(event: RuntimeUiEvent, state: { channel?: RuntimeUiChannel }, options: { cwd?: string; locale?: KittyLocale }): void {
+  const locale = options.locale ?? DEFAULT_LOCALE;
+  ensureRenderChannel(state, event.channel, locale);
   const name = event.toolName ?? "tool";
   const detail = buildToolFailureDetail(name, event.payload ?? event.message ?? "", options.cwd);
-  writeSemanticLine("result", formatRuntimeUiEventMessage(event, options, "normal", detail), "failed");
+  writeSemanticLine("result", formatRuntimeUiEventMessage(event, options, "normal", detail), "failed", locale);
 }
 
 function writePreview(
@@ -187,21 +194,22 @@ function writePreview(
   label: "content" | "preview",
   preview: string,
   verbosity: TerminalVerbosity,
+  locale: KittyLocale,
 ): void {
   if (verbosity === "minimal") {
     writeStdoutLine(colorRuntimeUiText(channel, preview));
     return;
   }
-  writeStdoutLine(`${formatRuntimeUiSemanticTag(label)}\n${colorRuntimeUiText(channel, preview)}`);
+  writeStdoutLine(`${formatRuntimeUiSemanticTag(label, undefined, locale)}\n${colorRuntimeUiText(channel, preview)}`);
 }
 
 function writeSemanticLine(
   tag: "tool" | "result",
   message: string,
   state?: "ok" | "failed",
+  locale: KittyLocale = DEFAULT_LOCALE,
 ): void {
-  const semanticMessage = message.startsWith(`${tag} `) ? message.slice(tag.length + 1) : message;
-  writeStdoutLine(`${formatRuntimeUiSemanticTag(tag, state)} ${semanticMessage}`.trimEnd());
+  writeStdoutLine(`${formatRuntimeUiSemanticTag(tag, state, locale)} ${message}`.trimEnd());
 }
 
 function writeFormattedLine(
@@ -210,7 +218,7 @@ function writeFormattedLine(
   options: RuntimeUiFormatOptions,
   verbosity: TerminalVerbosity,
 ): void {
-  ensureRenderChannel(state, event.channel);
+  ensureRenderChannel(state, event.channel, options.locale ?? DEFAULT_LOCALE);
   const message = formatRuntimeUiEventMessage(event, options, verbosity);
   writeStdoutLine(colorRuntimeUiText(event.channel, message));
 }
@@ -221,31 +229,32 @@ function formatRuntimeUiEventMessage(
   verbosity: TerminalVerbosity,
   forcedDetail?: string,
 ): string {
+  const locale = options.locale ?? DEFAULT_LOCALE;
   switch (event.kind) {
     case "status":
       return event.message ?? "";
     case "tool_call": {
       const name = event.toolName ?? "tool";
       const display = buildToolCallDisplay(name, event.payload ?? "{}", options.toolArgsMaxChars ?? 160, options.cwd);
-      return formatRuntimeUiMessage("tool", display.summary);
+      return display.summary;
     }
     case "tool_result": {
       const name = event.toolName ?? "tool";
       const display = buildToolResultDisplay(name, event.payload ?? event.message ?? "", options.cwd);
       const ok = event.ok ?? display.ok !== false;
-      const status = ok ? "ok" : "failed";
-      const tracked = display.tracked ? " tracked" : "";
+      const status = translate(locale, ok ? "common.ok" : "common.failed");
+      const tracked = display.tracked ? ` ${translate(locale, "common.tracked")}` : "";
       const summary = display.summary ? `${display.summary} ${status}${tracked}`.trim() : `${name} ${status}`;
       if (!ok) {
         const detail = forcedDetail ?? buildToolFailureDetail(name, event.payload ?? event.message ?? "", options.cwd);
-        return formatRuntimeUiMessage("result", summary, detail);
+        return formatRuntimeUiMessage(summary, detail);
       }
-      return formatRuntimeUiMessage("result", summary);
+      return summary;
     }
     case "tool_error": {
       const name = event.toolName ?? "tool";
       const detail = forcedDetail ?? buildToolFailureDetail(name, event.payload ?? event.message ?? "", options.cwd);
-      return formatRuntimeUiMessage("result", `${name} failed`, detail);
+      return formatRuntimeUiMessage(`${name} ${translate(locale, "common.failed")}`, detail);
     }
     case "assistant_text":
     case "reasoning":
@@ -253,34 +262,37 @@ function formatRuntimeUiEventMessage(
   }
 }
 
-function formatRuntimeUiEventPlainLine(event: RuntimeUiEvent, message: string): string {
+function formatRuntimeUiEventPlainLine(event: RuntimeUiEvent, message: string, locale: KittyLocale): string {
   switch (event.kind) {
     case "tool_call":
-      return `[tool] ${message.replace(/^tool\s+/, "")}`.trimEnd();
-    case "tool_result":
-      if (!message.includes(" failed")) {
-        return "";
-      }
-      return `[result] ${message.replace(/^result\s+/, "")}`.trimEnd();
+      return `[${translate(locale, "runtime.tool")}] ${message}`.trimEnd();
+    case "tool_result": {
+      const display = buildToolResultDisplay(event.toolName ?? "tool", event.payload ?? event.message ?? "");
+      if (event.ok ?? display.ok !== false) return "";
+      return `[${translate(locale, "runtime.result")}] ${message}`.trimEnd();
+    }
     case "tool_error":
-      return `[result] ${message.replace(/^result\s+/, "")}`.trimEnd();
+      return `[${translate(locale, "runtime.result")}] ${message}`.trimEnd();
     default:
       return message.trimEnd();
   }
 }
 
-function ensureRenderChannel(state: { channel?: RuntimeUiChannel }, channel: RuntimeUiChannel): void {
+function ensureRenderChannel(
+  state: { channel?: RuntimeUiChannel },
+  channel: RuntimeUiChannel,
+  locale: KittyLocale,
+): void {
   if (state.channel === channel) {
     return;
   }
   if (state.channel !== undefined) {
     writeStdout("\n");
   }
-  writeStdoutLine(formatRuntimeUiChannelHeader(channel));
+  writeStdoutLine(formatRuntimeUiChannelHeader(channel, locale));
   state.channel = channel;
 }
 
-function formatRuntimeUiMessage(prefix: string, summary?: string, detail?: string): string {
-  const base = [prefix, summary].filter(Boolean).join(" ");
-  return detail ? `${base}: ${detail}` : base;
+function formatRuntimeUiMessage(summary: string, detail?: string): string {
+  return detail ? `${summary}: ${detail}` : summary;
 }

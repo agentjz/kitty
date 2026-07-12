@@ -79,6 +79,15 @@ export function initializeControlPlaneSchema(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_sessions_updated ON sessions(updated_at DESC);
 
+    CREATE TABLE IF NOT EXISTS interaction_drafts (
+      session_id TEXT NOT NULL,
+      shell TEXT NOT NULL,
+      value TEXT NOT NULL,
+      cursor INTEGER NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY(session_id, shell)
+    );
+
     CREATE TABLE IF NOT EXISTS session_messages (
       id TEXT PRIMARY KEY,
       session_id TEXT NOT NULL,
@@ -109,6 +118,26 @@ export function initializeControlPlaneSchema(db: Database.Database): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_session_turns_session_status ON session_turns(session_id, status, created_at);
+
+    CREATE TABLE IF NOT EXISTS turn_steers (
+      id TEXT PRIMARY KEY,
+      turn_id TEXT NOT NULL,
+      session_id TEXT NOT NULL,
+      sequence INTEGER NOT NULL,
+      input TEXT NOT NULL,
+      message_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      rejection_reason TEXT,
+      created_at TEXT NOT NULL,
+      consumed_at TEXT,
+      rejected_at TEXT,
+      FOREIGN KEY(turn_id) REFERENCES session_turns(id) ON DELETE CASCADE,
+      FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+      UNIQUE(turn_id, sequence),
+      UNIQUE(message_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_turn_steers_turn_status ON turn_steers(turn_id, status, sequence);
 
     CREATE TABLE IF NOT EXISTS tool_calls (
       call_id TEXT PRIMARY KEY,

@@ -10,10 +10,12 @@ import type { CliOverrides, RuntimeConfig } from "../../types.js";
 import { ui } from "../../utils/console.js";
 import { writeStdoutLine } from "../../utils/stdio.js";
 import { truncateCliValue } from "../cliValues.js";
+import { DEFAULT_LOCALE, translate, type KittyLocale } from "../../i18n/index.js";
 
 export function registerExecutionCommand(
   program: Command,
   options: {
+    locale: KittyLocale;
     getCliOverrides: () => CliOverrides;
     resolveRuntime: (overrides: CliOverrides) => Promise<{
       cwd: string;
@@ -26,39 +28,41 @@ export function registerExecutionCommand(
 ): void {
   const command = program
     .command("execution")
-    .description("Inspect, read, or cancel recorded executions.");
+    .description(translate(options.locale, "cli.command.execution"));
 
   command
     .command("list")
-    .option("--json", "Print structured JSON.")
+    .option("--json", translate(options.locale, "cli.option.json"))
     .action(async (commandOptions: { json?: boolean }) => {
       const runtime = await options.resolveRuntime(options.getCliOverrides());
       const executions = new ExecutionStore(readStateRoot(runtime))
         .list()
         .map(summarizeExecution)
         .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
-      printExecutionList(executions, Boolean(commandOptions.json));
+      printExecutionList(executions, Boolean(commandOptions.json), runtime.config.locale);
     });
 
   command
     .command("inspect")
-    .argument("<id>", "Execution id")
-    .option("--json", "Print structured JSON.")
+    .description(translate(options.locale, "cli.command.executionInspect"))
+    .argument("<id>", translate(options.locale, "cli.argument.executionId"))
+    .option("--json", translate(options.locale, "cli.option.json"))
     .action(async (id: string, commandOptions: { json?: boolean }) => {
       const runtime = await options.resolveRuntime(options.getCliOverrides());
       const execution = new ExecutionStore(readStateRoot(runtime)).load(id);
       if (!execution) {
         throw unknownExecution(id);
       }
-      printExecutionList([summarizeExecution(execution)], Boolean(commandOptions.json));
+      printExecutionList([summarizeExecution(execution)], Boolean(commandOptions.json), runtime.config.locale);
     });
 
   command
     .command("read")
-    .argument("<id>", "Execution id")
-    .option("--json", "Print structured JSON.")
-    .option("--mode <mode>", "Read mode: summary, tail, or full.", "tail")
-    .option("--tail <lines>", "Number of output lines to read in tail mode.", (value) => Number.parseInt(value, 10), 80)
+    .description(translate(options.locale, "cli.command.executionRead"))
+    .argument("<id>", translate(options.locale, "cli.argument.executionId"))
+    .option("--json", translate(options.locale, "cli.option.json"))
+    .option("--mode <mode>", translate(options.locale, "cli.option.readMode"), "tail")
+    .option("--tail <lines>", translate(options.locale, "cli.option.tail"), (value) => Number.parseInt(value, 10), 80)
     .action(async (id: string, commandOptions: { json?: boolean; mode?: string; tail?: number }) => {
       const runtime = await options.resolveRuntime(options.getCliOverrides());
       const output = readExecutionOutput({
@@ -76,41 +80,42 @@ export function registerExecutionCommand(
 
   command
     .command("cancel")
-    .argument("<id>", "Execution id")
-    .option("--json", "Print structured JSON.")
+    .description(translate(options.locale, "cli.command.executionCancel"))
+    .argument("<id>", translate(options.locale, "cli.argument.executionId"))
+    .option("--json", translate(options.locale, "cli.option.json"))
     .action(async (id: string, commandOptions: { json?: boolean }) => {
       const runtime = await options.resolveRuntime(options.getCliOverrides());
       const execution = cancelExecution(readStateRoot(runtime), id, {
         terminatedBy: "cli",
       });
-      printExecutionList([summarizeExecution(execution)], Boolean(commandOptions.json));
+      printExecutionList([summarizeExecution(execution)], Boolean(commandOptions.json), runtime.config.locale);
     });
 }
 
-function printExecutionList(executions: RuntimeExecutionSummary[], json: boolean): void {
+function printExecutionList(executions: RuntimeExecutionSummary[], json: boolean, locale: KittyLocale): void {
   if (json) {
     writeStdoutLine(JSON.stringify({ executions }, null, 2));
     return;
   }
   if (executions.length === 0) {
-    ui.info("No executions recorded.");
+    ui.info(translate(locale, "cli.execution.none"));
     return;
   }
   for (const execution of executions) {
-    writeStdoutLine(formatExecutionLine(execution));
+    writeStdoutLine(formatExecutionLine(execution, locale));
   }
 }
 
-function formatExecutionLine(execution: RuntimeExecutionSummary): string {
+function formatExecutionLine(execution: RuntimeExecutionSummary, locale: KittyLocale = DEFAULT_LOCALE): string {
   return [
     execution.id,
     execution.kind,
     execution.status,
-    execution.actorName ? `actor=${execution.actorName}` : undefined,
-    execution.pid === undefined ? undefined : `pid=${execution.pid}`,
-    execution.deadlineAt ? `deadline=${execution.deadlineAt}` : undefined,
-    execution.summary ? `summary=${truncateCliValue(execution.summary, 90)}` : undefined,
-    execution.outputPreview ? `lastOutput=${truncateCliValue(execution.outputPreview, 120)}` : undefined,
+    execution.actorName ? `${translate(locale, "status.label.actor")}=${execution.actorName}` : undefined,
+    execution.pid === undefined ? undefined : `${translate(locale, "status.label.pid")}=${execution.pid}`,
+    execution.deadlineAt ? `${translate(locale, "status.label.deadline")}=${execution.deadlineAt}` : undefined,
+    execution.summary ? `${translate(locale, "status.label.summary")}=${truncateCliValue(execution.summary, 90)}` : undefined,
+    execution.outputPreview ? `${translate(locale, "status.label.lastOutput")}=${truncateCliValue(execution.outputPreview, 120)}` : undefined,
   ].filter(Boolean).join("  ");
 }
 

@@ -2,8 +2,7 @@ import stringWidth from "string-width";
 
 import type { TuiMarkdownLineKind, TuiMarkdownSpan } from "./markdown.js";
 import type { TuiTranscriptEntry, TuiTranscriptLineSpan } from "./transcriptTypes.js";
-
-const REASONING_PREFIX = "Thinking: ";
+import { DEFAULT_LOCALE, translate, type KittyLocale } from "../../i18n/index.js";
 
 export interface TuiTranscriptSourceRow {
   readonly markdownKind: TuiMarkdownLineKind | undefined;
@@ -24,16 +23,18 @@ export function wrapTranscriptEntryRows(
   entry: TuiTranscriptEntry,
   sourceRows: readonly TuiTranscriptSourceRow[],
   bodyWidth: number,
+  locale: KittyLocale = DEFAULT_LOCALE,
 ): TuiTranscriptWrappedRow[] {
   if (entry.role !== "reasoning") {
     return sourceRows.flatMap((line) => wrapSourceRow(line, bodyWidth, ""));
   }
 
+  const reasoningPrefix = `${translate(locale, "runtime.reasoning")}: `;
   const rows: TuiTranscriptWrappedRow[] = [];
-  const firstBodyWidth = Math.max(1, bodyWidth - stringWidth(REASONING_PREFIX));
+  const firstBodyWidth = Math.max(1, bodyWidth - stringWidth(reasoningPrefix));
   sourceRows.forEach((line, sourceIndex) => {
     const width = sourceIndex === 0 ? firstBodyWidth : bodyWidth;
-    const prefix = sourceIndex === 0 ? REASONING_PREFIX : "";
+    const prefix = sourceIndex === 0 ? reasoningPrefix : "";
     rows.push(...wrapSourceRow(line, width, prefix));
   });
   return rows;

@@ -2,213 +2,129 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import path from "node:path";
-import Database from "better-sqlite3";
 import test from "node:test";
 
 import type { RunTurnOptions } from "../../src/agent/types.js";
 import { ControlPlaneLedger } from "../../src/control/ledger.js";
-import { getProjectStatePaths } from "../../src/project/statePaths.js";
 import { InteractiveSessionDriver } from "../../src/interaction/sessionDriver.js";
 import { createMessage } from "../../src/session/messages.js";
 import { SessionStore } from "../../src/session/store.js";
 import { TuiController } from "../../src/shell/tui/controller.js";
 import { createTuiInteractionShell } from "../../src/shell/tui/shell.js";
-import { createToolRegistry } from "../../src/tools/core/registry.js";
 import { createAbortError } from "../../src/utils/abort.js";
 import { createTempWorkspace, createTestRuntimeConfig } from "../helpers.js";
 
-test("input submitted during interrupt cleanup is durably queued and runs next", async (t) => {
-  const root = await createTempWorkspace("driver-interrupt-queue", t);
-  const config = createTestRuntimeConfig(root);
-  const sessionStore = new SessionStore(config.paths.sessionsDir);
-  const session = await sessionStore.save(await sessionStore.create(root));
-  const controller = new TuiController(session);
-  const shell = createTuiInteractionShell(controller);
-  const firstStarted = deferred<void>();
-  const firstAbortObserved = deferred<void>();
-  const releaseFirstCleanup = deferred<void>();
-  const secondCompleted = deferred<void>();
-  const executionOrder: string[] = [];
-
-  const driver = new InteractiveSessionDriver({
-    cwd: root,
-    stateRootDir: root,
-    config,
-    session,
-    sessionStore,
-    shell,
-    localCommandHandler: async () => "continue",
-    runTurn: async (options: RunTurnOptions) => {
-      executionOrder.push(options.input);
-      if (options.input === "first") {
-        firstStarted.resolve();
-        await waitForAbort(options.abortSignal);
-        firstAbortObserved.resolve();
-        await releaseFirstCleanup.promise;
-        throw createAbortError("first interrupted");
-      }
-      const saved = await options.sessionStore.appendMessages(options.session, [
-        createMessage("assistant", `${options.input}-done`),
-      ]);
-      secondCompleted.resolve();
-      return completed(saved);
-    },
+test("input submitted during an active turn steers that turn instead of creating another turn", async (t) => {
+  const fixture = await createDriverFixture("driver-active-steer", t);
+  const started = deferred<void>();
+  const releaseConsumption = deferred<void>();
+  const completedTurn = deferred<void>();
+  const observedInputs: string[] = [];
+  const driver = fixture.createDriver(async (options) => {
+    observedInputs.push(options.input);
+    started.resolve();
+    await releaseConsumption.promise;
+    const steered = await options.steering!.consumePending(options.session);
+    assert.deepEqual(steered.inputs, ["refine the active work"]);
+    const saved = await options.sessionStore.appendMessages(steered.session, [
+      createMessage("assistant", "refined result"),
+    ]);
+    completedTurn.resolve();
+    return completed(saved);
   });
 
   const running = driver.run();
-  controller.submitInput("first");
-  await firstStarted.promise;
-  controller.interrupt();
-  await firstAbortObserved.promise;
-  controller.submitInput("second");
-  controller.interrupt();
-  controller.interrupt();
+  fixture.controller.submitInput("start work");
+  await started.promise;
+  fixture.controller.submitInput("refine the active work");
+  await waitUntil(() => readSteers(fixture.root, fixture.session.id).length === 1);
 
-  await waitUntil(() => readTurns(root, session.id).length === 2);
-  assert.deepEqual(readTurns(root, session.id).map((turn) => turn.status), ["running", "queued"]);
+  assert.equal(fixture.controller.getState().transcript.filter(
+    (entry) => entry.role === "user" && entry.text === "refine the active work",
+  ).length, 1);
+  assert.equal(readTurns(fixture.root, fixture.session.id).length, 1);
+  assert.equal(readTurns(fixture.root, fixture.session.id)[0]?.status, "running");
+  assert.deepEqual(readSteers(fixture.root, fixture.session.id).map((steer) => steer.status), ["pending"]);
 
-  releaseFirstCleanup.resolve();
-  await secondCompleted.promise;
-  await waitUntil(() => readTurns(root, session.id).every((turn) => ["completed", "aborted"].includes(turn.status)));
-  controller.closeInput();
+  releaseConsumption.resolve();
+  await completedTurn.promise;
+  await waitUntil(() => readTurns(fixture.root, fixture.session.id)[0]?.status === "completed");
+  fixture.controller.closeInput();
   await running;
 
-  assert.deepEqual(executionOrder, ["first", "second"]);
-  assert.deepEqual(readTurns(root, session.id).map((turn) => turn.status), ["aborted", "completed"]);
-  assert.equal((await sessionStore.load(session.id)).messages.some((message) => message.content === "second-done"), true);
+  assert.deepEqual(observedInputs, ["start work"]);
+  assert.deepEqual(readSteers(fixture.root, fixture.session.id).map((steer) => steer.status), ["consumed"]);
+  assert.equal((await fixture.sessionStore.load(fixture.session.id)).messages.some(
+    (message) => message.content === "refine the active work",
+  ), true);
 });
 
-test("accepted input is durable before asynchronous turn context preparation", async (t) => {
-  const root = await createTempWorkspace("driver-admission-boundary", t);
-  const config = createTestRuntimeConfig(root);
-  const sessionStore = new SessionStore(config.paths.sessionsDir);
-  const session = await sessionStore.save(await sessionStore.create(root));
-  const controller = new TuiController(session);
+test("accepted initial input is durable before asynchronous turn context preparation", async (t) => {
+  const fixture = await createDriverFixture("driver-admission-boundary", t);
   const releaseContext = deferred<void>();
   const driver = new InteractiveSessionDriver({
-    cwd: root,
-    stateRootDir: root,
-    config,
-    session,
-    sessionStore,
-    shell: createTuiInteractionShell(controller),
+    cwd: fixture.root,
+    stateRootDir: fixture.root,
+    config: fixture.config,
+    session: fixture.session,
+    sessionStore: fixture.sessionStore,
+    shell: createTuiInteractionShell(fixture.controller),
     turnContextProvider: async () => {
       await releaseContext.promise;
       return {};
     },
-    runTurn: async (options: RunTurnOptions) => completed(options.session),
+    runTurn: async (options) => completed(options.session),
   });
 
   const running = driver.run();
-  controller.submitInput("persist before preparation");
-  await waitUntil(() => readTurns(root, session.id).length === 1);
+  fixture.controller.submitInput("persist before preparation");
+  await waitUntil(() => readTurns(fixture.root, fixture.session.id).length === 1);
+  assert.equal(readTurns(fixture.root, fixture.session.id)[0]?.status, "queued");
 
-  assert.equal(readTurns(root, session.id)[0]?.status, "queued");
-  assert.equal(readTurns(root, session.id)[0]?.input, "persist before preparation");
-
-  controller.closeInput();
+  fixture.controller.closeInput();
   releaseContext.resolve();
   await running;
-  assert.equal(readTurns(root, session.id)[0]?.status, "queued");
+  assert.equal(readTurns(fixture.root, fixture.session.id)[0]?.status, "queued");
 });
 
-test("driver restart consumes an admitted queued turn without duplicating it", async (t) => {
-  const root = await createTempWorkspace("driver-restart-queue", t);
-  const config = createTestRuntimeConfig(root);
-  const sessionStore = new SessionStore(config.paths.sessionsDir);
-  const session = await sessionStore.save(await sessionStore.create(root));
-  const ledger = new ControlPlaneLedger(root);
-  const abandoned = ledger.turns.admit({
-    sessionId: session.id,
-    input: "abandoned running turn",
-    inputSource: "external",
-  });
-  assert.ok(ledger.turns.claim(abandoned.id));
-  const admitted = ledger.turns.admit({
-    sessionId: session.id,
-    input: "recover me",
-    inputSource: "external",
-  });
-  ledger.turns.reconcileExpired(session.id, new Date(Date.now() + 31_000));
+test("expired active turn resumes with its pending steer and no duplicate turn admission", async (t) => {
+  const fixture = await createDriverFixture("driver-steer-recovery", t);
+  const ledger = new ControlPlaneLedger(fixture.root);
+  const turn = ledger.turns.admit({ sessionId: fixture.session.id, input: "recover work", inputSource: "external" });
+  ledger.turns.claim(turn.id);
+  const steer = ledger.turnSteers.admit({
+    turnId: turn.id,
+    sessionId: fixture.session.id,
+    text: "recovered guidance",
+  })!;
+  assert.equal(ledger.turns.reconcileExpired(fixture.session.id, new Date(Date.now() + 31_000)), 1);
   ledger.close();
 
-  const controller = new TuiController(session);
-  const completedTurn = deferred<void>();
-  const driver = new InteractiveSessionDriver({
-    cwd: root,
-    stateRootDir: root,
-    config,
-    session,
-    sessionStore,
-    shell: createTuiInteractionShell(controller),
-    localCommandHandler: async () => "continue",
-    runTurn: async (options: RunTurnOptions) => {
-      const saved = await options.sessionStore.appendMessages(options.session, [
-        createMessage("assistant", `${options.input}-done`),
-      ]);
-      completedTurn.resolve();
-      return completed(saved);
-    },
-  });
-
-  const running = driver.run();
-  await completedTurn.promise;
-  controller.closeInput();
-  await running;
-
-  const turns = readTurns(root, session.id);
-  assert.equal(turns.length, 2);
-  assert.equal(turns[0]?.id, abandoned.id);
-  assert.equal(turns[0]?.status, "failed");
-  assert.equal(turns[1]?.id, admitted.id);
-  assert.equal(turns[1]?.status, "completed");
-  assert.equal((await sessionStore.load(session.id)).messages.some((message) => message.content === "recover me-done"), true);
-});
-
-test("restart reconciles a recently orphaned running turn after its lease expires", async (t) => {
-  const root = await createTempWorkspace("driver-running-reconcile", t);
-  const config = createTestRuntimeConfig(root);
-  const sessionStore = new SessionStore(config.paths.sessionsDir);
-  const session = await sessionStore.save(await sessionStore.create(root));
-  const ledger = new ControlPlaneLedger(root);
-  const runningTurn = ledger.turns.admit({
-    sessionId: session.id,
-    input: "orphan without a queued successor",
-    inputSource: "external",
-  });
-  ledger.turns.claim(runningTurn.id);
-  ledger.close();
-  setTurnLeaseExpiry(root, runningTurn.id, new Date(Date.now() + 100));
-
-  const controller = new TuiController(session);
-  const driver = new InteractiveSessionDriver({
-    cwd: root,
-    stateRootDir: root,
-    config,
-    session,
-    sessionStore,
-    shell: createTuiInteractionShell(controller),
+  const resumed = deferred<void>();
+  const driver = fixture.createDriver(async (options) => {
+    const steered = await options.steering!.consumePending(options.session);
+    assert.deepEqual(steered.inputs, ["recovered guidance"]);
+    resumed.resolve();
+    return completed(steered.session);
   });
   const running = driver.run();
-
-  await waitUntil(() => readTurns(root, session.id)[0]?.status === "failed");
-  assert.equal(
-    controller.getState().transcript.some((entry) => entry.text.includes("Recovered 1 interrupted turn")),
-    true,
-  );
-  controller.closeInput();
+  await resumed.promise;
+  await waitUntil(() => readTurns(fixture.root, fixture.session.id)[0]?.status === "completed");
+  fixture.controller.closeInput();
   await running;
+
+  assert.equal(readTurns(fixture.root, fixture.session.id).length, 1);
+  assert.equal(readTurns(fixture.root, fixture.session.id)[0]?.id, turn.id);
+  assert.equal(readSteers(fixture.root, fixture.session.id)[0]?.id, steer.id);
+  assert.equal(readSteers(fixture.root, fixture.session.id)[0]?.status, "consumed");
 });
 
-test("hard-killed driver leaves accepted input recoverable without duplicate admission", async (t) => {
-  const root = await createTempWorkspace("driver-hard-kill", t);
-  const config = createTestRuntimeConfig(root);
-  const sessionStore = new SessionStore(config.paths.sessionsDir);
-  const session = await sessionStore.save(await sessionStore.create(root));
+test("hard-killed driver preserves the active turn and steer for same-turn recovery", async (t) => {
+  const fixture = await createDriverFixture("driver-hard-kill-steer", t);
   const child = spawn(process.execPath, [
     path.resolve(".test-build/tests/fixtures/driver-hard-kill-child.js"),
-    root,
-    session.id,
+    fixture.root,
+    fixture.session.id,
   ], {
     cwd: process.cwd(),
     stdio: ["ignore", "pipe", "pipe"],
@@ -220,102 +136,171 @@ test("hard-killed driver leaves accepted input recoverable without duplicate adm
   await waitForChildReady(child);
   assert.equal(child.kill("SIGKILL"), true);
   await once(child, "exit");
+  const activeTurn = readTurns(fixture.root, fixture.session.id)[0]!;
+  assert.equal(activeTurn.status, "running");
+  assert.deepEqual(readSteers(fixture.root, fixture.session.id).map((steer) => steer.status), ["pending"]);
 
-  const afterKill = readTurns(root, session.id);
-  assert.deepEqual(afterKill.map((turn) => turn.status), ["running", "queued"]);
-  const queuedTurnId = afterKill[1]?.id;
-  const ledger = new ControlPlaneLedger(root);
+  const ledger = new ControlPlaneLedger(fixture.root);
   try {
-    assert.equal(ledger.turns.reconcileExpired(session.id, new Date(Date.now() + 31_000)), 1);
+    assert.equal(ledger.turns.reconcileExpired(fixture.session.id, new Date(Date.now() + 31_000)), 1);
   } finally {
     ledger.close();
   }
 
-  const controller = new TuiController(await sessionStore.load(session.id));
   const recovered = deferred<void>();
-  const replacement = new InteractiveSessionDriver({
-    cwd: root,
-    stateRootDir: root,
-    config,
-    session: await sessionStore.load(session.id),
-    sessionStore,
-    shell: createTuiInteractionShell(controller),
-    runTurn: async (options: RunTurnOptions) => {
-      recovered.resolve();
-      return completed(options.session);
-    },
+  const replacement = fixture.createDriver(async (options) => {
+    const steered = await options.steering!.consumePending(options.session);
+    assert.deepEqual(steered.inputs, ["survive hard kill"]);
+    recovered.resolve();
+    return completed(steered.session);
   });
   const replacementRun = replacement.run();
   await recovered.promise;
-  controller.closeInput();
+  await waitUntil(() => readTurns(fixture.root, fixture.session.id)[0]?.status === "completed");
+  fixture.controller.closeInput();
   await replacementRun;
 
-  const recoveredTurns = readTurns(root, session.id);
-  assert.equal(recoveredTurns.length, 2);
-  assert.equal(recoveredTurns[0]?.status, "failed");
-  assert.equal(recoveredTurns[1]?.id, queuedTurnId);
-  assert.equal(recoveredTurns[1]?.status, "completed");
+  assert.equal(readTurns(fixture.root, fixture.session.id).length, 1);
+  assert.equal(readTurns(fixture.root, fixture.session.id)[0]?.id, activeTurn.id);
+  assert.deepEqual(readSteers(fixture.root, fixture.session.id).map((steer) => steer.status), ["consumed"]);
 });
 
-test("closing the terminal aborts the active owner but preserves accepted queued input for restart", async (t) => {
-  const root = await createTempWorkspace("driver-close-recovery", t);
-  const config = createTestRuntimeConfig(root);
-  const sessionStore = new SessionStore(config.paths.sessionsDir);
-  const session = await sessionStore.save(await sessionStore.create(root));
-  const firstController = new TuiController(session);
+test("Ctrl+C aborts the active turn and rejects its unconsumed steers", async (t) => {
+  const fixture = await createDriverFixture("driver-interrupt-steer", t);
+  const started = deferred<void>();
+  const driver = fixture.createDriver(async (options) => {
+    started.resolve();
+    await waitForAbort(options.abortSignal);
+    throw createAbortError("interrupted");
+  });
+
+  const running = driver.run();
+  fixture.controller.submitInput("active");
+  await started.promise;
+  fixture.controller.submitInput("guidance before abort");
+  await waitUntil(() => readSteers(fixture.root, fixture.session.id).length === 1);
+  fixture.controller.interrupt();
+  await waitUntil(() => readTurns(fixture.root, fixture.session.id)[0]?.status === "aborted");
+  fixture.controller.closeInput();
+  await running;
+
+  assert.equal(readTurns(fixture.root, fixture.session.id).length, 1);
+  assert.deepEqual(readSteers(fixture.root, fixture.session.id).map((steer) => steer.status), ["rejected"]);
+});
+
+test("input submitted during interrupt cleanup becomes the next durable turn", async (t) => {
+  const fixture = await createDriverFixture("driver-interrupt-followup", t);
   const firstStarted = deferred<void>();
-  const firstDriver = new InteractiveSessionDriver({
-    cwd: root,
-    stateRootDir: root,
-    config,
-    session,
-    sessionStore,
-    shell: createTuiInteractionShell(firstController),
-    localCommandHandler: async () => "continue",
-    runTurn: async (options: RunTurnOptions) => {
+  const firstAbortObserved = deferred<void>();
+  const releaseFirstCleanup = deferred<void>();
+  const secondCompleted = deferred<void>();
+  const executionOrder: string[] = [];
+  const driver = fixture.createDriver(async (options) => {
+    executionOrder.push(options.input);
+    if (options.input === "first") {
       firstStarted.resolve();
       await waitForAbort(options.abortSignal);
-      throw createAbortError("terminal closed");
-    },
+      firstAbortObserved.resolve();
+      await releaseFirstCleanup.promise;
+      throw createAbortError("first interrupted");
+    }
+    secondCompleted.resolve();
+    return completed(options.session);
+  });
+
+  const running = driver.run();
+  fixture.controller.submitInput("first");
+  await firstStarted.promise;
+  fixture.controller.interrupt();
+  await firstAbortObserved.promise;
+  fixture.controller.submitInput("second");
+
+  await waitUntil(() => readTurns(fixture.root, fixture.session.id).length === 2);
+  assert.deepEqual(readTurns(fixture.root, fixture.session.id).map((turn) => turn.status), ["running", "queued"]);
+  assert.equal(readSteers(fixture.root, fixture.session.id).length, 0);
+
+  releaseFirstCleanup.resolve();
+  await secondCompleted.promise;
+  await waitUntil(() => readTurns(fixture.root, fixture.session.id).every(
+    (turn) => turn.status === "aborted" || turn.status === "completed",
+  ));
+  fixture.controller.closeInput();
+  await running;
+
+  assert.deepEqual(executionOrder, ["first", "second"]);
+  assert.deepEqual(readTurns(fixture.root, fixture.session.id).map((turn) => turn.status), ["aborted", "completed"]);
+});
+
+test("terminal close detaches active work for recovery instead of treating it as Ctrl+C", async (t) => {
+  const fixture = await createDriverFixture("driver-close-recovery", t);
+  const started = deferred<void>();
+  const firstDriver = fixture.createDriver(async (options) => {
+    started.resolve();
+    await waitForAbort(options.abortSignal);
+    throw createAbortError("terminal closed");
   });
 
   const firstRun = firstDriver.run();
-  firstController.submitInput("active");
-  await firstStarted.promise;
-  firstController.submitInput("survive restart");
-  await waitUntil(() => readTurns(root, session.id).length === 2);
-  firstController.closeInput();
+  fixture.controller.submitInput("active");
+  await started.promise;
+  fixture.controller.submitInput("survive terminal close");
+  await waitUntil(() => readSteers(fixture.root, fixture.session.id).length === 1);
+  fixture.controller.closeInput();
   await firstRun;
 
-  assert.deepEqual(readTurns(root, session.id).map((turn) => turn.status), ["aborted", "queued"]);
+  assert.deepEqual(readTurns(fixture.root, fixture.session.id).map((turn) => turn.status), ["queued"]);
+  assert.deepEqual(readSteers(fixture.root, fixture.session.id).map((steer) => steer.status), ["pending"]);
 
-  const secondController = new TuiController(await sessionStore.load(session.id));
-  const recovered = deferred<void>();
+  const secondController = new TuiController(await fixture.sessionStore.load(fixture.session.id));
+  const resumed = deferred<void>();
   const secondDriver = new InteractiveSessionDriver({
-    cwd: root,
-    stateRootDir: root,
-    config,
-    session: await sessionStore.load(session.id),
-    sessionStore,
+    cwd: fixture.root,
+    stateRootDir: fixture.root,
+    config: fixture.config,
+    session: await fixture.sessionStore.load(fixture.session.id),
+    sessionStore: fixture.sessionStore,
     shell: createTuiInteractionShell(secondController),
-    localCommandHandler: async () => "continue",
-    runTurn: async (options: RunTurnOptions) => {
-      const saved = await options.sessionStore.appendMessages(options.session, [
-        createMessage("assistant", `${options.input}-done`),
-      ]);
-      recovered.resolve();
-      return completed(saved);
+    runTurn: async (options) => {
+      const steered = await options.steering!.consumePending(options.session);
+      assert.deepEqual(steered.inputs, ["survive terminal close"]);
+      resumed.resolve();
+      return completed(steered.session);
     },
   });
-
   const secondRun = secondDriver.run();
-  await recovered.promise;
+  await resumed.promise;
+  await waitUntil(() => readTurns(fixture.root, fixture.session.id)[0]?.status === "completed");
   secondController.closeInput();
   await secondRun;
-
-  assert.deepEqual(readTurns(root, session.id).map((turn) => turn.status), ["aborted", "completed"]);
-  assert.equal((await sessionStore.load(session.id)).messages.some((message) => message.content === "survive restart-done"), true);
+  assert.deepEqual(readSteers(fixture.root, fixture.session.id).map((steer) => steer.status), ["consumed"]);
 });
+
+async function createDriverFixture(name: string, t: Parameters<typeof createTempWorkspace>[1]) {
+  const root = await createTempWorkspace(name, t);
+  const config = createTestRuntimeConfig(root);
+  const sessionStore = new SessionStore(config.paths.sessionsDir);
+  const session = await sessionStore.save(await sessionStore.create(root));
+  const controller = new TuiController(session);
+  return {
+    root,
+    config,
+    sessionStore,
+    session,
+    controller,
+    createDriver(runTurn: (options: RunTurnOptions) => Promise<ReturnType<typeof completed>>) {
+      return new InteractiveSessionDriver({
+        cwd: root,
+        stateRootDir: root,
+        config,
+        session,
+        sessionStore,
+        shell: createTuiInteractionShell(controller),
+        localCommandHandler: async () => "continue",
+        runTurn,
+      });
+    },
+  };
+}
 
 function completed(session: Awaited<ReturnType<SessionStore["load"]>>) {
   return {
@@ -338,12 +323,12 @@ function readTurns(root: string, sessionId: string) {
   }
 }
 
-function setTurnLeaseExpiry(root: string, turnId: string, expiresAt: Date): void {
-  const db = new Database(getProjectStatePaths(root).controlPlaneLedgerFile);
+function readSteers(root: string, sessionId: string) {
+  const ledger = new ControlPlaneLedger(root);
   try {
-    db.prepare("UPDATE session_turns SET lease_expires_at=? WHERE id=?").run(expiresAt.toISOString(), turnId);
+    return ledger.turns.listBySession(sessionId).flatMap((turn) => ledger.turnSteers.listByTurn(turn.id));
   } finally {
-    db.close();
+    ledger.close();
   }
 }
 
@@ -352,7 +337,7 @@ async function waitForAbort(signal: AbortSignal | undefined): Promise<void> {
   await new Promise<void>((resolve) => signal?.addEventListener("abort", () => resolve(), { once: true }));
 }
 
-async function waitUntil(predicate: () => boolean, timeoutMs = 2_000): Promise<void> {
+async function waitUntil(predicate: () => boolean, timeoutMs = 3_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (!predicate()) {
     if (Date.now() >= deadline) throw new Error("Timed out waiting for state transition.");

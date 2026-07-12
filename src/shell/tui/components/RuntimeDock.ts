@@ -4,13 +4,16 @@ import { TUI_DOCK_ROWS } from "../layout.js";
 import type { InkRuntime } from "./kit.js";
 import { formatElapsedCompact, type TuiActivity, type TuiActivitySeverity } from "../activity.js";
 import { TUI_SPINNER_FRAMES, useTuiAnimationFrame } from "../animation.js";
+import { DEFAULT_LOCALE, translate, type KittyLocale } from "../../../i18n/index.js";
 
 export function createRuntimeDockComponent(kit: Pick<InkRuntime, "React" | "Box" | "Text">) {
   const { React, Box, Text } = kit;
   return function RuntimeDock(props: {
     dock: TuiRuntimeDockState;
+    locale?: KittyLocale;
     now?: number;
   }): React.ReactNode {
+    const locale = props.locale ?? DEFAULT_LOCALE;
     const activity = props.dock.activity;
     const [clock, setClock] = React.useState(props.now ?? Date.now());
     React.useEffect(() => {
@@ -27,14 +30,14 @@ export function createRuntimeDockComponent(kit: Pick<InkRuntime, "React" | "Box"
     });
     const now = props.now ?? clock;
     const elapsed = props.dock.turnStartedAt !== undefined
-      ? `思考中 ${formatElapsedCompact(now - props.dock.turnStartedAt)}`
+      ? translate(locale, "tui.thinkingElapsed", { elapsed: formatElapsedCompact(now - props.dock.turnStartedAt) })
       : undefined;
     const facts: Array<{ label: string; value: string }> = [];
     if (props.dock.background) {
-      facts.push({ label: "后台", value: props.dock.background });
+      facts.push({ label: translate(locale, "tui.background"), value: props.dock.background });
     }
     if (props.dock.subagent) {
-      facts.push({ label: "子代理", value: props.dock.subagent });
+      facts.push({ label: translate(locale, "tui.subagent"), value: props.dock.subagent });
     }
     const compactFacts = facts.map(({ label, value }) => `${label} ${value}`).join("  ·  ");
     return React.createElement(
@@ -47,7 +50,7 @@ export function createRuntimeDockComponent(kit: Pick<InkRuntime, "React" | "Box"
       React.createElement(
         Box,
         { flexDirection: "row", height: 1, justifyContent: "space-between", width: "100%" },
-        renderActivityRow(React, Box, Text, activity, { spinnerFrame }),
+        renderActivityRow(React, Box, Text, activity, { spinnerFrame }, locale),
         compactFacts
           ? React.createElement(
             Box,
@@ -73,12 +76,13 @@ function renderActivityRow(
   Text: typeof import("ink").Text,
   activity: TuiActivity | undefined,
   animation: { spinnerFrame: number },
+  locale: KittyLocale,
 ): React.ReactNode {
   if (!activity) {
     return React.createElement(
       Box,
       { flexDirection: "row", flexGrow: 1, flexShrink: 1, height: 1, overflowX: "hidden" },
-      React.createElement(Text, { color: TUI_COLORS.muted }, "空闲"),
+      React.createElement(Text, { color: TUI_COLORS.muted }, translate(locale, "tui.idle")),
     );
   }
 
@@ -88,12 +92,12 @@ function renderActivityRow(
       Box,
       { flexDirection: "row", flexGrow: 1, flexShrink: 1, height: 1, overflowX: "hidden" },
       React.createElement(Text, { color }, readActivityMarker(activity, animation)),
-      React.createElement(Text, { color: TUI_COLORS.muted }, "正在运行"),
+      React.createElement(Text, { color: TUI_COLORS.muted }, translate(locale, "tui.running")),
     );
   }
 
-  const label = readActivityLabel(activity);
-  const blocker = activity.blockingLead ? "  阻塞 lead" : "";
+  const label = readActivityLabel(activity, locale);
+  const blocker = activity.blockingLead ? `  ${translate(locale, "tui.blockingLead")}` : "";
   const detail = activity.detail ? `  ${activity.detail}` : "";
   return React.createElement(
     Box,
@@ -119,20 +123,20 @@ function readActivityMarker(activity: TuiActivity, animation: { spinnerFrame: nu
   }
 }
 
-function readActivityLabel(activity: TuiActivity): string {
+function readActivityLabel(activity: TuiActivity, locale: KittyLocale): string {
   if (activity.status === "failed") {
-    return "失败";
+    return translate(locale, "tui.failed");
   }
   if (activity.status === "waiting") {
-    return activity.channel === "subagent" ? "子代理等待" : "正在等待";
+    return translate(locale, activity.channel === "subagent" ? "tui.subagentWaiting" : "tui.waiting");
   }
   if (activity.channel === "subagent") {
-    return "子代理正在运行";
+    return translate(locale, "tui.subagentRunning");
   }
   if (activity.kind === "background") {
-    return "后台正在运行";
+    return translate(locale, "tui.backgroundRunning");
   }
-  return "正在运行";
+  return translate(locale, "tui.running");
 }
 
 function readSeverityColor(severity: TuiActivitySeverity): string {

@@ -1,4 +1,5 @@
 import type { SessionRecord } from "../types.js";
+import { DEFAULT_LOCALE, translate, type KittyLocale } from "../i18n/index.js";
 
 export function parseSessionPickerChoice(
   input: string,
@@ -25,7 +26,11 @@ export function parseSessionPickerChoice(
   return { kind: "invalid" };
 }
 
-export function formatRelativeSessionTime(updatedAt: string, now: Date): string {
+export function formatRelativeSessionTime(
+  updatedAt: string,
+  now: Date,
+  locale: KittyLocale = DEFAULT_LOCALE,
+): string {
   const updatedTime = new Date(updatedAt).getTime();
   if (!Number.isFinite(updatedTime)) {
     return updatedAt;
@@ -33,40 +38,43 @@ export function formatRelativeSessionTime(updatedAt: string, now: Date): string 
 
   const seconds = Math.max(0, Math.floor((now.getTime() - updatedTime) / 1000));
   if (seconds < 60) {
-    return "刚刚";
+    return translate(locale, "tui.time.now");
   }
 
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) {
-    return `${minutes} 分钟前`;
+    return translate(locale, "tui.time.minutes", { count: minutes });
   }
 
   const hours = Math.floor(minutes / 60);
   if (hours < 24) {
-    return `${hours} 小时前`;
+    return translate(locale, "tui.time.hours", { count: hours });
   }
 
   const days = Math.floor(hours / 24);
   if (days < 7) {
-    return `${days} 天前`;
+    return translate(locale, "tui.time.days", { count: days });
   }
 
   const weeks = Math.floor(days / 7);
   if (days < 30) {
-    return `${weeks} 周前`;
+    return translate(locale, "tui.time.weeks", { count: weeks });
   }
 
   const months = Math.floor(days / 30);
   if (days < 365) {
-    return `${months} 个月前`;
+    return translate(locale, "tui.time.months", { count: months });
   }
 
-  return `${Math.floor(days / 365)} 年前`;
+  return translate(locale, "tui.time.years", { count: Math.floor(days / 365) });
 }
 
-export function formatSessionPickerTitle(session: Pick<SessionRecord, "title" | "id">): string {
+export function formatSessionPickerTitle(
+  session: Pick<SessionRecord, "title" | "id">,
+  locale: KittyLocale = DEFAULT_LOCALE,
+): string {
   const title = session.title?.trim();
-  return truncateDisplayTitle(title || `未命名会话 ${session.id}`);
+  return truncateDisplayTitle(title || translate(locale, "tui.unnamedSession", { id: session.id }));
 }
 
 function truncateDisplayTitle(title: string): string {

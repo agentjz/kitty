@@ -11,6 +11,8 @@ import { TurnLedgerRepo } from "./turns.js";
 import { ToolCallLedgerRepo } from "./toolCalls.js";
 import { ContextEpochLedgerRepo } from "./contextEpochs.js";
 import { RuntimeEventLedgerRepo } from "./runtimeEvents.js";
+import { InteractionDraftLedgerRepo } from "./interactionDrafts.js";
+import { TurnSteerLedgerRepo } from "./turnSteers.js";
 
 export type {
   ExecutionRecord,
@@ -34,6 +36,8 @@ export class ControlPlaneLedger {
   readonly toolCalls: ToolCallLedgerRepo;
   readonly contextEpochs: ContextEpochLedgerRepo;
   readonly runtimeEvents: RuntimeEventLedgerRepo;
+  readonly interactionDrafts: InteractionDraftLedgerRepo;
+  readonly turnSteers: TurnSteerLedgerRepo;
   private readonly db: Database.Database;
 
   constructor(rootDir: string) {
@@ -42,6 +46,7 @@ export class ControlPlaneLedger {
     this.db = new Database(statePaths.controlPlaneLedgerFile);
     this.db.pragma("journal_mode = WAL");
     this.db.pragma("synchronous = FULL");
+    this.db.pragma("busy_timeout = 5000");
     this.db.pragma("foreign_keys = ON");
     initializeControlPlaneSchema(this.db);
     this.executions = new ExecutionLedgerRepo(this.db);
@@ -52,6 +57,8 @@ export class ControlPlaneLedger {
     this.toolCalls = new ToolCallLedgerRepo(this.db);
     this.contextEpochs = new ContextEpochLedgerRepo(this.db);
     this.runtimeEvents = new RuntimeEventLedgerRepo(this.db);
+    this.interactionDrafts = new InteractionDraftLedgerRepo(this.db);
+    this.turnSteers = new TurnSteerLedgerRepo(this.db);
   }
 
   transaction<T>(operation: () => T): T {

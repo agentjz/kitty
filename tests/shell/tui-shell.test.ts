@@ -4,6 +4,9 @@ import test from "node:test";
 import { TuiController } from "../../src/shell/tui/controller.js";
 import { createTuiExecutionDockWatcher } from "../../src/shell/tui/executionDock.js";
 import { createTuiInteractionShell } from "../../src/shell/tui/shell.js";
+import { createTestRuntimeConfig } from "../helpers.js";
+
+const TUI_TEST_CONFIG = createTestRuntimeConfig(process.cwd());
 
 test("tui shell input queue resolves submitted input", async () => {
   const controller = new TuiController();
@@ -39,7 +42,7 @@ test("tui turn display keeps live tool facts in runtime dock", () => {
   const shell = createTuiInteractionShell(controller);
   const display = shell.createTurnDisplay({
     cwd: process.cwd(),
-    config: { showReasoning: true } as never,
+    config: TUI_TEST_CONFIG,
     abortSignal: new AbortController().signal,
   });
 
@@ -92,7 +95,7 @@ test("tui turn display renders replayed subagent runtime UI in the current trans
   const shell = createTuiInteractionShell(controller);
   const display = shell.createTurnDisplay({
     cwd: process.cwd(),
-    config: { showReasoning: true } as never,
+    config: TUI_TEST_CONFIG,
     abortSignal: new AbortController().signal,
   });
 
@@ -124,7 +127,7 @@ test("tui turn display renders replayed subagent runtime UI in the current trans
   assert.match(text, /\[子代理\]/);
   assert.match(text, /worker answer/);
   assert.equal(state.transcript.some((entry) => entry.role === "subagent" && entry.text === "worker answer"), true);
-  assert.equal(state.dock.activity?.summary, "子代理已完成，切回 lead");
+  assert.equal(state.dock.activity?.summary, "Lead resumed after delegated execution settled.");
 });
 
 test("tui turn display does not keep subagent read failures as live subagent state", () => {
@@ -132,7 +135,7 @@ test("tui turn display does not keep subagent read failures as live subagent sta
   const shell = createTuiInteractionShell(controller);
   const display = shell.createTurnDisplay({
     cwd: process.cwd(),
-    config: { showReasoning: true } as never,
+    config: TUI_TEST_CONFIG,
     abortSignal: new AbortController().signal,
   });
 
@@ -148,7 +151,7 @@ test("tui turn display shows todo_write preview as a tool transcript fact", () =
   const shell = createTuiInteractionShell(controller);
   const display = shell.createTurnDisplay({
     cwd: process.cwd(),
-    config: { showReasoning: true } as never,
+    config: TUI_TEST_CONFIG,
     abortSignal: new AbortController().signal,
   });
 
@@ -170,7 +173,7 @@ test("tui turn display keeps raw bash command visible while running", () => {
   const shell = createTuiInteractionShell(controller);
   const display = shell.createTurnDisplay({
     cwd: process.cwd(),
-    config: { showReasoning: true } as never,
+    config: TUI_TEST_CONFIG,
     abortSignal: new AbortController().signal,
   });
 
@@ -185,7 +188,7 @@ test("tui turn display marks subagent replayed tool calls as blocking lead activ
   const shell = createTuiInteractionShell(controller);
   const display = shell.createTurnDisplay({
     cwd: process.cwd(),
-    config: { showReasoning: true } as never,
+    config: TUI_TEST_CONFIG,
     abortSignal: new AbortController().signal,
   });
 
@@ -208,7 +211,7 @@ test("tui turn display exposes post-answer summary status", () => {
   const shell = createTuiInteractionShell(controller);
   const display = shell.createTurnDisplay({
     cwd: process.cwd(),
-    config: { showReasoning: true } as never,
+    config: TUI_TEST_CONFIG,
     abortSignal: new AbortController().signal,
   });
 
@@ -224,7 +227,7 @@ test("tui turn display does not let unrelated tools clear live execution facts",
   const shell = createTuiInteractionShell(controller);
   const display = shell.createTurnDisplay({
     cwd: process.cwd(),
-    config: { showReasoning: true } as never,
+    config: TUI_TEST_CONFIG,
     abortSignal: new AbortController().signal,
   });
 

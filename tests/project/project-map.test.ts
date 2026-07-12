@@ -36,7 +36,7 @@ test("project map exposes stable project facts without semantic judgment", async
 });
 
 test("project map degrades when package and git facts are missing", async (t) => {
-  const root = await createTempWorkspace("project-map-no-git", t);
+  const root = await createTempWorkspace("project-map-no-git", t, { gitBoundary: "unavailable" });
   await fs.mkdir(path.join(root, "src"), { recursive: true });
 
   const map = await buildProjectMap(root);

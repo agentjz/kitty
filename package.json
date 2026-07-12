@@ -22,15 +22,15 @@
     "access": "public"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.0.0"
   },
   "scripts": {
-    "build": "tsup src/cli.ts --format cjs --platform node --target node20 --outDir dist --clean --sourcemap && tsup src/tui.ts --format esm --platform node --target node20 --outDir dist --clean=false --external typescript",
+    "build": "tsup src/cli.ts --format cjs --platform node --target node22 --outDir dist --clean --sourcemap && tsup src/tui.ts --format esm --platform node --target node22 --outDir dist --clean=false --external typescript --external react-devtools-core",
     "check": "npm run typecheck && npm run build",
     "dev": "tsx src/cli.ts",
     "test:build": "node -e \"require('node:fs').rmSync('.test-build', { recursive: true, force: true })\" && tsc -p tsconfig.tests.json",
-    "test:core": "npm run test:build && node scripts/run-core-tests.mjs",
-    "test:eval": "npm run test:build && node --test .test-build/tests/evaluation/**/*.test.js",
+    "test:core": "npm run test:build && node scripts/run-tests.mjs core",
+    "test:eval": "npm run test:build && node scripts/run-tests.mjs evaluation",
     "eval:local": "node scripts/ensure-dist-built.mjs && node dist/cli.js eval --run-local",
     "eval:production": "node scripts/ensure-dist-built.mjs && node dist/cli.js eval --run-production",
     "verify": "npm test",
@@ -53,14 +53,12 @@
     "openai": "^6.4.0",
     "react": "^19.2.7",
     "string-width": "^8.2.1",
-    "wrap-ansi": "^10.0.0",
-    "ws": "^8.21.0"
+    "wrap-ansi": "^10.0.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.5.2",
     "@types/react": "^19.2.17",
-    "@types/ws": "^8.18.1",
     "tsup": "^8.5.0",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2"

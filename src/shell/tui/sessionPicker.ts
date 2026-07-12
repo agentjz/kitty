@@ -9,6 +9,7 @@ import {
 import { TUI_COLORS } from "./theme.js";
 import type { InkRuntime } from "./components/kit.js";
 import { createWelcomeWordmarkComponent } from "./components/WelcomeWordmark.js";
+import { DEFAULT_LOCALE, translate, type KittyLocale } from "../../i18n/index.js";
 
 export interface TuiSessionSelection {
   session: SessionRecord;
@@ -21,6 +22,7 @@ export async function selectTuiSession(options: {
   sessionStore: SessionStoreLike;
   React: InkRuntime["React"];
   ink: Pick<typeof import("ink"), "Box" | "Text" | "render" | "useInput" | "useStdout">;
+  locale?: KittyLocale;
   limit?: number;
 }): Promise<TuiSessionSelection | null> {
   const sessions = await options.sessionStore.list(options.limit ?? 10);
@@ -68,6 +70,7 @@ export async function selectTuiSession(options: {
 
     app = options.ink.render(
       options.React.createElement(Picker, {
+        locale: options.locale ?? DEFAULT_LOCALE,
         sessions,
         now: new Date(),
         onSelect: (choice: number) => {
@@ -91,11 +94,13 @@ export function createTuiSessionPickerComponent(
   const { React, Box, Text, useInput, useStdout } = kit;
   const WelcomeWordmark = createWelcomeWordmarkComponent(kit);
   return function TuiSessionPicker(props: {
+    locale?: KittyLocale;
     sessions: readonly SessionRecord[];
     now: Date;
     onSelect: (choice: number) => void;
     onCancel: () => void;
   }): React.ReactNode {
+    const locale = props.locale ?? DEFAULT_LOCALE;
     const [cursor, setCursor] = React.useState(1);
     const { stdout } = useStdout();
     const width = Math.max(40, stdout.columns ?? 80);
@@ -160,12 +165,12 @@ export function createTuiSessionPickerComponent(
             React.createElement(WelcomeWordmark),
           ),
         React.createElement(Box, { height: 1 }),
-        React.createElement(Text, { color: TUI_COLORS.text, bold: true }, "会话"),
+        React.createElement(Text, { color: TUI_COLORS.text, bold: true }, translate(locale, "tui.sessionTitle")),
         React.createElement(Box, { height: 1 }),
         React.createElement(
           Box,
           { flexDirection: "column" },
-          renderChoiceLine(React, Box, Text, cursor === 0, "0", "新建会话", ""),
+          renderChoiceLine(React, Box, Text, cursor === 0, "0", translate(locale, "tui.newSession"), ""),
           ...props.sessions.map((session, index) =>
             renderChoiceLine(
               React,
@@ -173,12 +178,12 @@ export function createTuiSessionPickerComponent(
               Text,
               cursor === index + 1,
               String(index + 1),
-              formatSessionPickerTitle(session),
-              formatRelativeSessionTime(session.updatedAt, props.now),
+              formatSessionPickerTitle(session, locale),
+              formatRelativeSessionTime(session.updatedAt, props.now, locale),
             )),
         ),
         dense ? null : React.createElement(Box, { height: 1 }),
-        dense ? null : React.createElement(Text, { color: TUI_COLORS.muted }, "↑↓ 选择  ·  Enter 打开  ·  Esc 退出"),
+        dense ? null : React.createElement(Text, { color: TUI_COLORS.muted }, translate(locale, "tui.sessionControls")),
       ),
       React.createElement(Box, { flexGrow: 1, minHeight: 0 }),
     );

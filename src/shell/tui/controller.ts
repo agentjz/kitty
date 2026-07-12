@@ -1,4 +1,6 @@
 import type { SessionRecord } from "../../types.js";
+import type { ComposerInputKey } from "./composerEditing.js";
+import { TuiComposerInteraction } from "./composerInteraction.js";
 import {
   appendTranscriptEntry,
   appendTranscriptText,
@@ -8,7 +10,9 @@ import {
   scrollTuiTranscriptToBottom,
   scrollTuiTranscriptToTop,
   updateComposerState,
+  updateOverlayState,
   updateRuntimeDock,
+  updateSelectionState,
   createInitialTuiState,
   formatContextBudget,
   type TuiTranscriptLineView,
@@ -18,6 +22,14 @@ import {
   type TuiViewport,
 } from "./store.js";
 import { TuiTranscriptProjection } from "./transcriptProjection.js";
+import type { TuiMouseEvent } from "./input/scroll.js";
+import {
+  projectMouseSelectionPoint,
+  projectSelectedLineViews,
+  readSelectedText,
+  type TuiSelectableTranscriptLineView,
+} from "./selection.js";
+import { DEFAULT_LOCALE, translate, type KittyLocale } from "../../i18n/index.js";
 
 export type TuiStateListener = (state: TuiState) => void;
 
@@ -27,6 +39,18 @@ export type TuiInputResult =
 
 interface PendingInput {
   resolve: (result: TuiInputResult) => void;
+}
+
+export interface TuiDraftStore {
+  load(sessionId: string): { cursor: number; value: string } | undefined;
+  save(sessionId: string, draft: { cursor: number; value: string }): void;
+  clear(sessionId: string): boolean;
+}
+
+export interface TuiControllerOptions {
+  draftStore?: TuiDraftStore;
+  locale?: KittyLocale;
+  writeClipboard?: (text: string) => Promise<void>;
 }
 
 const DEFAULT_VIEWPORT: TuiViewport = {
@@ -43,9 +67,30 @@ export class TuiController {
   private queuedInputs: string[] = [];
   private interruptHandler: (() => void) | undefined;
   private disposed = false;
+  private readonly sessionId: string | undefined;
+  private readonly composerInteraction: TuiComposerInteraction;
+  private selectionAutoScrollTimer: NodeJS.Timeout | undefined;
+  private selectionAutoScrollDirection = 0;
+  private selectionPointer: { x: number; y: number } | undefined;
 
-  constructor(session?: SessionRecord) {
-    this.state = createInitialTuiState(session);
+  constructor(session?: SessionRecord, private readonly options: TuiControllerOptions = {}) {
+    this.sessionId = session?.id;
+    this.state = createInitialTuiState(session, options.locale ?? DEFAULT_LOCALE);
+    const restoredDraft = this.sessionId ? options.draftStore?.load(this.sessionId) : undefined;
+    if (restoredDraft) {
+      this.state = updateComposerState(this.state, {
+        cursor: Math.max(0, Math.min(restoredDraft.cursor, restoredDraft.value.length)),
+        value: restoredDraft.value,
+      });
+    }
+    this.composerInteraction = new TuiComposerInteraction({
+      appendSystem: (text) => this.append("system", text),
+      getState: () => this.state,
+      isDisposed: () => this.disposed,
+      persistDraft: () => this.persistComposerDraft(),
+      setState: (state) => this.setState(state),
+      submitInput: (value) => this.submitInput(value),
+    });
     this.state = applyViewportResize(this.state, this.viewport, this.projectionOptions());
   }
 
@@ -74,20 +119,46 @@ export class TuiController {
     return this.openInput(promptLabel);
   }
 
-  submitInput(value: string): void {
+  submitInput(value: string): boolean {
     if (this.disposed) {
-      return;
+      return false;
     }
+    const normalizedValue = value.trim();
+    if (!normalizedValue) {
+      return false;
+    }
+    const history = appendInputHistory(this.state.composer.history, normalizedValue);
+    if (this.sessionId && this.options.draftStore && !this.options.draftStore.clear(this.sessionId)) {
+      this.append("system", translate(this.state.locale, "tui.draftBusy"));
+      return false;
+    }
+    this.setState(updateComposerState(this.state, {
+      cursor: 0,
+      history,
+      historyIndex: history.length,
+      stashedDraft: undefined,
+      value: "",
+    }));
+    this.setState(updateOverlayState(this.state, { kind: "closed" }));
     const pending = this.pendingInput;
     if (!pending) {
-      this.queuedInputs.push(value);
-      return;
+      this.queuedInputs.push(normalizedValue);
+      return true;
     }
     this.pendingInput = null;
     this.setState(updateComposerState(this.state, {
       promptLabel: "> ",
     }));
-    pending.resolve({ kind: "submit", value });
+    pending.resolve({ kind: "submit", value: normalizedValue });
+    return true;
+  }
+
+  handleComposerInput(input: string, key: ComposerInputKey): void {
+    this.composerInteraction.handleInput(input, key);
+  }
+
+  async editComposerExternally(editor: (value: string) => Promise<string>): Promise<void> {
+    await this.composerInteraction.editExternally(editor);
   }
 
   closeInput(): void {
@@ -170,18 +241,86 @@ export class TuiController {
   }
 
   scrollTop(): void {
-    this.setState(scrollTuiTranscriptToTop(this.state));
+    this.setState(scrollTuiTranscriptToTop(this.state, this.viewport, this.projectionOptions()));
   }
 
   scrollBottom(): void {
     this.setState(scrollTuiTranscriptToBottom(this.state, this.viewport, this.projectionOptions()));
   }
 
-  getVisibleTranscriptLineViews(viewport: TuiViewport): TuiTranscriptLineView[] {
-    return this.projection.renderVisibleLineViews(this.state.transcript, viewport, this.state.scroll.offset);
+  getVisibleTranscriptLineViews(viewport: TuiViewport): TuiSelectableTranscriptLineView[] {
+    if (!this.state.selection.anchor || !this.state.selection.focus) {
+      return this.projection.renderVisibleLineViews(this.state.transcript, viewport, this.state.scroll.offset);
+    }
+    return projectSelectedLineViews(this.renderAllTranscriptRows(), this.state.selection)
+      .slice(this.state.scroll.offset, this.state.scroll.offset + viewport.height);
+  }
+
+  handleMouseEvent(event: TuiMouseEvent): void {
+    if (event.kind === "wheel") {
+      this.scrollBy(event.delta);
+      return;
+    }
+    if (this.state.overlay.kind !== "closed") return;
+    this.selectionPointer = { x: event.x, y: event.y };
+    if (event.kind === "press") {
+      this.stopSelectionAutoScroll();
+      const point = this.resolveSelectionPoint(event.x, event.y);
+      if (!point) {
+        this.clearSelection();
+        return;
+      }
+      this.setState(updateSelectionState(this.state, {
+        anchor: point,
+        focus: point,
+        dragging: true,
+      }));
+      return;
+    }
+    if (event.kind === "drag") {
+      if (!this.state.selection.dragging) return;
+      this.updateSelectionFocus(event.x, event.y);
+      this.updateSelectionAutoScroll(event.y);
+      return;
+    }
+    if (!this.state.selection.dragging) return;
+    this.updateSelectionFocus(event.x, event.y);
+    this.stopSelectionAutoScroll();
+    this.setState(updateSelectionState(this.state, {
+      ...this.state.selection,
+      dragging: false,
+    }));
+  }
+
+  clearSelection(): boolean {
+    if (!this.state.selection.anchor && !this.state.selection.focus) return false;
+    this.stopSelectionAutoScroll();
+    this.setState(updateSelectionState(this.state, { dragging: false }));
+    return true;
+  }
+
+  copySelection(): boolean {
+    const text = readSelectedText(this.renderAllTranscriptRows(), this.state.selection);
+    if (!text) return false;
+    const writeClipboard = this.options.writeClipboard;
+    if (!writeClipboard) {
+      this.append("system", translate(this.state.locale, "tui.copyUnavailable"));
+      return true;
+    }
+    void writeClipboard(text).then(
+      () => {
+        this.clearSelection();
+        this.append("system", translate(this.state.locale, "tui.copySuccess"));
+      },
+      (error) => this.append("system", translate(this.state.locale, "tui.copyFailed", {
+        error: error instanceof Error ? error.message : String(error),
+      })),
+    );
+    return true;
   }
 
   dispose(): void {
+    this.stopSelectionAutoScroll();
     this.disposed = true;
     this.queuedInputs = [];
     this.closeInput();
@@ -207,6 +346,14 @@ export class TuiController {
     });
   }
 
+  private persistComposerDraft(): void {
+    if (!this.sessionId) return;
+    this.options.draftStore?.save(this.sessionId, {
+      cursor: this.state.composer.cursor,
+      value: this.state.composer.value,
+    });
+  }
+
   private setState(state: TuiState): void {
     if (this.disposed) {
       return;
@@ -221,4 +368,61 @@ export class TuiController {
   private projectionOptions(): { projection: TuiTranscriptProjection } {
     return { projection: this.projection };
   }
+
+  private renderAllTranscriptRows(): TuiTranscriptLineView[] {
+    return this.projection.renderLineViews(this.state.transcript, this.viewport.width);
+  }
+
+  private resolveSelectionPoint(x: number, y: number) {
+    return projectMouseSelectionPoint({
+      rows: this.renderAllTranscriptRows(),
+      scrollOffset: this.state.scroll.offset,
+      viewport: this.viewport,
+      x,
+      y,
+    });
+  }
+
+  private updateSelectionFocus(x: number, y: number): void {
+    const focus = this.resolveSelectionPoint(x, y);
+    if (!focus || !this.state.selection.anchor) return;
+    this.setState(updateSelectionState(this.state, {
+      ...this.state.selection,
+      focus,
+      dragging: true,
+    }));
+  }
+
+  private updateSelectionAutoScroll(y: number): void {
+    const direction = y <= 1 ? -1 : y >= this.viewport.height ? 1 : 0;
+    if (direction === 0) {
+      this.stopSelectionAutoScroll();
+      return;
+    }
+    if (this.selectionAutoScrollTimer && this.selectionAutoScrollDirection === direction) return;
+    this.stopSelectionAutoScroll();
+    this.selectionAutoScrollDirection = direction;
+    this.selectionAutoScrollTimer = setInterval(() => {
+      if (!this.state.selection.dragging || !this.selectionPointer) {
+        this.stopSelectionAutoScroll();
+        return;
+      }
+      this.scrollBy(direction);
+      this.updateSelectionFocus(this.selectionPointer.x, this.selectionPointer.y);
+    }, 60);
+    this.selectionAutoScrollTimer.unref();
+  }
+
+  private stopSelectionAutoScroll(): void {
+    if (this.selectionAutoScrollTimer) clearInterval(this.selectionAutoScrollTimer);
+    this.selectionAutoScrollTimer = undefined;
+    this.selectionAutoScrollDirection = 0;
+  }
+}
+
+function appendInputHistory(history: readonly string[], value: string): string[] {
+  if (history.at(-1) === value) {
+    return [...history];
+  }
+  return [...history, value];
 }

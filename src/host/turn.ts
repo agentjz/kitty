@@ -15,6 +15,8 @@ import type { HostTurnDependencies, HostTurnOptions, HostTurnOutcome } from "./t
 import type { ToolRegistry } from "../tools/core/types.js";
 import type { SessionRecord } from "../types.js";
 import { runWithTurnOwnership } from "../control/turnOwnership.js";
+import { consumePendingTurnSteers } from "../agent/turn/steering.js";
+import { translate } from "../i18n/index.js";
 
 const DEFAULT_IDENTITY = {
   kind: "lead" as const,
@@ -22,6 +24,7 @@ const DEFAULT_IDENTITY = {
 };
 
 export const PRESERVE_QUEUED_TURN_ABORT_REASON = "Preserve accepted queued turn for restart.";
+export const PRESERVE_ACTIVE_TURN_ABORT_REASON = "Detach active turn for durable recovery.";
 
 class QueuedTurnDetachedError extends Error {}
 
@@ -43,6 +46,7 @@ export async function runHostTurn(
   let session = options.session;
   let turnRecord: { id: string; input: string; ownerToken?: string } | undefined;
   let terminalStatus: "completed" | "failed" | "aborted" | undefined;
+  let detachedForRecovery = false;
   let heartbeatTimer: NodeJS.Timeout | undefined;
   const leaseAbortController = new AbortController();
   const turnAbortSignal = AbortSignal.any([
@@ -103,7 +107,7 @@ export async function runHostTurn(
       return {
         status: "aborted",
         session: options.session,
-        errorMessage: "Turn interrupted. You can keep chatting.",
+        errorMessage: translate(options.config.locale, "interaction.turnInterrupted"),
       };
     }
 
@@ -145,7 +149,7 @@ export async function runHostTurn(
       return {
         status: "aborted",
         session,
-        errorMessage: "Turn interrupted. You can keep chatting.",
+        errorMessage: translate(options.config.locale, "interaction.turnInterrupted"),
       };
     }
 
@@ -169,6 +173,29 @@ export async function runHostTurn(
         toolRegistry: wakeCloseoutTurn ? createToollessRegistry(toolRegistry!) : toolRegistry!,
         identity: options.identity ?? DEFAULT_IDENTITY,
         runtimePromptState,
+        steering: turnRecord?.ownerToken ? {
+          consumePending: async (currentSession) => {
+            const consumed = await consumePendingTurnSteers({
+              rootDir: stateRootDir,
+              turnId: turnRecord!.id,
+              ownerToken: turnRecord!.ownerToken!,
+              session: currentSession,
+              sessionStore: options.sessionStore,
+            });
+            return {
+              session: consumed.session,
+              inputs: consumed.steers.map((steer) => steer.input),
+            };
+          },
+          beginClosing: async () => {
+            const ledger = new ControlPlaneLedger(stateRootDir);
+            try {
+              return ledger.turns.beginClosing(turnRecord!.id, turnRecord!.ownerToken!);
+            } finally {
+              ledger.close();
+            }
+          },
+        } : undefined,
       });
       dependencies.onRunTurnStarted?.();
       const resultPromise = turnRecord?.ownerToken
@@ -188,7 +215,7 @@ export async function runHostTurn(
         break;
       }
 
-      options.callbacks?.onStatus?.("Lead yielded. Waiting for delegated execution wake signal.");
+      options.callbacks?.onStatus?.(translate(options.config.locale, "runtime.waitingDelegated"));
       const streamLeadWaitEvents = createLeadWaitRuntimeUiStreamer({
         events: sessionEvents,
         callbacks: options.callbacks,
@@ -203,7 +230,7 @@ export async function runHostTurn(
       options.callbacks?.onRuntimeUiEvent?.(createRuntimeUiEvent({
         channel: "lead",
         kind: "status",
-        message: "Lead resumed after delegated execution settled.",
+        message: translate(options.config.locale, "runtime.resumedDelegated"),
       }));
       const lifecycleLedger = new ControlPlaneLedger(stateRootDir);
       try {
@@ -244,6 +271,17 @@ export async function runHostTurn(
       };
     }
 
+    if (turnRecord.ownerToken) {
+      const closingLedger = new ControlPlaneLedger(stateRootDir);
+      try {
+        if (!closingLedger.turns.beginClosing(turnRecord.id, turnRecord.ownerToken)) {
+          throw new Error("Turn runner returned while user guidance was still pending.");
+        }
+      } finally {
+        closingLedger.close();
+      }
+    }
+
     await recordHostTurnFinished(stateRootDir, {
       host,
       sessionId: result.session.id,
@@ -279,7 +317,26 @@ export async function runHostTurn(
         status: "aborted",
         session: failedSession,
         error,
-        errorMessage: "Accepted input remains queued for restart.",
+        errorMessage: translate(options.config.locale, "interaction.queuedRestart"),
+      };
+    }
+    if (options.abortSignal?.reason === PRESERVE_ACTIVE_TURN_ABORT_REASON && turnRecord?.ownerToken) {
+      const recoveryLedger = new ControlPlaneLedger(stateRootDir);
+      try {
+        recoveryLedger.turns.detachForRecovery(
+          turnRecord.id,
+          turnRecord.ownerToken,
+          "Host detached while the turn was active. Resume from durable session and tool facts.",
+        );
+        detachedForRecovery = true;
+      } finally {
+        recoveryLedger.close();
+      }
+      return {
+        status: "aborted",
+        session: failedSession,
+        error,
+        errorMessage: translate(options.config.locale, "interaction.detachedRecovery"),
       };
     }
     if (isAbortError(error)) {
@@ -299,7 +356,7 @@ export async function runHostTurn(
         status: "aborted",
         session: failedSession,
         error,
-        errorMessage: "Turn interrupted. You can keep chatting.",
+        errorMessage: translate(options.config.locale, "interaction.turnInterrupted"),
       };
     }
 
@@ -329,9 +386,15 @@ export async function runHostTurn(
     };
   } finally {
     if (heartbeatTimer) clearInterval(heartbeatTimer);
-    if (turnRecord?.ownerToken) {
+    if (turnRecord?.ownerToken && !detachedForRecovery) {
       const ledger = new ControlPlaneLedger(stateRootDir);
       try {
+        if (terminalStatus === "aborted" || terminalStatus === "failed") {
+          ledger.turnSteers.rejectPending(
+            turnRecord.id,
+            terminalStatus === "aborted" ? "The current turn was interrupted." : "The current turn failed.",
+          );
+        }
         ledger.turns.finish(turnRecord.id, turnRecord.ownerToken, terminalStatus ?? "failed");
       } catch {
         // The lease may have expired and been recovered by another host.

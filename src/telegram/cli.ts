@@ -4,6 +4,7 @@ import type { Command } from "commander";
 
 import { getErrorMessage } from "../agent/errors.js";
 import type { CliOverrides, RuntimeConfig } from "../types.js";
+import { translate, type KittyLocale } from "../i18n/index.js";
 
 export async function createTelegramService(options: {
   cwd: string;
@@ -70,6 +71,7 @@ export async function createTelegramService(options: {
 export function registerTelegramCommands(
   program: Command,
   dependencies: {
+    locale: KittyLocale;
     getCliOverrides: () => CliOverrides;
     resolveRuntime: (overrides: CliOverrides) => Promise<{
       cwd: string;
@@ -90,19 +92,19 @@ export function registerTelegramCommands(
     }>;
   },
 ): void {
-  const telegramCommand = program.command("telegram").description("Serve Telegram private-chat control.");
+  const telegramCommand = program.command("telegram").description(translate(dependencies.locale, "cli.command.telegram"));
 
   telegramCommand
     .command("serve")
-    .description("Run the Telegram private-chat service via long polling.")
+    .description(translate(dependencies.locale, "cli.command.telegramServe"))
     .action(async () => {
       const runtime = await dependencies.resolveRuntime(dependencies.getCliOverrides());
       if (!runtime.config.telegram.token) {
-        throw new Error("Telegram token missing. Set KITTY_TELEGRAM_TOKEN or config.telegram.token.");
+        throw new Error(translate(runtime.config.locale, "telegram.tokenMissing"));
       }
 
       if (runtime.config.telegram.allowedUserIds.length === 0) {
-        throw new Error("Telegram whitelist is empty. Set KITTY_TELEGRAM_ALLOWED_USER_IDS or config.telegram.allowedUserIds.");
+        throw new Error(translate(runtime.config.locale, "telegram.whitelistEmpty"));
       }
 
       const acquireProcessLock =

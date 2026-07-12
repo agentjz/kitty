@@ -210,7 +210,7 @@ function mirrorTurnDisplay(
           kind: "tool_call",
           toolName: name,
           payload: args,
-        }), { cwd: options.cwd }));
+        }), { cwd: options.cwd, locale: options.config.locale }));
       },
       onToolResult(name, output) {
         flushTextBuffers();
@@ -219,7 +219,7 @@ function mirrorTurnDisplay(
           kind: "tool_result",
           toolName: name,
           payload: output,
-        }), { cwd: options.cwd }));
+        }), { cwd: options.cwd, locale: options.config.locale }));
       },
       onToolError(name, error) {
         flushTextBuffers();
@@ -228,7 +228,7 @@ function mirrorTurnDisplay(
           kind: "tool_error",
           toolName: name,
           payload: error,
-        }), { cwd: options.cwd }));
+        }), { cwd: options.cwd, locale: options.config.locale }));
       },
     },
     start() {

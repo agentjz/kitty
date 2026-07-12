@@ -1,5 +1,6 @@
 import type { ShellOutputPort } from "../interaction/shell.js";
 import { chunkTelegramMessage } from "./messageChunking.js";
+import { translate, type KittyLocale } from "../i18n/index.js";
 
 export class TelegramOutputPort implements ShellOutputPort {
   private readonly pending: Promise<unknown>[] = [];
@@ -7,6 +8,7 @@ export class TelegramOutputPort implements ShellOutputPort {
   constructor(
     private readonly options: {
       chatId: number;
+      locale: KittyLocale;
       messageChunkChars: number;
       enqueueReply: (chatId: number, text: string) => Promise<void>;
     },
@@ -21,11 +23,11 @@ export class TelegramOutputPort implements ShellOutputPort {
   }
 
   warn(text: string): void {
-    this.queue(`Warning: ${text}`);
+    this.queue(`${translate(this.options.locale, "telegram.prefix.warning")}: ${text}`);
   }
 
   error(text: string): void {
-    this.queue(`Error: ${text}`);
+    this.queue(`${translate(this.options.locale, "telegram.prefix.error")}: ${text}`);
   }
 
   dim(text: string): void {
@@ -37,7 +39,7 @@ export class TelegramOutputPort implements ShellOutputPort {
   }
 
   interrupt(text: string): void {
-    this.queue(`Interrupt: ${text}`);
+    this.queue(`${translate(this.options.locale, "telegram.prefix.interrupt")}: ${text}`);
   }
 
   async flush(): Promise<void> {

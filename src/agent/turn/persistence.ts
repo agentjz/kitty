@@ -21,10 +21,16 @@ export async function initializeTurnSession(
   input: string,
   sessionStore: SessionStoreLike,
   source: StoredMessage["source"] = "external",
+  messageId?: string,
 ): Promise<SessionRecord> {
-  const appended = await sessionStore.appendMessages(session, [
-    createMessage("user", input, { source }),
-  ]);
+  const existing = messageId
+    ? session.messages.some((message) => message.id === messageId)
+    : false;
+  const message = createMessage("user", input, { source });
+  if (messageId) message.id = messageId;
+  const appended = existing
+    ? session
+    : await sessionStore.appendMessages(session, [message]);
 
   const framed = applyCurrentTurnFrame(appended, input, undefined, source);
 

@@ -12,13 +12,14 @@ test("interactive intro prints session, cwd, and local commands", () => {
     cwd: "C:\\workspace\\kitty",
     session: { id: "session-intro" },
     output,
+    locale: "en",
   });
 
   const rendered = [...output.plainText, ...output.dimText].join("\n");
   assert.match(rendered, /session: session-intro/);
   assert.match(rendered, /cwd: C:\\workspace\\kitty/);
   assert.doesNotMatch(rendered, /Tools:/);
-  for (const command of listIntroLocalCommands()) {
+  for (const command of listIntroLocalCommands("en")) {
     assert.match(rendered, new RegExp(`${escapeRegExp(command.helpLabel)}\\s+${escapeRegExp(command.helpText)}`));
   }
   assert.doesNotMatch(rendered, /\/status\s+Show current project scene/);
@@ -31,6 +32,7 @@ test("interactive intro can print a supplied active tool surface label", () => {
     cwd: "C:\\workspace\\kitty",
     session: { id: "session-spec" },
     output,
+    locale: "en",
     toolsLabel: "custom runtime surface",
   });
 

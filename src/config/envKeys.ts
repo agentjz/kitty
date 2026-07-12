@@ -1,6 +1,7 @@
 import { EXTENSION_ENV_KEYS } from "../extensions/definitions.js";
 
 export const KITTY_BASE_ENV = {
+  locale: "KITTY_LOCALE",
   apiKey: "KITTY_API_KEY",
   provider: "KITTY_PROVIDER",
   baseUrl: "KITTY_BASE_URL",

@@ -10,15 +10,15 @@ import { isProcessAlive, terminatePid } from "../../src/execution/process.js";
 
 test("terminatePid kills a Windows process tree", { skip: process.platform !== "win32" }, async (t) => {
   const { parent, childPidPath } = await spawnProcessTree("windows");
+  let childPid: number | undefined;
 
   t.after(() => {
-    if (parent.pid && isProcessAlive(parent.pid)) {
-      terminatePid(parent.pid);
-    }
+    forceKillTestProcess(childPid);
+    forceKillTestProcess(parent.pid);
   });
 
   assert.ok(parent.pid);
-  const childPid = await waitForChildPid(childPidPath);
+  childPid = await waitForChildPid(childPidPath);
   assert.equal(isProcessAlive(childPid), true);
 
   terminatePid(parent.pid);
@@ -30,15 +30,15 @@ test("terminatePid kills a Windows process tree", { skip: process.platform !== "
 
 test("terminatePid kills a POSIX process tree", { skip: process.platform === "win32" }, async (t) => {
   const { parent, childPidPath } = await spawnProcessTree("posix");
+  let childPid: number | undefined;
 
   t.after(() => {
-    if (parent.pid && isProcessAlive(parent.pid)) {
-      terminatePid(parent.pid);
-    }
+    forceKillTestProcess(childPid);
+    forceKillTestProcess(parent.pid);
   });
 
   assert.ok(parent.pid);
-  const childPid = await waitForChildPid(childPidPath);
+  childPid = await waitForChildPid(childPidPath);
   assert.equal(isProcessAlive(childPid), true);
 
   terminatePid(parent.pid);
@@ -105,4 +105,13 @@ async function waitForProcessExit(pid: number): Promise<void> {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function forceKillTestProcess(pid: number | undefined): void {
+  if (!pid || !isProcessAlive(pid)) return;
+  try {
+    process.kill(pid, "SIGKILL");
+  } catch {
+    // The process may have exited between the liveness check and cleanup.
+  }
 }

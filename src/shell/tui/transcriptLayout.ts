@@ -20,6 +20,7 @@ import {
   type TuiTranscriptSourceRow,
   type TuiTranscriptWrappedRow,
 } from "./transcriptWrap.js";
+import { DEFAULT_LOCALE, type KittyLocale } from "../../i18n/index.js";
 
 export { TRANSCRIPT_OUTER_PADDING_X };
 export type {
@@ -36,35 +37,39 @@ export function renderTranscriptLineViews(
   entries: readonly TuiTranscriptEntry[],
   viewportWidth: number,
   theme: TuiTranscriptTheme,
+  locale: KittyLocale = DEFAULT_LOCALE,
 ): TuiTranscriptLineView[] {
-  return entries.flatMap((entry) => renderTranscriptEntryLineViews(entry, viewportWidth, theme));
+  return entries.flatMap((entry) => renderTranscriptEntryLineViews(entry, viewportWidth, theme, locale));
 }
 
 export function renderTranscriptRows(
   entries: readonly TuiTranscriptEntry[],
   viewportWidth: number,
   theme: TuiTranscriptTheme,
+  locale: KittyLocale = DEFAULT_LOCALE,
 ): string[] {
-  return renderTranscriptLineViews(entries, viewportWidth, theme).map((line) => line.text);
+  return renderTranscriptLineViews(entries, viewportWidth, theme, locale).map((line) => line.text);
 }
 
 export function measureTranscriptRows(
   entries: readonly TuiTranscriptEntry[],
   viewportWidth: number,
   theme: TuiTranscriptTheme,
+  locale: KittyLocale = DEFAULT_LOCALE,
 ): number {
-  return renderTranscriptLineViews(entries, viewportWidth, theme).length;
+  return renderTranscriptLineViews(entries, viewportWidth, theme, locale).length;
 }
 
 export function renderTranscriptEntryLineViews(
   entry: TuiTranscriptEntry,
   viewportWidth: number,
   theme: TuiTranscriptTheme,
+  locale: KittyLocale = DEFAULT_LOCALE,
 ): TuiTranscriptLineView[] {
   const frame = readTranscriptRoleFrame(entry.role, viewportWidth);
   const style = readTranscriptRoleStyle(entry.role, theme);
   const sourceRows = readEntryDisplayRows(entry);
-  const contentRows = wrapTranscriptEntryRows(entry, sourceRows, frame.bodyWidth);
+  const contentRows = wrapTranscriptEntryRows(entry, sourceRows, frame.bodyWidth, locale);
   const wrappedRows = contentRows.length > 0
     ? contentRows
     : [{ markdownKind: undefined, language: undefined, prefix: "", text: "", spans: [] }];

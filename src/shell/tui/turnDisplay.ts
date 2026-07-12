@@ -5,6 +5,7 @@ import { channelLabel } from "../../runtime-ui/theme.js";
 import type { TuiController } from "./controller.js";
 import type { TuiRuntimeDockState } from "./store.js";
 import { createRunningActivity } from "./activity.js";
+import { translate, type KittyLocale } from "../../i18n/index.js";
 import {
   projectTuiRuntimeStatusActivity,
   projectTuiToolCallFact,
@@ -14,7 +15,7 @@ import {
 
 export function createTuiTurnDisplay(options: {
   controller: TuiController;
-  config: { showReasoning: boolean };
+  config: { locale: KittyLocale; showReasoning: boolean };
   abortSignal: AbortSignal;
 }): InteractionTurnDisplay {
   let aborted = false;
@@ -34,7 +35,7 @@ export function createTuiTurnDisplay(options: {
       return;
     }
     visibleChannel = channel;
-    options.controller.append("system", `[${channelLabel(channel)}]`);
+    options.controller.append("system", `[${channelLabel(channel, options.config.locale)}]`);
   };
 
   options.abortSignal.addEventListener("abort", () => {
@@ -47,7 +48,11 @@ export function createTuiTurnDisplay(options: {
       renderRuntimeUiEvent(event);
     },
     onModelWaitStart() {
-      updateActivity(createRunningActivity({ kind: "model", channel: "lead", summary: "思考中" }));
+      updateActivity(createRunningActivity({
+        kind: "model",
+        channel: "lead",
+        summary: translate(options.config.locale, "runtime.thinking"),
+      }));
     },
     onModelWaitStop() {
       updateActivity(undefined);
@@ -105,7 +110,7 @@ export function createTuiTurnDisplay(options: {
       }
       const fact = projectTuiToolErrorFact(name, error);
       options.controller.updateDock(toDockPatch(fact));
-      options.controller.append("system", `工具失败：${name}`);
+      options.controller.append("system", translate(options.config.locale, "runtime.toolFailed", { name }));
     },
     onStatus(text) {
       if (isAborted()) {
@@ -189,7 +194,9 @@ export function createTuiTurnDisplay(options: {
             ? { ...fact.activity, channel: event.channel, blockingLead: event.channel === "subagent" }
             : undefined,
         });
-        options.controller.append("system", `工具失败：${event.toolName ?? "tool"}`);
+        options.controller.append("system", translate(options.config.locale, "runtime.toolFailed", {
+          name: event.toolName ?? "tool",
+        }));
         return;
       }
     }

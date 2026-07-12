@@ -27,7 +27,7 @@ hajimi -> DeepSeek CLI / deepseekcli -> Universe -> camera -> Athlete -> Deadmou
 证据来源：
 
 - 当前仓库 `AGENTS.md`
-- 当前仓库 `.codex/skills/kitty-agent-development/SKILL.md`
+- 当前仓库 `.agents/skills/kitty-agent-development/SKILL.md`
 - 当前仓库 `spec/`
 - 当前仓库 `VERSION_LOG.md`
 - 当前仓库 git 历史
@@ -53,7 +53,7 @@ hajimi -> DeepSeek CLI / deepseekcli -> Universe -> camera -> Athlete -> Deadmou
 | 11 | 2026-06-25 到 2026-06-26 | 多 provider | provider/model 分离，relay provider 单独管理 |
 | 12 | 2026-07-01 | DeepSeek replay | 空 `reasoningContent` 也必须保存和回放 |
 | 13 | 2026-07-01 | 发布体验 | 0.0.18 发布、postinstall/site/README 微调、默认 TUI |
-| 14 | 2026-07-05 | 历史文档 | `history.md` 接住从前身项目到 Kitty 的开发轨迹 |
+| 14 | 2026-07-05 | 历史文档 | `docs/history.md` 接住从前身项目到 Kitty 的开发轨迹 |
 | 15 | 2026-07-05 | 真实生产路径验收 | GPT/YLS 真实 provider 下验证 core 工具准确性、resume、events/status/memory/terminal log |
 
 ## 阶段 00：前身谱系，Kitty 不是凭空开始的
@@ -1118,7 +1118,7 @@ reasoningContent.length > 0 ? reasoningContent : undefined
 
 当前任务：
 
-用户准备换窗口，希望把这条超长对话和更早的项目演进整理成 `history.md`。这份文档不是整理成干净架构，而是按历史写：做了什么，没做什么，又做了什么，又删了什么，尝试什么，失败什么，最后什么证明有效。
+用户准备换窗口，希望把这条超长对话和更早的项目演进整理成 `docs/history.md`。这份文档不是整理成干净架构，而是按历史写：做了什么，没做什么，又做了什么，又删了什么，尝试什么，失败什么，最后什么证明有效。
 
 当前已经确认：
 
@@ -1130,7 +1130,7 @@ reasoningContent.length > 0 ? reasoningContent : undefined
 
 这份文档以后怎么用：
 
-- 新窗口先读 `AGENTS.md`、`.codex/skills/kitty-agent-development/SKILL.md`、`spec/`、`VERSION_LOG.md`、`history.md`。
+- 新窗口先读 `AGENTS.md`、`.agents/skills/kitty-agent-development/SKILL.md`、`spec.md`、`VERSION_LOG.md`、`docs/history.md`。
 - 如果要继续开发，先确认当前事实主干，不要按历史旧能力直接恢复。
 - 如果要理解为什么某条规则存在，就回到对应历史阶段看它是从哪个失败里来的。
 - 如果用户要求更新历史，按阶段追加，不要把整份文档改成宣传稿。

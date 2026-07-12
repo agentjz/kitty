@@ -7,9 +7,11 @@ import {
   createTerminalLogWriter,
   mirrorInteractionShellToTerminalLog,
 } from "../../observability/terminalLog.js";
-import { enableMouseWheelTracking } from "./input/scroll.js";
+import { enableMouseTracking } from "./input/scroll.js";
 import { createTuiInputGateway } from "./input/gateway.js";
 import { TuiController } from "./controller.js";
+import { SqliteTuiDraftStore } from "./draftPersistence.js";
+import { editTextExternally } from "./externalEditor.js";
 import {
   createTuiExecutionDockWatcher,
   readTuiLiveExecutionDock,
@@ -18,6 +20,7 @@ import { projectRuntimeStatusToDock } from "./store.js";
 import { createTuiInteractionShell } from "./shell.js";
 import { createCleanupStack } from "./lifecycle.js";
 import { selectTuiSession } from "./sessionPicker.js";
+import { writeTuiClipboard } from "./clipboard.js";
 
 interface StartTuiChatOptions {
   cwd: string;
@@ -39,6 +42,7 @@ export async function startTuiChat(options: StartTuiChatOptions): Promise<void> 
     sessionStore: options.sessionStore,
     React,
     ink,
+    locale: options.config.locale,
   });
   if (!selected) {
     return;
@@ -47,10 +51,16 @@ export async function startTuiChat(options: StartTuiChatOptions): Promise<void> 
   const projectContext = await loadProjectContext(selected.cwd, {
     projectDocMaxBytes: options.config.projectDocMaxBytes,
   });
-  const controller = new TuiController(selected.session);
+  const draftStore = new SqliteTuiDraftStore(projectContext.stateRootDir);
+  cleanup.add(() => draftStore.dispose());
+  const controller = new TuiController(selected.session, {
+    draftStore,
+    locale: options.config.locale,
+    writeClipboard: (text) => writeTuiClipboard(text),
+  });
   controller.updateDock({
     ...projectRuntimeStatusToDock(
-      await buildRuntimeStatus(projectContext.stateRootDir),
+      await buildRuntimeStatus(projectContext.stateRootDir, options.config.locale),
       selected.session,
     ),
     model: options.config.model,
@@ -66,23 +76,27 @@ export async function startTuiChat(options: StartTuiChatOptions): Promise<void> 
   const terminalLogWriter = createTerminalLogWriter(projectContext.stateRootDir, selected.session.id);
   const terminalShell = mirrorInteractionShellToTerminalLog(shell, terminalLogWriter);
   const inputGateway = createTuiInputGateway({
-    onMouseWheel: (delta) => {
-      controller.scrollBy(delta);
-    },
+    onClose: () => controller.closeInput(),
+    onMouseEvent: (event) => controller.handleMouseEvent(event),
   });
   const TuiApp = createTuiAppComponent({
     React,
     Box: ink.Box,
     Text: ink.Text,
     useInput: ink.useInput,
+    useStdin: ink.useStdin,
     useBoxMetrics: ink.useBoxMetrics,
     useCursor: ink.useCursor,
     useStdout: ink.useStdout,
   });
-  const app = ink.render(
+  let app: ReturnType<typeof ink.render> | undefined;
+  app = ink.render(
     React.createElement(TuiApp, {
       controller,
-      enableMouseTracking: () => enableMouseWheelTracking(process.stdout),
+      editExternally: editTextExternally,
+      enableMouseTracking: () => enableMouseTracking(process.stdout),
+      redraw: () => app?.clear(),
+      suspendInput: () => inputGateway.suspend(),
     }),
     {
       stdin: inputGateway.stdin,
@@ -93,7 +107,7 @@ export async function startTuiChat(options: StartTuiChatOptions): Promise<void> 
   cleanup.add(() => inputGateway.dispose());
   cleanup.add(() => executionDockWatcher.dispose());
   cleanup.add(() => terminalShell.dispose?.());
-  cleanup.add(() => app.unmount());
+  cleanup.add(() => app?.unmount());
   const driver = new InteractiveSessionDriver({
     cwd: selected.cwd,
     config: options.config,
@@ -110,6 +124,6 @@ export async function startTuiChat(options: StartTuiChatOptions): Promise<void> 
     await driver.run();
   } finally {
     cleanup.run();
-    await app.waitUntilExit().catch(() => undefined);
+    await app?.waitUntilExit().catch(() => undefined);
   }
 }

@@ -36,7 +36,13 @@ function terminateWindowsProcessTree(pid: number): void {
     if (!isProcessAlive(pid)) {
       return;
     }
-    throw error;
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+      if (isProcessAlive(pid)) throw error;
+    }
+    waitForProcessExitSync(pid, 500);
+    if (isProcessAlive(pid)) throw error;
   }
 }
 
@@ -120,4 +126,11 @@ function uniquePids(pids: readonly number[]): number[] {
 
 function sleepSync(ms: number): void {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function waitForProcessExitSync(pid: number, timeoutMs: number): void {
+  const deadline = Date.now() + timeoutMs;
+  while (isProcessAlive(pid) && Date.now() < deadline) {
+    sleepSync(10);
+  }
 }

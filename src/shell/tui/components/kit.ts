@@ -6,6 +6,7 @@ export interface InkRuntime {
   Box: typeof import("ink").Box;
   Text: typeof import("ink").Text;
   useInput: typeof import("ink").useInput;
+  useStdin: typeof import("ink").useStdin;
   useBoxMetrics: typeof import("ink").useBoxMetrics;
   useCursor: typeof import("ink").useCursor;
   useStdout: typeof import("ink").useStdout;

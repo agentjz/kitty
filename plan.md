@@ -1,208 +1,227 @@
-# Kitty Production Runtime Rebuild Plan
+# Kitty Production TUI Lifecycle Plan
 
 ## 1. 需求文档
 
-Kitty 要从可用的本地编程 Agent 重建为可以承担长任务、故障恢复、后台执行和多 Agent 协作的生产运行时。
+Kitty 的 TUI 必须把运行中的新输入理解为对当前任务的引导。用户在模型等待、流式回复或工具执行期间提交文本后，文本应立即被可靠接收，在当前 turn 的下一个模型请求中作为新的用户约束出现；它不能中断当前动作、并发启动另一个 turn、等当前 turn 结束后排队，也不能丢失。`Ctrl+C` 是唯一明确的当前 turn 中断操作。
 
-用户面对的最终体验：
+长输出仍在增长时，用户必须能脱离底部阅读历史，并用鼠标跨页选择和复制已渲染文本。新输出、状态变化和窗口缩放不能把阅读位置拉回底部，也不能破坏选择。
 
-- 输入一旦被 Kitty 接收，就不会因并发、崩溃、重启或宿主切换而丢失。
-- 同一 session 只有一个有效执行 owner；不同 session 可以并行。
-- 每次工具调用都有可恢复的开始、结果和失败事实。工具已经改变文件但进程随后崩溃时，Kitty 不会假装没有执行，也不会静默重放。
-- background 和 subagent 有明确 owner、心跳、deadline、取消确认和终态。失去执行权的 worker 不能继续提交文件修改。
-- 上下文压缩可验证、可恢复、不会发送已知超预算请求。
-- CLI、TUI、Web、Telegram、worker、status 和 observability 读取同一事实主干。
-- 产品不依赖自动长期 memory。连续性来自同一 session 的 durable items、context epoch、工具证据和任务状态。
+范围包含 durable steer、host/agent turn 生命周期、交互驱动、TUI 状态呈现、滚动锚点、鼠标选择、自动滚动、剪贴板、TUI presentation locale、故障恢复、测试、`spec.md` 和 README 当前事实同步。已有 slash command、composer、历史、草稿和 overlay 能力必须继续工作。
 
-范围包含 session、host turn、agent turn、context、tools、control plane、execution、provider observability、runtime status、CLI/TUI/Web/Telegram、测试、eval、spec 和 README 的一致重建。
-
-业务完成标准：真实 provider 修复任务能在并发输入、工具失败、强制中断、进程重启、context 压缩和 subagent 超时后继续完成；所有状态可从 SQLite 事实主干解释。
+业务完成标准：一个活跃 turn 只存在一个执行 owner；运行中提交的所有 steer 按接收顺序进入这个 owner，并在下一次可用的模型边界消费；即使上一响应看似已经完成，只要存在未消费 steer，当前 turn 就继续。用户能在持续输出时稳定滚动、跨页选择并复制。中断、强杀和重启后，不出现吞消息、重复执行或把 steer 伪装成新 turn。
 
 ## 2. 当前事实
 
-- `runHostTurn()` 是统一宿主边界，但输入、session、host event、task lifecycle 和 observability 分别写入不同存储。
-- `SessionStore` 直接覆盖 `.kitty/sessions/*.json`，没有 revision、CAS、durable input inbox 或跨进程 owner。
-- Local API 可并发加载并执行同一 session。Telegram 只有进程内 peer queue。
-- assistant tool call 在批次执行前写入 session；tool result 在整个批次执行后才逐个写入。崩溃或 abort 可留下已执行副作用但缺少 result 的历史。
-- typed `ToolResultEnvelope`、bash raw artifact、provider/model 分层、DeepSeek replay 和只并发安全读取是成熟设计，应保留。
-- execution 和 wake 位于 SQLite，但 close 与 wake 不是一个事务；worker 没有 claim token、heartbeat 或 fencing。
-- lead wait deadline 只把 execution 写成 `paused`，不会停止 worker。
-- context compression 是临时字符串投影，没有持久 epoch、源范围/hash；hard 模式可能返回仍超过预算的请求。
-- runtime status 拼接 JSON session、SQLite、JSONL observability、memory Markdown 和实时 project map，不具备一致 revision。
-- 自动 session memory 每个外部 turn 再调用一次模型；runtime long memory 是 Markdown CRUD/全文匹配，没有自动召回闭环。
-- 当前约 309 个测试覆盖 provider、tool evidence、host、TUI 和 execution happy path，但缺少同 session 并发、工具落账故障点、worker fencing、wake 事务、context epoch 和崩溃恢复测试。
-- `npm.cmd run typecheck` 在重建前通过。工作区在创建本计划前干净。
-- 本地参考源码显示：Codex 使用 typed append-only rollout 和 history revision；OpenCode 分离 durable prompt admission 与 execution coordinator；Gemini CLI 使用显式 tool-call 状态机；Cline 使用 session status lock 和 compaction source hash。
-
-未知点将在实现中用失败测试收束：真实 provider 对中断工具批次的 replay 行为、Windows 强杀后的进程树收口时序、现有 production eval 配置是否当前可用。
-
-收口阶段的新事实：真实 provider 已完成文件修复和最终验证，但首次使用了不适用于 PowerShell 的命令；`bash` 原始结果保存了 shell 信息，模型视图却被 output governance 投影覆盖，没有保留该恢复事实。根治边界是通用工具证据投影和“依赖基线证据的修改先完成取证”执行不变量，不是针对命令、文件、模型或评测写分支。
+- `turn_steers` 已在 SQLite 中持有同一 turn 的递增 steer、确定 message ID 和 `pending/consumed/rejected` 状态。
+- `runAgentTurn()` 在每次 context 构建前消费 steer，并在 final closing 事务边界再次检查；final 同时到达 steer 时保存当前 assistant 输出并继续同一 turn。
+- `TurnLedgerRepo.claim()` 保证同一 session 只有一个有效 execution owner。运行中的普通输入写入 active turn steer，不创建第二个执行 owner。
+- `Ctrl+C` 显式 abort 当前 turn 并拒绝未消费 steer；中断清理窗口的新输入进入下一 durable turn，不再挂到即将 aborted 的 owner。
+- 终端 EOF/关闭属于 recoverable detach：本地执行停止，active turn 回到 queued，pending steer 保持 pending；强杀则由 lease expiry 完成同一 turn 恢复。
+- Codex 当前实现把新用户输入放入 active turn 的 pending input，由 agent loop 在后续模型请求前 drain；pending input 会强制继续当前 turn，interrupt 独立 abort task。这是参考事实，不是需要照抄的数据结构。
+- TUI 的 composer、overlay、历史与 SQLite 草稿由 controller/store 持有。命令、历史、帮助和编辑器路径已有行为测试。
+- Transcript 使用 `follow/detached`、稳定 row anchor 和 unseen row count；流式追加与 resize 不把 detached 阅读位置拉回底部。
+- Input gateway 解析 SGR/X10 mouse press、drag、release 和 wheel，鼠标序列不会进入 composer 键盘流。
+- Selection owner 使用渲染 row ID 与字符列，支持宽字符、跨行文本、边缘自动滚动和字符级高亮；`Ctrl+C` 有选择时复制，无选择时中断。
+- Clipboard 优先使用平台 native provider，失败后在 TTY 使用 OSC52；复制失败保留选择并显示可恢复错误。
+- `KITTY_LOCALE` 已接入 runtime config、项目模板、session picker、TUI chrome、command/help、CLI/doctor/status/runtime UI 与 Telegram presentation；英文 schema 冻结 421 个 typed key，十二份 catalog 的 key 与占位符集合完全一致，运行时没有语言 fallback。Locale 只影响 presentation，不进入 prompt 或 control-plane。
+- `.kitty/control-plane.sqlite` 仍是运行时事实主干，使用 WAL、`synchronous=FULL`、busy timeout 和外键；没有新增 JSON 状态源。
+- Composer 已收敛为单一动态 frame；Ink adapter 统一下移一行到真实文本基线。Input gateway 可跨 chunk 保留 UTF-8/IME 与鼠标 framing，并把 EOF/close 投递给 controller。
+- 核心测试 runner 使用仓库内 `.test-tmp` 作为子进程临时根，每个临时 workspace 建立独立 Git 项目发现边界，并在成功、失败或 spawn error 后清理 `.test-build` 与 `.test-tmp`。
+- 统一 `run-tests.mjs` 已运行完整核心测试：339 项，338 通过、0 失败、1 项 POSIX-only 在 Windows 跳过；runner 正常返回并清理 `.test-build` 与 `.test-tmp`。
+- `npm.cmd run test:eval` 通过 11/11；重新构建 production bundle 后，`npm.cmd run eval:local` 的 14 个本地产品验收全部通过。Eval 已删除 Web 旧事实，并从结构化 status/Telegram attachment 事实验收，不再匹配本地化展示字符串。
+- Node 22 runtime contract 与 Ink optional devtools external 已写入当前构建配置。CLI CJS、TUI ESM production bundle、CLI version 与 TUI import smoke 均通过；先前 esbuild Access denied 在当前最终验证中未复现，没有替换 tsup 或降低构建语义。
 
 ## 3. 失败测试
 
-重建前必须新增并先证明以下行为会失败：
-
-1. 两个并发 host turn 使用同一 session 时，当前实现会丢消息或重复执行；目标是 durable admission 后串行完成。
-2. write/edit/bash 已产生副作用而 result 尚未写入时模拟崩溃；目标是恢复为明确的 interrupted tool result，不产生悬空 provider history。
-3. abort 发生在工具完成与结果持久化之间；目标是结果先落账，再结束 turn。
-4. execution close 成功但 wake 写入点失败；目标是一个事务内同时完成，重复 close 不产生重复 wake。
-5. subagent 超过 deadline 后继续尝试写文件；目标是 fencing 拒绝写入并终止进程树。
-6. worker PID 存活但 heartbeat/claim 已过期；目标是按 lease 事实进入 lost/stale，不把 PID 当 owner。
-7. context epoch 的源消息前缀被改变；目标是拒绝使用旧 epoch并重新压缩。
-8. system prompt 加最小 tail 仍超过预算；目标是本地结构化失败，不发送 provider 请求。
-9. runtime status 在并发更新中读取；目标是返回单一 ledger revision 的一致投影。
-10. provider retry、alternate base URL、stream fallback；目标是每次真实 HTTP attempt 有唯一 attempt ID，总调用预算不超过四次，且总有 terminal event。
-11. CLI/TUI/Web/Telegram 对同一 session 并发提交；目标是共用 durable inbox 和 owner。
-12. 删除长期 memory 后，长 session 经压缩、重启和 resume 仍保留用户约束、工具失败、changed paths 和恢复路径。
+1. provider 等待期间提交文本会创建第二个 `session_turns`：目标是只存在一个 running turn，新输入成为该 turn 的 pending steer。
+2. 工具执行期间连续提交两条输入：目标是工具不中断，两条 steer 按接收顺序进入工具后的下一次模型请求。
+3. 模型返回 final 的同时收到 steer：目标是 final 不结束 active turn，steer 持久化并触发同 turn 的后续模型请求。
+4. steer 被接收后进程在消费前崩溃：目标是 steer 保持 pending；恢复时不把它伪装成新 turn，也不静默丢弃。
+5. steer 消费后进程崩溃：目标是消费与 session user message 落账保持原子边界，不重复插入同一 steer。
+6. `Ctrl+C` 时存在 pending steer：目标是中断当前 turn，不把 steer 启动为新 turn；持久记录明确标记未执行原因。
+7. 无 active turn 时提交：目标是正常创建一个新 turn，不错误写入 steer 表。
+8. 内部 wake/delegated closeout：目标是保持 host 内部生命周期，不把内部 fact 当用户 steer。
+9. 用户滚离底部后 provider 持续追加：目标是可见历史锚点不动，并显示新内容提示。
+10. 流式输出和工具状态更新期间 PageUp/PageDown、滚轮仍可操作，且回到底部后恢复 follow 模式。
+11. 鼠标从 viewport 中部拖到顶部并继续：目标是自动向上滚动、扩大选择并保持文本顺序。
+12. 有选择时按 `Ctrl+C`：目标是复制选择且不 abort；无选择时按 `Ctrl+C` 才 abort。
+13. 剪贴板系统 fallback 失败：目标是保留选择并显示可恢复错误，不让输入或 turn 状态损坏。
+14. 窗口缩放、overlay 打开/关闭和流式追加：目标是阅读锚点与选择尽可能稳定，组件不重叠。
+15. 中文 IME 提交的 UTF-8 字节跨 stdin chunk：目标是 composer 收到完整字符，不出现替换字符或丢字。
+16. stdin EOF/close：目标是关闭当前输入等待并进入既有 detach/恢复边界，不让 TUI 永久挂起。
+17. 核心测试在受限系统临时目录运行命令：目标是 runner 提供仓库内可写且与 Kitty 根项目隔离的临时根，子进程测试不因 cwd 权限或父项目 skill 泄漏而失败。
+18. Windows 进程树终止失败：目标是测试必须在有界时间内报告失败且不挂住 runner；`taskkill /T` 部分失败后仍要收束 root，并继续验证 descendant 已终止。
+19. TUI production bundle：目标是 Ink 的 optional devtools peer 保持可选且可被 bundler 解析；Kitty 宣称的 Node engine 与 Ink 7 的真实最低版本一致。
+20. 任一已注册 locale 缺少 key、占位符与英文 schema 不一致或通过英文 fallback 补齐：目标是构建或测试直接失败，不向用户混合语言。
+21. 使用 `zh-TW`、`es`、`pt-BR`、`fr`、`de`、`ru`、`ar`、`hi` 启动 CLI/TUI/Telegram presenter：目标是配置被接受，关键帮助、诊断、状态和交互提示来自对应完整 catalog。
+22. README 快速路径与当前 Node、locale、host、构建和测试事实不一致：目标是首次用户只按文档即可安装、初始化、配置、启动和排错。
+23. `/copy` 不能把对话全文回显到聊天区，也不能依赖交互驱动可能落后的内存快照；必须从当前 session 的持久账本导出外部 user、assistant reasoning 和 assistant reply，并只在聊天区报告文件路径。
+24. 仓库开发 skill 统一位于 `.agents/skills/`；`AGENTS.md`、skill 自身事实和文档不能继续指向旧开发器专用目录。
 
 ## 4. 目标
 
-- `.kitty/control-plane.sqlite` 成为运行事实主干，保存 session、message、turn admission、turn lease、tool journal、context epoch、execution、wake、task lifecycle 和 runtime event。
-- `SessionStore` 从 SQLite 读取聚合 session，不再写 JSON snapshot 或 session memory asset。
-- 所有外部输入先写 durable turn record，再由唯一 owner claim；owner 通过 lease heartbeat 续期，写入使用 fencing token 校验。
-- tool call intent 在执行前落账，tool result 在每个调用完成后立即落账；恢复时补齐明确的 interrupted result。
-- execution terminal transition、wake outbox 和 task linkage 使用同一事务。
-- subagent worker claim、heartbeat、deadline、cancel 和写权限使用同一 execution token。
-- context epoch 保存源消息数量、源前缀 hash、摘要 items 和预算事实；无可行请求时显式失败。
-- observability 使用 turnId、itemId、toolCallId、executionId、requestId、attemptId 关联。
-- runtime status 从 SQLite 一致读取；project map 和终端日志只作为外部投影或 artifact。
-- 删除 runtime long memory、自动 session memory 总结及其 CLI/status/prompt surface。
-- spec、README、测试和 eval 只描述重建后的当前事实。
+- `session_turns` 只表示真正的 host turn，不再承担 steer 缓冲。
+- 新建 durable steer owner，以 turn ID 和递增顺序维护 `pending/consumed/rejected` 事实。
+- host 将 steer reader 作为当前 turn 能力传给 agent；其他宿主可复用同一接口。
+- agent 在每次 provider request 前消费 steer，并把它作为同一 turn 的外部 user message持久化。
+- final 路径在提交完成前再次检查 pending steer，消除“最后一刻丢 steer”的竞态。
+- driver 保证同一 session 只有一个运行 owner；运行中普通输入调用 steer，中断清理期间的新输入可以 durable admission 等待前一 owner 收束。
+- UI 明确显示“已引导当前任务”，不用 queued/pending turn 文案混淆用户。
+- transcript 以明确 follow/detached viewport 状态维护滚动，而不是从展示字符串或最后一行推断。
+- TUI 自己拥有选择范围、自动滚动和复制行为；alternate screen 不依赖终端原生不可跨页的选择。
+- 测试覆盖 provider wait、tool execution、final race、abort、crash recovery、stream scroll、跨页选择和 clipboard failure。
+- Presentation locale 对同一命令、帮助和交互事实只改变文案，不改变 command name、状态或持久化数据。
+- TUI composer 的可见文本与终端 IME 光标必须来自同一个动态布局模型；底部元信息只展示模型与上下文，不承担命令教学。
 
 ## 5. 不做范围
 
-- 不增加企业审批、安全沙箱或权限工作流主线。
-- 不引入向量库、知识图谱、自动长期记忆或隐藏用户画像。
-- 不保留 JSON session 兼容读取、旧 memory 兼容入口、旧状态别名或带版本编号的类型/表/API。
-- 不模仿某个参考项目的 UI 或产品术语。
-- 不提交、不 push、不发布 npm 包，除非项目所有者另行明确要求。
+- 不为旧的“运行中输入创建后续 turn”行为保留兼容层或迁移入口。
+- 不用系统提示词特判 steer；它是消息生命周期事实。
+- 不在 provider transport 中途注入正在生成的 HTTP 请求；steer 在下一个安全模型边界生效。
+- 不把本地 slash command 作为 steer；本地命令仍由 interaction owner 处理。
+- 不把审美判断写成截图测试；只验证布局、可见性、焦点和交互事实。
+- 不翻译 slash command 名、配置键、provider/model、文件路径、代码、日志原文和工具原始证据。
+- 不执行 commit、push、发布或版本升级，除非用户再次明确授权。
 
 ## 6. 设计
 
 ### 主链路
 
 ```text
-host input
-  -> durable turn admission
-  -> session owner claim + lease
-  -> append user message
-  -> build context from durable items + current context epoch
-  -> provider request / attempt events
-  -> append assistant tool intents
-  -> execute one effect boundary
-  -> append typed tool result immediately
-  -> repeat or append final assistant answer
-  -> terminal turn transition
-  -> release owner
-  -> host projection
+idle submit
+  -> admit session turn -> claim lease -> runHostTurn -> runAgentTurn
+
+active submit
+  -> InteractiveSessionDriver.steerActiveTurn
+  -> SQLite turn_steers(pending, turn_id, sequence)
+  -> active runAgentTurn next safe boundary
+  -> atomically append external user message + mark steer consumed
+  -> build context -> next provider request in the same turn
+
+Ctrl+C
+  -> active turn AbortController -> host abort -> reject remaining pending steers
 ```
 
-### SQLite owner
+### Durable steer owner
 
-`ControlPlaneLedger` 负责打开数据库、schema 和 transaction。表使用稳定业务名：
+`turn_steers` 持有 `id, turn_id, session_id, sequence, input, message_id, status, created_at, consumed_at, rejected_at, rejection_reason`。同一 turn 的 sequence 唯一且在事务内递增。queued/running turn 可以接收 steer；closing 或 terminal turn 拒绝新 steer。
 
-- `sessions`：metadata、revision、当前派生状态。
-- `session_messages`：append-only typed conversation items。
-- `session_turns`：durable input、状态、owner token、lease、terminal error。
-- `tool_calls`：call intent、effect、状态、result envelope、postcondition。
-- `context_epochs`：源前缀、hash、压缩结果和预算。
-- `executions`：worker token、attempt、heartbeat、deadline、cancel 状态。
-- `wake_signals`：execution terminal transition 同事务产生的 outbox fact。
-- `runtime_events`：结构化运行事件和关联 ID。
+消费采用事务边界：读取 pending steer、向 canonical session 聚合追加对应 external user message、将 steer 标记 consumed。由于 session aggregate 当前通过独立 store API 保存，若无法跨 repo 共享同一 SQLite transaction，则由幂等 steer message ID 和 CAS 重试保证“重复调用不重复消息、已落消息可补标 consumed”。不能用“先删后写”。
 
-表名、类型名、函数名和字段名不使用版本编号或 legacy 命名。
+turn 正常完成前必须原子检查没有 pending steer。若发现 steer，agent 继续循环。turn aborted/failed 时剩余 pending steer 进入 rejected 并保留原因；它们不能自动成为下一 turn，因为那会改变用户语义。
 
-### Session admission 与 fencing
+### Agent loop
 
-Host 为每个外部输入创建 turn ID。claim 使用 SQLite 条件更新，只有 session 当前无有效 owner或 lease 已过期时成功。等待者保留 queued 状态并轮询。owner 定时续期。Session 写入必须携带当前 owner token；token 失效立即失败。内部 delegated closeout 复用原 turn owner，不创建伪用户 turn。
+在每次 context 构建前调用 `consumePendingSteers()`，将新 session 返回给 loop。provider/tool 正在执行时只持久接收，不中断。无工具响应进入 final 前再执行一次 drain；有 steer 则先保存 assistant 响应，再追加 steer，然后继续请求。这样模型既看见已经输出的内容，也看见用户的新约束。
 
-### 工具恢复
+assistant 响应的 session 落账与 UI streaming 分开：流式文本可以已经显示，但只要 steer 在 final commit 边界前到达，turn 就继续。UI 不伪造撤回；后续模型得到完整上下文并调整。
 
-assistant tool call 本身是 intent。执行开始写 `tool_calls=running`。每个调用完成后立即把 canonical envelope 写入 `tool_calls` 和 `session_messages`。进程恢复时，任何没有 terminal result 的 intent 变为 `interrupted` error evidence，包含目标、已知事实和取证动作；机器不自动重放有副作用工具。
+### Host 与 driver
 
-文件系统不能与 SQLite 原子提交。write/edit 使用原子临时文件替换，并记录执行前/后内容 hash。subagent 写工具在执行前校验 execution worker token 与 running lease；失权 worker不能提交。
+`runHostTurn()` 仍唯一拥有 turn lease、heartbeat、abort、tool registry 和终态。它向 `runAgentTurn()` 注入当前 turn 的 steer consumer。提交时：无 active turn 则 admit 新 turn；有未中断 active turn 则 durable steer；active turn 已收到 interrupt 时，新输入 admit 为下一 turn 并等待当前 owner 收束。
 
-### Execution
+本地命令继续先解析并执行；只有 `continue` 的普通文本参与 start/steer。显式 interrupt/quit 与终端 detach 使用不同 abort reason，不能互相伪装。
 
-状态使用 `created`, `claimed`, `running`, `cancelling`, `completed`, `failed`, `aborted`, `lost`。`paused` 删除。deadline 到达进入 cancelling，终止进程树；终止确认后进入 aborted，无法确认则进入 lost。PID 只是诊断事实，worker token 和 heartbeat 才是 ownership。
+### 滚动
 
-### Context
+store 明确维护 `scroll.mode = follow | detached` 与稳定 anchor。append 只在 follow 时移动到底部；detached 时保持 anchor，并增加 unseen count。滚轮、PageUp/PageDown 在 provider wait、stream、tool 状态和 overlay 状态下由同一输入 owner处理。viewport 行数变化按 anchor 重投影，不按旧 offset 盲算。
 
-近场消息和工具边界继续优先保留。压缩结果成为 context epoch，并以源消息数量、最后消息 ID、源前缀 hash 校验。tool evidence 只在 epoch 内从 model view 切换到 compact view，不再次截断。system prompt 和最小安全 tail 仍超限时抛出 `ContextBudgetExceededError`。
+### 选择与复制
 
-### Observability 与展示
+输入 gateway 解析 SGR mouse down/move/up/wheel。store 维护 transcript 文本坐标的 anchor/focus，而不是屏幕颜色或 React 节点。projection 为每个可见渲染行提供稳定 row ID 与纯文本；拖到 viewport 边缘时 controller 定时滚动并更新 focus。stream append 不改变既有 row ID。
 
-运行事件写 SQLite。terminal log 和 crash report仍是 artifact，但不参与状态计算。Runtime status 在一个只读 transaction 中读取 session、turn、execution、wake、provider attempt、tool result 和 context epoch，再投影 scene。TUI/Web/Telegram 不拥有运行事实。
+有选择时 `Ctrl+C` 调用 clipboard owner，成功后清除高亮，失败则报告错误并保留选择；无选择时才交给 interrupt。Esc 清除选择。clipboard 先尝试平台 native provider，失败后在 TTY 使用 OSC52；输出内容来自渲染后的 transcript 行，保持换行顺序。
+
+### Presentation locale
+
+`KITTY_LOCALE` 接受 `zh-CN`、`zh-TW`、`en`、`ja`、`ko`、`es`、`pt-BR`、`fr`、`de`、`ru`、`ar`、`hi`，默认 `zh-CN`。`src/i18n/` 以英文 schema 冻结 typed message key，各 locale 必须显式提供完整 catalog；键集合和每个 message 的占位符集合必须完全一致，不允许运行时 fallback。TUI、session picker、CLI/doctor/status/runtime UI、local command metadata、interaction 与 Telegram 只读取 locale 后投影文本。命令名、路径、provider/model、工具证据、机器 JSON 和模型自然回复保持原文。
+
+### Composer 与 IME 光标
+
+Composer 内容框是可见输入文本和终端光标坐标的唯一几何 owner。Ink 完成布局后测量该内容框相对输出原点的真实位置；文本布局计算当前字符光标在内容框内的显示单元坐标，再由唯一的 Ink adapter 将容器行转换到下一行的文本基线。运行中状态、welcome 切换、overlay、换行和 resize 只会触发重新测量，不再维护独立光标行、双 frame 或从 footer 行数反推光标。
+
+TUI input gateway 使用有状态 UTF-8 decoder 跨 chunk 还原键盘与 IME 提交，鼠标事实过滤后再交给 Ink。stdin 的 `end`、`close` 和错误必须幂等关闭 controller 输入，使 host 走既有 recoverable detach，而不是只结束一个无人观察的中间流。
+
+核心测试 runner 为测试进程注入仓库内的专用临时根；每个测试 workspace 建立自己的项目发现边界，不能继承 Kitty 根项目事实。Node test runner 为单项测试设置有界超时；进程故障测试使用独立的已知 parent/child 清理路径，失败时必须释放句柄，不能靠强制退出掩盖泄漏。Windows 进程终止在 `taskkill /T` 非零且 root 仍存活时使用 Node 原生 kill 收束 root，行为测试仍负责证明 descendant 是否真正结束。
 
 ### 文件职责
 
-- `src/control/`：数据库、schema、transaction 和各事实仓库。
-- `src/session/`：SQLite session 聚合、消息 append、恢复和派生状态。
-- `src/host/`：turn admission、lease 生命周期和宿主结果。
-- `src/agent/turn/`：模型/工具推进，不拥有跨进程锁。
-- `src/execution/`：worker claim、heartbeat、取消、reconcile 和 fencing。
-- `src/context/runtime/`：context epoch、预算与 provider projection。
-- `src/observability/`：runtime event 写入和 artifact。
-- `src/runtime/`：只读一致投影。
+- `control/turnSteers.ts`：durable steer 状态机与查询。
+- `control/schema.ts`, `control/ledger.ts`：schema 和 repo 接线。
+- `agent/turn/steering.ts`：steer 到 canonical session message 的幂等消费。
+- `agent/turn/run.ts`：在模型循环安全边界协调消费与继续。
+- `host/turn.ts`, `host/types.ts`：turn owner 注入和终态拒绝。
+- `interaction/sessionDriver.ts`：start/steer/abort 三种用户动作仲裁。
+- `shell/tui/store.ts`, `controller.ts`, `transcriptProjection.ts`：scroll/selection 事实。
+- `shell/tui/input/*`, `components/Transcript.ts`：鼠标事件与展示。
+- `shell/tui/clipboard.ts`：OSC52 与平台 fallback。
+- `i18n/`：presentation locale、typed key、字典和插值。
+- `tests/i18n/`：catalog 键/占位符完整性、无 fallback、配置切换和关键 presenter 行为。
+- `README.md`, `docs/quickstart.md`：产品边界与首次用户可执行路径，不承载运行时事实。
+- `session/transcriptExport.ts`：把持久 session 中面向用户的对话事实投影为 Markdown 文件；不负责命令解析或聊天区呈现。
+
+超过 300 行按职责变化原因审查，不按行数机械拆分。
 
 ## 7. 实施任务
 
-- [x] 建立 SQLite session、turn、message、tool call、context epoch、runtime event schema 与 transaction API；新增失败测试验证事务和 CAS。
-- [x] 重写 `SessionStore` 为 SQLite 聚合存储，增加 revision 和 append-only message ID；删除 JSON snapshot 与 session memory asset 写入。
-- [x] 在 host 边界实现 durable admission、claim、heartbeat、等待、terminal transition 和 release；让所有 host 复用。
-- [x] 重排 tool batch：intent 先落账、每个 result 立即落账、abort 后补 terminal evidence、恢复时修复悬空调用。
-- [x] 为 write/edit 增加原子替换和内容 hash；为 subagent 工具写入增加 execution fencing。
-- [x] 重建 execution 状态机、worker claim/heartbeat、deadline cancel、lost reconcile，并事务化 wake。
-- [x] 建立 context epoch、源前缀校验和硬预算失败；删除每轮 session memory 模型调用。
-- [x] 把 observability runtime event 迁入 SQLite，加入全链路关联 ID 和真实 provider attempt 预算。
-- [x] 重写 runtime status/scene 为单 transaction 投影；同步 TUI/Web/Telegram/CLI。
-- [x] 删除 runtime long memory、memory CLI、memory status/prompt/docs/tests 和无效目录声明。
-- [x] 更新 provider、host、execution、context、recovery、跨 host 并发和故障注入测试。
-- [x] 更新 `spec.md`、README 和 eval，使其只描述当前生产事实。
-- [x] 修复命令失败的模型证据投影，保留实际 shell 和通用恢复路径；补充基线取证执行不变量，不引入任务或命令特判。
-- [x] 运行定向测试、完整 verify、本地 eval、强杀恢复演练和真实 provider production eval。
-- [x] 更新本计划收口，记录验证、未验证项和剩余风险。
+- [x] 写失败测试锁定 steer repo 状态机、顺序、有效 turn 校验、终态拒绝和中断清理窗口的新输入不丢失。
+- [x] 建立 `turn_steers` schema/repo 并接入 control ledger。
+- [x] 建立 agent steer consumer，保证 session message 幂等落账和 consumed 状态恢复。
+- [x] 完成 steer drain 的 context/final 竞态边界，并用行为测试证明 final 同时到达 steer 时不会失败或丢失。
+- [x] 保证单执行 owner；运行中提交走 steer，`Ctrl+C` 清理窗口的新输入进入下一 durable turn。
+- [x] 更新 host 终态和 crash recovery，区分 explicit abort、terminal detach 和 lease-expiry recovery。
+- [x] 更新 TUI 提交反馈和运行状态文案，删除 queued turn 语义。
+- [x] 用失败测试锁定 streaming detached viewport，并建立 anchor/unseen owner。
+- [x] 实现 SGR/X10 mouse selection、边缘自动滚动、稳定文本坐标和字符级高亮。
+- [x] 实现 native/OSC52 clipboard；`Ctrl+C` 按 selection 优先级路由。
+- [x] 建立 `KITTY_LOCALE` typed catalog，并接入 session picker、TUI chrome、slash commands、interaction 与 runtime scene。
+- [x] 删除 Web host 全链路：移除 `kitty web`、`src/web/`、Web 测试、WebSocket 直接依赖和文档事实，并将远程入口 eval 收敛为 Telegram 验收。
+- [x] 冻结完整 presentation message schema，让 CLI help、doctor/preflight、status presenter、host/runtime UI 与 Telegram 用户提示不得混杂未本地化固定文案。
+- [x] 提供 `zh-CN`、`zh-TW`、`en`、`ja`、`ko`、`es`、`pt-BR`、`fr`、`de`、`ru`、`ar`、`hi` 十二份完整 catalog，不允许已注册语言缺 key 或回退英文。
+- [x] 增加 locale 完整性、无 fallback、配置切换、非法值失败及关键 presenter 多语言行为测试。
+- [x] 按核心链路复审并清理现存技术债务：terminal renderer 改为读取 typed result 状态，eval scene/Telegram 改为读取结构化事实并删除 Web 旧事实；超过 300 行文件按职责审查后未机械拆分。
+- [x] 收敛 TUI footer：只展示模型和上下文，删除分隔点、斜杠命令与命令面板教学文案。
+- [x] 基于 Ink 官方光标机制与参考实现重建 TUI IME 坐标链：候选窗必须跟随受控 composer 的真实终端光标，运行中输入、welcome 切换、resize、overlay 和多行换行不能依赖硬编码行列补偿。
+- [x] 修复 TUI input gateway 的跨 chunk UTF-8/IME 解码、鼠标 framing 和 EOF/close 传播，并增加拆分中文、关闭幂等与鼠标过滤测试。
+- [x] 重建核心测试临时根与项目隔离，保证命令、skill、bash 测试在受限环境仍使用真实子进程且不会继承仓库事实。
+- [x] 硬化 Windows 进程树测试与 fallback：失败必须有界返回，成功必须同时终止 parent 和 child。
+- [x] 对齐 Node 22 runtime contract，并将 Ink optional devtools 保留为 external。
+- [x] 完成 CLI/TUI production bundle 与产物导入烟雾检查，未替换 tsup 或降低构建语义。
+- [x] 保留根 `README.md` 的教学型产品定位、官网与徽章，并提供面向首次用户的 `docs/quickstart.md`。
+- [x] 完成 `/copy` 文件导出：重新加载当前 session 的最新持久快照，按顺序保留 user、assistant reasoning 和 assistant reply，聊天区只报告导出路径。
+- [x] 将 `kitty-agent-development` 与 `plan` 迁移到 `.agents/skills/`，并更新仓库中的真实路径引用和运行时隔离测试。
+- [x] 同步 `spec.md` 与本计划，保证文档只描述实际交付的当前事实。
+- [x] 在 `/copy`、README、文档迁移、skill 迁移和思考样式修改后重新运行定向测试、完整验证、evaluation、diff 与残留扫描。
+- [x] 收口记录最新代码的实际验证、未验证项和剩余风险。
 
 ## 8. 验证计划
 
-局部验证：
-
-```powershell
-npm.cmd run test:build
-node --test .test-build/tests/session/*.test.js .test-build/tests/control/*.test.js
-node --test .test-build/tests/host/*.test.js .test-build/tests/execution/*.test.js
-node --test .test-build/tests/agent/*.test.js .test-build/tests/context/*.test.js
-node --test .test-build/tests/provider/*.test.js .test-build/tests/runtime/*.test.js
-```
+定向自动验证覆盖：control steer repo、agent loop、host admission、session driver、TUI store/gateway/render/selection/clipboard。
 
 完整验证：
 
 ```powershell
 npm.cmd run verify
-npm.cmd run eval:local
-npm.cmd run eval:production
 ```
 
-额外实战：
+最终验证事实：`npm.cmd run verify` 在最新代码上通过 typecheck、CLI/TUI production bundle 和完整 core suite；core 共 340 项，339 通过、0 失败、1 项 POSIX-only 跳过。`npm.cmd run test:eval` 通过 11/11，重新构建后的 `npm.cmd run eval:local` 通过全部 14 个本地验收。`/copy` 定向测试证明导出使用最新持久 session，并保留外部 user、assistant reasoning 和 assistant reply。`.agents/skills` 隔离测试证明开发 skill 不进入 Kitty runtime skill surface。
 
-- 并发 host 对同一 session 提交真实输入。
-- 在 tool intent、文件写入、tool result、turn terminal 各边界强杀并恢复。
-- 启动超时 subagent，确认 deadline 后进程树停止且失效 token 无法写入。
-- 制造长上下文并执行两次压缩、重启和继续。
-- 检查 SQLite 中一次真实任务的 turn、message、tool、execution、wake、request attempt 和 terminal event 关联完整。
+真实演练：
 
-production eval 依赖当前 `.kitty/.env` 和真实 provider；若外部 provider 不可用，必须记录实际阻塞，不能用 mock 宣称通过。
+- provider 等待、流式回复和工具执行三个阶段各连续提交两条 steer，确认都进入当前 turn 的下一次请求。
+- 在 final 文本即将结束时提交，确认当前 turn 继续且只生成一个 turn record。
+- steer 接收后分别强杀消费前和消费后进程，重启检查 pending/consumed 事实与 session message 不丢不重。
+- 有 pending steer 时按 `Ctrl+C`，确认当前 turn aborted、steer rejected、下一次输入创建正常新 turn。
+- 持续生成长文本时滚到中部，使用滚轮/PageUp/PageDown 阅读并返回底部。
+- 鼠标跨两页向上拖选，`Ctrl+C` 复制；无选择时 `Ctrl+C` 中断。
+- 40x12、80x24、160x40 下缩放并打开 overlay，确认 viewport、选择、composer 和 footer 不重叠。
+
+环境无法自动验证的原生终端剪贴板差异必须在收口中明确记录，不能假装已验证。
 
 ## 9. 收口
 
-目标已完成。SQLite 现在统一持有 session、message、turn、tool call、context epoch、execution、wake 和 runtime event 事实；host admission、tool evidence WAL、execution lease/fencing、context hard budget、provider attempt correlation 和 runtime status 已接入同一主干。长期 memory 的实现、入口、路径、状态、测试和文档已删除。
+目标已完成。Durable steer、TUI 滚动/选择/复制/草稿/overlay、IME 输入网关、测试隔离、Windows 进程 fallback、421-key presentation schema、十二份无 fallback catalog、CLI/TUI/Telegram presenter、README/quickstart、文档迁移、开发 skill 迁移、思考样式和 `/copy` 已接入同一当前事实。
 
-验证事实：
+真实 production PTY 验证了首屏、中文宽字符输入、overlay 打开/关闭、多行输入和正常 cleanup：可见中文与终端光标稳定落在同一行，四个中文字符按八个显示单元推进；多行重绘后光标落在第二行文本基线。自动测试覆盖 resize、overlay row budget、selection、clipboard fallback、stdin close 与跨 chunk UTF-8/mouse framing。
 
-- `npm.cmd run verify` 通过：typecheck、build、核心测试完成；279 个测试中 278 通过、0 失败、1 个 POSIX-only 测试在 Windows 按条件跳过。
-- `npm.cmd run eval:local` 通过全部 14 个场景，包括 context epoch、工具输出治理、host boundary、background/subagent lifecycle 和 lost/abort/terminate 恢复演练。
-- `npm.cmd run eval:production` 通过全部 5 个真实场景：DeepSeek provider probe、两轮 session、严格修复任务和 runtime status。修复任务先保留失败验证证据，再修改文件，再复验通过；tool.failed、tool.completed 和 turn.completed 闭环。
-- 定向工具证据测试 12/12 通过；同 session 并发 admission、tool batch、local API 和 execution lifecycle 测试通过。
-- 删除能力残留扫描无命中；内部源码没有版本编号或 legacy 命名。超过 300 行的文件已按职责和变化原因审查，没有为行数拆分。
-
-未验证与剩余风险：没有在 POSIX 主机运行 Windows 本次构建，POSIX 进程树终止测试因此未执行；真实 provider 实战只覆盖当前 DeepSeek 配置，不代表所有 catalog provider 的实时服务稳定性。SQLite 设计面向单机多进程，不宣称提供跨主机分布式共识。当前没有 commit 或 push 请求，也未执行 commit 或 push。
+未验证与剩余风险：当前工具不能驱动 Windows 原生 IME 候选窗，也不能拖动 ConPTY 改变真实窗口尺寸；候选窗视觉位置、人工拖窗和 native clipboard 仍需人在本机观察。POSIX 进程树测试在 Windows 按条件跳过。`eval:production` 需要当前项目完整 `.kitty/.env` 和真实 provider 额度，本轮未擅自调用。没有 commit、push 或发布请求，也未执行这些操作。

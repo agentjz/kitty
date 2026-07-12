@@ -4,9 +4,10 @@ import { normalizeModelReasoningEffort, normalizeModelThinkingMode } from "./mod
 import { normalizeExtensions } from "./extensions.js";
 import { invalidConfigValue, missingConfigValue } from "./errors.js";
 import type { AppConfig } from "../types.js";
+import { DEFAULT_LOCALE, parseKittyLocale, SUPPORTED_LOCALES } from "../i18n/index.js";
 
 export function normalizeRuntimeConfig(
-  config: AppConfig,
+  config: Omit<AppConfig, "locale"> & { locale: unknown },
   runtime: {
     cwd?: string;
     cacheDir?: string;
@@ -14,6 +15,7 @@ export function normalizeRuntimeConfig(
   } = {},
 ): AppConfig {
   const normalized = {
+    locale: normalizeLocale(config.locale),
     provider: requireTextConfig(config.provider, "provider"),
     baseUrl: requireTextConfig(config.baseUrl, "baseUrl"),
     model: requireTextConfig(config.model, "model"),
@@ -39,6 +41,20 @@ export function normalizeRuntimeConfig(
 
   validateProviderModelConfig(normalized);
   return normalized;
+}
+
+function normalizeLocale(value: unknown): AppConfig["locale"] {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return DEFAULT_LOCALE;
+  }
+  const locale = parseKittyLocale(value);
+  if (!locale) {
+    throw invalidConfigValue(
+      "KITTY_LOCALE",
+      `KITTY_LOCALE must be one of: ${SUPPORTED_LOCALES.join(", ")}.`,
+    );
+  }
+  return locale;
 }
 
 function validateProviderModelConfig(config: Pick<AppConfig, "provider" | "model">): void {

@@ -2,6 +2,7 @@ import type { CliProgramDependencies } from "../dependencies.js";
 import type { RuntimeConfig, SessionRecord } from "../../types.js";
 import { createHostSession } from "../../host/session.js";
 import { selectCliSession } from "./sessionPicker.js";
+import { translate, type KittyLocale } from "../../i18n/index.js";
 
 export async function createSessionStore(sessionsDir: string) {
   const { SessionStore } = await import("../../session/index.js");
@@ -51,6 +52,7 @@ export async function resolveCliSession(input: {
   sessionStore: Awaited<ReturnType<typeof createSessionStore>>;
   resume?: string;
   interactive?: boolean;
+  locale?: KittyLocale;
 }): Promise<{
   session: SessionRecord;
   cwd: string;
@@ -68,6 +70,7 @@ export async function resolveCliSession(input: {
       cwd: input.cwd,
       cwdOverridden: Boolean(input.cwdOverridden),
       sessionStore: input.sessionStore,
+      locale: input.locale,
     });
   }
 
@@ -107,7 +110,11 @@ export async function runCliMode(
     sessionStore: options.sessionStore,
   });
   if (!result.closeout.completed && options.onIncomplete) {
-    options.onIncomplete(result.closeout.unfinishedReason ?? options.incompleteMessage ?? "Run did not complete.");
+    options.onIncomplete(
+      result.closeout.unfinishedReason
+      ?? options.incompleteMessage
+      ?? translate(options.config.locale, "cli.run.incomplete"),
+    );
   }
   return result;
 }

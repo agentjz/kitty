@@ -8,7 +8,9 @@ import {
 import type { TuiController } from "../controller.js";
 import { TUI_COLORS } from "../theme.js";
 import { TRANSCRIPT_OUTER_PADDING_X } from "../transcriptLayout.js";
+import { selectableLineText, type TuiSelectableTranscriptLineView } from "../selection.js";
 import type { InkRuntime } from "./kit.js";
+import { translate } from "../../../i18n/index.js";
 
 export function createTranscriptComponent(kit: Pick<InkRuntime, "React" | "Box" | "Text">) {
   const { React, Box, Text } = kit;
@@ -17,10 +19,15 @@ export function createTranscriptComponent(kit: Pick<InkRuntime, "React" | "Box" 
     state: TuiState;
     viewport: TuiViewport;
   }): React.ReactNode {
+    const showNotice = props.state.scroll.unseenRows > 0;
+    const contentViewport = {
+      ...props.viewport,
+      height: Math.max(0, props.viewport.height - (showNotice ? 1 : 0)),
+    };
     const rows = props.controller
-      ? props.controller.getVisibleTranscriptLineViews(props.viewport)
-      : renderTranscriptLineViews(props.state.transcript, props.viewport.width)
-        .slice(props.state.scroll.offset, props.state.scroll.offset + props.viewport.height);
+      ? props.controller.getVisibleTranscriptLineViews(contentViewport)
+    : renderTranscriptLineViews(props.state.transcript, props.viewport.width, props.state.locale)
+        .slice(props.state.scroll.offset, props.state.scroll.offset + contentViewport.height);
     return React.createElement(
       Box,
       {
@@ -32,8 +39,12 @@ export function createTranscriptComponent(kit: Pick<InkRuntime, "React" | "Box" 
         paddingX: TRANSCRIPT_OUTER_PADDING_X,
       },
       ...rows.map((row) => renderTranscriptLine(React, Box, Text, row)),
-      props.state.scroll.newContentPending
-        ? React.createElement(Text, { color: TUI_COLORS.warning }, "有新内容，按 End 回到底部")
+      showNotice
+        ? React.createElement(Text, { color: TUI_COLORS.warning }, translate(
+          props.state.locale,
+          "tui.newContentRows",
+          { count: props.state.scroll.unseenRows },
+        ))
         : null,
     );
   };
@@ -43,7 +54,7 @@ function renderTranscriptLine(
   React: InkRuntime["React"],
   Box: typeof import("ink").Box,
   Text: typeof import("ink").Text,
-  row: TuiTranscriptLineView,
+  row: TuiSelectableTranscriptLineView,
 ): React.ReactNode {
   if (row.kind === "spacer") {
     return React.createElement(Box, { key: row.id, height: 1 });
@@ -68,7 +79,9 @@ function renderTranscriptLine(
         width: row.frame.bodyWidth,
         marginLeft: row.frame.gap,
       },
-      row.prefix
+      row.selection
+        ? renderSelectedLine(React, Text, row)
+        : row.prefix
         ? React.createElement(
           Text,
           { color: row.style.text, wrap: "truncate-end" },
@@ -82,6 +95,25 @@ function renderTranscriptLine(
           wrap: "truncate-end",
         }, ...renderTranscriptSpans(React, Text, row)),
     ),
+  );
+}
+
+function renderSelectedLine(
+  React: InkRuntime["React"],
+  Text: typeof import("ink").Text,
+  row: TuiSelectableTranscriptLineView,
+): React.ReactNode {
+  const text = selectableLineText(row);
+  const selection = row.selection!;
+  return React.createElement(
+    Text,
+    { color: row.style.text, wrap: "truncate-end" },
+    text.slice(0, selection.start),
+    React.createElement(Text, {
+      backgroundColor: TUI_COLORS.selection,
+      color: TUI_COLORS.text,
+    }, text.slice(selection.start, selection.end)),
+    text.slice(selection.end),
   );
 }
 

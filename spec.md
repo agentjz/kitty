@@ -6,6 +6,8 @@
 
 Kitty 是一个智能体。它接收用户任务，构建上下文，调用模型，执行工具，保存工作状态，并能在同一任务现场继续工作。
 
+当前运行时最低版本是 Node.js 22。生产构建输出 CLI CJS 与 TUI ESM；Ink 的可选 `react-devtools-core` 保持 external，未安装时不影响 TUI 启动。
+
 产品目标是持久化的智能体工作能力：
 
 - 单一 lead agent 循环；
@@ -19,7 +21,7 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 
 - 模型负责计划、优先级和语义取舍。
 - 机器模块负责执行、校验、持久化和暴露事实。
-- CLI、TUI、Web、Telegram 和 worker 复用同一条 host turn 边界。
+- CLI、TUI、Telegram 和 worker 复用同一条 host turn 边界。
 - 不保留兼容层、别名、旧状态或平行事实源。
 - 代码、测试、CLI 输出和本文档必须描述同一个当前产品事实。
 
@@ -44,6 +46,7 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 .kitty/.env
 .kitty/events/
 .kitty/changes/
+.kitty/exports/
 .kitty/extensions/
 .kitty/control-plane.sqlite
 .kitty/observability/{events,crashes,terminal}/
@@ -66,6 +69,7 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 
 主要用户配置：
 
+- `KITTY_LOCALE`：`zh-CN`、`zh-TW`、`en`、`ja`、`ko`、`es`、`pt-BR`、`fr`、`de`、`ru`、`ar` 或 `hi`，默认 `zh-CN`；只影响 presentation。
 - `KITTY_PROVIDER`
 - `KITTY_MODEL`
 - `KITTY_BASE_URL`
@@ -88,6 +92,10 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 - `src/host/`：所有宿主共用的生命周期、session 绑定、工具注册表创建、turn 事件、abort 处理、lead 等待与恢复。
 - `src/interaction/`：宿主无关的交互输入输出驱动。
 
+本地命令名称、别名、分类、说明和解析只由 `src/interaction/localCommandDefinitions.ts` 持有。CLI/TUI 等壳可以采用不同呈现，但必须把规范输入交回 `InteractiveSessionDriver`；壳不能直接调用命令 handler 或维护第二张命令表。
+
+`/copy` 把当前 session 的外部 user 消息、assistant reasoning 和 assistant reply 按顺序导出到 `.kitty/exports/conversation-<sessionId>.md`，聊天区只显示导出路径。Tool、system 和 internal user fact 不进入面向用户的对话文件。
+
 ### Turn 行为
 
 `runHostTurn()` 是统一 turn 边界。它：
@@ -108,6 +116,10 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 5. 流式输出 reasoning 和回答回调。
 6. 执行工具批次或收束最终回答。
 7. 最终回答后写入 session title 和完成态 task lifecycle 事实。
+
+交互宿主在 active turn 期间收到的普通外部输入不是新 turn，而是写入 SQLite `turn_steers` 的 durable steer。Steer 按 turn 内 sequence 排序，状态为 `pending`、`consumed` 或 `rejected`；agent 在下一次 context 构建前消费，并以确定 message ID 写入同一 session。Final answer 进入持久化前必须通过 turn `closing` 事务边界确认没有 pending steer；若同时到达新 steer，则保存当前 assistant 输出并继续同一 turn。
+
+`Ctrl+C` 是显式 abort：当前 turn 进入 aborted，未消费 steer 进入 rejected。中断清理尚未结束时的新输入必须 admit 为下一 durable turn，不能写到即将 aborted 的 owner。终端 EOF/关闭是 recoverable detach：停止本地执行但把 active turn 放回 queued，pending steer 保持 pending；进程强杀后由 lease expiry 完成同一 turn 恢复。任何时刻同一 session 只能有一个有效 execution owner。
 
 Provider request 是临时失败的唯一重试 owner：同一逻辑请求最多四次调用、总等待最多 90 秒，并优先采用服务端 `Retry-After`。Agent turn 不得重新发送已耗尽重试预算的请求。Abort 必须中断当前请求或等待，不能伪造正常完成。
 
@@ -262,19 +274,31 @@ Terminal log 使用 UTF-8，记录可读的用户输入、reasoning、assistant 
 - `src/cli/`：命令解析与 presenter。
 - `src/host/localApi.ts`：本地 session/message/event/status API。
 - `src/telegram/`：Telegram polling host。
-- `src/web/`：Web host。
 
-`kitty`、`kitty tui`、`kitty agent`、Web、Telegram 和 worker 命令都进入同一条 host/agent turn 主链路。`status`、`events`、`background`、`execution`、`doctor`、`eval` 等 CLI 命令暴露已存事实，不能创建平行生命周期语义。
+`kitty`、`kitty tui`、`kitty agent`、Telegram 和 worker 命令都进入同一条 host/agent turn 主链路。`status`、`events`、`background`、`execution`、`doctor`、`eval` 等 CLI 命令暴露已存事实，不能创建平行生命周期语义。
 
 ### TUI
 
-`src/shell/tui/` 是 Ink 宿主壳。它负责终端输入、滚动、resize、transcript layout、composer geometry、runtime dock 渲染和清理；它不拥有 session 或 execution 事实。
+`src/shell/tui/` 是 Ink 宿主壳。它负责终端输入、滚动、resize、transcript layout、composer geometry、overlay/focus、runtime dock 渲染和清理；它不拥有 session 或 execution 事实。
 
 TUI 规则：
 
+- Composer 是 controller/store 持有的受控状态，React 组件不能私有持有另一份 draft 或 cursor。唯一键盘入口按全局动作、顶层 overlay、composer 编辑的顺序分派。
+- Composer 内容框是可见输入与终端 IME 光标的唯一几何 owner。Ink 布局后测得的内容框绝对位置与当前字符的显示单元偏移生成光标坐标，再由唯一 renderer adapter 将容器行下移到文本基线；welcome、运行中状态、overlay、换行和 resize 不得维护独立光标行、双 frame 或 footer 行数补偿。
+- 输入 `/` 打开共享命令补全；`Ctrl+P` 打开同源命令面板；Up/Down 或 Ctrl+P/N 选择，Tab 补全，Enter 经原 input queue 执行，Esc 只关闭顶层 overlay。
+- `Ctrl+R` 搜索当前 session 的外部用户输入历史。普通 Up/Down 先在多行草稿内移动，到首尾边界后才遍历历史；历史条目不可被原地修改。
+- 空草稿输入 `?` 打开真实键位帮助。Home/End 按当前行移动，Ctrl+Home/End 同时定位 transcript 和整个草稿；Delete 向前删除，Backspace 向后删除；Ctrl+K/U/W/Y 使用 composer kill buffer。
+- `Ctrl+G` 释放 TUI raw input 并启动 `$VISUAL`、`$EDITOR` 或平台默认编辑器；编辑成功后替换草稿，失败时保留原草稿并显示错误，临时文件必须清理。
+- 未提交草稿同步写入 SQLite `interaction_drafts`，以 session ID 和 shell 为 owner；只有数据库短暂占用时才进入待写重试。草稿不属于 session message 或模型上下文；提交时清除，正常退出时 flush，恢复时 clamp cursor。
+- 命令、历史和帮助共享一个判别式 overlay 状态；同一时刻只能有一个顶层交互，响应式行预算不能覆盖 composer、dock 或 transcript。
+- Transcript 滚动状态只能是 `follow` 或 `detached`。Detached 状态保存稳定 row anchor 和 unseen row count；流式追加、工具状态更新与 resize 不能把阅读位置拉回底部。
+- Input gateway 使用有状态 UTF-8 decoder 保留跨 chunk 的中文与 IME 提交，并对跨 chunk 的 SGR/X10 mouse press、drag、release 和 wheel 做完整 framing；鼠标序列不得进入 composer 键盘流。stdin EOF、close 或错误必须幂等关闭 controller 输入，让 active turn 进入 recoverable detach。Selection 使用渲染 row ID 与字符列，支持宽字符、跨行选择、边缘自动滚动和字符级高亮。
+- 有 selection 时 `Ctrl+C` 复制，不触发 turn interrupt；无 selection 时才中断。Esc 清除 selection。Clipboard 优先使用平台 native provider，失败后在 TTY 使用 OSC52；复制失败必须保留 selection 并显示错误。
+- Session picker、TUI chrome、CLI/doctor/status/runtime UI、command/help、interaction 与 Telegram 提示读取 runtime locale 的 typed catalog。十二份 catalog 必须拥有完全一致的 key 与占位符集合，运行时不做语言 fallback。Locale 不能进入 prompt、session message、tool evidence 或 control-plane 状态；命令名、路径、provider/model、机器 JSON 和模型回复保持原文。
+
 - Transcript 的 user、assistant、reasoning、system、subagent、subagent-reasoning 使用同一个正文框架。Role 可以改变 gutter、颜色和强调，但不能改变正文起始列。
 - Footer 的 model 标签与 Runtime Dock 的 activity/background/subagent 标签使用同一个左侧内容 inset。
-- Model metadata 位于 composer 下方左侧；context budget 位于右侧。
+- Model metadata 位于 composer 下方左侧；context budget 位于右侧。Footer 不显示分隔点、斜杠命令或命令面板教学。
 - Context budget 必须属于当前选中的 session。项目全局 runtime status 不能用另一条最近已保存 session 的 budget 覆盖新建或已选 session。
 - 用户提交后到最终模型回答完成期间，TUI 在 Runtime Dock 第一行右侧显示本轮持续时间；思考、工具调用和后续模型请求不重置它。
 - Runtime Dock 保持稳定两行结构；第一行左侧展示当前 activity，过长摘要单行截断，右侧展示本轮持续时间；第二行展示 live background/subagent lane。
@@ -298,8 +322,10 @@ TUI 定向验证：
 
 ```powershell
 npm.cmd run test:build
-node --test .test-build/tests/shell/tui-render.test.js .test-build/tests/shell/tui-store.test.js .test-build/tests/shell/tui-shell.test.js
+node --test .test-build/tests/shell/tui-command-menu.test.js .test-build/tests/shell/tui-external-editor.test.js .test-build/tests/shell/tui-gateway.test.js .test-build/tests/shell/tui-render.test.js .test-build/tests/shell/tui-store.test.js .test-build/tests/shell/tui-shell.test.js
 ```
+
+`scripts/run-tests.mjs` 统一运行 core/evaluation 测试。它为子进程提供仓库内隔离临时根，每个临时 workspace 建立独立项目发现边界，单项测试使用有界超时，并在结束或启动失败时清理生成状态。
 
 显式产品验收：
 

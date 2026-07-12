@@ -9,9 +9,11 @@ import { resetProjectRuntime } from "../project/reset.js";
 import { buildRuntimeStatus } from "../runtime/status.js";
 import { summarizeExecution } from "../runtime/executionSummary.js";
 import type { SessionStoreLike } from "../session/index.js";
+import { exportSessionConversation } from "../session/transcriptExport.js";
 import type { RuntimeConfig, SessionRecord } from "../types.js";
 import { formatLocalCommandHelp, isLocalCommand, normalizeLocalCommand } from "./localCommandDefinitions.js";
 import type { ShellOutputPort } from "./shell.js";
+import { translate } from "../i18n/index.js";
 
 export interface LocalCommandContext {
   cwd: string;
@@ -48,17 +50,17 @@ export async function handleLocalCommand(
       config: context.config,
       currentSessionId: context.session.id,
     });
-    output.warn("Project runtime reset. Session closed.");
+    output.warn(translate(context.config.locale, "local.resetDone"));
     return "quit";
   }
 
   if (command === "help") {
-    output.plain(formatLocalCommandHelp());
+    output.plain(formatLocalCommandHelp(context.config.locale));
     return "handled";
   }
 
   if (command === "session") {
-    output.info(`Current session: ${context.session.id}`);
+    output.info(translate(context.config.locale, "local.currentSession", { id: context.session.id }));
     return "handled";
   }
 
@@ -68,7 +70,10 @@ export async function handleLocalCommand(
   }
 
   if (command === "status") {
-    output.plain(formatRuntimeStatusText(await buildRuntimeStatus(await resolveLocalStateRootDir(context))).trimEnd());
+    output.plain(formatRuntimeStatusText(
+      await buildRuntimeStatus(await resolveLocalStateRootDir(context)),
+      context.config.locale,
+    ).trimEnd());
     return "handled";
   }
 
@@ -78,7 +83,10 @@ export async function handleLocalCommand(
   }
 
   if (command === "skills") {
-    output.plain(formatSkillsForLocalCommand(await buildRuntimeStatus(await resolveLocalStateRootDir(context))));
+    output.plain(formatSkillsForLocalCommand(
+      await buildRuntimeStatus(await resolveLocalStateRootDir(context)),
+      context.config.locale,
+    ));
     return "handled";
   }
 
@@ -89,7 +97,7 @@ export async function handleLocalCommand(
       paths: getAppPaths(stateRootDir),
       sessionId: context.session.id,
       limit: 20,
-    })));
+    }), context.config.locale));
     return "handled";
   }
 
@@ -104,17 +112,20 @@ export async function handleLocalCommand(
   }
 
   if (command === "copy") {
-    output.plain(formatSessionTranscript(context.session));
+    const session = context.sessionStore
+      ? await context.sessionStore.load(context.session.id)
+      : context.session;
+    const result = await exportSessionConversation(await resolveLocalStateRootDir(context), session);
+    if (result.sectionCount === 0) {
+      output.info(translate(context.config.locale, "local.noMessages"));
+      return "handled";
+    }
+    output.info(translate(context.config.locale, "local.conversationExported", { path: result.filePath }));
     return "handled";
   }
 
   if (command === "export") {
     output.plain(JSON.stringify(context.session, null, 2));
-    return "handled";
-  }
-
-  if (command === "clear") {
-    output.info("Current prompt cleared.");
     return "handled";
   }
 
@@ -129,43 +140,43 @@ async function formatBackgroundExecutionsForLocalCommand(context: LocalCommandCo
     .map(summarizeExecution)
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
   if (executions.length === 0) {
-    return "No background executions recorded.";
+    return translate(context.config.locale, "local.noBackground");
   }
-  return executions.map(formatBackgroundExecution).join("\n");
+  return executions.map((execution) => formatBackgroundExecution(execution, context.config.locale)).join("\n");
 }
 
 async function resolveLocalStateRootDir(context: Pick<LocalCommandContext, "cwd" | "stateRootDir">): Promise<string> {
   return context.stateRootDir ?? (await resolveProjectRoots(context.cwd)).stateRootDir;
 }
 
-function formatSkillsForLocalCommand(status: Awaited<ReturnType<typeof buildRuntimeStatus>>): string {
+function formatSkillsForLocalCommand(
+  status: Awaited<ReturnType<typeof buildRuntimeStatus>>,
+  locale: RuntimeConfig["locale"],
+): string {
   if (status.skills.total === 0) {
     return status.scene.skills.nextAction;
   }
   return [
-    `skills: ${status.skills.ready}/${status.skills.total} ready`,
+    translate(locale, "local.skillsReady", { ready: status.skills.ready, total: status.skills.total }),
     ...status.skills.needsAttention.map((skill) =>
-      `${skill.name}  status=${skill.status}  issues=${skill.issues.join("; ") || "none"}`),
+      translate(locale, "local.skillLine", {
+        name: skill.name,
+        status: skill.status,
+        issues: skill.issues.join("; ") || translate(locale, "common.none"),
+      })),
   ].join("\n");
 }
 
 async function formatSessionsForLocalCommand(context: LocalCommandContext): Promise<string> {
   const sessions = await (context.sessionStore?.list(10) ?? []);
   if (sessions.length === 0) {
-    return "No saved sessions yet.";
+    return translate(context.config.locale, "local.noSessions");
   }
   return sessions.map((session) => [
     session.id === context.session.id ? "*" : " ",
     session.id,
     session.updatedAt,
-    session.title ?? "(untitled)",
-    `messages=${session.messageCount}`,
+    session.title ?? translate(context.config.locale, "common.untitled"),
+    translate(context.config.locale, "local.sessionMessages", { count: session.messageCount }),
   ].join("  ")).join("\n");
-}
-
-function formatSessionTranscript(session: SessionRecord): string {
-  if (session.messages.length === 0) {
-    return "Current session has no messages yet.";
-  }
-  return session.messages.map((message) => `${message.role}: ${message.content}`).join("\n\n");
 }

@@ -4,10 +4,12 @@ import type { CliProgramDependencies } from "../dependencies.js";
 import type { CliOverrides, RuntimeConfig } from "../../types.js";
 import { ui } from "../../utils/console.js";
 import { createSessionStore, resolveCliSession, runCliMode } from "./sessionHelpers.js";
+import { translate, type KittyLocale } from "../../i18n/index.js";
 
 export function registerAgentCommand(
   program: Command,
   options: {
+    locale: KittyLocale;
     getCliOverrides: () => CliOverrides;
     resolveRuntime: (overrides: CliOverrides) => Promise<{
       cwd: string;
@@ -20,8 +22,8 @@ export function registerAgentCommand(
 ): void {
   program
     .command("agent")
-    .description("Start agent mode: direct execution for maintenance, debugging, quick edits, and clear tasks.")
-    .argument("[prompt...]", "Optional one-shot prompt. Without a prompt, opens interactive agent mode.")
+    .description(translate(options.locale, "cli.command.agent"))
+    .argument("[prompt...]", translate(options.locale, "cli.argument.promptOptional"))
     .action(async (promptParts: string[]) => {
       const prompt = promptParts.join(" ").trim();
       const runtime = await options.resolveRuntime(options.getCliOverrides());
@@ -31,6 +33,7 @@ export function registerAgentCommand(
         cwd: runtime.cwd,
         cwdOverridden: Boolean(runtime.overrides.cwd),
         interactive: !prompt,
+        locale: runtime.config.locale,
       });
       if (!selected) {
         return;
@@ -41,7 +44,7 @@ export function registerAgentCommand(
         config: runtime.config,
         session: selected.session,
         sessionStore,
-        incompleteMessage: "Agent one-shot did not complete.",
+        incompleteMessage: translate(runtime.config.locale, "cli.agent.incomplete"),
         onIncomplete: (message) => {
           ui.error(message);
           process.exitCode = 1;

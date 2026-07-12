@@ -6,6 +6,7 @@ import { formatRuntimeStatusText } from "../cli/commands/runtimeStatusPresenter.
 import { buildRuntimeStatus } from "../runtime/status.js";
 import { SessionStore } from "../session/store.js";
 import { appendObservabilityEvent } from "../observability/writer.js";
+import { translate } from "../i18n/index.js";
 import { passed, type EvaluationCheckId, type EvaluationCheckResult } from "./types.js";
 import { prepareCheckWorkspace } from "./workspace.js";
 
@@ -84,28 +85,31 @@ export async function runProductionSceneCheck(id: EvaluationCheckId, rootDir: st
   }
 
   const status = await buildRuntimeStatus(workspace);
-  const text = formatRuntimeStatusText(status);
+  const text = formatRuntimeStatusText(status, "en");
+  const contextBudget = status.sessions.latest?.contextBudget;
+  const usage = status.modelRequests.recent.find((request) => request.usageAvailable)?.usage;
 
   if (
     status.scene.background.active !== 1 ||
     status.scene.background.blocked !== 1 ||
-    !status.scene.cost.includes("1000 tokens") ||
-    !status.scene.cost.includes("700 cached") ||
+    contextBudget?.estimatedChars !== 50_000 ||
+    usage?.totalTokens !== 1_000 ||
+    usage.cacheReadTokens !== 700 ||
     status.scene.skills.ready < 1 ||
     status.skills.ready < 1 ||
-    !text.includes("Current scene:") ||
-    !text.includes("Background:") ||
-    !text.includes("Cost:")
+    !text.includes(`${translate("en", "status.currentScene")}:`) ||
+    !text.includes(`${translate("en", "status.background")}:`) ||
+    !text.includes(`${translate("en", "status.cost")}:`)
   ) {
     return {
       id,
       status: "failed",
-      fact: `production scene incomplete: background=${status.scene.background.active}/${status.scene.background.blocked}, skills=${status.skills.ready}/${status.skills.total}, cost=${status.scene.cost}`,
+      fact: `production scene incomplete: background=${status.scene.background.active}/${status.scene.background.blocked}, skills=${status.skills.ready}/${status.skills.total}, context=${contextBudget?.estimatedChars ?? "none"}, tokens=${usage?.totalTokens ?? "none"}`,
     };
   }
 
   return passed(
     id,
-    `production scene ready: background=${status.scene.background.active}/${status.scene.background.blocked}, skills=${status.skills.ready}/${status.skills.total}, cost=${status.scene.cost}`,
+    `production scene ready: background=${status.scene.background.active}/${status.scene.background.blocked}, skills=${status.skills.ready}/${status.skills.total}, context=${contextBudget.estimatedChars}, tokens=${usage.totalTokens}`,
   );
 }

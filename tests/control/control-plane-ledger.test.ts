@@ -6,6 +6,23 @@ import { createSessionRecord } from "../../src/session/store.js";
 import { ExecutionStore } from "../../src/execution/store.js";
 import { createTempWorkspace } from "../helpers.js";
 
+test("control plane ledger owns shell drafts independently from session messages", async (t) => {
+  const root = await createTempWorkspace("control-interaction-draft", t);
+  const ledger = new ControlPlaneLedger(root);
+  ledger.interactionDrafts.save({
+    sessionId: "session-draft",
+    shell: "tui",
+    value: "unfinished input",
+    cursor: 5,
+    updatedAt: "2026-07-12T00:00:00.000Z",
+  });
+  assert.equal(ledger.interactionDrafts.load("session-draft", "tui")?.value, "unfinished input");
+  assert.equal(ledger.sessions.load("session-draft"), undefined);
+  ledger.interactionDrafts.delete("session-draft", "tui");
+  assert.equal(ledger.interactionDrafts.load("session-draft", "tui"), undefined);
+  ledger.close();
+});
+
 test("control plane ledger persists execution lifecycle facts", async (t) => {
   const root = await createTempWorkspace("control-ledger", t);
   const ledger = new ControlPlaneLedger(root);
@@ -146,6 +163,65 @@ test("session turns claim only the durable queue head and fence expired owners",
   assert.throws(() => ledger.turns.assertOwner(first.id, "wrong-token"), /no longer owns/);
   ledger.turns.finish(first.id, claimed!.ownerToken!, "completed");
   assert.equal(ledger.turns.claim(second.id)?.status, "running");
+  ledger.close();
+});
+
+test("turn steers remain ordered inside one active turn and block closing until consumed", async (t) => {
+  const root = await createTempWorkspace("control-turn-steers", t);
+  const ledger = new ControlPlaneLedger(root);
+  const session = ledger.sessions.save(await createSessionRecord(root));
+  const turn = ledger.turns.admit({ sessionId: session.id, input: "start", inputSource: "external" });
+  const claimed = ledger.turns.claim(turn.id)!;
+
+  const first = ledger.turnSteers.admit({ turnId: turn.id, sessionId: session.id, text: "first guidance" });
+  const second = ledger.turnSteers.admit({ turnId: turn.id, sessionId: session.id, text: "second guidance" });
+
+  assert.ok(first);
+  assert.ok(second);
+  assert.deepEqual(ledger.turnSteers.listPending(turn.id).map((steer) => steer.input), [
+    "first guidance",
+    "second guidance",
+  ]);
+  assert.equal(ledger.turns.beginClosing(turn.id, claimed.ownerToken!), false);
+
+  ledger.turnSteers.markConsumed({ steerId: first!.id, turnId: turn.id, ownerToken: claimed.ownerToken! });
+  ledger.turnSteers.markConsumed({ steerId: second!.id, turnId: turn.id, ownerToken: claimed.ownerToken! });
+  assert.equal(ledger.turns.beginClosing(turn.id, claimed.ownerToken!), true);
+  assert.equal(
+    ledger.turnSteers.admit({ turnId: turn.id, sessionId: session.id, text: "too late" }),
+    undefined,
+  );
+  ledger.turns.finish(turn.id, claimed.ownerToken!, "completed");
+  ledger.close();
+});
+
+test("expired running turns return to durable recovery with pending steers intact", async (t) => {
+  const root = await createTempWorkspace("control-turn-steer-recovery", t);
+  const ledger = new ControlPlaneLedger(root);
+  const session = ledger.sessions.save(await createSessionRecord(root));
+  const turn = ledger.turns.admit({ sessionId: session.id, input: "start", inputSource: "external" });
+  ledger.turns.claim(turn.id);
+  const steer = ledger.turnSteers.admit({ turnId: turn.id, sessionId: session.id, text: "survive crash" });
+
+  assert.equal(ledger.turns.reconcileExpired(session.id, new Date(Date.now() + 31_000)), 1);
+  assert.equal(ledger.turns.load(turn.id)?.status, "queued");
+  assert.equal(ledger.turnSteers.load(steer!.id)?.status, "pending");
+  assert.equal(ledger.turns.claim(turn.id)?.status, "running");
+  ledger.close();
+});
+
+test("aborting a queued turn rejects its pending steers in the same ledger transition", async (t) => {
+  const root = await createTempWorkspace("control-queued-steer-abort", t);
+  const ledger = new ControlPlaneLedger(root);
+  const session = ledger.sessions.save(await createSessionRecord(root));
+  const turn = ledger.turns.admit({ sessionId: session.id, input: "start", inputSource: "external" });
+  const steer = ledger.turnSteers.admit({ turnId: turn.id, sessionId: session.id, text: "queued guidance" })!;
+
+  ledger.turns.abortQueued(turn.id, "Explicitly cancelled before execution.");
+
+  assert.equal(ledger.turns.load(turn.id)?.status, "aborted");
+  assert.equal(ledger.turnSteers.load(steer.id)?.status, "rejected");
+  assert.equal(ledger.turnSteers.load(steer.id)?.rejectionReason, "Explicitly cancelled before execution.");
   ledger.close();
 });
 

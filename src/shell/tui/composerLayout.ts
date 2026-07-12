@@ -3,6 +3,8 @@ import wrapAnsi from "wrap-ansi";
 
 import { TUI_COMPOSER_MAX_ROWS, normalizeComposerRows } from "./layout.js";
 
+const INK_TEXT_BASELINE_OFFSET_ROWS = 1;
+
 export const COMPOSER_FRAME = {
   gap: 2,
   gutter: "┃",
@@ -28,7 +30,6 @@ export interface ComposerLayoutInput {
 export interface ComposerLayoutModel {
   readonly contentWidth: number;
   readonly cursor: { x: number; y: number } | undefined;
-  readonly cursorCell: { x: number; y: number } | undefined;
   readonly rows: readonly string[];
   readonly visibleRows: number;
 }
@@ -70,34 +71,12 @@ export function layoutComposer(input: ComposerLayoutInput): ComposerLayoutModel 
       value: input.value,
     })
     : undefined;
-  const cursorCell = measureComposerCursorCell({
-    contentWidth,
-    cursor: input.cursor,
-    rows,
-    visibleStart,
-    value: input.value,
-  });
 
   return {
     contentWidth,
     cursor,
-    cursorCell,
     rows: visible,
     visibleRows,
-  };
-}
-
-export function composeInkCursorPosition(input: {
-  readonly cell: { x: number; y: number } | undefined;
-  readonly fallback: { x: number; y: number } | undefined;
-  readonly rowFrame: ComposerFrameMetrics;
-}): { x: number; y: number } | undefined {
-  if (!input.cell || !input.rowFrame.hasMeasured) {
-    return input.fallback ? shiftInkCursorRow(input.fallback) : undefined;
-  }
-  return {
-    x: input.rowFrame.left + input.cell.x,
-    y: input.rowFrame.top + 1,
   };
 }
 
@@ -112,7 +91,7 @@ function measureComposerCursor(input: {
   const cell = measureComposerCursorCell(input);
   return {
     x: input.origin.x + cell.x,
-    y: input.origin.y + cell.y,
+    y: input.origin.y + cell.y + INK_TEXT_BASELINE_OFFSET_ROWS,
   };
 }
 
@@ -131,13 +110,6 @@ function measureComposerCursorCell(input: {
   return {
     x: Math.min(stringWidth(cursorLine), input.contentWidth),
     y: cursorVisibleRow,
-  };
-}
-
-function shiftInkCursorRow(position: { x: number; y: number }): { x: number; y: number } {
-  return {
-    x: position.x,
-    y: position.y + 1,
   };
 }
 

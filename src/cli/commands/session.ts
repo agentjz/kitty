@@ -7,10 +7,12 @@ import { writeStdoutLine } from "../../utils/stdio.js";
 import { ui } from "../../utils/console.js";
 import { createSessionStore, resolveCliSession, runCliMode } from "./sessionHelpers.js";
 import { startTuiMode } from "./tuiMode.js";
+import { translate, type KittyLocale } from "../../i18n/index.js";
 
 export function registerSessionCommands(
   program: Command,
   options: {
+    locale: KittyLocale;
     getCliOverrides: () => CliOverrides;
     resolveRuntime: (overrides: CliOverrides) => Promise<{
       cwd: string;
@@ -22,7 +24,7 @@ export function registerSessionCommands(
   },
 ): void {
   program
-    .argument("[prompt...]", "Start a one-shot prompt. Without a prompt, opens the terminal UI.")
+    .argument("[prompt...]", translate(options.locale, "cli.argument.promptOptional"))
     .action(async (promptParts: string[]) => {
       const prompt = promptParts.join(" ").trim();
       if (!prompt) {
@@ -39,6 +41,7 @@ export function registerSessionCommands(
         sessionStore,
         cwd: runtime.cwd,
         cwdOverridden: Boolean(runtime.overrides.cwd),
+        locale: runtime.config.locale,
       });
       if (!selected) {
         return;
@@ -57,8 +60,8 @@ export function registerSessionCommands(
 
   program
     .command("run")
-    .description("Run a one-shot prompt in a new session.")
-    .argument("<prompt...>", "Prompt to send")
+    .description(translate(options.locale, "cli.command.run"))
+    .argument("<prompt...>", translate(options.locale, "cli.argument.promptRequired"))
     .action(async (promptParts: string[]) => {
       const prompt = promptParts.join(" ").trim();
       const runtime = await options.resolveRuntime(options.getCliOverrides());
@@ -66,6 +69,7 @@ export function registerSessionCommands(
       const selected = await resolveCliSession({
         sessionStore,
         cwd: runtime.cwd,
+        locale: runtime.config.locale,
       });
       if (!selected) {
         return;
@@ -84,15 +88,15 @@ export function registerSessionCommands(
 
   program
     .command("resume")
-    .description("Resume the latest session or a specific session id in interactive mode.")
-    .argument("[sessionId]", "Session id")
+    .description(translate(options.locale, "cli.command.resume"))
+    .argument("[sessionId]", translate(options.locale, "cli.argument.sessionIdOptional"))
     .action(async (sessionId: string | undefined) => {
       const runtime = await options.resolveRuntime(options.getCliOverrides());
       const sessionStore = await createSessionStore(runtime.paths.sessionsDir);
       const session = sessionId ? await sessionStore.load(sessionId) : await loadLatestSession(sessionStore);
 
       if (!session) {
-        throw new Error("No saved sessions found.");
+        throw new Error(translate(runtime.config.locale, "cli.sessions.none"));
       }
 
       await runCliMode(options.dependencies, {
@@ -106,15 +110,15 @@ export function registerSessionCommands(
 
   program
     .command("sessions")
-    .description("List recent sessions.")
-    .option("-n, --limit <count>", "Number of sessions to show", (value) => Number.parseInt(value, 10), 20)
+    .description(translate(options.locale, "cli.command.sessions"))
+    .option("-n, --limit <count>", translate(options.locale, "cli.option.limitSessions"), (value) => Number.parseInt(value, 10), 20)
     .action(async (commandOptions: { limit?: number }) => {
       const runtime = await options.resolveRuntime(options.getCliOverrides());
       const sessionStore = await createSessionStore(runtime.paths.sessionsDir);
       const sessions = await sessionStore.list(commandOptions.limit ?? 20);
 
       if (sessions.length === 0) {
-        ui.info("No saved sessions yet.");
+        ui.info(translate(runtime.config.locale, "cli.sessions.noneYet"));
         return;
       }
 
@@ -123,8 +127,8 @@ export function registerSessionCommands(
           [
             session.id,
             session.updatedAt,
-            session.title ?? "(untitled)",
-            `messages=${session.messageCount}`,
+            session.title ?? translate(runtime.config.locale, "common.untitled"),
+            `${translate(runtime.config.locale, "status.label.messages")}=${session.messageCount}`,
           ].join("  "),
         );
       }

@@ -47,7 +47,8 @@ async function main(): Promise<void> {
     const ledger = new ControlPlaneLedger(root);
     try {
       const turns = ledger.turns.listBySession(sessionId);
-      if (turns.length === 2 && turns[0]?.status === "running" && turns[1]?.status === "queued") {
+      const steers = turns[0] ? ledger.turnSteers.listByTurn(turns[0].id) : [];
+      if (turns.length === 1 && turns[0]?.status === "running" && steers.length === 1 && steers[0]?.status === "pending") {
         process.stdout.write("READY\n");
       }
     } finally {

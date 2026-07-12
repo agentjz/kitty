@@ -2,7 +2,7 @@
 
 `dev.md` 是 Kitty 当前开发纪律。它约束如何改 Kitty，不描述 Kitty 对用户运行时的能力。
 
-`history.md` 保留演进证据和失败路径。`spec.md` 保留当前产品事实。`dev.md` 保留当前工程节奏。
+`docs/history.md` 保留演进证据和失败路径。`spec.md` 保留当前产品事实。`dev.md` 保留当前工程节奏。
 
 ## 1. 改动原则
 
@@ -26,7 +26,7 @@
 2. 当前 `spec.md`。
 3. 当前确定性测试和 production eval。
 4. 当前运行日志和状态文件。
-5. `history.md` 里的演进证据。
+5. `docs/history.md` 里的演进证据。
 6. 用户偏好和旧讨论。
 
 历史只能解释为什么，不自动决定现在保留什么。
@@ -41,7 +41,7 @@
 - Session snapshot：session schema/store。
 - Execution lifecycle：control-plane ledger 和 execution 层。
 - Runtime status：runtime status 聚合层。
-- TUI/CLI/Web/Telegram：只投影事实，不拥有事实。
+- TUI/CLI/Telegram：只投影事实，不拥有事实。
 - Tool output：output governance 和 model projection。
 
 Presenter 不能重新计算事实。UI 不能保存第二套生命周期。测试不能为旧能力制造当前事实。
@@ -84,7 +84,7 @@ Presenter 不能重新计算事实。UI 不能保存第二套生命周期。测�
 保留必须满足至少一个条件：
 
 - 当前运行时主链路直接使用；
-- 当前 CLI/TUI/Web/Telegram 用户路径直接使用；
+- 当前 CLI/TUI/Telegram 用户路径直接使用；
 - 当前 `spec.md` 明确描述且代码真实存在；
 - 当前 production eval 需要；
 - 它是公开包入口的一部分，并且仍是当前事实。
@@ -99,7 +99,7 @@ Presenter 不能重新计算事实。UI 不能保存第二套生命周期。测�
 
 - provider/model/request 方言：统一进 catalog、capabilities、dialect、request body。
 - execution output 读取：background、subagent、execution CLI 共用同一个 reader。
-- runtime scene 投影：CLI/TUI/Web 只读 runtime facts，不各自重算。
+- runtime scene 投影：CLI/TUI 只读 runtime facts，不各自重算。
 - 错误分类：retry、fallback、CLI 展示共用错误 kind，不散落 message 猜测。
 - 配置 contract：init template、env example、doctor/preflight 读取同一个配置事实。
 - 工具输出治理：raw 保存、projection、model view 只走一条链。
@@ -132,13 +132,24 @@ Presenter 不能重新计算事实。UI 不能保存第二套生命周期。测�
 
 把用户视为会在任意边界连续按 Ctrl+C、关闭终端、杀死 Node 进程、让 Agent 杀死自身进程、断电或重启主机。正常退出不是正确性的前提。
 
+- 这是一项强制 lifecycle review gate，适用于每个新功能，不只适用于 turn。设计、实现和测试收口前都必须逐项检查接受、执行、提交、中断、失败、恢复、重放和清理边界。
 - UI 只有在 SQLite transaction 提交后才能把输入视为已接受并回显；提交失败必须明确显示未接收，不能只留在进程内存、输入框或 presenter 状态。SQLite 必须使用能抵抗进程强杀和断电的 durability 配置。
-- 同一 session 的执行保持串行，但 admission 不能等待上一轮结束。当前 owner 清理期间收到的新输入必须持久排队并自动接棒。
-- Ctrl+C 只取消当前有效 owner。连续 Ctrl+C 必须幂等，不能误删、跳过或取消后续已接受输入。
-- running turn 依靠 owner token、heartbeat 和 lease 判定存活。进程消失后，过期 owner 必须进入明确终态，不能永久阻塞队首。
-- 重启必须从 SQLite 恢复 queued turn；不能要求用户重输，不能重复 admission，也不能把展示字符串当作恢复事实。
+- 运行中的普通输入是当前 turn 的 durable steer。它进入当前 turn 的下一次模型请求，不中断、不并发开新 turn，也不伪装成当前 turn 结束后的队列。
+- steer 的 session message 使用稳定 ID。进程在“消息落账”和“steer 标记 consumed”之间死亡时，恢复必须补齐状态而不重复消息。
+- Ctrl+C 只取消当前有效 owner，并明确 reject 尚未消费的 steer。连续 Ctrl+C 必须幂等，不能误删、跳过或把 steer 启动成新 turn。
+- 关闭终端、SIGHUP/SIGTERM、进程被杀和断电不是 Ctrl+C。可控关闭必须 detach 当前 turn；不可控消失由 owner token、heartbeat 和 lease 对账，同一 turn 从 durable session、tool journal 和 pending steer 恢复。
+- running turn 依靠 owner token、heartbeat 和 lease 判定存活。过期 running owner 回到可恢复 admission；final close 边界不确定时进入明确失败，不能永久阻塞，也不能盲目重放已展示的最终回答。
 - 工具副作用不盲目重放。恢复使用 tool journal、结果 envelope 和文件 hash 判断已知事实，未知边界返回 interrupted evidence。
-- 测试必须覆盖 interrupt cleanup 期间提交、连续中断、queued turn 重启恢复、expired running 对账、进程树终止和重复恢复幂等性。
+- 展示层状态也必须抗中断：草稿、locale、滚动锚点、选择范围和复制失败不能反推或覆盖运行事实；重启后读取持久 owner，不读取展示字符串。
+- 测试必须覆盖 provider 等待、工具执行和 final 竞态中的 steer，连续中断、终端 detach、强杀恢复、expired running 对账、进程树终止、消费幂等和重复恢复。
+
+每个功能收口时必须回答：
+
+- 接受事实何时持久化，提交前崩溃会怎样。
+- 执行中 Ctrl+C、关闭终端、强杀和断电分别落到什么状态。
+- 恢复读取哪个 owner，是否会丢失、重复或错误重放。
+- 清理是否幂等，失败是否保留可行动证据。
+- 用户连续重复操作时，状态机是否仍只有一条合法路径。
 
 ## 9. 发布规则
 

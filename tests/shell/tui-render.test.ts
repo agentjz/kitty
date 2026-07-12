@@ -11,7 +11,6 @@ import { TuiController } from "../../src/shell/tui/controller.js";
 import { applyComposerInput } from "../../src/shell/tui/composerEditing.js";
 import { measureAbsoluteBox } from "../../src/shell/tui/inkGeometry.js";
 import {
-  composeInkCursorPosition,
   layoutComposer,
   measureComposerContentWidth,
   measureComposerTextOrigin,
@@ -22,6 +21,42 @@ import {
   TUI_DOCK_COMPOSER_GAP_ROWS,
   TUI_FOOTER_CONTENT_INSET_X,
 } from "../../src/shell/tui/layout.js";
+import { measureTuiOverlayRows } from "../../src/shell/tui/overlayLayout.js";
+
+test("tui overlays stay within the responsive row budget", () => {
+  let state = createInitialTuiState();
+  state = { ...state, overlay: { kind: "commandPalette", query: "", selectedIndex: 0 } };
+  assert.equal(measureTuiOverlayRows(state, 4), 4);
+  state = { ...state, overlay: { kind: "keyboardHelp", offset: 0 } };
+  assert.equal(measureTuiOverlayRows(state, 3), 3);
+  state = { ...state, overlay: { kind: "historySearch", query: "none", selectedIndex: 0 } };
+  assert.equal(measureTuiOverlayRows(state, 6), 2);
+});
+
+test("tui command, history, and help overlays render their current facts", async () => {
+  const React = await import("react");
+  const ink = await import("ink");
+  const { createTuiOverlayComponent } = await import("../../src/shell/tui/components/Overlay.js");
+  const Overlay = createTuiOverlayComponent({ React: React.default, Box: ink.Box, Text: ink.Text });
+  let state = createInitialTuiState();
+  state = { ...state, overlay: { kind: "slashCommands", query: "sta", selectedIndex: 0 } };
+  const commands = ink.renderToString(React.default.createElement(Overlay, { maxRows: 5, state }), { columns: 80 });
+  assert.match(commands, /\/status/);
+  assert.match(commands, /查看当前项目状态/);
+
+  state = {
+    ...state,
+    composer: { ...state.composer, history: ["first prompt", "second prompt"] },
+    overlay: { kind: "historySearch", query: "second", selectedIndex: 0 },
+  };
+  const history = ink.renderToString(React.default.createElement(Overlay, { maxRows: 5, state }), { columns: 80 });
+  assert.match(history, /second prompt/);
+
+  state = { ...state, overlay: { kind: "keyboardHelp", offset: 0 } };
+  const help = ink.renderToString(React.default.createElement(Overlay, { maxRows: 8, state }), { columns: 80 });
+  assert.match(help, /Ctrl\+P/);
+  assert.match(help, /命令面板/);
+});
 
 test("tui footer keeps model and context below the composer", async () => {
   const React = await import("react");
@@ -70,6 +105,7 @@ test("tui footer keeps model and context below the composer", async () => {
   assert.match(output, /上下文 100\/1000 chars \(10%\)$/);
   assert.equal(lines.findIndex((line) => line.includes("模型 deepseek-v4-flash")) > lines.findIndex((line) => line.includes("输入消息")), true);
   assert.doesNotMatch(output, /本轮/);
+  assert.doesNotMatch(output, /·|命令|Ctrl\+P|\/\s/);
   assert.equal(measureTuiFooterRows(1), 10);
 });
 
@@ -187,8 +223,7 @@ test("tui composer layout derives visible rows and cursor from one frame model",
 
   assert.deepEqual(measureComposerTextOrigin(frame), { x: 10, y: 20 });
   assert.equal(measureComposerContentWidth(frame.width), 73);
-  assert.deepEqual(layout.cursor, { x: 13, y: 20 });
-  assert.deepEqual(layout.cursorCell, { x: 3, y: 0 });
+  assert.deepEqual(layout.cursor, { x: 13, y: 21 });
   assert.deepEqual(layout.rows, ["111"]);
   assert.equal(layout.visibleRows, 1);
 });
@@ -206,9 +241,8 @@ test("tui composer layout grows for wrapped multiline input and keeps cursor on 
   assert.equal(layout.visibleRows, 2);
   assert.deepEqual(
     layout.cursor,
-    { x: 8, y: 11 },
+    { x: 8, y: 12 },
   );
-  assert.deepEqual(layout.cursorCell, { x: 8, y: 1 });
 });
 
 test("tui composer cursor may sit after the last column instead of covering the last character", () => {
@@ -219,7 +253,7 @@ test("tui composer cursor may sit after the last column instead of covering the 
   });
 
   assert.deepEqual(layout.rows, ["12345"]);
-  assert.deepEqual(layout.cursor, { x: 7, y: 3 });
+  assert.deepEqual(layout.cursor, { x: 7, y: 4 });
 });
 
 test("tui composer cursor uses display width for Chinese input", () => {
@@ -230,10 +264,10 @@ test("tui composer cursor uses display width for Chinese input", () => {
   });
 
   assert.deepEqual(layout.rows, ["你好"]);
-  assert.deepEqual(layout.cursor, { x: 5, y: 2 });
+  assert.deepEqual(layout.cursor, { x: 5, y: 3 });
 });
 
-test("tui composer separates cursor cell from measured terminal row", () => {
+test("tui composer derives multiline terminal cursor from its measured content frame", () => {
   const layout = layoutComposer({
     cursor: "first\nsecond".length,
     frame: { hasMeasured: true, left: 4, top: 10, width: 20 },
@@ -241,22 +275,7 @@ test("tui composer separates cursor cell from measured terminal row", () => {
   });
 
   assert.deepEqual(layout.rows, ["first", "second"]);
-  assert.deepEqual(layout.cursorCell, { x: 6, y: 1 });
-  assert.deepEqual(layout.cursor, { x: 10, y: 11 });
-});
-
-test("tui composer translates measured row into Ink cursor suffix coordinates", () => {
-  assert.deepEqual(composeInkCursorPosition({
-    cell: { x: 6, y: 1 },
-    fallback: { x: 10, y: 11 },
-    rowFrame: { hasMeasured: true, left: 4, top: 11, width: 20 },
-  }), { x: 10, y: 12 });
-
-  assert.deepEqual(composeInkCursorPosition({
-    cell: { x: 6, y: 1 },
-    fallback: { x: 10, y: 11 },
-    rowFrame: { hasMeasured: false, left: 0, top: 0, width: 20 },
-  }), { x: 10, y: 12 });
+  assert.deepEqual(layout.cursor, { x: 10, y: 12 });
 });
 
 test("tui composer editor handles common editing keys and explicit multiline insertion", () => {
@@ -286,6 +305,53 @@ test("tui geometry measures absolute box position through Ink parents", () => {
     top: 22,
     width: 80,
   });
+});
+
+test("tui composer gives Ink the same cursor position as its visible text layout", async () => {
+  const React = await import("react");
+  const ink = await import("ink");
+  const { createComposerComponent } = await import("../../src/shell/tui/components/Composer.js");
+  const cursorPositions: Array<{ x: number; y: number } | undefined> = [];
+  const Composer = createComposerComponent({
+    React: React.default,
+    Box: ink.Box,
+    Text: ink.Text,
+    useCursor: (() => ({
+      setCursorPosition(position: { x: number; y: number } | undefined) {
+        cursorPositions.push(position);
+      },
+    })) as typeof ink.useCursor,
+    useInput: (() => undefined) as unknown as typeof ink.useInput,
+    useStdin: (() => ({
+      isRawModeSupported: false,
+      setRawMode() {},
+    })) as unknown as typeof ink.useStdin,
+  });
+  const state = createInitialTuiState();
+  const activeState = {
+    ...state,
+    composer: {
+      ...state.composer,
+      cursor: 3,
+      value: "123",
+    },
+  };
+
+  ink.renderToString(
+    React.default.createElement(Composer, {
+      controller: {
+        updateComposerVisibleRows() {},
+      } as unknown as TuiController,
+      editExternally: async (value: string) => value,
+      frame: { hasMeasured: true, left: 7, top: 18, width: 20 },
+      redraw() {},
+      state: activeState,
+      suspendInput: () => () => undefined,
+    }),
+    { columns: 80 },
+  );
+
+  assert.deepEqual(cursorPositions[0], { x: 10, y: 19 });
 });
 
 function createFakeDomElement(
@@ -348,6 +414,28 @@ test("tui transcript renders user, reasoning, assistant, and system rows", async
   assert.match(output, /notice/);
 });
 
+test("tui composer editor moves within multiline text before requesting history", () => {
+  const value = "first\nsecond";
+  let action = applyComposerInput({ cursor: value.length, value }, "", { upArrow: true });
+  assert.equal(action.kind, "update");
+  assert.equal(action.state.cursor, 5);
+  action = applyComposerInput(action.state, "", { upArrow: true });
+  assert.equal(action.kind, "history");
+  assert.equal(action.kind === "history" && action.direction, -1);
+});
+
+test("tui composer editor uses line boundaries, forward delete, and word movement", () => {
+  const value = "first line\nsecond word";
+  let action = applyComposerInput({ cursor: value.length, value }, "a", { ctrl: true });
+  assert.equal(action.state.cursor, "first line\n".length);
+  action = applyComposerInput(action.state, "", { end: true });
+  assert.equal(action.state.cursor, value.length);
+  action = applyComposerInput(action.state, "", { leftArrow: true, ctrl: true });
+  assert.equal(action.state.cursor, value.lastIndexOf("word"));
+  action = applyComposerInput(action.state, "", { delete: true });
+  assert.equal(action.state.value, "first line\nsecond ord");
+});
+
 test("tui transcript aligns every message role content column", async () => {
   const React = await import("react");
   const ink = await import("ink");
@@ -374,7 +462,7 @@ test("tui transcript aligns every message role content column", async () => {
   );
   const lines = output.split("\n");
   const userColumn = readRenderedColumn(lines, "user text");
-  const reasoningColumn = readRenderedColumn(lines, "Thinking:");
+  const reasoningColumn = readRenderedColumn(lines, "思考:");
   const assistantColumn = readRenderedColumn(lines, "assistant text");
   const subagentColumn = readRenderedColumn(lines, "subagent text");
   const systemColumn = readRenderedColumn(lines, "system text");
@@ -448,7 +536,7 @@ test("tui transcript render does not create unmanaged wrapped rows", async () =>
 
   assert.equal(output.split("\n").length, viewport.height);
   assert.equal(expectedRows.length, viewport.height);
-  assert.equal(output.includes("Thinking:"), expectedRows.some((row) => row.prefix === "Thinking: "));
+  assert.equal(output.includes("思考:"), expectedRows.some((row) => row.prefix === "思考: "));
 });
 
 function readRenderedColumn(lines: readonly string[], text: string): number {

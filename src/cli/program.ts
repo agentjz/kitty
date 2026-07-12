@@ -16,20 +16,23 @@ import { registerSessionCommands } from "./commands/session.js";
 import { registerWorkerCommand } from "./commands/worker.js";
 import { writeStderr, writeStdout, writeStdoutLine } from "../utils/stdio.js";
 import { registerTelegramCommands } from "../telegram/cli.js";
-import { registerWebCommand } from "./commands/web.js";
 import { registerTuiCommand } from "./commands/tui.js";
+import { DEFAULT_LOCALE, translate, type KittyLocale } from "../i18n/index.js";
 
 export { type CliProgramDependencies } from "./dependencies.js";
 
-export function buildCliProgram(dependencies: CliProgramDependencies = {}): Command {
+export function buildCliProgram(
+  dependencies: CliProgramDependencies = {},
+  locale: KittyLocale = DEFAULT_LOCALE,
+): Command {
   const program = new Command();
   const resolveRuntime = dependencies.resolveRuntime ?? resolveCliRuntime;
   const getCliOverrides = () => extractCliOverrides(program.opts());
 
   program
     .name("kitty")
-    .description("Kitty - an agent harness for durable execution.")
-    .version(packageJson.version, "-v, --version", "Print the current Kitty version.")
+    .description(translate(locale, "cli.program.description"))
+    .version(packageJson.version, "-v, --version", translate(locale, "cli.version.description"))
     .configureOutput({
       writeOut: (text) => {
         writeStdout(text);
@@ -41,72 +44,80 @@ export function buildCliProgram(dependencies: CliProgramDependencies = {}): Comm
         write(text);
       },
     })
-    .option("-m, --model <model>", "Override the configured model")
-    .option("-C, --cwd <path>", "Working directory for this run");
+    .option("-m, --model <model>", translate(locale, "cli.option.model"))
+    .option("-C, --cwd <path>", translate(locale, "cli.option.cwd"));
 
   program
     .command("version")
-    .description("Print the current Kitty version.")
+    .description(translate(locale, "cli.version.description"))
     .action(() => {
       writeStdoutLine(packageJson.version);
     });
 
   registerAgentCommand(program, {
+    locale,
     getCliOverrides,
     resolveRuntime,
     dependencies,
   });
   registerBackgroundCommand(program, {
+    locale,
     getCliOverrides,
     resolveRuntime,
   });
   registerExecutionCommand(program, {
+    locale,
     getCliOverrides,
     resolveRuntime,
   });
   registerSessionCommands(program, {
+    locale,
     getCliOverrides,
     resolveRuntime,
     dependencies,
   });
   registerProjectCommands(program, {
+    locale,
     getCliOverrides,
     resolveRuntime,
   });
   registerEventsCommand(program, {
+    locale,
     getCliOverrides,
     resolveRuntime,
   });
   registerConfigCommands(program, {
+    locale,
     getCliOverrides,
     resolveRuntime,
   });
   registerDoctorCommand(program, {
+    locale,
     getCliOverrides,
     resolveRuntime,
     probeProviderConnection: dependencies.probeProviderConnection,
   });
   registerEvaluationCommand(program, {
+    locale,
     getCwd: () => {
       const overrides = getCliOverrides();
       return overrides.cwd ?? process.cwd();
     },
   });
   registerTelegramCommands(program, {
+    locale,
     getCliOverrides,
     resolveRuntime,
     createTelegramService: dependencies.createTelegramService,
     acquireProcessLock: dependencies.acquireProcessLock,
   });
   registerWorkerCommand(program, {
-    getCliOverrides,
-    resolveRuntime,
-  });
-  registerWebCommand(program, {
+    locale,
     getCliOverrides,
     resolveRuntime,
   });
   registerTuiCommand(program, {
+    locale,
     getCliOverrides,
     resolveRuntime,
     cliDependencies: dependencies,

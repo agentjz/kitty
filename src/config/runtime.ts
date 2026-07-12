@@ -27,6 +27,7 @@ export async function resolveRuntimeConfig(overrides: CliOverrides = {}): Promis
   const telegramAllowedUserIds = parseTelegramAllowedUserIds(env.telegramAllowedUserIds);
 
   const merged = normalizeRuntimeConfig({
+    locale: env.locale,
     provider: env.provider,
     model: overrides.model ?? env.model,
     profile: env.profile,

@@ -6,7 +6,7 @@ import {
   buildContextRuntimeRequest,
 } from "../../context/runtime/index.js";
 import { resolveAgentProfile } from "../profiles/registry.js";
-import { emitAssistantFinalOutput, emitAssistantReasoning } from "./finalize.js";
+import { emitAssistantFinalOutput, emitAssistantReasoning, persistAssistantContinuation } from "./finalize.js";
 import { updateSessionTitleAfterTurn } from "./lifecycle.js";
 import {
   initializeTurnSession,
@@ -20,6 +20,8 @@ import { ControlPlaneLedger } from "../../control/ledger.js";
 import { loadProjectContext } from "../../context/projectContext.js";
 import { createDefaultAgentToolRegistry } from "../../tools/registry.js";
 import { throwIfAborted } from "../../utils/abort.js";
+import { missingConfigValue } from "../../config/errors.js";
+import { KITTY_ENV } from "../../config/envKeys.js";
 
 export type { AgentCallbacks, RunTurnOptions } from "../types.js";
 
@@ -34,13 +36,14 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
   const turnModelConfig = options.config;
   const profile = resolveAgentProfile(options.config.profile);
   if (!turnModelConfig.apiKey) {
-    throw new Error("Missing API key. Open the project's .env file and add KITTY_API_KEY.");
+    throw missingConfigValue(KITTY_ENV.apiKey);
   }
   let session = await initializeTurnSession(
     options.session,
     options.input,
     options.sessionStore,
     options.inputSource ?? "external",
+    options.turnId ? `msg-turn-${options.turnId}` : undefined,
   );
   const controlLedger = new ControlPlaneLedger(projectContext.stateRootDir);
   try {
@@ -62,6 +65,15 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
   try {
     for (;;) {
       throwIfAborted(options.abortSignal, "Turn aborted by user.");
+      if (options.steering) {
+        const steered = await options.steering.consumePending(session);
+        session = steered.session;
+        if (steered.inputs.length > 0) {
+          options.callbacks?.onStatus?.(
+            `已将 ${steered.inputs.length} 条新要求加入当前任务。`,
+          );
+        }
+      }
       const turnRuntimeState = {
         ...(runtimePromptState ?? {}),
         identity,
@@ -178,6 +190,12 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
           continue;
         }
         unavailableToolProtocolOutputs = 0;
+        if (response.content?.trim() && options.steering && !(await options.steering.beginClosing())) {
+          session = await persistAssistantContinuation(session, response, options);
+          emitAssistantFinalOutput(response, options);
+          options.callbacks?.onStatus?.("收到新的用户要求，继续当前任务。");
+          continue;
+        }
         const completed = await resolveToollessTurn({
           session,
           response,

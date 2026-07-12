@@ -2,6 +2,7 @@ export const TUI_COLORS = {
   background: "#090a0b",
   panel: "#121518",
   panelStrong: "#191e23",
+  selection: "#31414d",
   border: "#4a535b",
   muted: "#858d94",
   text: "#edf0f2",

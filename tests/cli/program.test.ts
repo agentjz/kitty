@@ -14,12 +14,14 @@ import { ExecutionStore } from "../../src/execution/store.js";
 import { SessionEventStore } from "../../src/session/events.js";
 import { SessionStore } from "../../src/session/store.js";
 import { createTestRuntimeConfig } from "../helpers.js";
+import { invalidConfigValue, missingConfigValue } from "../../src/config/errors.js";
+import { KITTY_ENV } from "../../src/config/envKeys.js";
 
 test("cli program exposes current top-level commands", () => {
   const program = buildCliProgram();
   const commands = program.commands.map((command) => command.name());
 
-  for (const name of ["agent", "background", "execution", "resume", "sessions", "events", "config", "init", "status", "changes", "undo", "diff", "doctor", "eval", "telegram", "web", "tui", "version", "__worker__"]) {
+  for (const name of ["agent", "background", "execution", "resume", "sessions", "events", "config", "init", "status", "changes", "undo", "diff", "doctor", "eval", "telegram", "tui", "version", "__worker__"]) {
     assert.equal(commands.includes(name), true, `${name} command should exist`);
   }
   assert.equal(program.helpInformation().includes("__worker__"), false);
@@ -97,7 +99,7 @@ test("execution command inspects, reads, and cancels delegated executions", asyn
       overrides: { cwd: root },
       config,
     }),
-  });
+  }, "en");
   const store = new ExecutionStore(root);
   const completed = store.create({
     kind: "subagent",
@@ -163,9 +165,9 @@ test("doctor does not report ready when local project template is incomplete", a
       stateRootDir: root,
       paths: getAppPaths(root),
       overrides: { cwd: root },
-      config: createTestRuntimeConfig(root),
+      config: { ...createTestRuntimeConfig(root), locale: "en" },
     }),
-  });
+  }, "en");
 
   program.exitOverride();
   await assert.rejects(
@@ -227,8 +229,9 @@ test("events command formats tool lifecycle facts directly", () => {
 test("cli setup errors explain the bootstrap path", () => {
   const root = path.join(os.tmpdir(), "kitty-missing-env");
   const message = formatCliSetupError(
-    new Error("Missing or invalid KITTY_MAX_OUTPUT_TOKENS in the project's .kitty/.env file."),
+    invalidConfigValue("KITTY_MAX_OUTPUT_TOKENS", "invalid output token limit"),
     root,
+    "en",
   );
 
   assert.match(message ?? "", /Project is not ready to run/);
@@ -239,7 +242,7 @@ test("cli setup errors explain the bootstrap path", () => {
 
 test("cli setup errors explain missing provider key", () => {
   const root = path.join(os.tmpdir(), "kitty-missing-key");
-  const message = formatCliSetupError(new Error("API key not found."), root);
+  const message = formatCliSetupError(missingConfigValue(KITTY_ENV.apiKey), root, "en");
 
   assert.match(message ?? "", /Provider API key is missing/);
   assert.match(message ?? "", /KITTY_API_KEY/);
@@ -247,12 +250,12 @@ test("cli setup errors explain missing provider key", () => {
 });
 
 test("tui command requires an interactive TTY", async () => {
-  const program = buildCliProgram();
+  const program = buildCliProgram({}, "en");
 
   program.exitOverride();
   await assert.rejects(
     () => program.parseAsync(["tui"], { from: "user" }),
-    /requires an interactive TTY/,
+    /需要交互式 TTY/,
   );
 });
 

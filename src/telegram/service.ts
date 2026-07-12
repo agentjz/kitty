@@ -24,6 +24,7 @@ import type { TelegramPrivateMessage, TelegramUpdate } from "./types.js";
 import { QueuedHostMessageRecorder, resolveHostStateRoot } from "../observability/hostEvents.js";
 import { TelegramTurnState } from "./service/turnState.js";
 import { describeIgnoredTelegramUpdate, isStopCommand } from "./service/updateClassification.js";
+import { translate } from "../i18n/index.js";
 
 export interface TelegramServiceOptions {
   cwd: string;
@@ -233,7 +234,7 @@ export class TelegramService {
     const activeTurn = this.turnState.getActiveTurn(message.peerKey);
     if (activeTurn && !activeTurn.controller.signal.aborted) {
       activeTurn.controller.abort();
-      await this.enqueueReply(message.chatId, "Stopping the current Telegram task. The bot stays online for your next request.");
+      await this.enqueueReply(message.chatId, translate(this.options.config.locale, "telegram.stopConfirmed"));
       await this.options.deliveryQueue.flushDue();
       this.logger.info("stop requested", {
         peerKey: message.peerKey,
@@ -246,7 +247,7 @@ export class TelegramService {
 
     if (this.turnState.getQueuedTurnCount(message.peerKey) > 0) {
       this.turnState.armPendingStop(message.peerKey);
-      await this.enqueueReply(message.chatId, "Stopping the current Telegram task. The bot stays online for your next request.");
+      await this.enqueueReply(message.chatId, translate(this.options.config.locale, "telegram.stopConfirmed"));
       await this.options.deliveryQueue.flushDue();
       this.logger.info("stop armed for queued turn", {
         peerKey: message.peerKey,
@@ -256,7 +257,7 @@ export class TelegramService {
       return;
     }
 
-    await this.enqueueReply(message.chatId, "No Telegram task is running right now.");
+    await this.enqueueReply(message.chatId, translate(this.options.config.locale, "telegram.noTask"));
     await this.options.deliveryQueue.flushDue();
     this.logger.info("stop requested with no active turn", {
       peerKey: message.peerKey,

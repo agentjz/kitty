@@ -1,10 +1,12 @@
 import type { InteractionTurnDisplay } from "../../interaction/shell.js";
 import { createWaitingSpinner, wrapCallbacksWithSpinnerStop } from "./spinner.js";
 import { createRuntimeUiAgentCallbacks } from "../../runtime-ui/agentCallbacks.js";
+import { translate, type KittyLocale } from "../../i18n/index.js";
 
 export function createCliTurnDisplay(options: {
   cwd: string;
   config: {
+    locale: KittyLocale;
     showReasoning: boolean;
   };
   abortSignal: AbortSignal;
@@ -19,7 +21,9 @@ export function createCliTurnDisplay(options: {
     toolArgsMaxChars: 200,
     abortSignal: options.abortSignal,
   });
-  const waitingSpinner = createWaitingSpinner({ label: "thinking" });
+  const waitingSpinner = createWaitingSpinner({
+    label: translate(options.config.locale, "runtime.thinking"),
+  });
   const callbacks = wrapCallbacksWithSpinnerStop(runtimeUi.callbacks, () => {
     waitingSpinner.stop();
   });

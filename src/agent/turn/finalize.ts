@@ -86,6 +86,18 @@ export function emitAssistantFinalOutput(response: AssistantResponse, options: R
   }
 }
 
+export async function persistAssistantContinuation(
+  session: SessionRecord,
+  response: AssistantResponse,
+  options: RunTurnOptions,
+): Promise<SessionRecord> {
+  return options.sessionStore.appendMessages(session, [
+    createMessage("assistant", response.content ?? "", {
+      reasoningContent: response.reasoningContent,
+    }),
+  ]);
+}
+
 function hasVisibleAssistantResult(content: string | null | undefined): boolean {
   return typeof content === "string" && content.trim().length > 0;
 }

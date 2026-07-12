@@ -7,19 +7,22 @@ import {
 } from "../../evaluation/harness.js";
 import { writeStdoutLine } from "../../utils/stdio.js";
 import type { EvaluationSuite } from "../../evaluation/types.js";
+import { translate, type KittyLocale } from "../../i18n/index.js";
 
 export function registerEvaluationCommand(
   program: Command,
   options: {
     getCwd?: () => string;
+    locale?: KittyLocale;
   } = {},
 ): void {
+  const locale = options.locale ?? "zh-CN";
   program
     .command("eval")
-    .description("List or run product acceptance scenarios.")
-    .option("--json", "Print structured JSON.")
-    .option("--run-local", "Run local deterministic evaluation checks.")
-    .option("--run-production", "Run explicit production acceptance against the current project.")
+    .description(translate(locale, "cli.command.eval"))
+    .option("--json", translate(locale, "cli.option.json"))
+    .option("--run-local", translate(locale, "cli.option.runLocal"))
+    .option("--run-production", translate(locale, "cli.option.runProduction"))
     .action(async (commandOptions: { json?: boolean; runLocal?: boolean; runProduction?: boolean }) => {
       const suite = resolveEvaluationSuite(commandOptions);
       const scenarios = suite === "production"
@@ -35,20 +38,22 @@ export function registerEvaluationCommand(
       }
 
       if (suite === "production") {
-        writeStdoutLine("Production evaluation explicitly requested.");
-        writeStdoutLine("It uses the current project state and may consume the configured provider if production checks require it.");
+        writeStdoutLine(translate(locale, "cli.eval.productionNotice"));
+        writeStdoutLine(translate(locale, "cli.eval.productionCost"));
         writeStdoutLine("");
       }
 
-      writeStdoutLine(suite ? `Evaluation scenarios run (${suite}):` : "Evaluation scenarios:");
+      writeStdoutLine(suite
+        ? translate(locale, "cli.eval.scenariosRun", { suite })
+        : translate(locale, "cli.eval.scenarios"));
       for (const scenario of scenarios) {
         writeStdoutLine(`- ${scenario.id} [${scenario.suite}]: ${scenario.title}`);
-        writeStdoutLine(`  用户路径: ${scenario.userPath}`);
-        writeStdoutLine(`  机器证据: ${scenario.evidence}`);
+        writeStdoutLine(`  ${translate(locale, "cli.eval.userPath")}: ${scenario.userPath}`);
+        writeStdoutLine(`  ${translate(locale, "cli.eval.evidence")}: ${scenario.evidence}`);
       }
       if (result) {
         writeStdoutLine("");
-        writeStdoutLine(`Status: ${result.status}`);
+        writeStdoutLine(translate(locale, "cli.eval.status", { status: result.status }));
         for (const check of result.checks) {
           const scenario = scenarios.find((item) => item.id === check.id);
           writeStdoutLine(`${check.status} ${check.id}${scenario ? ` ${scenario.title}` : ""}: ${check.fact}${check.error ? ` (${check.error})` : ""}`);

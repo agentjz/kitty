@@ -49,6 +49,7 @@ export async function runTelegramTurn(options: {
 }): Promise<void> {
   const output = new TelegramOutputPort({
     chatId: options.message.chatId,
+    locale: options.config.locale,
     messageChunkChars: options.config.telegram.messageChunkChars,
     enqueueReply: async (chatId, text) => options.enqueueReply(chatId, text),
   });

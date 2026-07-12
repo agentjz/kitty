@@ -15,6 +15,7 @@ import {
   formatSessionPickerTitle,
   parseSessionPickerChoice,
 } from "../../session/picker.js";
+import { DEFAULT_LOCALE, translate, type KittyLocale } from "../../i18n/index.js";
 
 const DEFAULT_SESSION_PICKER_LIMIT = 10;
 
@@ -35,6 +36,7 @@ export async function selectCliSession(options: {
   sessionStore: SessionStoreLike;
   limit?: number;
   io?: Partial<SessionPickerIo>;
+  locale?: KittyLocale;
 }): Promise<CliSessionSelection | null> {
   const sessions = await options.sessionStore.list(options.limit ?? DEFAULT_SESSION_PICKER_LIMIT);
   if (sessions.length === 0) {
@@ -45,14 +47,16 @@ export async function selectCliSession(options: {
   }
 
   const io = resolveSessionPickerIo(options.io);
+  const locale = options.locale ?? DEFAULT_LOCALE;
   renderSessionPicker({
     sessions,
     io,
     now: io.now(),
+    locale,
   });
 
   while (true) {
-    const answer = await io.readChoice("选择会话（输入编号，0 新建）: ");
+    const answer = await io.readChoice(translate(locale, "cli.sessionPicker.prompt"));
     if (answer === null) {
       return null;
     }
@@ -68,7 +72,7 @@ export async function selectCliSession(options: {
     if (selected.kind === "existing") {
       const session = sessions[selected.index];
       if (!session) {
-        io.writeLine("无效选择，请重新输入。");
+        io.writeLine(translate(locale, "cli.sessionPicker.invalid"));
         continue;
       }
 
@@ -78,7 +82,7 @@ export async function selectCliSession(options: {
       };
     }
 
-    io.writeLine("无效选择，请输入列表编号，或输入 0 新建会话。");
+    io.writeLine(translate(locale, "cli.sessionPicker.invalidRange"));
   }
 }
 
@@ -86,12 +90,14 @@ export function renderSessionPicker(options: {
   sessions: SessionRecord[];
   io: Pick<SessionPickerIo, "writeLine">;
   now: Date;
+  locale?: KittyLocale;
 }): void {
-  options.io.writeLine("最近会话");
-  options.io.writeLine("0. 新建会话");
+  const locale = options.locale ?? DEFAULT_LOCALE;
+  options.io.writeLine(translate(locale, "cli.sessionPicker.recent"));
+  options.io.writeLine(`0. ${translate(locale, "cli.sessionPicker.new")}`);
   options.sessions.forEach((session, index) => {
     options.io.writeLine(
-      `${index + 1}. ${formatSessionPickerTitle(session)}  ${formatRelativeSessionTime(session.updatedAt, options.now)}`,
+      `${index + 1}. ${formatSessionPickerTitle(session, locale)}  ${formatRelativeSessionTime(session.updatedAt, options.now, locale)}`,
     );
   });
   options.io.writeLine();

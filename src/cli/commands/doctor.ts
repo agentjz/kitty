@@ -7,12 +7,14 @@ import { formatConfigPreflightReport, inspectConfigPreflight } from "../../confi
 import type { CliOverrides, RuntimeConfig } from "../../types.js";
 import { ui } from "../../utils/console.js";
 import { writeStdoutLine } from "../../utils/stdio.js";
+import { translate, type KittyLocale } from "../../i18n/index.js";
 
 type ProviderProbe = typeof probeProviderConnection;
 
 export function registerDoctorCommand(
   program: Command,
   options: {
+    locale: KittyLocale;
     getCliOverrides: () => CliOverrides;
     resolveRuntime: (overrides: CliOverrides) => Promise<{
       cwd: string;
@@ -25,38 +27,39 @@ export function registerDoctorCommand(
 ): void {
   program
     .command("doctor")
-    .description("Check local setup and validate the API connection.")
+    .description(translate(options.locale, "cli.command.doctor"))
     .action(async () => {
       const overrides = options.getCliOverrides();
       const cwd = overrides.cwd ? path.resolve(overrides.cwd) : process.cwd();
       const preflight = await inspectConfigPreflight(cwd);
 
       ui.heading("kitty doctor");
-      for (const line of formatConfigPreflightReport(preflight)) {
+      for (const line of formatConfigPreflightReport(preflight, options.locale)) {
         writeStdoutLine(line);
       }
 
       const runtime = await options.resolveRuntime(overrides);
 
-      ui.heading("runtime");
-      ui.info(`env: ${runtime.paths.configDir}`);
-      ui.info(`provider: ${runtime.config.provider}`);
-      ui.info(`model: ${runtime.config.model}`);
-      ui.info(`baseUrl: ${runtime.config.baseUrl}`);
+      const locale = runtime.config.locale;
+      ui.heading(translate(locale, "doctor.runtime"));
+      ui.info(`${translate(locale, "doctor.env")}: ${runtime.paths.configDir}`);
+      ui.info(`${translate(locale, "preflight.provider")}: ${runtime.config.provider}`);
+      ui.info(`${translate(locale, "preflight.model")}: ${runtime.config.model}`);
+      ui.info(`${translate(locale, "preflight.baseUrl")}: ${runtime.config.baseUrl}`);
       const profile = resolveModelProfile({
         provider: runtime.config.provider,
         model: runtime.config.model,
       });
-      ui.info(`provider profile: ${profile.provider.label}`);
-      ui.info(`model profile: ${profile.model.label}`);
-      ui.info(`wire API: ${profile.model.wireApi}`);
-      ui.info(`reasoning replay: ${profile.model.capabilities.reasoningContentReplay}`);
-      ui.info(`context limit: ${profile.model.limit.context}`);
-      ui.info(`output limit: ${profile.model.limit.output}`);
+      ui.info(`${translate(locale, "preflight.providerProfile")}: ${profile.provider.label}`);
+      ui.info(`${translate(locale, "preflight.modelProfile")}: ${profile.model.label}`);
+      ui.info(`${translate(locale, "preflight.wireApi")}: ${profile.model.wireApi}`);
+      ui.info(`${translate(locale, "doctor.reasoningReplay")}: ${profile.model.capabilities.reasoningContentReplay}`);
+      ui.info(`${translate(locale, "doctor.contextLimit")}: ${profile.model.limit.context}`);
+      ui.info(`${translate(locale, "doctor.outputLimit")}: ${profile.model.limit.output}`);
 
       if (!runtime.config.apiKey.trim()) {
         throw new Error(
-          "User-fixable error: API key not found. Set `KITTY_API_KEY` in the current project `.kitty/.env`, then rerun `kitty doctor`.",
+          translate(locale, "doctor.apiKeyMissing"),
         );
       }
 
@@ -68,14 +71,14 @@ export function registerDoctorCommand(
         apiKey: runtime.config.apiKey,
       });
       if (diagnosis.kind === "ok") {
-        ui.success(formatProviderProbeSuccess(diagnosis));
+        ui.success(formatProviderProbeSuccess(diagnosis, locale));
         if (diagnosis.resolvedBaseUrl !== runtime.config.baseUrl) {
-          ui.info(`resolvedBaseUrl: ${diagnosis.resolvedBaseUrl}`);
+          ui.info(`${translate(locale, "preflight.baseUrl")}: ${diagnosis.resolvedBaseUrl}`);
         }
         if (!preflight.ready) {
-          throw new Error("User-fixable error: local project template is incomplete. Run `kitty init`, then rerun `kitty doctor`.");
+          throw new Error(translate(locale, "doctor.templateIncomplete"));
         }
-        ui.success("Kitty is ready. Start with `kitty` or run `kitty \"your task\"`.");
+        ui.success(translate(locale, "doctor.ready"));
         return;
       }
 
@@ -85,15 +88,16 @@ export function registerDoctorCommand(
 
 function formatProviderProbeSuccess(
   diagnosis: Extract<ProviderConnectionProbeResult, { kind: "ok" }>,
+  locale: KittyLocale,
 ): string {
   if (diagnosis.probe === "responses") {
-    return "Provider reachable. responses probe ok";
+    return translate(locale, "doctor.providerResponsesOk");
   }
 
   if (diagnosis.probe === "chat.completions") {
-    return "Provider reachable. chat completions probe ok";
+    return translate(locale, "doctor.providerChatOk");
   }
 
-  return `Provider reachable. models=${diagnosis.models ?? 0}`;
+  return translate(locale, "doctor.providerModelsOk", { count: diagnosis.models ?? 0 });
 }
 

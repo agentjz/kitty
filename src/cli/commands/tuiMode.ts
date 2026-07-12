@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 import type { CliOverrides, RuntimeConfig } from "../../types.js";
 import type { CliProgramDependencies } from "../dependencies.js";
 import { createSessionStore } from "./sessionHelpers.js";
+import { translate, type KittyLocale } from "../../i18n/index.js";
 
 export async function startTuiMode(dependencies: {
   getCliOverrides: () => CliOverrides;
@@ -27,10 +28,10 @@ export async function startTuiMode(dependencies: {
   }
 
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
-    throw new Error("kitty requires an interactive TTY. Use kitty run <prompt> for one-shot execution.");
+    throw new Error(translate(runtime.config.locale, "cli.tui.requiresTty"));
   }
 
-  const { startTuiChat } = await loadTuiEntrypoint();
+  const { startTuiChat } = await loadTuiEntrypoint(runtime.config.locale);
   await startTuiChat({
     cwd: runtime.cwd,
     cwdOverridden: Boolean(runtime.overrides.cwd),
@@ -39,10 +40,14 @@ export async function startTuiMode(dependencies: {
   });
 }
 
-async function loadTuiEntrypoint(): Promise<typeof import("../../shell/tui/start.js")> {
+async function loadTuiEntrypoint(locale: KittyLocale): Promise<typeof import("../../shell/tui/start.js")> {
   try {
     return await import(new URL("./tui.mjs", pathToFileURL(__filename)).href) as typeof import("../../shell/tui/start.js");
   } catch (error) {
-    throw new Error(`TUI entrypoint is unavailable. Run npm.cmd run build and try again. Cause: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(translate(
+      locale,
+      "cli.tui.unavailable",
+      { error: error instanceof Error ? error.message : String(error) },
+    ));
   }
 }

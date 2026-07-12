@@ -6,10 +6,12 @@ import { ui } from "../../utils/console.js";
 import { writeStdoutLine } from "../../utils/stdio.js";
 import { truncateCliValue } from "../cliValues.js";
 import { registerRuntimeStatusCommand } from "./runtimeStatus.js";
+import { translate, type KittyLocale } from "../../i18n/index.js";
 
 export function registerProjectCommands(
   program: Command,
   options: {
+    locale: KittyLocale;
     getCliOverrides: () => CliOverrides;
     resolveRuntime: (overrides: CliOverrides) => Promise<{
       cwd: string;
@@ -23,7 +25,7 @@ export function registerProjectCommands(
 
   program
     .command("init")
-    .description("Create local .kitty/.env and .kitty/.kittyignore files in the current project.")
+    .description(translate(options.locale, "cli.command.init"))
     .action(async () => {
       const overrides = options.getCliOverrides();
       const cwd = overrides.cwd ? path.resolve(overrides.cwd) : process.cwd();
@@ -32,30 +34,30 @@ export function registerProjectCommands(
       const result = await initializeProjectFiles(cwd);
 
       if (result.created.length > 0) {
-        ui.success(`Created ${result.created.length} file(s).`);
+        ui.success(translate(options.locale, "cli.init.created", { count: result.created.length }));
         for (const filePath of result.created) {
           writeStdoutLine(filePath);
         }
       }
 
       if (result.skipped.length > 0) {
-        ui.info(`Skipped ${result.skipped.length} existing file(s).`);
+        ui.info(translate(options.locale, "cli.init.skipped", { count: result.skipped.length }));
         for (const filePath of result.skipped) {
           writeStdoutLine(filePath);
         }
       }
 
-      ui.heading("config preflight");
-      for (const line of formatConfigPreflightReport(result.preflight)) {
+      ui.heading(translate(options.locale, "preflight.status"));
+      for (const line of formatConfigPreflightReport(result.preflight, options.locale)) {
         writeStdoutLine(line);
       }
     });
 
   program
     .command("changes")
-    .description("List recorded file changes, or show one change by id.")
-    .argument("[changeId]", "Optional change id")
-    .option("-n, --limit <count>", "Number of changes to show", (value) => Number.parseInt(value, 10), 20)
+    .description(translate(options.locale, "cli.command.changes"))
+    .argument("[changeId]", translate(options.locale, "cli.argument.changeIdOptional"))
+    .option("-n, --limit <count>", translate(options.locale, "cli.option.limitChanges"), (value) => Number.parseInt(value, 10), 20)
     .action(async (changeId: string | undefined, commandOptions: { limit?: number }) => {
       const runtime = await options.resolveRuntime(options.getCliOverrides());
       const { ChangeStore } = await import("../../agent/changes/store.js");
@@ -69,7 +71,7 @@ export function registerProjectCommands(
 
       const changes = await changeStore.list(commandOptions.limit ?? 20);
       if (changes.length === 0) {
-        ui.info("No recorded changes yet.");
+        ui.info(translate(runtime.config.locale, "cli.changes.none"));
         return;
       }
 
@@ -79,8 +81,8 @@ export function registerProjectCommands(
             change.id,
             change.createdAt,
             change.toolName,
-            `files=${change.operations.length}`,
-            change.undoneAt ? "undone" : "active",
+            `${translate(runtime.config.locale, "status.label.files")}=${change.operations.length}`,
+            translate(runtime.config.locale, change.undoneAt ? "common.undone" : "common.active"),
             truncateCliValue(change.summary, 80),
           ].join("  "),
         );
@@ -89,15 +91,15 @@ export function registerProjectCommands(
 
   program
     .command("undo")
-    .description("Undo the latest recorded change or a specific change id.")
-    .argument("[changeId]", "Optional change id")
+    .description(translate(options.locale, "cli.command.undo"))
+    .argument("[changeId]", translate(options.locale, "cli.argument.changeIdOptional"))
     .action(async (changeId: string | undefined) => {
       const runtime = await options.resolveRuntime(options.getCliOverrides());
       const { ChangeStore } = await import("../../agent/changes/store.js");
       const changeStore = new ChangeStore(runtime.paths.changesDir);
       const result = await changeStore.undo(changeId);
 
-      ui.success(`Undid ${result.record.id}`);
+      ui.success(translate(runtime.config.locale, "cli.undo.done", { id: result.record.id }));
       for (const filePath of result.restoredPaths) {
         writeStdoutLine(filePath);
       }
@@ -105,8 +107,8 @@ export function registerProjectCommands(
 
   program
     .command("diff")
-    .description("Show current git diff in this project, or only for one path.")
-    .argument("[target]", "Optional file path")
+    .description(translate(options.locale, "cli.command.diff"))
+    .argument("[target]", translate(options.locale, "cli.argument.targetOptional"))
     .action(async (target: string | undefined) => {
       const runtime = await options.resolveRuntime(options.getCliOverrides());
       const { execa } = await import("execa");
@@ -117,10 +119,10 @@ export function registerProjectCommands(
       });
 
       if ((result.exitCode ?? 0) > 1) {
-        throw new Error(result.all || "git diff failed.");
+        throw new Error(result.all || translate(runtime.config.locale, "cli.diff.failed"));
       }
 
       const output = result.all?.trim();
-      writeStdoutLine(output ? output : "No diff.");
+      writeStdoutLine(output ? output : translate(runtime.config.locale, "cli.diff.none"));
     });
 }

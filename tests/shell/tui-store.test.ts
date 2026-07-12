@@ -49,6 +49,16 @@ test("tui state projects external session messages without internal facts", () =
   assert.deepEqual(state.transcript.map((entry) => entry.text), ["hello", "hi"]);
 });
 
+test("tui live transcript entry IDs remain unique when internal session messages were omitted", () => {
+  let state = createInitialTuiState(createSession([
+    { role: "user", content: "internal wake", source: "internal" },
+    { role: "assistant", content: "visible answer" },
+  ]));
+  state = appendTranscriptEntry(state, { role: "user", text: "next input" }, viewport);
+
+  assert.equal(new Set(state.transcript.map((entry) => entry.id)).size, state.transcript.length);
+});
+
 test("tui context budget defaults to zero before runtime facts arrive", () => {
   assert.equal(createInitialTuiState().dock.context, "0%");
   assert.equal(formatContextBudget(undefined), "0%");
@@ -114,19 +124,35 @@ test("tui transcript sticks to bottom unless user scrolls history", () => {
   let state = createInitialTuiState();
   state = appendTranscriptEntry(state, { role: "assistant", text: "one\ntwo\nthree\nfour" }, viewport);
 
-  assert.equal(state.scroll.stickToBottom, true);
+  assert.equal(state.scroll.mode, "follow");
   const bottomOffset = state.scroll.offset;
 
   state = scrollTuiTranscript(state, viewport, -2);
-  assert.equal(state.scroll.stickToBottom, false);
+  assert.equal(state.scroll.mode, "detached");
 
   state = appendTranscriptEntry(state, { role: "assistant", text: "five" }, viewport);
-  assert.equal(state.scroll.newContentPending, true);
+  assert.equal(state.scroll.unseenRows > 0, true);
   assert.equal(state.scroll.offset < bottomOffset + 2, true);
 
   state = scrollTuiTranscriptToBottom(state, viewport);
-  assert.equal(state.scroll.newContentPending, false);
-  assert.equal(state.scroll.stickToBottom, true);
+  assert.equal(state.scroll.unseenRows, 0);
+  assert.equal(state.scroll.mode, "follow");
+});
+
+test("tui streaming preserves the detached top row while new rows arrive", () => {
+  const projection = new TuiTranscriptProjection();
+  const narrow: TuiViewport = { width: 32, height: 4 };
+  let state = createInitialTuiState();
+  state = appendTranscriptEntry(state, { role: "assistant", text: "one\ntwo\nthree\nfour\nfive\nsix" }, narrow, { projection });
+  state = scrollTuiTranscript(state, narrow, -3, { projection });
+  const before = projection.renderLineViews(state.transcript, narrow.width)[state.scroll.offset]?.id;
+
+  state = appendTranscriptText(state, "assistant", "\nseven\neight\nnine", narrow, { projection });
+  const after = projection.renderLineViews(state.transcript, narrow.width)[state.scroll.offset]?.id;
+
+  assert.equal(state.scroll.mode, "detached");
+  assert.equal(after, before);
+  assert.equal(state.scroll.unseenRows > 0, true);
 });
 
 test("tui streaming appends assistant text into one visible entry", () => {
@@ -158,7 +184,7 @@ test("tui transcript layout owns wrapping and bottom scroll for long assistant o
     getVisibleTranscriptRows(state, narrow),
     rows.slice(state.scroll.offset, state.scroll.offset + narrow.height).map((row) => row.text),
   );
-  assert.equal(rows.some((row) => row.prefix === "Thinking: "), true);
+  assert.equal(rows.some((row) => row.prefix === "思考: "), true);
 });
 
 test("tui transcript layout uses terminal display width for wide characters", () => {
@@ -168,11 +194,11 @@ test("tui transcript layout uses terminal display width for wide characters", ()
     text: "你好你好你好你好你好",
   }], 24);
 
-  assert.equal(rows.some((row) => row.prefix === "Thinking: "), true);
+  assert.equal(rows.some((row) => row.prefix === "思考: "), true);
   assert.equal(rows.every((row) => row.kind === "spacer" || !row.text.includes("你好你好你好你好你好")), true);
 });
 
-test("tui Thinking remains readable without terminal dim styling", () => {
+test("tui Thinking remains readable without italic or dim styling", () => {
   const rows = renderTranscriptLineViews([{
     id: "entry-1",
     role: "reasoning",
@@ -181,7 +207,8 @@ test("tui Thinking remains readable without terminal dim styling", () => {
 
   assert.equal(rows.length > 0, true);
   assert.equal(rows.every((row) => row.style.dim === false), true);
-  assert.equal(rows[0]?.prefix, "Thinking: ");
+  assert.equal(rows.every((row) => row.style.italicPrefix === false), true);
+  assert.equal(rows[0]?.prefix, "思考: ");
 });
 
 test("tui transcript gives submitted user messages a padded focus surface", () => {

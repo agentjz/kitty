@@ -1,6 +1,3 @@
-import { once } from "node:events";
-import { WebSocket, WebSocketServer } from "ws";
-
 import { passed, type EvaluationCheckId, type EvaluationCheckResult } from "./types.js";
 import { prepareCheckWorkspace } from "./workspace.js";
 
@@ -62,21 +59,8 @@ export async function runHostTurnBoundaryCheck(id: EvaluationCheckId, rootDir: s
 }
 
 export async function runRemoteEntrypointsCheck(id: EvaluationCheckId): Promise<EvaluationCheckResult> {
-  const { createWebInputPort } = await import("../web/inputPort.js");
-  const { serveHtml } = await import("../web/serveHtml.js");
   const { buildFileTurnInput } = await import("../telegram/inboundFiles.js");
-  const wss = new WebSocketServer({ port: 0 });
-  const input = createWebInputPort(wss);
-  const port = (wss.address() as import("net").AddressInfo).port;
-  const client = new WebSocket(`ws://127.0.0.1:${port}`);
-
-  try {
-    await once(client, "open");
-    const pending = input.readInput("> ");
-    client.send(JSON.stringify({ type: "input", text: "remote parity check" }));
-    const received = await pending;
-    const html = serveHtml();
-    const turnInput = buildFileTurnInput(
+  const turnInput = buildFileTurnInput(
       {
         kind: "private_file_message",
         updateId: 1,
@@ -114,20 +98,17 @@ export async function runRemoteEntrypointsCheck(id: EvaluationCheckId): Promise<
       },
       [],
       process.cwd(),
-    );
+  );
+  const normalizedTurnInput = turnInput.replaceAll("\\", "/");
 
-    if (received.kind !== "submit" || !html.includes("小猫智能体") || !turnInput.includes("The user uploaded a file")) {
-      return {
-        id,
-        status: "failed",
-        fact: `remote entrypoints incomplete: web=${received.kind}, html=${html.length}, telegramInput=${turnInput.length}`,
-      };
-    }
-    return passed(id, "remote entrypoints ready: web input and Telegram file turn input are available");
-  } finally {
-    client.close();
-    await closeWebSocketServer(wss);
+  if (!normalizedTurnInput.startsWith("inspect upload") || !normalizedTurnInput.includes("brief.md -> uploads/brief.md")) {
+    return {
+      id,
+      status: "failed",
+      fact: `remote entrypoint incomplete: telegramInput=${turnInput.length}`,
+    };
   }
+  return passed(id, "remote entrypoint ready: Telegram file input enters the shared turn contract");
 }
 
 export async function runRecoveryDrillsCheck(id: EvaluationCheckId, rootDir: string): Promise<EvaluationCheckResult> {
@@ -192,19 +173,4 @@ export async function runRecoveryDrillsCheck(id: EvaluationCheckId, rootDir: str
     id,
     `recovery drills ready: lost=${lost.lostExecutions.length}, aborted=${aborted.length}, terminated=${terminated.terminatedPids.length}, executions=${status.executions.total}`,
   );
-}
-
-async function closeWebSocketServer(wss: WebSocketServer): Promise<void> {
-  for (const client of wss.clients) {
-    client.close();
-  }
-  await new Promise<void>((resolve, reject) => {
-    wss.close((error) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      resolve();
-    });
-  });
 }

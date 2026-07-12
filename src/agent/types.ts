@@ -48,6 +48,13 @@ export interface RunTurnOptions {
   callbacks?: AgentCallbacks;
   fetchAssistantResponse?: (input: ModelRequestInput) => Promise<AssistantResponse>;
   fetchSessionTitleResponse?: (input: ModelRequestInput) => Promise<AssistantResponse>;
+  steering?: {
+    consumePending: (session: SessionRecord) => Promise<{
+      session: SessionRecord;
+      inputs: string[];
+    }>;
+    beginClosing: () => Promise<boolean>;
+  };
 }
 
 export interface ModelRequestInput {

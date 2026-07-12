@@ -106,8 +106,8 @@ export const EVALUATION_SCENARIOS: readonly EvaluationScenario[] = [
     id: "remote-entrypoints-available",
     suite: "local",
     title: "远程入口复用同一主干",
-    userPath: "Web / Telegram 入口能接入同一 turn 输入，不分裂成另一套 agent。",
-    evidence: "验证 web input port、HTML shell 和 Telegram file turn input 可用。",
+    userPath: "Telegram 私聊中的文本和文件能接入同一 turn 输入，不分裂成另一套 agent。",
+    evidence: "验证 Telegram file input 保留用户 instruction 与本地 attachment path，并进入共享 turn contract。",
   },
   {
     id: "recovery-drills-pass",

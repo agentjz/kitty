@@ -11,11 +11,11 @@ import { createSkillTools } from "../../src/extensions/tools/skills/index.js";
 import { createToolRegistry } from "../../src/tools/core/registry.js";
 import { createTempWorkspace, createTestRuntimeConfig, createToolContext, parseToolJson } from "../helpers.js";
 
-test("project skills are discovered from runtime skill roots but not .codex skills", async (t) => {
+test("project runtime skills do not load development skills from .agents", async (t) => {
   const root = await createTempWorkspace("skill-discovery", t);
   await writeSkill(root, "skills/skepticism/SKILL.md", "skepticism", "Skeptical review method.", "VISIBLE_BODY");
   await writeFile(root, "skills/skepticism/references/checklist.md", "CHECKLIST_BODY");
-  await writeSkill(root, ".codex/skills/dev/SKILL.md", "dev-only", "Codex-only development method.", "HIDDEN_BODY");
+  await writeSkill(root, ".agents/skills/dev/SKILL.md", "dev-only", "Development-agent-only method.", "HIDDEN_BODY");
 
   const context = await loadProjectContext(root, { projectDocMaxBytes: 24_576 });
 

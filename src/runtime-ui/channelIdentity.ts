@@ -1,4 +1,5 @@
 import type { RuntimeUiChannel } from "./events.js";
+import { DEFAULT_LOCALE, translate, type KittyLocale, type MessageKey } from "../i18n/index.js";
 
 export interface RuntimeUiChannelIdentity {
   channel: RuntimeUiChannel;
@@ -7,29 +8,30 @@ export interface RuntimeUiChannelIdentity {
 
 export type RuntimeUiLineRole = "assistant" | "reasoning";
 
-export const RUNTIME_UI_CHANNEL_IDENTITIES: Record<RuntimeUiChannel, RuntimeUiChannelIdentity> = {
-  lead: {
-    channel: "lead",
-    label: "决策主脑",
-  },
-  subagent: {
-    channel: "subagent",
-    label: "子代理",
-  },
-  system: {
-    channel: "system",
-    label: "系统",
-  },
+const CHANNEL_LABEL_KEYS: Record<RuntimeUiChannel, MessageKey> = {
+  lead: "runtime.channel.lead",
+  subagent: "runtime.channel.subagent",
+  system: "runtime.channel.system",
 };
 
-export function getRuntimeUiChannelIdentity(channel: RuntimeUiChannel): RuntimeUiChannelIdentity {
-  return RUNTIME_UI_CHANNEL_IDENTITIES[channel];
+export function getRuntimeUiChannelIdentity(
+  channel: RuntimeUiChannel,
+  locale: KittyLocale = DEFAULT_LOCALE,
+): RuntimeUiChannelIdentity {
+  return {
+    channel,
+    label: translate(locale, CHANNEL_LABEL_KEYS[channel]),
+  };
 }
 
-export function formatRuntimeUiRoleLabel(channel: RuntimeUiChannel, role: RuntimeUiLineRole): string {
-  const identity = getRuntimeUiChannelIdentity(channel);
+export function formatRuntimeUiRoleLabel(
+  channel: RuntimeUiChannel,
+  role: RuntimeUiLineRole,
+  locale: KittyLocale = DEFAULT_LOCALE,
+): string {
+  const identity = getRuntimeUiChannelIdentity(channel, locale);
   if (role === "reasoning") {
-    return `${identity.label}思考`;
+    return `${identity.label} ${translate(locale, "runtime.reasoning")}`;
   }
   return identity.label;
 }

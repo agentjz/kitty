@@ -16,6 +16,7 @@ validation/
 *.log
 *.tsbuildinfo
 .test-build/
+.test-tmp/
 .test-tmp-*
 out.txt
 out-round3.txt
