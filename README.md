@@ -1,28 +1,53 @@
+<div align="center">
+
 # Kitty Agent
 
-官网：https://luckymaomi.github.io/kitty/
+### 如何设计一个智能体
 
-<p align="center">
-  <strong>🐾 一个 Agent 是如何设计的：从工具循环开始，组装成能完成任务的智能体。</strong>
-</p>
+从工具循环开始，理解目标、使用工具、持续行动，完成任务。
 
-<p align="center">
+[官网](https://luckymaomi.github.io/kitty/) · [快速开始](docs/quickstart.md) · [技术规格](spec.md) · [开发规则](AGENTS.md)
+
+<p>
   <a href="https://www.npmjs.com/package/@jun133/kitty"><img alt="npm" src="https://img.shields.io/npm/v/%40jun133%2Fkitty?color=111827&label=npm"></a>
-  <img alt="node" src="https://img.shields.io/badge/node-%3E%3D22-339933">
-  <img alt="typescript" src="https://img.shields.io/badge/TypeScript-5.9-3178C6">
-  <img alt="license" src="https://img.shields.io/badge/license-MIT-0f766e">
-  <img alt="agent" src="https://img.shields.io/badge/mode-agent-7c3aed">
+  <a href="https://github.com/luckymaomi/kitty/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/luckymaomi/kitty?style=flat&amp;color=ca8a04"></a>
+  <img alt="Node.js" src="https://img.shields.io/badge/node-%3E%3D22-339933">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.9-3178C6">
+  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-0f766e"></a>
 </p>
+</div>
 
-## 一个 Agent 是如何组装的
+## 一个模型，如何成为真正的智能体？
 
-Kitty 是一个智能体。它用一套可直接运行的实现，展示 Agent 如何从最初的工具循环，逐步拥有记忆、上下文、计划和协作能力。
+模型很会思考，也很会表达，但仅仅拥有一个聊天框，它仍然只能给出答案。
 
-模型先在工具循环中判断、调用工具、读取工具结果，再根据新事实继续判断。session 留下这一轮已经确认的现场；`AGENTS.md` 和 skills 提供长期规则与熟练做法；上下文把这些信息和用户输入组装成下一轮模型能看懂的完整输入。复杂任务会拆成 To Do，按明确步骤持续推进。
+真正的智能体需要看见外部世界，需要采取行动，需要记住已经发生的事情，也需要在漫长、复杂甚至随时可能中断的任务中继续向前。
 
-这让一个 Agent 能在真实项目里搜得到、看得懂、改得准、跑得通、记得住，并继续完成长任务。
+Kitty 展示了这个过程：从最简单的工具循环开始，一步一步为模型装上行动、记忆、上下文、计划、后台执行和恢复能力，最终组装成一个能够持续完成任务的智能体。
 
-## ⚡ 快速开始
+## 从会回答，到会完成
+
+### 第一步：让模型能够行动
+
+工具把模型与真实世界连接起来。
+
+它可以读取资料、修改文件、运行命令、查看结果。每一次工具调用都会产生新的事实，模型根据这些事实继续判断：下一步该做什么，是否需要再次行动，任务是否真的已经完成。
+
+这就是 Agent Loop，也是 Kitty 的起点。
+
+### 第二步：让每次行动都有连续性
+
+一次请求可以给出一个答案，但复杂任务往往需要很多轮判断。
+
+Kitty 用 session 保存对话和任务现场，用 context 组织当前真正需要的信息，用 skills 提供已经沉淀好的做事方法。即使任务很长，模型仍然知道自己正在做什么、已经确认了什么、接下来还要完成什么。
+
+### 第三步：让复杂任务持续推进
+
+真正的工作不会永远在几秒钟内结束。
+
+Kitty 可以把复杂目标拆成清晰步骤，让耗时命令在后台运行，并在执行过程中继续接收新的引导。你看到的是一个正在推进、可以观察、可以中断、也可以继续的工作现场。
+
+## 开始使用
 
 安装 Kitty：
 
@@ -30,67 +55,65 @@ Kitty 是一个智能体。它用一套可直接运行的实现，展示 Agent �
 npm install -g @jun133/kitty@latest
 ```
 
-进入你想让 Kitty 工作的项目目录，然后初始化：
+进入希望 Kitty 工作的项目目录，初始化配置：
 
 ```bash
 kitty init
 ```
 
-打开 `.kitty/.env`，填入 provider 的 API key，再启动 Kitty：
+打开 `.kitty/.env`，填写 provider API key，然后启动：
 
 ```bash
 kitty
 ```
 
-第一次使用 Windows 命令行、不会进入项目目录或不知道怎样填写配置，请按 [小白快速启动](docs/quickstart.md) 一步一步操作。
+Kitty 会打开会话界面。你可以新建任务，也可以回到之前保存的现场。
 
-## Kitty 怎么工作
+第一次使用 Windows 命令行、不熟悉项目目录或不知道如何填写配置，可以按 [小白快速启动](docs/quickstart.md) 一步一步操作。
 
-Kitty 默认进入 TUI。它会先显示最近会话：继续已有会话，或者新建会话。主区显示用户输入、思考和回复；工具、后台任务和上下文占用会进入同一个工作现场。
-
-运行中可以继续输入要求，Kitty 会在下一次模型请求中接收引导。`Ctrl+C` 用于中断；有文本选择时，`Ctrl+C` 优先复制。输入 `/` 可以探索命令，空输入按 `?` 可以查看键位。
-
-交给 Kitty 一个真实目标：
+## 直接执行一次任务
 
 ```bash
-kitty run "用 Spring Boot 3、MySQL、Redis 和 Vue 3 做一个考试管理平台，包含题库、试卷、考试发布、在线作答和成绩归档"
+kitty run "调查当前项目，找出最重要的问题，完成修改并验证结果。"
 ```
 
-这类任务会触发 Kitty 的完整工作方式：先调查当前资料和事实，再判断边界、调用工具、运行验证，并把现场留给下一轮继续。
+Kitty 会调查事实、判断边界、调用工具、检查结果，并把已经完成的现场保存下来。
 
-## ⌨️ 入门命令
+## 打开 Kitty，理解智能体
+
+如果你正在研究“如何设计一个智能体”，Kitty 的源码覆盖了从模型请求到生产生命周期的完整链路：
+
+```text
+输入 -> Session -> Context -> Model -> Tools -> Runtime Facts -> 下一次判断
+```
+
+你可以从工具循环开始阅读，再进入 session、context、background execution、steer、恢复和多端交互。
+
+## 常用入口
 
 | 命令 | 用途 |
 | --- | --- |
-| `kitty` | 启动 Kitty TUI |
+| `kitty` | 启动 Kitty |
 | `kitty init` | 初始化当前项目 |
-| `kitty resume` | 继续最近会话 |
-| `kitty status` | 查看当前项目现场 |
-| `kitty run <prompt>` | 在新会话中执行一次任务 |
+| `kitty run <prompt>` | 执行一次明确任务 |
+| `kitty resume [sessionId]` | 恢复最近或指定会话 |
+| `kitty status` | 查看当前运行现场 |
 | `kitty background` | 查看或控制后台执行 |
+| `kitty telegram` | 启动 Telegram 私聊服务 |
 | `kitty --version` | 查看版本 |
 
-其他命令不用背。运行 `kitty --help`，或在 TUI 输入 `/` 查看 `/status`、`/export` 和 `/exit`。
+在 TUI 输入 `/` 可以查看 `/status`、`/export` 和 `/exit`；空输入时按 `?` 可以查看键位。
 
-## ⚙️ 配置
+支持中文、英文、日文和韩文四种语言。
 
-项目运行配置只从 `.kitty/.env` 读取。`kitty init` 会创建 `.kitty/.env`、`.kitty/.env.example` 和 `.kitty/.kittyignore`。
+## 继续了解
 
-主要配置：
-
-- `KITTY_PROVIDER`
-- `KITTY_BASE_URL`
-- `KITTY_MODEL`
-- `KITTY_API_KEY`
-- `KITTY_PROFILE`
-- `KITTY_LOCALE`
-
-`KITTY_LOCALE` 支持 `zh-CN`、`en`、`ja` 和 `ko`。它只改变界面文案，不改变命令名、模型回复或工具证据。
-
-## 📜 文档
-
+- [官网：如何设计一个智能体](https://luckymaomi.github.io/kitty/)
 - [小白快速启动](docs/quickstart.md)
 - [当前技术事实](spec.md)
+- [设计哲学](philosophy.md)
 - [开发规则](AGENTS.md)
 
-项目文档、代码和测试共同描述同一个当前现实。
+## License
+
+[MIT](LICENSE)
