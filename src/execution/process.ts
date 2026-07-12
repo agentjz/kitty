@@ -95,6 +95,7 @@ function terminatePosixProcessTree(pid: number): void {
   if (!targets.some(isProcessAlive)) return;
   sendPosixProcessGroupSignal(pid, "SIGKILL");
   sendPosixSignals(targets, "SIGKILL");
+  waitForProcessExitSync(pid, 1_000);
   if (targets.some(isProcessAlive)) throw new Error(`Failed to terminate process tree rooted at pid ${pid}.`);
 }
 

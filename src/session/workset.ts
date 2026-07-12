@@ -120,9 +120,10 @@ function normalizeWorksetEntry(value: unknown): SessionWorksetEntry | undefined 
 function normalizeDisplayPath(cwd: string, targetPath: string): string {
   const absolutePath = path.resolve(cwd, targetPath);
   const relative = path.relative(cwd, absolutePath);
-  return relative && !relative.startsWith("..") && !path.isAbsolute(relative)
+  const result = relative && !relative.startsWith("..") && !path.isAbsolute(relative)
     ? relative
     : absolutePath;
+  return result.split(path.sep).join("/");
 }
 
 function readString(value: unknown): string {

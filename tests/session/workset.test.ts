@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
+import path from "node:path";
+import process from "node:process";
 import test from "node:test";
 
 import { createSessionRecord } from "../../src/session/store.js";
 import { recordSessionWorksetFile } from "../../src/session/workset.js";
 
-test("session workset records read and change facts for files", async () => {
+test("session workset records read and change facts for files", { skip: process.platform !== "win32" }, async () => {
   let session = await createSessionRecord("C:/repo");
 
   session = recordSessionWorksetFile(session, {
@@ -26,7 +28,7 @@ test("session workset records read and change facts for files", async () => {
   });
 
   assert.equal(session.workset?.files.length, 1);
-  assert.equal(session.workset.files[0]?.path, "src\\app.ts");
+  assert.equal(session.workset.files[0]?.path.split(path.sep).join("/"), "src/app.ts");
   assert.equal(session.workset.files[0]?.readCount, 1);
   assert.equal(session.workset.files[0]?.changedCount, 1);
   assert.equal(session.workset.files[0]?.lastTool, "edit");
