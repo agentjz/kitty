@@ -1,7 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import { getProjectStatePaths } from "../project/statePaths.js";
 import type { SessionRecord, StoredMessage } from "../types.js";
 
 export interface ConversationExportResult {
@@ -10,15 +9,13 @@ export interface ConversationExportResult {
 }
 
 export async function exportSessionConversation(
-  stateRootDir: string,
+  runtimeRootDir: string,
   session: SessionRecord,
 ): Promise<ConversationExportResult> {
   const sections = session.messages.flatMap(formatConversationMessage);
-  const paths = getProjectStatePaths(stateRootDir);
-  const filePath = path.join(paths.exportsDir, `conversation-${safeFilePart(session.id)}.md`);
+  const filePath = path.join(path.resolve(runtimeRootDir), `conversation-${safeFilePart(session.id)}.md`);
   if (sections.length === 0) return { filePath, sectionCount: 0 };
 
-  await fs.mkdir(paths.exportsDir, { recursive: true });
   const content = [
     "# Kitty Conversation",
     "",

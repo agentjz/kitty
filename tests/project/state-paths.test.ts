@@ -18,7 +18,6 @@ test("project state paths centralize extension and observability state", async (
   assert.equal(paths.sessionsDir.startsWith(paths.kittyDir), true);
   assert.equal(paths.changesDir.startsWith(paths.kittyDir), true);
   assert.equal(paths.eventsDir.startsWith(paths.kittyDir), true);
-  assert.equal(paths.exportsDir.startsWith(paths.kittyDir), true);
   assert.equal(paths.extensionsDir.startsWith(paths.kittyDir), true);
   assert.equal(paths.controlPlaneLedgerFile.startsWith(paths.kittyDir), true);
   assert.equal(paths.observabilityEventsDir.includes("observability"), true);
@@ -27,7 +26,6 @@ test("project state paths centralize extension and observability state", async (
     "changesDir",
     "controlPlaneLedgerFile",
     "eventsDir",
-    "exportsDir",
     "extensionsDir",
     "kittyDir",
     "observabilityCrashesDir",
@@ -41,7 +39,6 @@ test("project state paths centralize extension and observability state", async (
   assert.equal((await fs.stat(paths.sessionsDir)).isDirectory(), true);
   assert.equal((await fs.stat(paths.changesDir)).isDirectory(), true);
   assert.equal((await fs.stat(paths.eventsDir)).isDirectory(), true);
-  assert.equal((await fs.stat(paths.exportsDir)).isDirectory(), true);
   assert.equal((await fs.stat(paths.extensionsDir)).isDirectory(), true);
   assert.equal((await fs.stat(paths.observabilityEventsDir)).isDirectory(), true);
 });

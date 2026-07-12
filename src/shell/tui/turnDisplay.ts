@@ -97,7 +97,6 @@ export function createTuiTurnDisplay(options: {
       options.controller.updateDock(toDockPatch(fact));
       if (fact.transcript) {
         options.controller.append(fact.transcript.role, fact.transcript.text, {
-          details: fact.transcript.details,
           planItems: fact.transcript.planItems,
         });
       }

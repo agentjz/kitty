@@ -36,7 +36,7 @@ export async function runCli(
 
 function maybeHandleEntryFastPath(argv: string[]): boolean {
   const userArgs = argv.slice(2);
-  if (userArgs.length === 1 && (userArgs[0] === "--version" || userArgs[0] === "-v" || userArgs[0] === "version")) {
+  if (userArgs.length === 1 && (userArgs[0] === "--version" || userArgs[0] === "-v")) {
     writeStdoutLine(packageJson.version);
     return true;
   }

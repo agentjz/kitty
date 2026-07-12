@@ -3,7 +3,7 @@ import type { Command } from "commander";
 import { buildRuntimeStatus } from "../../runtime/status.js";
 import type { CliOverrides, RuntimeConfig } from "../../types.js";
 import { writeStdoutLine } from "../../utils/stdio.js";
-import { formatRuntimeStatusText } from "./runtimeStatusPresenter.js";
+import { formatRuntimeStatusText } from "../../runtime-ui/statusPresenter.js";
 import { translate, type KittyLocale } from "../../i18n/index.js";
 
 export function registerRuntimeStatusCommand(
@@ -25,7 +25,7 @@ export function registerRuntimeStatusCommand(
     .option("--json", translate(options.locale, "cli.option.json"))
     .action(async (commandOptions: { json?: boolean }) => {
       const runtime = await options.resolveRuntime(options.getCliOverrides());
-      const status = await buildRuntimeStatus(runtime.cwd, runtime.config.locale);
+      const status = await buildRuntimeStatus(runtime.cwd, runtime.config.locale, { config: runtime.config });
 
       if (commandOptions.json) {
         writeStdoutLine(JSON.stringify(status, null, 2));

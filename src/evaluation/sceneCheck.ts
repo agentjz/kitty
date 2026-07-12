@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { ControlPlaneLedger } from "../control/ledger.js";
-import { formatRuntimeStatusText } from "../cli/commands/runtimeStatusPresenter.js";
+import { formatRuntimeStatusText } from "../runtime-ui/statusPresenter.js";
 import { buildRuntimeStatus } from "../runtime/status.js";
 import { SessionStore } from "../session/store.js";
 import { appendObservabilityEvent } from "../observability/writer.js";

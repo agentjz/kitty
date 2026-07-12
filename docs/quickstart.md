@@ -42,7 +42,7 @@ npm install -g @jun133/kitty
 安装结束后检查：
 
 ```cmd
-kitty version
+kitty --version
 ```
 
 能看到版本号，说明 Kitty 已安装。
@@ -106,19 +106,7 @@ KITTY_API_KEY=你的APIKey
 
 保存记事本并关闭。
 
-## 阶段七：检查配置
-
-回到 CMD，输入：
-
-```cmd
-kitty doctor
-```
-
-如果提示缺少配置，按它显示的“下一步”修改 `.kitty/.env`，然后再次运行 `kitty doctor`。
-
-看到 provider 可以连接后，再启动 Kitty。
-
-## 阶段八：启动 Kitty
+## 阶段七：启动 Kitty
 
 输入：
 
@@ -144,10 +132,10 @@ kitty
 | --- | --- |
 | `kitty` | 启动 Kitty |
 | `kitty init` | 初始化当前项目 |
-| `kitty doctor` | 检查配置 |
 | `kitty resume` | 继续最近会话 |
 | `kitty status` | 查看当前现场 |
-| `kitty version` | 查看版本 |
+| `kitty run <prompt>` | 在新会话中执行一次任务 |
+| `kitty --version` | 查看版本 |
 
 其他命令不需要背：
 
@@ -182,7 +170,7 @@ notepad .kitty\.env
 填写 `KITTY_API_KEY`，保存后运行：
 
 ```cmd
-kitty doctor
+kitty
 ```
 
 ### 进入了错误的文件夹

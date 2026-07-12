@@ -7,8 +7,8 @@ export function createWelcomeTipComponent(kit: Pick<InkRuntime, "React" | "Box" 
   return function WelcomeTip(props: { locale: KittyLocale }): React.ReactNode {
     return React.createElement(
       Box,
-      { flexDirection: "row", height: 1, overflowX: "hidden", width: "100%" },
-      React.createElement(Text, { color: TUI_COLORS.accentGold, bold: true }, "● Lucky猫咪  "),
+      { flexDirection: "row", height: 1, justifyContent: "center", overflowX: "hidden", width: "100%" },
+      React.createElement(Text, { color: TUI_COLORS.accentGold, bold: true }, "猫咪："),
       React.createElement(Text, { color: TUI_COLORS.muted, wrap: "truncate-end" }, translate(props.locale, "tui.authorTip")),
     );
   };

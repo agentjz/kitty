@@ -9,7 +9,6 @@ import {
   scrollTuiTranscript,
   scrollTuiTranscriptToBottom,
   scrollTuiTranscriptToTop,
-  toggleLatestTranscriptDetails,
   updateComposerState,
   updateOverlayState,
   updateRuntimeDock,
@@ -189,7 +188,6 @@ export class TuiController {
   }
 
   append(role: TuiTranscriptRole, text: string, options: {
-    details?: string;
     planItems?: TuiTranscriptEntry["planItems"];
   } = {}): void {
     if (!text) {
@@ -198,7 +196,6 @@ export class TuiController {
     this.setState(appendTranscriptEntry(this.state, {
       role,
       text,
-      details: options.details,
       planItems: options.planItems,
     }, this.viewport, this.projectionOptions()));
   }
@@ -268,15 +265,6 @@ export class TuiController {
     }
     return projectSelectedLineViews(this.renderAllTranscriptRows(), this.state.selection)
       .slice(this.state.scroll.offset, this.state.scroll.offset + viewport.height);
-  }
-
-  toggleLatestToolDetails(): boolean {
-    const next = toggleLatestTranscriptDetails(this.state, this.viewport, this.projectionOptions());
-    if (next === this.state) {
-      return false;
-    }
-    this.setState(next);
-    return true;
   }
 
   handleMouseEvent(event: TuiMouseEvent): void {

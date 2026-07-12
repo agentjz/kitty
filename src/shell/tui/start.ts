@@ -2,20 +2,14 @@ import { loadProjectContext } from "../../context/projectContext.js";
 import { buildRuntimeStatus } from "../../runtime/status.js";
 import { InteractiveSessionDriver } from "../../interaction/sessionDriver.js";
 import type { SessionStoreLike } from "../../session/index.js";
-import type { RuntimeConfig, SessionRecord } from "../../types.js";
-import {
-  createTerminalLogWriter,
-  mirrorInteractionShellToTerminalLog,
-} from "../../observability/terminalLog.js";
+import type { RuntimeConfig } from "../../types.js";
+import { createTerminalLogWriter, mirrorInteractionShellToTerminalLog } from "../../observability/terminalLog.js";
 import { enableMouseTracking } from "./input/scroll.js";
 import { createTuiInputGateway } from "./input/gateway.js";
 import { TuiController } from "./controller.js";
 import { SqliteTuiDraftStore } from "./draftPersistence.js";
 import { editTextExternally } from "./externalEditor.js";
-import {
-  createTuiExecutionDockWatcher,
-  readTuiLiveExecutionDock,
-} from "./executionDock.js";
+import { createTuiExecutionDockWatcher, readTuiLiveExecutionDock } from "./executionDock.js";
 import { projectRuntimeStatusToDock } from "./store.js";
 import { createTuiInteractionShell } from "./shell.js";
 import { createCleanupStack } from "./lifecycle.js";
@@ -43,10 +37,9 @@ export async function startTuiChat(options: StartTuiChatOptions): Promise<void> 
     React,
     ink,
     locale: options.config.locale,
+    model: options.config.model,
   });
-  if (!selected) {
-    return;
-  }
+  if (!selected) return;
 
   const projectContext = await loadProjectContext(selected.cwd, {
     projectDocMaxBytes: options.config.projectDocMaxBytes,
@@ -62,6 +55,7 @@ export async function startTuiChat(options: StartTuiChatOptions): Promise<void> 
     ...projectRuntimeStatusToDock(
       await buildRuntimeStatus(projectContext.stateRootDir, options.config.locale, {
         ownerSessionId: selected.session.id,
+        config: options.config,
       }),
       selected.session,
     ),
@@ -75,9 +69,10 @@ export async function startTuiChat(options: StartTuiChatOptions): Promise<void> 
       ownerSessionId: selected.session.id,
     }),
   });
-  const shell = createTuiInteractionShell(controller);
-  const terminalLogWriter = createTerminalLogWriter(projectContext.stateRootDir, selected.session.id);
-  const terminalShell = mirrorInteractionShellToTerminalLog(shell, terminalLogWriter);
+  const terminalShell = mirrorInteractionShellToTerminalLog(
+    createTuiInteractionShell(controller),
+    createTerminalLogWriter(projectContext.stateRootDir, selected.session.id),
+  );
   const inputGateway = createTuiInputGateway({
     onClose: () => controller.closeInput(),
     onMouseEvent: (event) => controller.handleMouseEvent(event),
@@ -94,20 +89,17 @@ export async function startTuiChat(options: StartTuiChatOptions): Promise<void> 
     useStdout: ink.useStdout,
   });
   let app: ReturnType<typeof ink.render> | undefined;
-  app = ink.render(
-    React.createElement(TuiApp, {
-      controller,
-      editExternally: editTextExternally,
-      enableMouseTracking: () => enableMouseTracking(process.stdout),
-      redraw: () => app?.clear(),
-      suspendInput: () => inputGateway.suspend(),
-    }),
-    {
-      stdin: inputGateway.stdin,
-      exitOnCtrlC: false,
-      alternateScreen: true,
-    },
-  );
+  app = ink.render(React.createElement(TuiApp, {
+    controller,
+    editExternally: editTextExternally,
+    enableMouseTracking: () => enableMouseTracking(process.stdout),
+    redraw: () => app?.clear(),
+    suspendInput: () => inputGateway.suspend(),
+  }), {
+    stdin: inputGateway.stdin,
+    exitOnCtrlC: false,
+    alternateScreen: true,
+  });
   cleanup.add(() => inputGateway.dispose());
   cleanup.add(() => executionDockWatcher.dispose());
   cleanup.add(() => terminalShell.dispose?.());

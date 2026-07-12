@@ -1,6 +1,7 @@
 export interface RuntimeStatus {
   rootDir: string;
   stateDir: string;
+  config?: RuntimeConfigSummary;
   scene: RuntimeSceneSummary;
   sessions: {
     total: number;
@@ -11,7 +12,11 @@ export interface RuntimeStatus {
   skills: {
     total: number;
     ready: number;
+    items: RuntimeSkillSummary[];
     needsAttention: RuntimeSkillSummary[];
+  };
+  events: {
+    recent: RuntimeSessionEventSummary[];
   };
   projectMap?: RuntimeProjectMapSummary;
   modelRequests: {
@@ -29,6 +34,26 @@ export interface RuntimeStatus {
   wakeSignals: {
     recent: RuntimeWakeSignalSummary[];
   };
+}
+
+export interface RuntimeConfigSummary {
+  provider: string;
+  model: string;
+  baseUrl: string;
+  profile: string;
+  thinking?: string;
+  reasoningEffort?: string;
+  showReasoning: boolean;
+  enabledExtensions: string[];
+}
+
+export interface RuntimeSessionEventSummary {
+  type: string;
+  createdAt: string;
+  host?: string;
+  message?: string;
+  toolName?: string;
+  error?: string;
 }
 
 export interface RuntimeSceneSummary {

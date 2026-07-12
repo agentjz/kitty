@@ -1,11 +1,7 @@
 import { createHostSession } from "../../host/session.js";
 import type { SessionStoreLike } from "../../session/index.js";
 import type { SessionRecord } from "../../types.js";
-import {
-  formatRelativeSessionTime,
-  formatSessionPickerTitle,
-  parseSessionPickerChoice,
-} from "../../session/picker.js";
+import { formatRelativeSessionTime, formatSessionPickerTitle, parseSessionPickerChoice } from "../../session/picker.js";
 import { TUI_COLORS } from "./theme.js";
 import type { InkRuntime } from "./components/kit.js";
 import { createWelcomeWordmarkComponent } from "./components/WelcomeWordmark.js";
@@ -24,14 +20,12 @@ export async function selectTuiSession(options: {
   React: InkRuntime["React"];
   ink: Pick<typeof import("ink"), "Box" | "Text" | "render" | "useInput" | "useStdout">;
   locale?: KittyLocale;
+  model: string;
   limit?: number;
 }): Promise<TuiSessionSelection | null> {
   const sessions = await options.sessionStore.list(options.limit ?? 10);
   if (sessions.length === 0) {
-    return {
-      session: await createHostSession(options.sessionStore, options.cwd),
-      cwd: options.cwd,
-    };
+    return { session: await createHostSession(options.sessionStore, options.cwd), cwd: options.cwd };
   }
 
   return new Promise((resolve) => {
@@ -44,10 +38,7 @@ export async function selectTuiSession(options: {
         return;
       }
       if (choice === 0) {
-        resolve({
-          session: await createHostSession(options.sessionStore, options.cwd),
-          cwd: options.cwd,
-        });
+        resolve({ session: await createHostSession(options.sessionStore, options.cwd), cwd: options.cwd });
         return;
       }
       const session = sessions[choice - 1];
@@ -72,6 +63,7 @@ export async function selectTuiSession(options: {
     app = options.ink.render(
       options.React.createElement(Picker, {
         locale: options.locale ?? DEFAULT_LOCALE,
+        model: options.model,
         sessions,
         now: new Date(),
         onSelect: (choice: number) => {
@@ -97,6 +89,7 @@ export function createTuiSessionPickerComponent(
   const WelcomeTip = createWelcomeTipComponent(kit);
   return function TuiSessionPicker(props: {
     locale?: KittyLocale;
+    model: string;
     sessions: readonly SessionRecord[];
     now: Date;
     onSelect: (choice: number) => void;
@@ -134,11 +127,8 @@ export function createTuiSessionPickerComponent(
         return;
       }
       const parsed = parseSessionPickerChoice(input, props.sessions.length);
-      if (parsed.kind === "new") {
-        props.onSelect(0);
-      } else if (parsed.kind === "existing") {
-        props.onSelect(parsed.index + 1);
-      }
+      if (parsed.kind === "new") props.onSelect(0);
+      if (parsed.kind === "existing") props.onSelect(parsed.index + 1);
     });
 
     return React.createElement(
@@ -160,7 +150,8 @@ export function createTuiSessionPickerComponent(
           { justifyContent: "center", width: "100%" },
           React.createElement(WelcomeWordmark, { compact }),
         ),
-        dense ? null : React.createElement(WelcomeTip, { locale }),
+        compact ? null : React.createElement(Box, { height: 1 }),
+        compact ? null : React.createElement(WelcomeTip, { locale }),
         React.createElement(Box, { height: 1 }),
         React.createElement(
           Box,
@@ -178,7 +169,17 @@ export function createTuiSessionPickerComponent(
             )),
         ),
         dense ? null : React.createElement(Box, { height: 1 }),
-        dense ? null : React.createElement(Text, { color: TUI_COLORS.muted }, translate(locale, "tui.sessionControls")),
+        dense ? null : React.createElement(
+          Box,
+          { flexDirection: "row", justifyContent: "space-between", width: "100%" },
+          React.createElement(
+            Box,
+            { flexDirection: "row", flexShrink: 1, marginRight: 2 },
+            React.createElement(Text, { color: TUI_COLORS.muted }, `${translate(locale, "tui.model")} `),
+            React.createElement(Text, { color: TUI_COLORS.accentBlue, wrap: "truncate-end" }, props.model),
+          ),
+          React.createElement(Text, { color: TUI_COLORS.muted }, translate(locale, "tui.sessionControls")),
+        ),
       ),
       React.createElement(Box, { flexGrow: 1, minHeight: 0 }),
     );

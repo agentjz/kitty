@@ -130,7 +130,7 @@ function readEntryDisplayRows(entry: TuiTranscriptEntry, width: number): TuiTran
         language: undefined,
       },
       ...(entry.planItems ?? []).map((item): TuiTranscriptSourceRow => {
-        const marker = item.status === "completed" ? "✓" : item.status === "in_progress" ? "◉" : "□";
+        const marker = item.status === "completed" ? "✓" : item.status === "in_progress" ? "●" : "□";
         const prefix = `  ${marker} #${item.id} `;
         return {
           markdownKind: item.status === "completed"
@@ -149,10 +149,7 @@ function readEntryDisplayRows(entry: TuiTranscriptEntry, width: number): TuiTran
     ];
   }
   if (entry.role === "tool") {
-    const text = entry.expanded && entry.details
-      ? `${entry.text}\n${entry.details}`
-      : entry.text;
-    return text.split(/\r?\n/).map((row, index) => ({
+    return entry.text.split(/\r?\n/).map((row, index) => ({
       markdownKind: index === 0 ? "toolHeader" : "toolDetail",
       text: row,
       spans: [{ text: row }],

@@ -16,17 +16,17 @@ export async function handleTelegramLocalCommand(
     return "handled";
   }
 
-  const command = normalizeLocalCommand(input);
+  const command = normalizeLocalCommand(input, "telegram");
 
   if (command === "help") {
     output.plain(formatTelegramHelp(context.config.locale));
     return "handled";
   }
 
-  if (command === "exit" || command === "reset") {
+  if (!command && input.trim().startsWith("/")) {
     output.warn(formatTelegramBlockedLocalCommand(context.config.locale));
     return "handled";
   }
 
-  return handleSharedLocalCommand(input, context, output);
+  return handleSharedLocalCommand(input, context, output, "telegram");
 }

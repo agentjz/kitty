@@ -32,7 +32,7 @@ test("tui projects completed write and edit diffs from tool result facts", () =>
   }), "en");
 
   assert.equal(fact.transcript?.role, "change");
-  assert.match(fact.transcript?.text ?? "", /^● Updated src\/example\.ts/m);
+  assert.match(fact.transcript?.text ?? "", /^Updated src\/example\.ts/m);
   assert.match(fact.transcript?.text ?? "", /^  \+1 -1/m);
   assert.match(fact.transcript?.text ?? "", /^  - const oldValue/m);
   assert.match(fact.transcript?.text ?? "", /^  \+ const newValue/m);
@@ -43,9 +43,20 @@ test("tui projects completed write and edit diffs from tool result facts", () =>
     endLine: 12,
     content: "10 | first\n11 | second\n12 | third",
   }), "en");
-  assert.equal(read.transcript?.role, "tool");
-  assert.equal(read.transcript?.text, "● Read src/example.ts · 10-12 · Ctrl+O to expand");
-  assert.match(read.transcript?.details ?? "", /11 \| second/);
+  assert.deepEqual(read.transcript, {
+    role: "tool",
+    text: "Read src/example.ts · 10-12",
+  });
+
+  const bash = projectTuiToolResultFact("bash", JSON.stringify({
+    command: "npm test",
+    status: "completed",
+    output: "all tests passed",
+  }), "en");
+  assert.deepEqual(bash.transcript, {
+    role: "tool",
+    text: "Ran npm test · completed",
+  });
 });
 
 test("tui projects real write and edit argument progress without exposing arguments", () => {
@@ -76,13 +87,13 @@ test("tui projects real write and edit argument progress without exposing argume
 
 test("tui turn display connects provider progress and completed diff facts", () => {
   const docks: Array<Partial<TuiRuntimeDockState>> = [];
-  const transcript: Array<{ role: TuiTranscriptRole; text: string; details?: string }> = [];
+  const transcript: Array<{ role: TuiTranscriptRole; text: string }> = [];
   const controller = {
     updateDock(patch: Partial<TuiRuntimeDockState>) {
       docks.push(patch);
     },
-    append(role: TuiTranscriptRole, text: string, options: { details?: string } = {}) {
-      transcript.push({ role, text, details: options.details });
+    append(role: TuiTranscriptRole, text: string) {
+      transcript.push({ role, text });
     },
   } as unknown as TuiController;
   const display = createTuiTurnDisplay({
@@ -106,8 +117,7 @@ test("tui turn display connects provider progress and completed diff facts", () 
   assert.equal(docks[0]?.activity?.detail, "1.2 kB");
   assert.deepEqual(transcript, [{
     role: "change",
-    text: "● Updated src/example.ts\n  +1 -1\n  - old\n  + new",
-    details: undefined,
+    text: "Updated src/example.ts\n  +1 -1\n  - old\n  + new",
   }]);
 });
 
@@ -122,7 +132,7 @@ test("tui projects typed plan items without parsing preview text", () => {
   }), "en");
 
   assert.equal(fact.transcript?.role, "plan");
-  assert.equal(fact.transcript?.text, "● Updated Plan · 1/3");
+  assert.equal(fact.transcript?.text, "Updated Plan · 1/3");
   assert.deepEqual(fact.transcript?.planItems?.map((item) => item.status), [
     "completed",
     "in_progress",

@@ -122,7 +122,7 @@ export function createInitialTuiState(session?: SessionRecord, locale: KittyLoca
 }
 
 export function hasTuiConversation(state: Pick<TuiState, "transcript">): boolean {
-  return state.transcript.some((entry) => entry.role !== "system");
+  return state.transcript.length > 0;
 }
 
 export function appendTranscriptEntry(
@@ -166,34 +166,6 @@ export function updateRuntimeDock(state: TuiState, dock: Partial<TuiRuntimeDockS
     dock: {
       ...state.dock,
       ...dock,
-    },
-  };
-}
-
-export function toggleLatestTranscriptDetails(
-  state: TuiState,
-  viewport: TuiViewport,
-  options: TuiProjectionOptions = {},
-): TuiState {
-  let index = -1;
-  for (let candidate = state.transcript.length - 1; candidate >= 0; candidate -= 1) {
-    if (state.transcript[candidate]?.details) {
-      index = candidate;
-      break;
-    }
-  }
-  if (index < 0) {
-    return state;
-  }
-  const entry = state.transcript[index]!;
-  const transcript = state.transcript.slice();
-  transcript[index] = { ...entry, expanded: !entry.expanded };
-  const changed = applyContentChange(state, { ...state, transcript }, viewport, options);
-  return {
-    ...changed,
-    scroll: {
-      ...changed.scroll,
-      unseenRows: state.scroll.unseenRows,
     },
   };
 }

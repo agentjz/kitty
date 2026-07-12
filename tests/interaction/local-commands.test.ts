@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
-import { executionOwnership } from "../../src/control/types.js";
 
+import { executionOwnership } from "../../src/control/types.js";
 import { BackgroundExecutionStore } from "../../src/execution/background.js";
 import {
   listSlashCommands,
@@ -15,54 +15,30 @@ import { SessionEventStore } from "../../src/session/events.js";
 import { InProcessSessionStore, SessionStore, type SessionStoreLike } from "../../src/session/store.js";
 import type { SessionRecord } from "../../src/types.js";
 import { createTempWorkspace, createTestRuntimeConfig, TEST_EXECUTION_OWNER } from "../helpers.js";
-import { InteractiveSessionDriver } from "../../src/interaction/sessionDriver.js";
-import { TuiController } from "../../src/shell/tui/controller.js";
-import { createTuiInteractionShell } from "../../src/shell/tui/shell.js";
-import { getProjectStatePaths } from "../../src/project/statePaths.js";
 
-test("slash command metadata comes from the local command registry", () => {
-  const commands = listSlashCommands();
-  const names = commands.map((command) => command.name);
-
-  for (const name of [
-    "/help",
+test("interactive slash commands expose only the current TUI product surface", () => {
+  assert.deepEqual(listSlashCommands("tui").map((command) => command.name), [
     "/status",
-    "/background",
-    "/skills",
-    "/events",
-    "/doctor",
-    "/sessions",
-    "/copy",
     "/export",
-    "/reset",
     "/exit",
-  ]) {
-    assert.equal(names.includes(name), true, `${name} should be registered`);
-  }
-
-  assert.equal(normalizeLocalCommand("/bg"), "background");
-  assert.equal(normalizeLocalCommand("/resume"), "sessions");
+  ]);
+  assert.equal(normalizeLocalCommand("/resume", "tui"), undefined);
+  assert.equal(normalizeLocalCommand("/copy", "tui"), undefined);
+  assert.equal(normalizeLocalCommand("/reset", "tui"), undefined);
+  assert.equal(isExplicitExitCommand("/exit"), true);
+  assert.equal(isExplicitExitCommand("quit"), false);
 });
 
-test("local commands classify empty, exit, help, session, and config input", async (t) => {
-  const root = await createTempWorkspace("local-commands", t);
-  const output = createRecordingOutput();
-  const context = createLocalCommandContext(root);
-
-  assert.equal(isExplicitExitCommand(" /QUIT "), true);
-  assert.equal(await handleLocalCommand("   ", context, output), "handled");
-  assert.equal(await handleLocalCommand("/exit", context, output), "quit");
-  assert.equal(await handleLocalCommand("/help", context, output), "handled");
-  assert.equal(await handleLocalCommand("/session", context, output), "handled");
-  assert.equal(await handleLocalCommand("/config", context, output), "handled");
-  assert.equal(await handleLocalCommand("explain this repo", context, output), "continue");
-
-  assert.equal(output.plainText.length, 1);
-  assert.equal(output.infoText.length, 2);
-});
-
-test("runtime slash commands are handled locally", async (t) => {
-  const root = await createTempWorkspace("local-runtime-commands", t);
+test("status aggregates configuration, background, events, and every discovered skill", async (t) => {
+  const root = await createTempWorkspace("local-status", t);
+  await fs.mkdir(path.join(root, "skills", "demo"), { recursive: true });
+  await fs.writeFile(path.join(root, "skills", "demo", "SKILL.md"), [
+    "---",
+    "name: demo",
+    "description: Demo status skill.",
+    "---",
+    "# Demo",
+  ].join("\n"), "utf8");
   const context = createLocalCommandContext(root);
   const sessionStore = new SessionStore(context.config.paths.sessionsDir);
   context.session = await sessionStore.save(context.session);
@@ -71,7 +47,7 @@ test("runtime slash commands are handled locally", async (t) => {
   const backgroundStore = new BackgroundExecutionStore(root);
   const execution = backgroundStore.create({
     ...TEST_EXECUTION_OWNER,
-    command: "echo slash-background",
+    command: "echo status-background",
     cwd: root,
     requestedBy: "test",
     ownerSessionId: context.session.id,
@@ -79,10 +55,9 @@ test("runtime slash commands are handled locally", async (t) => {
   });
   backgroundStore.close(execution.id, executionOwnership(execution), {
     status: "completed",
-    output: "slash-background",
-    summary: "slash-background",
+    output: "status-background",
+    summary: "status-background",
   });
-
   await new SessionEventStore(context.config.paths.eventsDir).append({
     type: "turn.completed",
     sessionId: context.session.id,
@@ -91,16 +66,18 @@ test("runtime slash commands are handled locally", async (t) => {
   });
 
   const output = createRecordingOutput();
-  for (const command of ["/status", "/background", "/skills", "/events", "/doctor", "/sessions", "/copy", "/export"]) {
-    assert.equal(await handleLocalCommand(command, context, output), "handled", `${command} should be local`);
-  }
-
-  assert.equal(output.plainText.length, 7);
-  assert.equal(output.infoText.length, 1);
+  assert.equal(await handleLocalCommand("/status", context, output), "handled");
+  const status = output.plainText.join("\n");
+  assert.match(status, new RegExp(context.config.provider));
+  assert.match(status, new RegExp(context.config.model));
+  assert.match(status, /status-background/);
+  assert.match(status, /turn\.completed/);
+  assert.match(status, /demo/);
+  assert.doesNotMatch(status, new RegExp(context.config.apiKey));
 });
 
-test("copy exports visible conversation and assistant reasoning to a session file", async (t) => {
-  const root = await createTempWorkspace("local-copy", t);
+test("export writes the latest visible conversation into the current runtime root", async (t) => {
+  const root = await createTempWorkspace("local-export", t);
   const context = createLocalCommandContext(root);
   const sessionStore = new InProcessSessionStore();
   context.sessionStore = sessionStore;
@@ -130,72 +107,16 @@ test("copy exports visible conversation and assistant reasoning to a session fil
   context.session = staleSession;
   const output = createRecordingOutput();
 
-  assert.equal(await handleLocalCommand("/copy", context, output), "handled");
-  assert.equal(output.plainText.length, 0);
-  assert.equal(output.infoText.length, 1);
-
-  const filePath = path.join(getProjectStatePaths(root).exportsDir, `conversation-${context.session.id}.md`);
+  assert.equal(await handleLocalCommand("/export", context, output), "handled");
+  const filePath = path.join(root, `conversation-${context.session.id}.md`);
   const exported = await fs.readFile(filePath, "utf8");
   assert.match(exported, /## User .*\n\nhello/);
   assert.match(exported, /## Assistant Reasoning .*\n\ninspect the evidence/);
   assert.match(exported, /## Assistant .*\n\nfinished reply/);
-  assert.match(exported, /## User .*\n\nlatest durable message/);
+  assert.match(exported, /latest durable message/);
   assert.doesNotMatch(exported, /wake fact|raw tool evidence/);
   assert.equal(output.infoText[0]?.includes(filePath), true);
-});
-
-test("session driver owns destructive command confirmation for every interactive shell", async (t) => {
-  const root = await createTempWorkspace("local-command-confirmation", t);
-  const sessionStore = new InProcessSessionStore();
-  const session = await sessionStore.create(root);
-  const controller = new TuiController();
-  const handled: string[] = [];
-  controller.submitInput("/reset");
-  controller.submitInput("not-reset");
-  controller.submitInput("/exit");
-
-  const driver = new InteractiveSessionDriver({
-    cwd: root,
-    config: createTestRuntimeConfig(root),
-    session,
-    sessionStore,
-    shell: createTuiInteractionShell(controller),
-    stateRootDir: root,
-    localCommandHandler: async (input) => {
-      handled.push(input);
-      return input === "/exit" ? "quit" : "handled";
-    },
-  });
-  await driver.run();
-
-  assert.deepEqual(handled, ["/exit"]);
-  assert.match(controller.getState().transcript.map((entry) => entry.text).join("\n"), /已取消重置/);
-});
-
-test("session driver runs a destructive command only after exact confirmation", async (t) => {
-  const root = await createTempWorkspace("local-command-confirmed", t);
-  const sessionStore = new InProcessSessionStore();
-  const session = await sessionStore.create(root);
-  const controller = new TuiController();
-  const handled: string[] = [];
-  controller.submitInput("/reset");
-  controller.submitInput("reset");
-
-  const driver = new InteractiveSessionDriver({
-    cwd: root,
-    config: createTestRuntimeConfig(root),
-    session,
-    sessionStore,
-    shell: createTuiInteractionShell(controller),
-    stateRootDir: root,
-    localCommandHandler: async (input) => {
-      handled.push(input);
-      return "quit";
-    },
-  });
-  await driver.run();
-
-  assert.deepEqual(handled, ["/reset"]);
+  await assert.rejects(() => fs.access(path.join(root, ".kitty", "exports", path.basename(filePath))));
 });
 
 function createLocalCommandContext(root: string): {
@@ -215,20 +136,13 @@ function createLocalCommandContext(root: string): {
       updatedAt: "2026-05-20T00:00:00.000Z",
       cwd: root,
       messageCount: 1,
-      messages: [{
-        role: "user",
-        content: "hello",
-        createdAt: "2026-05-20T00:00:00.000Z",
-      }],
+      messages: [{ role: "user", source: "external", content: "hello", createdAt: "2026-05-20T00:00:00.000Z" }],
     },
     config: createTestRuntimeConfig(root),
   };
 }
 
-function createRecordingOutput(): ShellOutputPort & {
-  plainText: string[];
-  infoText: string[];
-} {
+function createRecordingOutput(): ShellOutputPort & { plainText: string[]; infoText: string[] } {
   const plainText: string[] = [];
   const infoText: string[] = [];
   return {
@@ -236,10 +150,10 @@ function createRecordingOutput(): ShellOutputPort & {
     infoText,
     plain: (text) => plainText.push(text),
     info: (text) => infoText.push(text),
-    warn: () => undefined,
-    error: () => undefined,
-    dim: () => undefined,
-    heading: () => undefined,
-    interrupt: () => undefined,
+    warn: (text) => infoText.push(text),
+    error: (text) => infoText.push(text),
+    dim: (text) => infoText.push(text),
+    heading: (text) => infoText.push(text),
+    interrupt: (text) => infoText.push(text),
   };
 }

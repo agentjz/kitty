@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import stringWidth from "string-width";
 import packageJson from "../../package.json";
 
 import {
@@ -12,10 +13,12 @@ import { TuiController } from "../../src/shell/tui/controller.js";
 import { applyComposerInput } from "../../src/shell/tui/composerEditing.js";
 import { measureAbsoluteBox } from "../../src/shell/tui/inkGeometry.js";
 import {
+  COMPOSER_FRAME,
   layoutComposer,
   measureComposerContentWidth,
   measureComposerTextOrigin,
 } from "../../src/shell/tui/composerLayout.js";
+import { readTranscriptRoleFrame } from "../../src/shell/tui/transcriptFrame.js";
 import {
   measureTuiFooterRows,
   TUI_COMPOSER_META_GAP_ROWS,
@@ -23,6 +26,13 @@ import {
   TUI_FOOTER_CONTENT_INSET_X,
 } from "../../src/shell/tui/layout.js";
 import { measureTuiOverlayRows } from "../../src/shell/tui/overlayLayout.js";
+import {
+  TUI_SPINNER_FRAMES,
+} from "../../src/shell/tui/animation.js";
+
+test("tui activity spinner stays within one fixed terminal cell", () => {
+  assert.deepEqual([...new Set(TUI_SPINNER_FRAMES.map((frame) => stringWidth(frame)))], [1]);
+});
 
 test("tui overlays stay within the responsive row budget", () => {
   let state = createInitialTuiState();
@@ -169,6 +179,7 @@ test("tui runtime dock does not repeat thinking on both sides", async () => {
   );
 
   assert.match(output, /正在运行\s+思考中 3s$/);
+  assert.match(output, /^⠋ 正在运行/);
   assert.equal(output.match(/思考中/g)?.length, 1);
 });
 
@@ -187,6 +198,7 @@ test("tui session picker uses a centered compact identity and fills the terminal
   });
   const output = ink.renderToString(
     React.default.createElement(Picker, {
+      model: "deepseek-v4-flash",
       sessions: [{
         id: "session-1",
         revision: 0,
@@ -209,12 +221,89 @@ test("tui session picker uses a centered compact identity and fills the terminal
   assert.equal(Math.max(...lines.map((line) => [...line].length)) <= 80, true);
   assert.equal(lines.some((line) => line.trim() === "会话"), false);
   assert.match(output, new RegExp(`v${packageJson.version.replaceAll(".", "\\.")}`));
-  assert.match(output, /Lucky猫咪/);
+  assert.match(output, /猫咪：尽情地探索并享受吧！/);
+  assert.doesNotMatch(output, /github\.com|幸运猫咪|Tips:|Learn more|\/\\_\/\\|\( o\.o \)/);
+  const versionLine = lines.findIndex((line) => line.includes(`v${packageJson.version}`));
+  const wordmarkLine = lines.findIndex((line) => line.includes("▄▄"));
+  assert.equal(versionLine >= 0, true);
+  assert.equal(wordmarkLine > versionLine, true);
   assert.match(output, /模型身份与能力/);
+  assert.match(output, /模型 deepseek-v4-flash/);
+  assert.match(output, /Enter 打开/);
   assert.doesNotMatch(output, /继续会话/);
 });
 
-test("tui transcript visibly projects changes, plans, and collapsed tool details", async () => {
+test("tui compact picker keeps project identity without crowding session choices", async () => {
+  const React = await import("react");
+  const ink = await import("ink");
+  const { createTuiSessionPickerComponent } = await import("../../src/shell/tui/sessionPicker.js");
+  const Picker = createTuiSessionPickerComponent({
+    React: React.default,
+    Box: ink.Box,
+    Text: ink.Text,
+    useInput() {},
+    useStdout() {
+      return { stdout: { columns: 80, rows: 10 } } as ReturnType<typeof ink.useStdout>;
+    },
+  });
+  const sessions = Array.from({ length: 7 }, (_, index) => ({
+      id: `session-${index + 1}`,
+      revision: 0,
+      createdAt: "2026-07-11T12:00:00.000Z",
+      updatedAt: "2026-07-11T13:00:00.000Z",
+      cwd: process.cwd(),
+      messageCount: 0,
+      messages: [],
+      title: `compact session ${index + 1}`,
+    }));
+  const output = ink.renderToString(React.default.createElement(Picker, {
+    model: "deepseek-v4-flash",
+    sessions,
+    now: new Date("2026-07-11T13:01:00.000Z"),
+    onSelect() {},
+    onCancel() {},
+  }), { columns: 80 });
+
+  assert.equal(output.split(/\r?\n|\r/).length, 16);
+  assert.match(output, new RegExp(`v${packageJson.version.replaceAll(".", "\\.")}`));
+  assert.match(output, /compact session 1/);
+  assert.match(output, /模型 deepseek-v4-flash/);
+  assert.doesNotMatch(output, /github\.com|猫咪：/);
+});
+
+test("tui leaves the welcome layout as soon as a local command returns visible output", async () => {
+  const React = await import("react");
+  const ink = await import("ink");
+  const { createTuiAppComponent } = await import("../../src/shell/tui/components/App.js");
+  const controller = new TuiController();
+  const App = createTuiAppComponent({
+    React: React.default,
+    Box: ink.Box,
+    Text: ink.Text,
+    useCursor: (() => ({ setCursorPosition() {} })) as unknown as typeof ink.useCursor,
+    useInput: (() => undefined) as unknown as typeof ink.useInput,
+    usePaste: (() => undefined) as unknown as typeof ink.usePaste,
+    useStdin: (() => ({ isRawModeSupported: false, setRawMode() {} })) as unknown as typeof ink.useStdin,
+    useStdout: (() => ({ stdout: { columns: 80, rows: 24 } })) as unknown as typeof ink.useStdout,
+  } as Parameters<typeof createTuiAppComponent>[0]);
+  const props = {
+    controller,
+    editExternally: async (value: string) => value,
+    enableMouseTracking: () => () => undefined,
+    redraw() {},
+    suspendInput: () => () => undefined,
+  };
+
+  const welcome = ink.renderToString(React.default.createElement(App, props), { columns: 80 });
+  assert.match(welcome, /猫咪：尽情地探索并享受吧！/);
+
+  controller.append("system", "status returned before any model turn");
+  const conversation = ink.renderToString(React.default.createElement(App, props), { columns: 80 });
+  assert.match(conversation, /status returned before any model turn/);
+  assert.doesNotMatch(conversation, /猫咪：尽情地探索并享受吧！/);
+});
+
+test("tui transcript visibly projects changes, plans, and compact tool facts", async () => {
   const React = await import("react");
   const ink = await import("ink");
   const { createTranscriptComponent } = await import("../../src/shell/tui/components/Transcript.js");
@@ -225,12 +314,12 @@ test("tui transcript visibly projects changes, plans, and collapsed tool details
       {
         id: "change-1",
         role: "change" as const,
-        text: "● Updated src/example.ts\n  +1 -1\n  @@ -8,3 +8,3 @@\n  - old value\n  + new value",
+        text: "Updated src/example.ts\n  +1 -1\n  @@ -8,3 +8,3 @@\n  - old value\n  + new value",
       },
       {
         id: "plan-1",
         role: "plan" as const,
-        text: "● Updated Plan · 1/2",
+        text: "Updated Plan · 1/2",
         planItems: [
           { id: "1", text: "inspect facts", status: "completed" as const },
           { id: "2", text: "verify behavior", status: "in_progress" as const },
@@ -239,8 +328,7 @@ test("tui transcript visibly projects changes, plans, and collapsed tool details
       {
         id: "read-1",
         role: "tool" as const,
-        text: "● Read src/example.ts · 8-10 · Ctrl+O to expand",
-        details: "8 | hidden until expanded",
+        text: "Read src/example.ts · 8-10",
       },
     ],
   };
@@ -255,9 +343,17 @@ test("tui transcript visibly projects changes, plans, and collapsed tool details
   assert.match(output, /\+ new value/);
   assert.match(output, /Updated Plan/);
   assert.match(output, /✓ #1 inspect facts/);
-  assert.match(output, /◉ #2 verify behavior/);
+  assert.match(output, /● #2 verify behavior/);
   assert.match(output, /Read src\/example\.ts/);
-  assert.doesNotMatch(output, /hidden until expanded/);
+  assert.doesNotMatch(output, /● (?:Updated|Read)/);
+  assert.doesNotMatch(output, /Ctrl\+O/);
+});
+
+test("tui input and reasoning frames have no visible accent bar", () => {
+  assert.equal(COMPOSER_FRAME.gutter, "");
+  assert.equal(COMPOSER_FRAME.gap, 0);
+  assert.equal(readTranscriptRoleFrame("user", 80).gutter.trim(), "");
+  assert.equal(readTranscriptRoleFrame("reasoning", 80).gutter.trim(), "");
 });
 
 test("tui composer layout derives visible rows and cursor from one frame model", () => {
@@ -269,7 +365,7 @@ test("tui composer layout derives visible rows and cursor from one frame model",
   });
 
   assert.deepEqual(measureComposerTextOrigin(frame), { x: 10, y: 20 });
-  assert.equal(measureComposerContentWidth(frame.width), 73);
+  assert.equal(measureComposerContentWidth(frame.width), 76);
   assert.deepEqual(layout.cursor, { x: 13, y: 21 });
   assert.deepEqual(layout.rows, ["111"]);
   assert.equal(layout.visibleRows, 1);

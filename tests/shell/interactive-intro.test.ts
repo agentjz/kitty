@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { ShellOutputPort } from "../../src/interaction/shell.js";
-import { listIntroLocalCommands } from "../../src/interaction/localCommandDefinitions.js";
+import { listSlashCommands } from "../../src/interaction/localCommandDefinitions.js";
 import { writeCliInteractiveIntro } from "../../src/shell/cli/intro.js";
 
 test("interactive intro prints session, cwd, and local commands", () => {
@@ -19,10 +19,10 @@ test("interactive intro prints session, cwd, and local commands", () => {
   assert.match(rendered, /session: session-intro/);
   assert.match(rendered, /cwd: C:\\workspace\\kitty/);
   assert.doesNotMatch(rendered, /Tools:/);
-  for (const command of listIntroLocalCommands("en")) {
-    assert.match(rendered, new RegExp(`${escapeRegExp(command.helpLabel)}\\s+${escapeRegExp(command.helpText)}`));
+  for (const command of listSlashCommands("tui", "en")) {
+    assert.match(rendered, new RegExp(`${escapeRegExp(command.name)}\\s+${escapeRegExp(command.description)}`));
   }
-  assert.doesNotMatch(rendered, /\/status\s+Show current project scene/);
+  assert.doesNotMatch(rendered, /\/resume|\/reset|\/doctor/);
 });
 
 test("interactive intro can print a supplied active tool surface label", () => {

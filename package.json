@@ -1,6 +1,6 @@
 {
   "name": "@jun133/kitty",
-  "version": "0.0.29",
+  "version": "0.0.30",
   "description": "Agent",
   "license": "MIT",
   "keywords": [
@@ -14,7 +14,9 @@
     "kitty": "dist/cli.js"
   },
   "files": [
-    "dist",
+    "dist/*.js",
+    "dist/*.mjs",
+    "dist/*.map",
     "README.md",
     "scripts/postinstall.cjs"
   ],
@@ -31,8 +33,8 @@
     "test:build": "node -e \"require('node:fs').rmSync('.test-build', { recursive: true, force: true })\" && tsc -p tsconfig.tests.json",
     "test:core": "npm run test:build && node scripts/run-tests.mjs core",
     "test:eval": "npm run test:build && node scripts/run-tests.mjs evaluation",
-    "eval:local": "node scripts/ensure-dist-built.mjs && node dist/cli.js eval --run-local",
-    "eval:production": "node scripts/ensure-dist-built.mjs && node dist/cli.js eval --run-production",
+    "eval:local": "npm run test:build && node .test-build/scripts/run-evaluation.js local",
+    "eval:production": "npm run test:build && node .test-build/scripts/run-evaluation.js production",
     "verify": "npm test",
     "typecheck": "tsc --noEmit",
     "postinstall": "node scripts/postinstall.cjs",

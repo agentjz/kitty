@@ -1,6 +1,6 @@
 import chalk from "chalk";
 
-import { formatLocalCommandHelpLine, listIntroLocalCommands } from "../../interaction/localCommandDefinitions.js";
+import { listSlashCommands } from "../../interaction/localCommandDefinitions.js";
 import type { ShellOutputPort } from "../../interaction/shell.js";
 import type { SessionRecord } from "../../types.js";
 import { renderKittyBanner } from "../banner.js";
@@ -20,8 +20,8 @@ export function writeCliInteractiveIntro(options: {
     options.output.dim(`${translate(options.locale, "cli.intro.tools")}: ${options.toolsLabel}`);
   }
   options.output.dim(`${translate(options.locale, "cli.intro.commands")}:`);
-  for (const command of listIntroLocalCommands(options.locale)) {
-    options.output.dim(formatLocalCommandHelpLine(command.id, options.locale));
+  for (const command of listSlashCommands("tui", options.locale)) {
+    options.output.dim(`${command.name.padEnd(12)} ${command.description}`);
   }
   options.output.dim("");
 }

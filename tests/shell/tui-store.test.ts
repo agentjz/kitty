@@ -14,7 +14,6 @@ import {
   formatContextBudget,
   scrollTuiTranscript,
   scrollTuiTranscriptToBottom,
-  toggleLatestTranscriptDetails,
   type TuiViewport,
 } from "../../src/shell/tui/store.js";
 import { projectTuiExecutionDockFacts, readTuiLiveExecutionDock } from "../../src/shell/tui/executionDock.js";
@@ -30,13 +29,13 @@ const viewport: TuiViewport = {
   height: 3,
 };
 
-test("tui welcome is reserved for sessions without real conversation", () => {
+test("tui leaves the welcome layout after the first visible transcript entry", () => {
   const empty = createInitialTuiState();
   const systemOnly = appendTranscriptEntry(empty, { role: "system", text: "recovery notice" }, viewport);
   const conversation = appendTranscriptEntry(systemOnly, { role: "user", text: "hello" }, viewport);
 
   assert.equal(hasTuiConversation(empty), false);
-  assert.equal(hasTuiConversation(systemOnly), false);
+  assert.equal(hasTuiConversation(systemOnly), true);
   assert.equal(hasTuiConversation(conversation), true);
 });
 
@@ -215,7 +214,7 @@ test("tui transcript renders completed change facts with distinct diff rows", ()
 test("tui transcript renders typed plan hierarchy and completed strike state", () => {
   const state = appendTranscriptEntry(createInitialTuiState(undefined, "en"), {
     role: "plan",
-    text: "● Updated Plan · 1/3",
+    text: "Updated Plan · 1/3",
     planItems: [
       { id: "1", text: "inspect facts", status: "completed" },
       { id: "2", text: "implement projection", status: "in_progress" },
@@ -228,28 +227,8 @@ test("tui transcript renders typed plan hierarchy and completed strike state", (
   const completed = rows.find((row) => row.markdownKind === "planCompleted");
   assert.equal(completed?.text.includes("✓ #1 inspect facts"), true);
   assert.equal(completed?.spans.some((span) => span.text === "inspect facts" && span.strike), true);
-  assert.equal(rows.some((row) => row.markdownKind === "planActive" && row.text.includes("◉ #2")), true);
+  assert.equal(rows.some((row) => row.markdownKind === "planActive" && row.text.includes("● #2")), true);
   assert.equal(rows.some((row) => row.markdownKind === "planPending" && row.text.includes("□ #3")), true);
-});
-
-test("tui tool details expand explicitly without changing detached unseen facts", () => {
-  let state = createInitialTuiState();
-  state = appendTranscriptEntry(state, {
-    role: "tool",
-    text: "● read src/example.ts · Ctrl+O",
-    details: "1 | first\n2 | second",
-  }, { width: 60, height: 2 });
-  state = scrollTuiTranscript(state, { width: 60, height: 2 }, -1);
-  const unseenRows = state.scroll.unseenRows;
-
-  const expanded = toggleLatestTranscriptDetails(state, { width: 60, height: 2 });
-  assert.equal(expanded.transcript[0]?.expanded, true);
-  assert.equal(renderTranscriptLineViews(expanded.transcript, 60).some((row) => row.text === "2 | second"), true);
-  assert.equal(expanded.scroll.unseenRows, unseenRows);
-
-  const collapsed = toggleLatestTranscriptDetails(expanded, { width: 60, height: 2 });
-  assert.equal(collapsed.transcript[0]?.expanded, false);
-  assert.equal(renderTranscriptLineViews(collapsed.transcript, 60).some((row) => row.text === "2 | second"), false);
 });
 
 test("tui transcript projection caches stable entry layout by id text and width", () => {

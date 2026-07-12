@@ -31,7 +31,7 @@ test("shared tool result presentation preserves every diff hunk and its counts",
   assert.equal(presentation.diffLines.filter((line) => line.startsWith("@@")).length, 2);
 });
 
-test("shared tool result presentation keeps structured plan and expandable details", () => {
+test("shared tool result presentation keeps structured plan and source evidence", () => {
   const plan = projectToolResultPresentation("todo_write", JSON.stringify({
     items: [
       { id: "1", text: "inspect facts", status: "completed" },

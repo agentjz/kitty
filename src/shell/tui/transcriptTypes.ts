@@ -7,8 +7,6 @@ export interface TuiTranscriptEntry {
   id: string;
   role: TuiTranscriptRole;
   text: string;
-  details?: string;
-  expanded?: boolean;
   planItems?: readonly ToolPlanItem[];
 }
 

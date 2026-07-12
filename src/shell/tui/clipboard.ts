@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process";
 
 const CLIPBOARD_TIMEOUT_MS = 5_000;
+const WINDOWS_CLIPBOARD_SCRIPT =
+  "[Console]::InputEncoding = [System.Text.Encoding]::UTF8; $ErrorActionPreference = 'Stop'; Set-Clipboard -Value ([Console]::In.ReadToEnd())";
 
 export interface TuiClipboardOptions {
   output?: Pick<NodeJS.WriteStream, "isTTY" | "write">;
@@ -38,7 +40,12 @@ export function nativeClipboardCommands(platform: NodeJS.Platform): Array<{
   command: string;
   args: readonly string[];
 }> {
-  if (platform === "win32") return [{ command: "clip.exe", args: [] }];
+  if (platform === "win32") {
+    return [{
+      command: "powershell.exe",
+      args: ["-NonInteractive", "-NoProfile", "-Command", WINDOWS_CLIPBOARD_SCRIPT],
+    }];
+  }
   if (platform === "darwin") return [{ command: "pbcopy", args: [] }];
   return [
     { command: "wl-copy", args: [] },

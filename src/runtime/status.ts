@@ -6,6 +6,9 @@ import { loadProjectContext } from "../context/projectContext.js";
 import { summarizeExecutionSet } from "./executionSummary.js";
 import { buildRuntimeScene } from "./scene.js";
 import type { SessionRecord } from "../types.js";
+import type { RuntimeConfig } from "../types.js";
+import { readEnabledExtensionIds } from "../config/extensions.js";
+import { SessionEventStore, type SessionEventRecord } from "../session/events.js";
 import type {
   ObservabilityEventRecord,
 } from "../observability/schema.js";
@@ -28,7 +31,7 @@ const DEFAULT_RECENT_LIMIT = 10;
 export async function buildRuntimeStatus(
   rootDir: string,
   locale: KittyLocale = DEFAULT_LOCALE,
-  scope: { ownerSessionId?: string } = {},
+  scope: { ownerSessionId?: string; config?: RuntimeConfig } = {},
 ): Promise<RuntimeStatus> {
   const paths = getProjectStatePaths(rootDir);
   const durable = readRuntimeLedgerSnapshot(paths.rootDir, scope.ownerSessionId);
@@ -39,6 +42,9 @@ export async function buildRuntimeStatus(
   ]);
 
   const sessions = durable.sessions.map(summarizeSession);
+  const sessionEvents = durable.sessions[0]
+    ? await new SessionEventStore(paths.eventsDir).list(durable.sessions[0].id, DEFAULT_RECENT_LIMIT)
+    : [];
   const modelRequests = durable.events
     .filter((record) => record.event === "model.request" && record.status === "completed")
     .slice(0, DEFAULT_RECENT_LIMIT)
@@ -51,6 +57,7 @@ export async function buildRuntimeStatus(
   const statusWithoutScene = {
     rootDir: paths.rootDir,
     stateDir: paths.kittyDir,
+    config: scope.config ? summarizeConfig(scope.config) : undefined,
     sessions: {
       total: sessions.length,
       latest: sessions[0],
@@ -58,6 +65,9 @@ export async function buildRuntimeStatus(
       skipped: 0,
     },
     skills: summarizeSkills(projectContext.skills),
+    events: {
+      recent: sessionEvents.slice().reverse().map(summarizeSessionEvent),
+    },
     projectMap: summarizeProjectMap(projectMap),
     modelRequests: {
       recent: modelRequests,
@@ -122,6 +132,30 @@ function summarizeSession(session: SessionRecord): RuntimeSessionSummary {
         reason: file.reason,
       })),
     } : undefined,
+  };
+}
+
+function summarizeConfig(config: RuntimeConfig): NonNullable<RuntimeStatus["config"]> {
+  return {
+    provider: config.provider,
+    model: config.model,
+    baseUrl: config.baseUrl,
+    profile: config.profile,
+    thinking: config.thinking,
+    reasoningEffort: config.reasoningEffort,
+    showReasoning: config.showReasoning,
+    enabledExtensions: readEnabledExtensionIds(config),
+  };
+}
+
+function summarizeSessionEvent(event: SessionEventRecord): RuntimeStatus["events"]["recent"][number] {
+  return {
+    type: event.type,
+    createdAt: event.createdAt,
+    host: event.host,
+    message: event.message,
+    toolName: typeof event.details?.toolName === "string" ? event.details.toolName : undefined,
+    error: typeof event.details?.error === "string" ? event.details.error : undefined,
   };
 }
 
@@ -228,6 +262,7 @@ function summarizeSkills(skills: Awaited<ReturnType<typeof loadProjectContext>>[
   return {
     total: summaries.length,
     ready: summaries.filter((skill) => skill.status === "ready").length,
+    items: summaries,
     needsAttention: summaries.filter((skill) => skill.status !== "ready"),
   };
 }

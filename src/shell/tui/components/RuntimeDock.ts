@@ -3,7 +3,10 @@ import { TUI_COLORS } from "../theme.js";
 import { TUI_DOCK_ROWS } from "../layout.js";
 import type { InkRuntime } from "./kit.js";
 import { formatElapsedCompact, type TuiActivity, type TuiActivitySeverity } from "../activity.js";
-import { TUI_SPINNER_FRAMES, useTuiAnimationFrame } from "../animation.js";
+import {
+  TUI_SPINNER_FRAMES,
+  useTuiAnimationFrame,
+} from "../animation.js";
 import { DEFAULT_LOCALE, translate, type KittyLocale } from "../../../i18n/index.js";
 
 export function createRuntimeDockComponent(kit: Pick<InkRuntime, "React" | "Box" | "Text">) {
@@ -88,7 +91,7 @@ function renderActivityRow(
     return React.createElement(
       Box,
       { flexDirection: "row", flexGrow: 1, flexShrink: 1, height: 1, overflowX: "hidden" },
-      React.createElement(Text, { color }, readActivityMarker(activity, animation)),
+      React.createElement(Text, { color: TUI_COLORS.accentGold }, readActivityMarker(activity, animation)),
       React.createElement(Text, { color: TUI_COLORS.muted }, translate(locale, "tui.running")),
     );
   }

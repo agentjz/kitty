@@ -13,7 +13,7 @@ export interface TuiCommandMenuWindow {
 
 export function filterTuiCommandMenu(query: string, locale: KittyLocale = DEFAULT_LOCALE): TuiCommandMenuItem[] {
   const normalizedQuery = normalizeQuery(query);
-  return listSlashCommands(locale)
+  return listSlashCommands("tui", locale)
     .map((command, definitionIndex) => ({
       ...command,
       definitionIndex,

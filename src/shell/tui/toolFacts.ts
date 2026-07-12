@@ -20,7 +20,6 @@ export interface TuiToolResultFact {
   readonly transcript?: {
     readonly role: TuiTranscriptRole;
     readonly text: string;
-    readonly details?: string;
     readonly planItems?: readonly ToolPlanItem[];
   };
 }
@@ -107,7 +106,7 @@ function projectToolTranscript(
       return {
         role: "change",
         text: [
-          `● ${translate(locale, presentation.action === "created" ? "tui.tool.created" : "tui.tool.updated")} ${presentation.path}`,
+          `${translate(locale, presentation.action === "created" ? "tui.tool.created" : "tui.tool.updated")} ${presentation.path}`,
           `  +${presentation.addedLines} -${presentation.removedLines}`,
           ...presentation.diffLines.map((line) => `  ${line}`),
         ].join("\n"),
@@ -118,8 +117,7 @@ function projectToolTranscript(
         : "";
       return {
         role: "tool",
-        text: `● ${translate(locale, "tui.tool.read")} ${presentation.path}${range}${presentation.content ? ` · ${translate(locale, "tui.tool.expand")}` : ""}`,
-        details: presentation.content,
+        text: `${translate(locale, "tui.tool.read")} ${presentation.path}${range}`,
       };
     }
     case "command": {
@@ -129,14 +127,13 @@ function projectToolTranscript(
       ].filter(Boolean).join(" · ");
       return {
         role: "tool",
-        text: `● ${translate(locale, "tui.tool.ran")} ${presentation.command}${facts ? ` · ${facts}` : ""}${presentation.output ? ` · ${translate(locale, "tui.tool.expand")}` : ""}`,
-        details: presentation.output,
+        text: `${translate(locale, "tui.tool.ran")} ${presentation.command}${facts ? ` · ${facts}` : ""}`,
       };
     }
     case "plan":
       return {
         role: "plan",
-        text: `● ${translate(locale, "tui.tool.updatedPlan")} · ${presentation.completed}/${presentation.items.length}`,
+        text: `${translate(locale, "tui.tool.updatedPlan")} · ${presentation.completed}/${presentation.items.length}`,
         planItems: presentation.items,
       };
     case "none":

@@ -89,7 +89,7 @@ function buildEndpoint(baseUrl: string, path: string): string {
     return new URL(path, ensureTrailingSlash(baseUrl)).toString();
   } catch {
     throw new Error(
-      `User-fixable error: \`KITTY_BASE_URL\` is not a valid URL: ${baseUrl}. Fix it and rerun \`kitty doctor\`.`,
+      `User-fixable error: \`KITTY_BASE_URL\` is not a valid URL: ${baseUrl}. Fix it in \`.kitty/.env\` and start Kitty again.`,
     );
   }
 }

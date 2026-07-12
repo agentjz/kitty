@@ -1,6 +1,6 @@
-import type { RuntimeStatus } from "../../runtime/status.js";
-import { truncateCliValue } from "../cliValues.js";
-import { DEFAULT_LOCALE, translate, type KittyLocale, type MessageKey } from "../../i18n/index.js";
+import type { RuntimeStatus } from "../runtime/status.js";
+import { DEFAULT_LOCALE, translate, type KittyLocale, type MessageKey } from "../i18n/index.js";
+import { truncate } from "./previewPolicy.js";
 
 export function formatRuntimeStatusText(
   status: RuntimeStatus,
@@ -10,6 +10,18 @@ export function formatRuntimeStatusText(
 
   lines.push(`${translate(locale, "status.project")}: ${status.rootDir}`);
   lines.push(`${translate(locale, "status.state")}: ${status.stateDir}`);
+
+  if (status.config) {
+    lines.push("");
+    lines.push(`${translate(locale, "status.configuration")}:`);
+    lines.push(`- ${translate(locale, "preflight.provider")}: ${status.config.provider}`);
+    lines.push(`- ${translate(locale, "preflight.model")}: ${status.config.model}`);
+    lines.push(`- ${translate(locale, "preflight.baseUrl")}: ${status.config.baseUrl}`);
+    lines.push(`- ${translate(locale, "preflight.providerProfile")}: ${status.config.profile}`);
+    lines.push(`- ${translate(locale, "status.thinking")}: ${status.config.thinking ?? translate(locale, "common.none")}`);
+    lines.push(`- ${translate(locale, "status.reasoningEffort")}: ${status.config.reasoningEffort ?? translate(locale, "common.none")}`);
+    lines.push(`- ${translate(locale, "status.extensions")}: ${status.config.enabledExtensions.join(", ") || translate(locale, "common.none")}`);
+  }
   lines.push("");
   lines.push(`${translate(locale, "status.currentScene")}:`);
   lines.push(`- ${translate(locale, "status.now")}: ${status.scene.headline}`);
@@ -159,7 +171,7 @@ export function formatRuntimeStatusText(
         output.savingsRatio === undefined ? undefined : formatFact(locale, "status.label.savedRatio", `${Math.round(output.savingsRatio * 100)}%`),
         output.truncated ? formatFact(locale, "status.label.recoverable", translate(locale, "common.yes")) : undefined,
         output.degraded ? formatFact(locale, "status.label.degraded", translate(locale, "common.yes")) : undefined,
-        output.outputPath ? formatFact(locale, "status.label.fullOutput", truncateCliValue(output.outputPath, 80)) : undefined,
+        output.outputPath ? formatFact(locale, "status.label.fullOutput", truncate(output.outputPath, 80)) : undefined,
       ].filter(Boolean).join("  "));
     }
   }
@@ -173,7 +185,7 @@ export function formatRuntimeStatusText(
         execution.kind,
         execution.status,
         formatFact(locale, "status.label.risk", execution.risk),
-        formatFact(locale, "status.label.summary", truncateCliValue(execution.summary, 80)),
+        formatFact(locale, "status.label.summary", truncate(execution.summary, 80)),
         formatFact(locale, "status.label.next", execution.nextAction),
       ].filter(Boolean).join("  "));
       if (execution.lastOutput) {
@@ -190,18 +202,33 @@ export function formatRuntimeStatusText(
         execution.id,
         execution.kind,
         execution.status,
-        execution.summary ? truncateCliValue(execution.summary, 80) : undefined,
+        execution.summary ? truncate(execution.summary, 80) : undefined,
       ].filter(Boolean).join("  "));
     }
   }
 
-  if (status.skills.needsAttention.length > 0) {
+  if (status.events.recent.length > 0) {
     lines.push("");
-    lines.push(`${translate(locale, "status.skillsAttention")}:`);
-    for (const skill of status.skills.needsAttention) {
+    lines.push(`${translate(locale, "status.recentEvents")}:`);
+    for (const event of status.events.recent) {
+      lines.push([
+        event.createdAt,
+        event.type,
+        event.host ? formatFact(locale, "status.label.host", event.host) : undefined,
+        event.toolName ? formatFact(locale, "status.label.lastTool", event.toolName) : undefined,
+        event.message ? formatFact(locale, "status.label.message", truncate(event.message, 80)) : undefined,
+        event.error ? formatFact(locale, "status.label.error", truncate(event.error, 80)) : undefined,
+      ].filter(Boolean).join("  "));
+    }
+  }
+
+  if (status.skills.items.length > 0) {
+    lines.push("");
+    lines.push(`${translate(locale, "status.skills")}:`);
+    for (const skill of status.skills.items) {
       lines.push([
         skill.name,
-        skill.path,
+        formatFact(locale, "status.label.state", skill.status),
         formatFact(locale, "status.label.resources", skill.resources),
         formatFact(locale, "status.label.dependencies", skill.dependencies),
         skill.issues.length > 0 ? formatFact(locale, "status.label.issues", skill.issues.join("; ")) : undefined,

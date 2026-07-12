@@ -17,7 +17,6 @@ export interface ProjectStatePaths {
   sessionsDir: string;
   changesDir: string;
   eventsDir: string;
-  exportsDir: string;
   extensionsDir: string;
   controlPlaneLedgerFile: string;
   observabilityDir: string;
@@ -37,7 +36,6 @@ export function getProjectStatePaths(rootDir: string): ProjectStatePaths {
     sessionsDir: path.join(kittyDir, "sessions"),
     changesDir: path.join(kittyDir, "changes"),
     eventsDir: path.join(kittyDir, "events"),
-    exportsDir: path.join(kittyDir, "exports"),
     extensionsDir,
     controlPlaneLedgerFile: path.join(kittyDir, "control-plane.sqlite"),
     observabilityDir,
@@ -53,7 +51,6 @@ export async function ensureProjectStateDirectories(rootDir: string): Promise<Pr
   await fs.mkdir(paths.sessionsDir, { recursive: true });
   await fs.mkdir(paths.changesDir, { recursive: true });
   await fs.mkdir(paths.eventsDir, { recursive: true });
-  await fs.mkdir(paths.exportsDir, { recursive: true });
   await fs.mkdir(paths.observabilityEventsDir, { recursive: true });
   await fs.mkdir(paths.observabilityCrashesDir, { recursive: true });
   return paths;

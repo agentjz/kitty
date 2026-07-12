@@ -38,8 +38,6 @@ export type ConfigPreflightNextStep =
   | "run_init"
   | "fill_missing"
   | "set_api_key"
-  | "rerun_doctor"
-  | "verify_provider"
   | "start_kitty"
   | "review_env";
 
@@ -131,15 +129,15 @@ function buildPreflightNextSteps(input: {
     return ["run_init"];
   }
   if (input.missingKeys.length > 0) {
-    return ["fill_missing", "rerun_doctor"];
+    return ["fill_missing", "start_kitty"];
   }
   if (!input.apiKeyPresent) {
-    return ["set_api_key", "rerun_doctor"];
+    return ["set_api_key", "start_kitty"];
   }
   if (input.ready) {
-    return ["verify_provider", "start_kitty"];
+    return ["start_kitty"];
   }
-  return ["review_env", "rerun_doctor"];
+  return ["review_env"];
 }
 
 function readExpectedEnvKeys(): string[] {
@@ -221,8 +219,6 @@ function formatPreflightNextStep(step: ConfigPreflightNextStep, locale: KittyLoc
     run_init: "preflight.runInit",
     fill_missing: "preflight.fillMissing",
     set_api_key: "preflight.setApiKey",
-    rerun_doctor: "preflight.rerunDoctor",
-    verify_provider: "preflight.verifyProvider",
     start_kitty: "preflight.startKitty",
     review_env: "preflight.reviewEnv",
   } as const;

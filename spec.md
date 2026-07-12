@@ -46,7 +46,6 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 .kitty/.env
 .kitty/events/
 .kitty/changes/
-.kitty/exports/
 .kitty/extensions/
 .kitty/control-plane.sqlite
 .kitty/observability/{events,crashes,terminal}/
@@ -58,7 +57,7 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 
 ### 职责
 
-- `src/config/`：读取 `.kitty/.env`、校验运行配置、创建模板、执行配置诊断。
+- `src/config/`：读取 `.kitty/.env`、校验运行配置、创建模板、执行配置预检。
 - `src/provider/catalog.ts`：定义 provider 与 model 的固有事实。
 - `src/project/`：构建项目地图并管理 `.kitty` 路径。
 - `src/context/projectContext.ts`：为 turn 加载项目事实和运行时 skill 清单。
@@ -82,7 +81,7 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 
 默认 provider profile 是 Agnes AI。当前具名 provider profile 还包括 NVIDIA NIM、Groq、Cerebras、Gemini、DeepSeek、OpenAI、YLS 和 TTAPI。`openai-compatible` 仅用于用户明确配置的高级兼容 endpoint；它不是任何具名 provider 的别名。
 
-`kitty init` 创建项目状态模板。`kitty doctor` 展示配置和 provider 连接事实。
+`kitty init` 创建项目状态模板。`kitty status` 展示无密钥运行配置、session、execution、event 与 skill 事实。
 
 ## 4. Agent 与 Host Turn
 
@@ -94,7 +93,7 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 
 本地命令名称、别名、分类、说明和解析只由 `src/interaction/localCommandDefinitions.ts` 持有。CLI/TUI 等壳可以采用不同呈现，但必须把规范输入交回 `InteractiveSessionDriver`；壳不能直接调用命令 handler 或维护第二张命令表。
 
-`/copy` 把当前 session 的外部 user 消息、assistant reasoning 和 assistant reply 按顺序导出到 `.kitty/exports/conversation-<sessionId>.md`，聊天区只显示导出路径。Tool、system 和 internal user fact 不进入面向用户的对话文件。
+`/export` 把当前 session 的外部 user 消息、assistant reasoning 和 assistant reply 按顺序导出到 Kitty 当前运行根目录的 `conversation-<sessionId>.md`，聊天区只显示导出路径。Tool、system 和 internal user fact 不进入面向用户的对话文件。
 
 ### Turn 行为
 
@@ -277,7 +276,7 @@ Terminal log 使用 UTF-8，记录可读的用户输入、reasoning、assistant 
 - `src/host/localApi.ts`：本地 session/message/event/status API。
 - `src/telegram/`：Telegram polling host。
 
-`kitty`、`kitty tui`、`kitty agent`、Telegram 和本地 API 都进入同一条 host/agent turn 主链路。`status`、`events`、`background`、`doctor`、`eval` 等 CLI 命令暴露已存事实，不能创建平行生命周期语义。
+`kitty` TUI、`kitty run`、`kitty resume`、Telegram 和本地 API 都进入同一条 host/agent turn 主链路。`status` 与 `background` CLI 命令只暴露已存事实，不能创建平行生命周期语义。Evaluation harness 是开发脚本，不属于公共 CLI。
 
 Telegram service 使用 SQLite service lease 的 token、generation 与 heartbeat 保证单 owner；lease 丢失立即停止 service。Update ID 进入 durable inbox，并与唯一 turn ID 绑定。回复进入 durable outbox，状态为 queued、sending、sent 或 uncertain；远端调用后无法确认本地提交时不得自动盲重试。
 
@@ -298,15 +297,16 @@ TUI 规则：
 - 命令、历史和帮助共享一个判别式 overlay 状态；同一时刻只能有一个顶层交互，响应式行预算不能覆盖 composer、dock 或 transcript。
 - Transcript 滚动状态只能是 `follow` 或 `detached`。Detached 状态保存稳定 row anchor 和 unseen row count；流式追加、工具状态更新与 resize 不能把阅读位置拉回底部。
 - Input gateway 使用有状态 UTF-8 decoder 保留跨 chunk 的中文与 IME 提交，并对跨 chunk 的 SGR/X10 mouse press、drag、release 和 wheel 做完整 framing；鼠标序列不得进入 composer 键盘流。stdin EOF、close 或错误必须幂等关闭 controller 输入，让 active turn 进入 recoverable detach，并由 session driver 终止当前 root session tree 的进程。Selection 使用渲染 row ID 与字符列，支持宽字符、跨行选择、边缘自动滚动和字符级高亮。
-- 有 selection 时 `Ctrl+C` 复制，不触发 turn interrupt；无 selection 时才中断。Esc 清除 selection。Clipboard 优先使用平台 native provider，失败后在 TTY 使用 OSC52；复制失败必须保留 selection 并显示错误。
-- Session picker、TUI chrome、CLI/doctor/status/runtime UI、command/help、interaction 与 Telegram 提示读取 runtime locale 的 typed catalog。简体中文、英文、日文、韩文四份 catalog 必须拥有完全一致的 key 与占位符集合，运行时不做语言 fallback。Locale 不能进入 prompt、session message、tool evidence 或 control-plane 状态；命令名、路径、provider/model、机器 JSON 和模型回复保持原文。
-- Welcome 品牌版本直接读取发布包版本；作者建议由 typed locale catalog 提供。窄终端可以隐藏建议，但不得挤压 session choice 或 composer。
+- 有 selection 时 `Ctrl+C` 复制，不触发 turn interrupt；无 selection 时才中断。Esc 清除 selection。Clipboard 优先使用平台 native provider，失败后在 TTY 使用 OSC52；复制失败必须保留 selection 并显示错误。Windows native provider 必须通过 PowerShell 显式把 stdin 设为 UTF-8 后写入 Unicode clipboard，不得把 UTF-8 字节交给按本地代码页解码的 `clip.exe`。
+- Session picker、TUI chrome、CLI/status/runtime UI、command/help、interaction 与 Telegram 提示读取 runtime locale 的 typed catalog。简体中文、英文、日文、韩文四份 catalog 必须拥有完全一致的 key 与占位符集合，运行时不做语言 fallback。Locale 不能进入 prompt、session message、tool evidence 或 control-plane 状态；命令名、路径、provider/model、机器 JSON 和模型回复保持原文。
+- Welcome 品牌版本直接读取发布包版本；标识上方只显示版本，不显示项目地址或额外入口。Kitty 文本标识与一行 `猫咪：尽情地探索并享受吧！` 组成独立品牌身份，正文由 typed locale catalog 提供。版本行不参与标识居中；窄终端可以隐藏签名，但不得挤压 session choice 或 composer。
+- Session picker 从 TUI composition root 显式接收当前 runtime config 的 model，只在底部控制行左侧显示 typed 模型标签与模型名，右侧保留选择/打开/退出控制。Picker 不读取配置、不推断模型，也不把显示事实写回 session 或 runtime。
 
-- Transcript 的 user、assistant、reasoning、system、tool、change、plan 使用同一个正文框架。Role 可以改变 gutter、颜色和强调，但不能改变正文起始列；user、tool、change 与 plan 不绘制仿 OpenCode 的左侧竖线。
+- Transcript 的 user、assistant、reasoning、system、tool、change、plan 使用同一个正文框架。Role 可以改变颜色和强调，但不能改变正文起始列；user、reasoning、tool、change 与 plan 不绘制装饰性左侧竖线。Composer 只使用 panel padding 作为左边界，不绘制输入竖线。
 - Assistant Markdown 以 `marked` GFM AST 为语法事实，并在当前正文宽度重新投影；嵌套/任务列表必须保留层级，宽表格降级为 key/value records，确认含表格的 `md` / `markdown` fence 才展开。Resize 必须从原始 source 重排，不能缓存旧换行。
-- `runtime-ui/toolPresentation.ts` 把核心工具调用和结果规范化为宿主无关的 typed presentation facts。CLI、TUI、Telegram 和 Local API 只消费这些事实；壳不能重新解析工具 JSON、猜测状态或定义第二份工具语义。
+- `runtime-ui/toolPresentation.ts` 把核心工具调用和结果规范化为宿主无关的 typed presentation facts。CLI、TUI、Telegram 和 Local API 只消费这些事实；壳不能重新解析工具 JSON、猜测状态或定义第二份工具语义。Agent、provider、host、session、execution、tools 与共享 runtime/presentation 模块不得 import TUI/CLI/Telegram adapter；依赖只能从 composition root 和壳指向端口与运行事实。
 - `write` / `edit` 成功后，共享投影从工具结果的 path 与标准 unified diff hunk 生成 change fact；所有 hunk 都保留，未修改的文件区段不进入该事实。TUI 仅为新增、删除和上下文行添加样式，不做第二次隐式裁剪；上游若限制证据，必须携带显式 truncation/artifact recovery。不得从未完成的流式参数推断变更结果。
-- `read` / `bash` 完成后展示紧凑工具摘要；存在详情时显示 `Ctrl+O`，由用户显式展开或收起最近详情。折叠只改变 projection，不能删除原始工具结果或改变 detached scroll anchor/unseen count。
+- `read` / `bash` 完成后只展示紧凑工具摘要。TUI 不保存第二份详情、没有工具全文展开状态，也不监听工具展开快捷键；原始工具结果继续由 session/evidence 事实保存。`write` / `edit` 的 typed change fact 和所有相关 diff hunk 不受此规则影响。
 - `todo_write` 完成后直接消费共享 fact 中的 typed items，显示计划完成数与 pending / in_progress / completed 层级；完成项使用删除线。TUI 不解析 `preview` 文本推断计划状态。
 - Footer 的 model 标签与 Runtime Dock 的 activity/background 标签使用同一个左侧内容 inset。
 - Model metadata 位于 composer 下方左侧；context budget 位于右侧。Footer 不显示分隔点、斜杠命令或命令面板教学。

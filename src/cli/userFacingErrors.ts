@@ -21,14 +21,14 @@ export function formatCliSetupError(
       return [
         translate(locale, "cli.setup.apiKeyMissing"),
         translate(locale, "cli.setup.setApiKey", { path: envFile }),
-        translate(locale, "cli.setup.thenDoctor"),
+        translate(locale, "cli.setup.thenRestart"),
       ].join("\n");
     }
     return [
       translate(locale, "cli.setup.projectNotReady"),
       translate(locale, "cli.setup.createTemplate"),
       translate(locale, "cli.setup.configFile", { path: envFile }),
-      translate(locale, "cli.setup.fillAndDoctor"),
+      translate(locale, "cli.setup.fillAndStart"),
       translate(locale, "cli.setup.originalError", { error: message }),
     ].join("\n");
   }

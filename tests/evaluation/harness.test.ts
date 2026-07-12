@@ -1,10 +1,6 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import test from "node:test";
 
-import { buildCliProgram } from "../../src/cli/program.js";
 import {
   listEvaluationChecks,
   listEvaluationScenarios,
@@ -79,49 +75,4 @@ test("evaluation harness runs local machine-verifiable checks", async (t) => {
   assert.ok(result.checks.some((check) => check.id === "background-lifecycle-ready"));
   assert.ok(result.checks.some((check) => check.id === "remote-entrypoints-available"));
   assert.ok(result.checks.some((check) => check.id === "recovery-drills-pass"));
-});
-
-test("eval command can run local checks", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "kitty-eval-run-"));
-  const program = buildCliProgram();
-
-  program.exitOverride();
-  await program.parseAsync(["-C", root, "eval", "--run-local"], { from: "user" });
-});
-
-test("eval command does not keep the old generic run flag", async () => {
-  const program = buildCliProgram();
-  const evalCommand = program.commands.find((command) => command.name() === "eval");
-
-  assert.ok(evalCommand);
-  assert.deepEqual(
-    evalCommand.options.map((option) => option.flags),
-    [
-      "--json",
-      "--run-local",
-      "--run-production",
-    ],
-  );
-});
-
-test("eval command exits non-zero when explicit production acceptance fails", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "kitty-eval-failing-production-"));
-  fs.mkdirSync(path.join(root, ".kitty"), { recursive: true });
-  const previousExitCode = process.exitCode;
-  const program = buildCliProgram();
-
-  program.exitOverride();
-  try {
-    await program.parseAsync(["-C", root, "eval", "--run-production"], { from: "user" });
-    assert.equal(process.exitCode, 1);
-  } finally {
-    process.exitCode = previousExitCode;
-  }
-});
-
-test("eval command lists scenarios without running provider checks", async () => {
-  const program = buildCliProgram();
-
-  program.exitOverride();
-  await program.parseAsync(["eval", "--json"], { from: "user" });
 });

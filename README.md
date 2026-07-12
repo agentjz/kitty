@@ -27,7 +27,7 @@ Kitty 是一个智能体。它用一套可直接运行的实现，展示 Agent �
 安装 Kitty：
 
 ```bash
-npm install -g @jun133/kitty
+npm install -g @jun133/kitty@latest
 ```
 
 进入你想让 Kitty 工作的项目目录，然后初始化：
@@ -36,13 +36,7 @@ npm install -g @jun133/kitty
 kitty init
 ```
 
-打开 `.kitty/.env`，填入 provider 的 API key，再检查配置：
-
-```bash
-kitty doctor
-```
-
-启动 Kitty：
+打开 `.kitty/.env`，填入 provider 的 API key，再启动 Kitty：
 
 ```bash
 kitty
@@ -59,7 +53,7 @@ Kitty 默认进入 TUI。它会先显示最近会话：继续已有会话，或�
 交给 Kitty 一个真实目标：
 
 ```bash
-kitty "用 Spring Boot 3、MySQL、Redis 和 Vue 3 做一个考试管理平台，包含题库、试卷、考试发布、在线作答和成绩归档"
+kitty run "用 Spring Boot 3、MySQL、Redis 和 Vue 3 做一个考试管理平台，包含题库、试卷、考试发布、在线作答和成绩归档"
 ```
 
 这类任务会触发 Kitty 的完整工作方式：先调查当前资料和事实，再判断边界、调用工具、运行验证，并把现场留给下一轮继续。
@@ -70,12 +64,13 @@ kitty "用 Spring Boot 3、MySQL、Redis 和 Vue 3 做一个考试管理平台�
 | --- | --- |
 | `kitty` | 启动 Kitty TUI |
 | `kitty init` | 初始化当前项目 |
-| `kitty doctor` | 检查配置和 provider 连接 |
 | `kitty resume` | 继续最近会话 |
 | `kitty status` | 查看当前项目现场 |
-| `kitty version` | 查看版本 |
+| `kitty run <prompt>` | 在新会话中执行一次任务 |
+| `kitty background` | 查看或控制后台执行 |
+| `kitty --version` | 查看版本 |
 
-其他命令不用背。运行 `kitty --help`，或在 TUI 输入 `/` 自己探索。
+其他命令不用背。运行 `kitty --help`，或在 TUI 输入 `/` 查看 `/status`、`/export` 和 `/exit`。
 
 ## ⚙️ 配置
 

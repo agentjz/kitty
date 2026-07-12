@@ -195,7 +195,7 @@ function readRoleFrameBase(role: TuiTranscriptRole): Omit<TuiTranscriptLineFrame
     case "reasoning":
       return {
         ...TRANSCRIPT_CONTENT_FRAME,
-        gutter: "┃",
+        gutter: " ",
       };
     case "system":
       return {

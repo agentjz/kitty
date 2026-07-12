@@ -55,7 +55,7 @@ export function createCommandMenuComponent(kit: Pick<InkRuntime, "React" | "Box"
           React.createElement(
             Text,
             { color: TUI_COLORS.muted, wrap: "truncate-end" },
-            `${command.description}${command.requiresConfirmation ? ` · ${translate(props.locale, "command.confirmation.required")}` : ""}`,
+            command.description,
           ),
         );
       })),

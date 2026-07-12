@@ -6,8 +6,8 @@ import { TUI_COMPOSER_MAX_ROWS, normalizeComposerRows } from "./layout.js";
 const INK_TEXT_BASELINE_OFFSET_ROWS = 1;
 
 export const COMPOSER_FRAME = {
-  gap: 2,
-  gutter: "┃",
+  gap: 0,
+  gutter: "",
   paddingX: 2,
   paddingY: 1,
   tabWidth: 2,

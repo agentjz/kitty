@@ -82,7 +82,7 @@ export class TuiTranscriptProjection {
     const normalizedWidth = Math.max(1, Math.floor(width));
     const key = `${entry.id}\0${normalizedWidth}`;
     const planSignature = entry.planItems?.map((item) => `${item.id}:${item.status}:${item.text}`).join("\0") ?? "";
-    const signature = `${entry.role}\0${entry.text}\0${entry.details ?? ""}\0${entry.expanded ? "1" : "0"}\0${planSignature}`;
+    const signature = `${entry.role}\0${entry.text}\0${planSignature}`;
     const cached = this.cache.get(key);
     if (cached?.signature === signature) {
       return cached.rows;

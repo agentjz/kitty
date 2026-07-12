@@ -12,7 +12,7 @@ import type { RegisteredTool, ToolFilter } from "../tools/core/types.js";
 import type { RuntimeConfig, SessionRecord } from "../types.js";
 import { defaultInteractiveExitGuard, type InteractiveExitGuard } from "./exitGuard.js";
 import { handleLocalCommand, type LocalCommandResult } from "./localCommands.js";
-import { getLocalCommandDefinition, normalizeLocalCommand } from "./localCommandDefinitions.js";
+import { normalizeLocalCommand } from "./localCommandDefinitions.js";
 import type { InteractionShell } from "./shell.js";
 import { ControlPlaneLedger } from "../control/ledger.js";
 import { translate, type MessageKey } from "../i18n/index.js";
@@ -102,20 +102,6 @@ export class InteractiveSessionDriver {
     if (!this.options.localCommandHandler && command === undefined) {
       this.submitAgentInput(input);
       return "continue";
-    }
-
-    if (command) {
-      const confirmation = getLocalCommandDefinition(command, this.options.config.locale).confirmation;
-      if (confirmation) {
-        this.options.shell.output.warn(confirmation.prompt);
-        const response = await this.options.shell.input.readInput(confirmation.prompt);
-        if (response.kind === "closed") return "quit";
-        if (response.value.trim().toLowerCase() !== confirmation.acceptedInput) {
-          this.options.shell.output.info(confirmation.cancelledText);
-          return "handled";
-        }
-      }
-      if (command === "reset") await this.closeBounded();
     }
 
     let localCommandResult: LocalCommandResult;

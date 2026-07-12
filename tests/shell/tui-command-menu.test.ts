@@ -15,14 +15,14 @@ test("tui command menu projects the shared slash command registry", () => {
   const menu = filterTuiCommandMenu("");
   assert.deepEqual(
     menu.map(({ definitionIndex: _definitionIndex, ...command }) => command),
-    listSlashCommands(),
+    listSlashCommands("tui"),
   );
 });
 
 test("tui command menu ranks canonical prefix before aliases and descriptions", () => {
   assert.equal(filterTuiCommandMenu("sta")[0]?.name, "/status");
-  assert.equal(filterTuiCommandMenu("res")[0]?.name, "/reset");
-  assert.equal(filterTuiCommandMenu("会话事件")[0]?.name, "/events");
+  assert.equal(filterTuiCommandMenu("exp")[0]?.name, "/export");
+  assert.equal(filterTuiCommandMenu("导出")[0]?.name, "/export");
   assert.equal(filterTuiCommandMenu("sts")[0]?.name, "/status");
   assert.deepEqual(filterTuiCommandMenu("does-not-exist"), []);
 });
@@ -39,7 +39,7 @@ test("tui command menu selection wraps and keeps selected rows visible", () => {
   assert.equal(moveTuiCommandSelection(3, 2, 1), 0);
   const commands = filterTuiCommandMenu("");
   const window = windowTuiCommandMenu(commands, 9, 4);
-  assert.equal(window.items.length, 4);
+  assert.equal(window.items.length, commands.length);
   assert.ok(window.startIndex <= window.selectedIndex);
   assert.ok(window.selectedIndex < window.startIndex + window.items.length);
 });

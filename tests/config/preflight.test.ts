@@ -18,6 +18,7 @@ test("config preflight reports missing project files without loading runtime", a
   assert.equal(report.files.some((file) => file.path.endsWith(`${PROJECT_STATE_DIR_NAME}`) && !file.exists), true);
   assert.equal(report.env.missingKeys.includes(KITTY_ENV.apiKey), true);
   assert.equal(report.env.apiKeyPresent, false);
+  assert.deepEqual(report.nextSteps, ["run_init"]);
 });
 
 test("config preflight reports current env contract and provider preset", async (t) => {
@@ -34,4 +35,5 @@ test("config preflight reports current env contract and provider preset", async 
   assert.equal(report.env.missingKeys.length, 0);
   assert.equal(report.env.apiKeyPresent, true);
   assert.equal(report.env.providerPreset, getDefaultProviderPreset().label);
+  assert.deepEqual(report.nextSteps, ["start_kitty"]);
 });

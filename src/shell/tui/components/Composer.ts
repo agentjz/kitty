@@ -85,10 +85,6 @@ export function createComposerComponent(kit: Pick<InkRuntime, "React" | "Box" | 
         props.redraw();
         return;
       }
-      if (key.ctrl && input.toLowerCase() === "o") {
-        props.controller.toggleLatestToolDetails();
-        return;
-      }
       if (key.ctrl && input.toLowerCase() === "g") {
         void props.controller.editComposerExternally(async (value) => {
           const resumeInput = props.suspendInput();
@@ -115,7 +111,9 @@ export function createComposerComponent(kit: Pick<InkRuntime, "React" | "Box" | 
         minHeight: 3,
         width: "100%",
       },
-      React.createElement(Text, { color: TUI_COLORS.user, wrap: "truncate-end" }, COMPOSER_FRAME.gutter),
+      COMPOSER_FRAME.gutter
+        ? React.createElement(Text, { color: TUI_COLORS.user, wrap: "truncate-end" }, COMPOSER_FRAME.gutter)
+        : null,
       React.createElement(
         Box,
         {

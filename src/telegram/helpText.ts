@@ -4,8 +4,7 @@ export function formatTelegramHelp(locale: KittyLocale): string {
   return [
     translate(locale, "telegram.help.help"),
     translate(locale, "telegram.help.stop"),
-    translate(locale, "telegram.help.session"),
-    translate(locale, "telegram.help.config"),
+    translate(locale, "telegram.help.status"),
     "",
     translate(locale, "telegram.help.files"),
     translate(locale, "telegram.help.sendFile"),
