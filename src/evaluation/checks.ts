@@ -13,6 +13,14 @@ import {
   runRecoveryDrillsCheck,
   runRemoteEntrypointsCheck,
 } from "./hostAndRecoveryChecks.js";
+import { prepareCheckWorkspace } from "./workspace.js";
+
+const EVAL_EXECUTION_OWNER = {
+  ownerSessionId: "eval-session",
+  createdBySessionId: "eval-session",
+  parentTurnId: "eval-turn",
+  originToolCallId: "eval-tool-call",
+} as const;
 
 export {
   EVALUATION_SCENARIOS,
@@ -26,7 +34,8 @@ export async function runEvaluationCheck(id: EvaluationCheckId, rootDir: string)
     switch (id) {
       case "runtime-status-builds": {
         const { buildRuntimeStatus } = await import("../runtime/status.js");
-        const status = await buildRuntimeStatus(rootDir);
+        const workspace = await prepareCheckWorkspace(rootDir, "runtime-status");
+        const status = await buildRuntimeStatus(workspace);
         return passed(id, `runtime status ready: sessions=${status.sessions.total}, executions=${status.executions.total}`);
       }
       case "project-map-builds": {
@@ -36,7 +45,8 @@ export async function runEvaluationCheck(id: EvaluationCheckId, rootDir: string)
       }
       case "context-epochs-readable": {
         const { ControlPlaneLedger } = await import("../control/ledger.js");
-        const ledger = new ControlPlaneLedger(rootDir);
+        const workspace = await prepareCheckWorkspace(rootDir, "context-epochs");
+        const ledger = new ControlPlaneLedger(workspace);
         try {
           return passed(id, `context epoch ledger readable: sessions=${ledger.sessions.list(10).length}`);
         } finally {
@@ -70,11 +80,8 @@ export async function runEvaluationCheck(id: EvaluationCheckId, rootDir: string)
       case "host-turn-boundary-runs": {
         return await runHostTurnBoundaryCheck(id, rootDir);
       }
-      case "background-subagent-lifecycle-ready": {
-        return await runBackgroundSubagentLifecycleCheck(id, rootDir);
-      }
-      case "delegation-behavior-boundary-ready": {
-        return await runDelegationBehaviorBoundaryCheck(id);
+      case "background-lifecycle-ready": {
+        return await runBackgroundLifecycleCheck(id, rootDir);
       }
       case "remote-entrypoints-available": {
         return await runRemoteEntrypointsCheck(id);
@@ -93,43 +100,15 @@ export async function runEvaluationCheck(id: EvaluationCheckId, rootDir: string)
   }
 }
 
-async function runDelegationBehaviorBoundaryCheck(id: EvaluationCheckId): Promise<EvaluationCheckResult> {
-  const { EXTENSION_DEFINITIONS } = await import("../extensions/definitions.js");
-
-  const background = EXTENSION_DEFINITIONS.find((definition) => definition.id === "background");
-  const subagent = EXTENSION_DEFINITIONS.find((definition) => definition.id === "subagent");
-  if (!background || !subagent) {
-    throw new Error("background/subagent extension definitions are missing");
-  }
-
-  const backgroundSurface = readExtensionSurface(background);
-  const subagentSurface = readExtensionSurface(subagent);
-
-  assertSurfaceIncludes(backgroundSurface, [
-    "long local commands",
-    "without blocking",
-    "output over time",
-  ], "background behavior surface");
-  assertSurfaceIncludes(subagentSurface, [
-    "independent context",
-    "simple direct edits",
-    "dependent tasks",
-    "shared plan",
-    "independent",
-  ], "subagent behavior surface");
-
-  return passed(id, "delegation behavior boundary ready: lead direct work, background long commands, subagent independent bounded work");
-}
-
-async function runBackgroundSubagentLifecycleCheck(id: EvaluationCheckId, rootDir: string): Promise<EvaluationCheckResult> {
+async function runBackgroundLifecycleCheck(id: EvaluationCheckId, projectRootDir: string): Promise<EvaluationCheckResult> {
+  const rootDir = await prepareCheckWorkspace(projectRootDir, "background-lifecycle");
   const { BackgroundExecutionStore } = await import("../execution/background.js");
-  const { cancelExecution } = await import("../execution/lifecycle.js");
   const { readExecutionOutput } = await import("../execution/output.js");
-  const { ExecutionStore } = await import("../execution/store.js");
   const { buildRuntimeStatus } = await import("../runtime/status.js");
 
   const backgroundStore = new BackgroundExecutionStore(rootDir);
   const background = backgroundStore.create({
+    ...EVAL_EXECUTION_OWNER,
     command: "eval background lifecycle",
     cwd: rootDir,
     requestedBy: "eval",
@@ -151,84 +130,24 @@ async function runBackgroundSubagentLifecycleCheck(id: EvaluationCheckId, rootDi
     throw new Error("background output tail was not readable");
   }
 
-  const executionStore = new ExecutionStore(rootDir);
-  const completedSubagent = executionStore.create({
-    kind: "subagent",
-    prompt: "eval subagent lifecycle",
+  const running = backgroundStore.create({
+    ...EVAL_EXECUTION_OWNER,
+    command: "eval cancellable background",
     cwd: rootDir,
-    requestedBy: "lead",
-    actorName: "eval-subagent",
-    actorRole: "explorer",
+    requestedBy: "eval",
   });
-  executionStore.close(completedSubagent.id, {
-    status: "completed",
-    resultText: "subagent-result\n",
-    summary: "subagent-result",
-  });
-  const subagentOutput = readExecutionOutput({
-    rootDir,
-    id: completedSubagent.id,
-    kind: "subagent",
-    mode: "summary",
-  });
-  if (subagentOutput.output !== "subagent-result") {
-    throw new Error("subagent summary output was not readable");
-  }
-
-  const runningSubagent = executionStore.create({
-    kind: "subagent",
-    prompt: "eval cancellable subagent",
-    cwd: rootDir,
-    requestedBy: "lead",
-  });
-  executionStore.markRunning(runningSubagent.id, { pid: process.pid });
-  const cancelled = cancelExecution(rootDir, runningSubagent.id, {
-    expectedKind: "subagent",
-    terminatedBy: "eval",
-  });
+  backgroundStore.markRunning(running.id, { pid: process.pid });
+  const cancelled = backgroundStore.close(running.id, { status: "aborted", terminatedBy: "eval" });
   if (cancelled.status !== "aborted") {
-    throw new Error("subagent cancel did not close execution as aborted");
+    throw new Error("background cancel did not close execution as aborted");
   }
 
   const status = await buildRuntimeStatus(rootDir);
   const wakeCount = status.wakeSignals.recent.filter((signal) =>
-    signal.executionId === runningSubagent.id && signal.reason === "aborted").length;
+    signal.executionId === running.id && signal.reason === "aborted").length;
   if (wakeCount === 0) {
-    throw new Error("subagent cancel wake signal was not recorded");
+    throw new Error("background cancel wake signal was not recorded");
   }
 
-  return passed(id, `background/subagent lifecycle ready: executions=${status.executions.total}, wakes=${status.wakeSignals.recent.length}`);
-}
-
-function readExtensionSurface(definition: {
-  summary: string;
-  capability: {
-    description: string;
-    bestFor: readonly string[];
-  };
-  createTools: () => readonly {
-    definition: {
-      function: {
-        description?: string;
-      };
-    };
-  }[];
-}): string {
-  const toolDescriptions = definition.createTools()
-    .map((tool) => tool.definition.function.description ?? "")
-    .join("\n");
-  return [
-    definition.summary,
-    definition.capability.description,
-    ...definition.capability.bestFor,
-    toolDescriptions,
-  ].join("\n").toLowerCase();
-}
-
-function assertSurfaceIncludes(surface: string, needles: readonly string[], label: string): void {
-  for (const needle of needles) {
-    if (!surface.includes(needle.toLowerCase())) {
-      throw new Error(`${label} does not include '${needle}'`);
-    }
-  }
+  return passed(id, `background lifecycle ready: executions=${status.executions.total}, wakes=${status.wakeSignals.recent.length}`);
 }

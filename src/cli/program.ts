@@ -8,12 +8,10 @@ import { registerConfigCommands } from "./commands/config.js";
 import { registerDoctorCommand } from "./commands/doctor.js";
 import { registerEvaluationCommand } from "./commands/evaluation.js";
 import { registerEventsCommand } from "./commands/events.js";
-import { registerExecutionCommand } from "./commands/execution.js";
 import { registerProjectCommands } from "./commands/project.js";
 import { registerAgentCommand } from "./commands/agent.js";
 import { registerBackgroundCommand } from "./commands/background.js";
 import { registerSessionCommands } from "./commands/session.js";
-import { registerWorkerCommand } from "./commands/worker.js";
 import { writeStderr, writeStdout, writeStdoutLine } from "../utils/stdio.js";
 import { registerTelegramCommands } from "../telegram/cli.js";
 import { registerTuiCommand } from "./commands/tui.js";
@@ -65,11 +63,6 @@ export function buildCliProgram(
     getCliOverrides,
     resolveRuntime,
   });
-  registerExecutionCommand(program, {
-    locale,
-    getCliOverrides,
-    resolveRuntime,
-  });
   registerSessionCommands(program, {
     locale,
     getCliOverrides,
@@ -110,11 +103,6 @@ export function buildCliProgram(
     resolveRuntime,
     createTelegramService: dependencies.createTelegramService,
     acquireProcessLock: dependencies.acquireProcessLock,
-  });
-  registerWorkerCommand(program, {
-    locale,
-    getCliOverrides,
-    resolveRuntime,
   });
   registerTuiCommand(program, {
     locale,

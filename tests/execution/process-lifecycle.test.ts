@@ -7,6 +7,25 @@ import { spawn } from "node:child_process";
 import test from "node:test";
 
 import { isProcessAlive, terminatePid } from "../../src/execution/process.js";
+import { watchProcessUntilParentExit } from "../../src/execution/parentDeathWatchdog.js";
+
+test("parent death watchdog kills a background process after abrupt host loss", async (t) => {
+  const parent = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore", windowsHide: true });
+  const target = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore", windowsHide: true });
+  assert.ok(parent.pid);
+  assert.ok(target.pid);
+  const stopWatchdog = watchProcessUntilParentExit({ parentPid: parent.pid, targetPid: target.pid });
+  t.after(() => {
+    stopWatchdog();
+    forceKillTestProcess(parent.pid);
+    forceKillTestProcess(target.pid);
+  });
+
+  process.kill(parent.pid, "SIGKILL");
+  await waitForProcessExit(parent.pid);
+  await waitForProcessExit(target.pid);
+  assert.equal(isProcessAlive(target.pid), false);
+});
 
 test("terminatePid kills a Windows process tree", { skip: process.platform !== "win32" }, async (t) => {
   const { parent, childPidPath } = await spawnProcessTree("windows");

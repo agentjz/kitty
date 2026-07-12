@@ -6,6 +6,7 @@ import {
 } from "./production.js";
 import type { EvaluationRunResult, EvaluationSuite } from "./types.js";
 import { summarizeChecks } from "./types.js";
+import { cleanupCheckWorkspaces } from "./workspace.js";
 
 export {
   listEvaluationChecks,
@@ -27,14 +28,18 @@ export async function runEvaluationChecks(
   rootDir: string,
   suite: EvaluationSuite = "local",
 ): Promise<EvaluationRunResult> {
-  if (suite === "production") {
-    return runProductionEvaluationChecks(rootDir);
-  }
+  try {
+    if (suite === "production") {
+      return await runProductionEvaluationChecks(rootDir);
+    }
 
-  const checks = await Promise.all(listEvaluationChecks().map((check) => runEvaluationCheck(check, rootDir)));
-  return {
-    suite,
-    status: summarizeChecks(checks),
-    checks,
-  };
+    const checks = await Promise.all(listEvaluationChecks().map((check) => runEvaluationCheck(check, rootDir)));
+    return {
+      suite,
+      status: summarizeChecks(checks),
+      checks,
+    };
+  } finally {
+    await cleanupCheckWorkspaces(rootDir);
+  }
 }

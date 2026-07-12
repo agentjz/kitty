@@ -21,7 +21,7 @@ export const backgroundTerminateTool: RegisteredTool = {
   async execute(rawArgs, context) {
     const args = parseArgs(rawArgs);
     const id = readString(args.id, "id");
-    const execution = terminateBackgroundExecution(context.projectContext.stateRootDir, id);
+    const execution = terminateBackgroundExecution(context.projectContext.stateRootDir, id, context.ownerSessionId);
     await waitForRegisteredBackgroundProcess(id);
     return okResult(JSON.stringify({
       id: execution.id,

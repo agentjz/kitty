@@ -2,7 +2,6 @@ import type { RegisteredTool } from "../tools/core/types.js";
 import { createBackgroundTools } from "./tools/background/index.js";
 import { createNetworkTools } from "./tools/network/index.js";
 import { createSkillTools } from "./tools/skills/index.js";
-import { createSubagentTools } from "./tools/subagent/index.js";
 import { createTodoTools } from "./tools/todo/index.js";
 import { createWorktreeTools } from "./tools/worktree/index.js";
 
@@ -80,23 +79,6 @@ export const EXTENSION_DEFINITIONS = [
         "running long local commands without blocking the current turn",
         "reading, checking, waiting for, or terminating recorded background executions",
         "watching services, test matrices, or commands that produce output over time",
-      ],
-      cost: "medium",
-    },
-  },
-  {
-    id: "subagent",
-    envKey: "KITTY_EXTENSION_SUBAGENT",
-    defaultEnabled: true,
-    summary: "Focused subagent execution with durable lifecycle tracking.",
-    createTools: createSubagentTools,
-    capability: {
-      description: "Focused subagent execution recorded in the control plane with output read and cancellation.",
-      bestFor: [
-        "delegating complex bounded investigation or implementation work that benefits from independent context",
-        "checking, reading, or cancelling subagent execution state",
-        "parallel work only when tasks are independent or share an explicit plan",
-        "keeping dependent tasks sequential until the lead has a shared plan",
       ],
       cost: "medium",
     },

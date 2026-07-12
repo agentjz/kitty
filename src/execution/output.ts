@@ -23,8 +23,13 @@ export function readExecutionOutput(input: {
   lines?: number;
   maxChars?: number;
   kind?: ExecutionRecord["kind"];
+  ownerSessionId?: string;
 }): ExecutionOutputRead {
-  const execution = requireExecution(new ExecutionStore(input.rootDir).load(input.id), input.id);
+  const store = new ExecutionStore(input.rootDir);
+  const execution = requireExecution(
+    input.ownerSessionId ? store.loadOwned(input.id, input.ownerSessionId) : store.load(input.id),
+    input.id,
+  );
   if (input.kind && execution.kind !== input.kind) {
     throw executionKindMismatch(input.id, execution.kind, input.kind);
   }

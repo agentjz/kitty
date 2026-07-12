@@ -9,8 +9,7 @@ export interface RuntimeUiChannelIdentity {
 export type RuntimeUiLineRole = "assistant" | "reasoning";
 
 const CHANNEL_LABEL_KEYS: Record<RuntimeUiChannel, MessageKey> = {
-  lead: "runtime.channel.lead",
-  subagent: "runtime.channel.subagent",
+  agent: "runtime.channel.agent",
   system: "runtime.channel.system",
 };
 

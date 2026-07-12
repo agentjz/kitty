@@ -12,7 +12,7 @@ export function createCliTurnDisplay(options: {
   abortSignal: AbortSignal;
 }): InteractionTurnDisplay {
   const runtimeUi = createRuntimeUiAgentCallbacks({
-    channel: "lead",
+    channel: "agent",
     config: options.config,
     cwd: options.cwd,
     assistantLeadingBlankLine: true,

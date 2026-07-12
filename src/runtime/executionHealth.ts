@@ -2,7 +2,7 @@ import type { ExecutionRecord } from "../control/ledger.js";
 import type { RuntimeExecutionHealth } from "./statusTypes.js";
 
 export function isActiveExecution(execution: ExecutionRecord): boolean {
-  return execution.status === "created" || execution.status === "claimed" || execution.status === "running" || execution.status === "cancelling";
+  return execution.status === "created" || execution.status === "running";
 }
 
 export function summarizeExecutionHealth(execution: ExecutionRecord): RuntimeExecutionHealth {

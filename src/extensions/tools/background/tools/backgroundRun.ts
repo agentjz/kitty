@@ -10,7 +10,7 @@ export const backgroundRunTool: RegisteredTool = {
     type: "function",
     function: {
       name: "background_run",
-      description: "Start a long-running local command without blocking the lead turn, and record its lifecycle in the local control plane.",
+      description: "Start a long-running local command without blocking the current turn, and record its lifecycle in the local control plane.",
       parameters: {
         type: "object",
         properties: {
@@ -32,8 +32,11 @@ export const backgroundRunTool: RegisteredTool = {
     const job = store.create({
       command,
       cwd,
-      requestedBy: context.identity.name,
-      sessionId: context.sessionId,
+      requestedBy: "agent",
+      ownerSessionId: context.ownerSessionId,
+      createdBySessionId: context.sessionId,
+      parentTurnId: context.turnId,
+      originToolCallId: context.toolCallId,
       timeoutMs,
     });
     const { subprocess } = await launchCommand(command, cwd, timeoutMs);

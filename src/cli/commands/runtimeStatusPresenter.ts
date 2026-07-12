@@ -166,7 +166,7 @@ export function formatRuntimeStatusText(
 
   if (status.scene.executions.length > 0) {
     lines.push("");
-    lines.push(`${translate(locale, "status.delegatedScene")}:`);
+    lines.push(`${translate(locale, "tui.background")}:`);
     for (const execution of status.scene.executions) {
       lines.push([
         execution.id,
@@ -190,9 +190,7 @@ export function formatRuntimeStatusText(
         execution.id,
         execution.kind,
         execution.status,
-        execution.actorName ? formatFact(locale, "status.label.actor", execution.actorName) : undefined,
         execution.summary ? truncateCliValue(execution.summary, 80) : undefined,
-        execution.assignment?.expectedOutput ? formatFact(locale, "status.label.expected", truncateCliValue(execution.assignment.expectedOutput, 60)) : undefined,
       ].filter(Boolean).join("  "));
     }
   }

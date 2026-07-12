@@ -32,7 +32,6 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
   const projectContext = options.stateRootDir
     ? { ...loadedProjectContext, stateRootDir: options.stateRootDir }
     : loadedProjectContext;
-  const identity = options.identity ?? { kind: "lead" as const, name: "lead" };
   const turnModelConfig = options.config;
   const profile = resolveAgentProfile(options.config.profile);
   if (!turnModelConfig.apiKey) {
@@ -76,7 +75,6 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
       }
       const turnRuntimeState = {
         ...(runtimePromptState ?? {}),
-        identity,
       };
       const lifecycleLedger = new ControlPlaneLedger(projectContext.stateRootDir);
       let taskLifecycle;
@@ -151,8 +149,6 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
           observability: {
             rootDir: projectContext.stateRootDir,
             sessionId: session.id,
-            identityKind: identity.kind,
-            identityName: identity.name,
             configuredModel: turnModelConfig.model,
             turnId: options.turnId,
           },
@@ -199,7 +195,6 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
         const completed = await resolveToollessTurn({
           session,
           response,
-          identity,
           changedPaths,
           options,
         });
@@ -214,7 +209,6 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
           options,
           client,
           requestModel,
-          identity,
           rootDir: projectContext.stateRootDir,
         });
         const completionLedger = new ControlPlaneLedger(projectContext.stateRootDir);
@@ -237,7 +231,6 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
         session,
         response,
         options,
-        identity,
         toolRegistry,
         projectContext,
         changeStore,
@@ -247,10 +240,6 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
       changedPaths = batchResult.changedPaths;
       const progress = recordToolBatchProgress(toolLoopProgress, batchResult.evidence);
       toolLoopProgress = progress.state;
-      if (batchResult.yieldResult) {
-        toolLoopProgress = consumeToolLoopCloseout(toolLoopProgress);
-        return batchResult.yieldResult;
-      }
       if (progress.internalFactBlock) {
         runtimePromptState = {
           ...(runtimePromptState ?? {}),

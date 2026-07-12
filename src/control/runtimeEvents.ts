@@ -10,11 +10,11 @@ export class RuntimeEventLedgerRepo {
     this.db.prepare(`
       INSERT INTO runtime_events (
         id, timestamp, event, status, host, session_id, turn_id, item_id,
-        execution_id, request_id, attempt_id, identity_kind, identity_name,
+        execution_id, request_id, attempt_id,
         duration_ms, tool_name, model, error_json, details_json
       ) VALUES (
         @id, @timestamp, @event, @status, @host, @sessionId, @turnId, @itemId,
-        @executionId, @requestId, @attemptId, @identityKind, @identityName,
+        @executionId, @requestId, @attemptId,
         @durationMs, @toolName, @model, @errorJson, @detailsJson
       )
     `).run({
@@ -41,8 +41,6 @@ export class RuntimeEventLedgerRepo {
       executionId: optionalString(row.execution_id),
       requestId: optionalString(row.request_id),
       attemptId: optionalString(row.attempt_id),
-      identityKind: optionalString(row.identity_kind),
-      identityName: optionalString(row.identity_name),
       durationMs: typeof row.duration_ms === "number" ? row.duration_ms : undefined,
       toolName: optionalString(row.tool_name),
       model: optionalString(row.model),

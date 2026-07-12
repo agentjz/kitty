@@ -2,26 +2,16 @@ import { AgentTurnError, getErrorMessage } from "../agent/errors.js";
 import { runAgentTurn } from "../agent/turn.js";
 import { ControlPlaneLedger } from "../control/ledger.js";
 import { resolveProjectRoots } from "../context/repoRoots.js";
-import { buildLeadWakeFacts, waitForLeadWaitExecutions } from "../execution/leadWait.js";
-import { createLeadWaitRuntimeUiStreamer } from "../execution/leadWaitRuntimeUi.js";
-import { completeExactDelegatedCloseout } from "./delegatedCloseout.js";
 import { enterCrashContext } from "../observability/crashRecorder.js";
 import { recordHostTurnFinished, recordHostTurnStarted } from "../observability/hostEvents.js";
-import { createRuntimeUiEvent } from "../runtime-ui/events.js";
 import { SessionEventStore } from "../session/events.js";
 import { isAbortError, sleepWithSignal, throwIfAborted } from "../utils/abort.js";
 import { createHostToolRegistry } from "./toolRegistry.js";
 import type { HostTurnDependencies, HostTurnOptions, HostTurnOutcome } from "./types.js";
-import type { ToolRegistry } from "../tools/core/types.js";
 import type { SessionRecord } from "../types.js";
-import { runWithTurnOwnership } from "../control/turnOwnership.js";
 import { consumePendingTurnSteers } from "../agent/turn/steering.js";
 import { translate } from "../i18n/index.js";
-
-const DEFAULT_IDENTITY = {
-  kind: "lead" as const,
-  name: "lead",
-};
+import { createTurnScopedSessionStore } from "./turnSessionStore.js";
 
 export const PRESERVE_QUEUED_TURN_ABORT_REASON = "Preserve accepted queued turn for restart.";
 export const PRESERVE_ACTIVE_TURN_ABORT_REASON = "Detach active turn for durable recovery.";
@@ -81,8 +71,6 @@ export async function runHostTurn(
     await recordHostTurnStarted(stateRootDir, {
       host,
       sessionId: options.session.id,
-      identityKind: (options.identity ?? DEFAULT_IDENTITY).kind,
-      identityName: (options.identity ?? DEFAULT_IDENTITY).name,
       cwd: options.cwd,
     });
     await sessionEvents.append({
@@ -97,8 +85,6 @@ export async function runHostTurn(
       await recordHostTurnFinished(stateRootDir, {
         host,
         sessionId: options.session.id,
-        identityKind: (options.identity ?? DEFAULT_IDENTITY).kind,
-        identityName: (options.identity ?? DEFAULT_IDENTITY).name,
         status: "aborted",
         durationMs: Date.now() - startedAt,
         cwd: options.cwd,
@@ -139,8 +125,6 @@ export async function runHostTurn(
       await recordHostTurnFinished(stateRootDir, {
         host,
         sessionId: options.session.id,
-        identityKind: (options.identity ?? DEFAULT_IDENTITY).kind,
-        identityName: (options.identity ?? DEFAULT_IDENTITY).name,
         status: "aborted",
         durationMs: Date.now() - startedAt,
         cwd: options.cwd,
@@ -153,123 +137,49 @@ export async function runHostTurn(
       };
     }
 
-    let nextInput = turnRecord.input;
-    let runtimePromptState = options.runtimePromptState;
-    let wakeCloseoutTurn = false;
-    let result: Awaited<ReturnType<typeof runTurn>>;
-    for (;;) {
-      const runTurnOperation = () => runTurn({
-        input: nextInput,
-        cwd: options.cwd,
-        stateRootDir,
-        config: options.config,
-        session,
-        sessionStore: options.sessionStore,
-        inputSource: wakeCloseoutTurn ? "internal" : "external",
-        turnId: turnRecord?.id,
-        turnOwnerToken: turnRecord?.ownerToken,
-        abortSignal: turnAbortSignal,
-        callbacks: options.callbacks,
-        toolRegistry: wakeCloseoutTurn ? createToollessRegistry(toolRegistry!) : toolRegistry!,
-        identity: options.identity ?? DEFAULT_IDENTITY,
-        runtimePromptState,
-        steering: turnRecord?.ownerToken ? {
-          consumePending: async (currentSession) => {
-            const consumed = await consumePendingTurnSteers({
-              rootDir: stateRootDir,
-              turnId: turnRecord!.id,
-              ownerToken: turnRecord!.ownerToken!,
-              session: currentSession,
-              sessionStore: options.sessionStore,
-            });
-            return {
-              session: consumed.session,
-              inputs: consumed.steers.map((steer) => steer.input),
-            };
-          },
-          beginClosing: async () => {
-            const ledger = new ControlPlaneLedger(stateRootDir);
-            try {
-              return ledger.turns.beginClosing(turnRecord!.id, turnRecord!.ownerToken!);
-            } finally {
-              ledger.close();
-            }
-          },
-        } : undefined,
-      });
-      dependencies.onRunTurnStarted?.();
-      const resultPromise = turnRecord?.ownerToken
-        ? runWithTurnOwnership({
-            rootDir: stateRootDir,
-            sessionId: session.id,
-            turnId: turnRecord.id,
-            ownerToken: turnRecord.ownerToken,
-          }, runTurnOperation)
-        : runTurnOperation();
-      result = await resultPromise;
-      session = result.session;
-
-      const transition = result.transition;
-      const isLead = (options.identity ?? DEFAULT_IDENTITY).kind === "lead";
-      if (!isLead || transition?.action !== "yield" || transition.reason.code !== "yield.execution_wait") {
-        break;
-      }
-
-      options.callbacks?.onStatus?.(translate(options.config.locale, "runtime.waitingDelegated"));
-      const streamLeadWaitEvents = createLeadWaitRuntimeUiStreamer({
-        events: sessionEvents,
-        callbacks: options.callbacks,
-      });
-      const executions = await waitForLeadWaitExecutions({
-        rootDir: stateRootDir,
-        executionIds: transition.reason.executionIds,
-        abortSignal: turnAbortSignal,
-        onPoll: streamLeadWaitEvents,
-      });
-      await streamLeadWaitEvents(executions);
-      options.callbacks?.onRuntimeUiEvent?.(createRuntimeUiEvent({
-        channel: "lead",
-        kind: "status",
-        message: translate(options.config.locale, "runtime.resumedDelegated"),
-      }));
-      const lifecycleLedger = new ControlPlaneLedger(stateRootDir);
-      try {
-        lifecycleLedger.taskLifecycle.update({
+    const turnSessionStore = turnRecord?.ownerToken
+      ? createTurnScopedSessionStore(options.sessionStore, {
+          rootDir: stateRootDir,
           sessionId: session.id,
-          stage: "normal_work",
-          reason: "wake.execution_settled",
-          activeExecutionIds: [],
-          completionFacts: executions
-            .map((execution) => execution.output ?? execution.summary)
-            .filter((fact): fact is string => Boolean(fact)),
-        });
-      } finally {
-        lifecycleLedger.close();
-      }
-      const wakeFacts = buildLeadWakeFacts(executions);
-      const directCloseout = await completeExactDelegatedCloseout({
-        session,
-        sessionStore: options.sessionStore,
-        stateRootDir,
-        callbacks: options.callbacks,
-        executions,
-      });
-      if (directCloseout) {
-        result = directCloseout;
-        session = directCloseout.session;
-        break;
-      }
-      nextInput = wakeFacts.userInput;
-      wakeCloseoutTurn = true;
-      runtimePromptState = {
-        ...(runtimePromptState ?? {}),
-        turnPhase: "delegated_closeout",
-        internalFactBlocks: [
-          ...(runtimePromptState?.internalFactBlocks ?? []),
-          wakeFacts.promptBlock,
-        ],
-      };
-    }
+          turnId: turnRecord.id,
+          ownerToken: turnRecord.ownerToken,
+        })
+      : options.sessionStore;
+    dependencies.onRunTurnStarted?.();
+    const result = await runTurn({
+      input: turnRecord.input,
+      cwd: options.cwd,
+      stateRootDir,
+      config: options.config,
+      session,
+      sessionStore: turnSessionStore,
+      inputSource: "external",
+      turnId: turnRecord.id,
+      turnOwnerToken: turnRecord.ownerToken,
+      ownerSessionId: session.id,
+      abortSignal: turnAbortSignal,
+      callbacks: options.callbacks,
+      toolRegistry,
+      runtimePromptState: options.runtimePromptState,
+      steering: turnRecord.ownerToken ? {
+        consumePending: async (currentSession) => {
+          const consumed = await consumePendingTurnSteers({
+            rootDir: stateRootDir,
+            turnId: turnRecord!.id,
+            ownerToken: turnRecord!.ownerToken!,
+            session: currentSession,
+            sessionStore: turnSessionStore,
+          });
+          return { session: consumed.session, inputs: consumed.steers.map((steer) => steer.input) };
+        },
+        beginClosing: async () => {
+          const ledger = new ControlPlaneLedger(stateRootDir);
+          try { return ledger.turns.beginClosing(turnRecord!.id, turnRecord!.ownerToken!); }
+          finally { ledger.close(); }
+        },
+      } : undefined,
+    });
+    session = result.session;
 
     if (turnRecord.ownerToken) {
       const closingLedger = new ControlPlaneLedger(stateRootDir);
@@ -285,8 +195,6 @@ export async function runHostTurn(
     await recordHostTurnFinished(stateRootDir, {
       host,
       sessionId: result.session.id,
-      identityKind: (options.identity ?? DEFAULT_IDENTITY).kind,
-      identityName: (options.identity ?? DEFAULT_IDENTITY).name,
       status: "completed",
       durationMs: Date.now() - startedAt,
       cwd: options.cwd,
@@ -344,8 +252,6 @@ export async function runHostTurn(
       await recordHostTurnFinished(stateRootDir, {
         host,
         sessionId: failedSession.id,
-        identityKind: (options.identity ?? DEFAULT_IDENTITY).kind,
-        identityName: (options.identity ?? DEFAULT_IDENTITY).name,
         status: "aborted",
         durationMs: Date.now() - startedAt,
         cwd: options.cwd,
@@ -363,8 +269,6 @@ export async function runHostTurn(
     await recordHostTurnFinished(stateRootDir, {
       host,
       sessionId: failedSession.id,
-      identityKind: (options.identity ?? DEFAULT_IDENTITY).kind,
-      identityName: (options.identity ?? DEFAULT_IDENTITY).name,
       status: "failed",
       durationMs: Date.now() - startedAt,
       cwd: options.cwd,
@@ -461,14 +365,6 @@ async function claimTurn(input: {
     }
     await sleepWithSignal(50, input.abortSignal);
   }
-}
-
-function createToollessRegistry(registry: ToolRegistry): ToolRegistry {
-  return {
-    ...registry,
-    definitions: [],
-    entries: [],
-  };
 }
 
 async function readStateRootDir(cwd: string): Promise<string> {

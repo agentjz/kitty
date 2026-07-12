@@ -11,7 +11,7 @@ export type InteractiveExitProcess = RunningExecutionProcess;
 export type InteractiveExitTerminationResult = TerminationResult;
 
 export interface InteractiveExitGuard {
-  collectRunningProcesses(cwd: string): Promise<InteractiveExitProcess[]>;
+  collectRunningProcesses(cwd: string, ownerSessionId: string): Promise<InteractiveExitProcess[]>;
   terminateProcesses(processes: InteractiveExitProcess[], cwd: string): Promise<InteractiveExitTerminationResult>;
 }
 
@@ -20,9 +20,9 @@ export const defaultInteractiveExitGuard: InteractiveExitGuard = {
   terminateProcesses,
 };
 
-export async function collectRunningProcesses(cwd: string): Promise<InteractiveExitProcess[]> {
+export async function collectRunningProcesses(cwd: string, ownerSessionId: string): Promise<InteractiveExitProcess[]> {
   const roots = await resolveProjectRoots(cwd);
-  return collectRunningExecutionProcesses(roots.stateRootDir, cwd);
+  return collectRunningExecutionProcesses(roots.stateRootDir, ownerSessionId);
 }
 
 export async function terminateProcesses(

@@ -261,9 +261,6 @@ function readExecutionRisk(execution: RuntimeExecutionSummary): RuntimeExecution
 }
 
 function readExecutionSummary(execution: RuntimeExecutionSummary, locale: KittyLocale): string {
-  if (execution.assignment?.objective) {
-    return truncateText(execution.assignment.objective, 120);
-  }
   if (execution.summary) {
     return truncateText(execution.summary, 120);
   }
@@ -278,39 +275,17 @@ function readExecutionNextAction(
   risk: RuntimeExecutionSceneSummary["risk"],
   locale: KittyLocale,
 ): string {
-  if (execution.kind === "background") {
-    if (risk === "blocked") {
-      return translate(locale, "scene.execution.backgroundBlocked", { id: execution.id });
-    }
-    if (risk === "watch") {
-      return translate(locale, "scene.execution.backgroundWatch", { id: execution.id });
-    }
-    return translate(locale, "scene.execution.backgroundActive", { id: execution.id });
-  }
-  if (risk === "blocked") {
-    return translate(locale, "scene.execution.inspectBeforeContinue", {
-      kind: readExecutionKindLabel(execution.kind, locale), id: execution.id,
-    });
-  }
-  if (risk === "watch") {
-    return translate(locale, "scene.execution.watch", {
-      kind: readExecutionKindLabel(execution.kind, locale), id: execution.id,
-    });
-  }
-  if (execution.waitPolicy === "while_execution_active") {
-    return translate(locale, "scene.leadWait");
-  }
-  return translate(locale, "scene.taskActive");
+  if (risk === "blocked") return translate(locale, "scene.execution.backgroundBlocked", { id: execution.id });
+  if (risk === "watch") return translate(locale, "scene.execution.backgroundWatch", { id: execution.id });
+  return translate(locale, "scene.execution.backgroundActive", { id: execution.id });
 }
 
 function readExecutionKindLabel(kind: string, locale: KittyLocale): string {
   switch (kind) {
     case "background":
       return translate(locale, "scene.kind.background");
-    case "subagent":
-      return translate(locale, "scene.kind.subagent");
     default:
-      return translate(locale, "scene.kind.delegated");
+      return translate(locale, "scene.kind.background");
   }
 }
 

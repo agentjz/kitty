@@ -6,6 +6,8 @@ import type { RuntimeConfig } from "../types.js";
 import { getProjectStatePaths } from "../project/statePaths.js";
 import { createRuntimeUiEvent } from "../runtime-ui/events.js";
 import { formatRuntimeUiEventLine } from "../runtime-ui/terminalRenderer.js";
+import { buildToolCallDisplay } from "../runtime-ui/toolDisplay.js";
+import { translate } from "../i18n/index.js";
 
 export interface TerminalLogWriter {
   write(text: string): void;
@@ -205,17 +207,14 @@ function mirrorTurnDisplay(
       },
       onToolCall(name, args) {
         flushTextBuffers();
-        forwardWithFallback(writer, () => display.callbacks.onToolCall?.(name, args), formatRuntimeUiEventLine(createRuntimeUiEvent({
-          channel: "lead",
-          kind: "tool_call",
-          toolName: name,
-          payload: args,
-        }), { cwd: options.cwd, locale: options.config.locale }));
+        const summary = buildToolCallDisplay(name, args, 4_000, options.cwd).summary;
+        writer.write(`[${translate(options.config.locale, "runtime.tool")}] ${summary}\n`);
+        forwardOutputOnly(() => display.callbacks.onToolCall?.(name, args));
       },
       onToolResult(name, output) {
         flushTextBuffers();
         forwardWithFallback(writer, () => display.callbacks.onToolResult?.(name, output), formatRuntimeUiEventLine(createRuntimeUiEvent({
-          channel: "lead",
+          channel: "agent",
           kind: "tool_result",
           toolName: name,
           payload: output,
@@ -224,7 +223,7 @@ function mirrorTurnDisplay(
       onToolError(name, error) {
         flushTextBuffers();
         forwardWithFallback(writer, () => display.callbacks.onToolError?.(name, error), formatRuntimeUiEventLine(createRuntimeUiEvent({
-          channel: "lead",
+          channel: "agent",
           kind: "tool_error",
           toolName: name,
           payload: error,

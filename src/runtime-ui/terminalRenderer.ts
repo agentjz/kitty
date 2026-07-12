@@ -1,4 +1,4 @@
-import { buildToolCallDisplay, buildToolFailureDetail, buildToolResultDisplay } from "./toolDisplay.js";
+import { buildToolFailureDetail, buildToolResultDisplay } from "./toolDisplay.js";
 import {
   normalizeTerminalVerbosity,
   shouldShowToolCallPreview,
@@ -150,12 +150,7 @@ function renderToolCall(
 ): void {
   const locale = options.locale ?? DEFAULT_LOCALE;
   ensureRenderChannel(state, event.channel, locale);
-  const name = event.toolName ?? "tool";
-  const display = buildToolCallDisplay(name, event.payload ?? "{}", options.toolArgsMaxChars ?? 160, options.cwd);
   writeSemanticLine("tool", formatRuntimeUiEventMessage(event, options, verbosity), undefined, locale);
-  if (display.preview && shouldShowToolCallPreview(name, verbosity)) {
-    writePreview(event.channel, "content", display.preview, verbosity, locale);
-  }
 }
 
 function renderToolResult(
@@ -235,16 +230,14 @@ function formatRuntimeUiEventMessage(
       return event.message ?? "";
     case "tool_call": {
       const name = event.toolName ?? "tool";
-      const display = buildToolCallDisplay(name, event.payload ?? "{}", options.toolArgsMaxChars ?? 160, options.cwd);
-      return display.summary;
+      return name;
     }
     case "tool_result": {
       const name = event.toolName ?? "tool";
       const display = buildToolResultDisplay(name, event.payload ?? event.message ?? "", options.cwd);
       const ok = event.ok ?? display.ok !== false;
       const status = translate(locale, ok ? "common.ok" : "common.failed");
-      const tracked = display.tracked ? ` ${translate(locale, "common.tracked")}` : "";
-      const summary = display.summary ? `${display.summary} ${status}${tracked}`.trim() : `${name} ${status}`;
+      const summary = `${name} ${status}`;
       if (!ok) {
         const detail = forcedDetail ?? buildToolFailureDetail(name, event.payload ?? event.message ?? "", options.cwd);
         return formatRuntimeUiMessage(summary, detail);

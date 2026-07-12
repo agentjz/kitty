@@ -1,9 +1,7 @@
 ﻿import { noteSessionDiff } from "../../session/sessionDiff.js";
 import { createMessage, createToolMessage } from "../../session/messages.js";
-import { collectNewLeadWaitExecutionIds, listLeadWaitExecutions } from "../../execution/leadWait.js";
 import { buildToolResultEnvelope } from "../toolResults/evidenceBuilder.js";
 import { ControlPlaneLedger } from "../../control/ledger.js";
-import { buildRunTurnResult, createExecutionWaitYieldTransition } from "../runtimeTransition.js";
 import { persistToolBatchCheckpoint } from "./persistence.js";
 import { executeToolBatch } from "./toolBatch.js";
 import { recordObservabilityEvent } from "../../observability/writer.js";
@@ -14,14 +12,13 @@ import type { ChangeStore } from "../changes/store.js";
 import type { ProjectContext, SessionRecord, StoredMessage, ToolExecutionResult } from "../../types.js";
 import type { ToolCallRecord } from "../../types.js";
 import type { ToolRegistry } from "../../tools/core/types.js";
-import type { AgentIdentity, AssistantResponse, RunTurnOptions, RunTurnResult } from "../types.js";
+import type { AssistantResponse, RunTurnOptions } from "../types.js";
 import { readToolFailureError } from "./toolFailure.js";
 
 export interface ProcessToolCallBatchInput {
   session: SessionRecord;
   response: AssistantResponse;
   options: RunTurnOptions;
-  identity: AgentIdentity;
   toolRegistry: ToolRegistry;
   projectContext: ProjectContext;
   changeStore: ChangeStore;
@@ -32,13 +29,12 @@ export interface ProcessToolCallBatchResult {
   session: SessionRecord;
   changedPaths: Set<string>;
   evidence: ToolBatchEvidence;
-  yieldResult?: RunTurnResult;
 }
 
 export async function processToolCallBatch(input: ProcessToolCallBatchInput): Promise<ProcessToolCallBatchResult> {
   let session = input.session;
   let changedPaths = new Set(input.changedPaths);
-  const { response, options, identity, toolRegistry, projectContext, changeStore } = input;
+  const { response, options, toolRegistry, projectContext, changeStore } = input;
 
   if (response.content && !response.streamedAssistantContent) {
     options.callbacks?.onAssistantStage?.(response.content);
@@ -54,9 +50,6 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
   const batchModelOutputs: string[] = [];
   const batchChangedPaths = new Set<string>();
   const sessionEvents = new SessionEventStore(options.config.paths.eventsDir);
-  const leadWaitExecutionsBefore = identity.kind === "lead"
-    ? listLeadWaitExecutions(projectContext.stateRootDir)
-    : [];
   const toolEntryByName = new Map((toolRegistry.entries ?? []).map((entry) => [entry.name, entry]));
   if (options.turnId) {
     const ledger = new ControlPlaneLedger(projectContext.stateRootDir);
@@ -83,15 +76,13 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
       type: "tool.started",
       sessionId: session.id,
       cwd: options.cwd,
-      details: buildToolStartedEventDetails(toolCall, identity),
+      details: buildToolStartedEventDetails(toolCall),
     });
     options.callbacks?.onToolCall?.(toolCall.function.name, toolCall.function.arguments);
     await recordObservabilityEvent(projectContext.stateRootDir, {
       event: "tool.execution",
       status: "started",
       sessionId: session.id,
-      identityKind: identity.kind,
-      identityName: identity.name,
       toolName: toolCall.function.name,
     });
   }
@@ -146,8 +137,6 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
       event: "tool.execution",
       status: result.ok ? "completed" : "failed",
       sessionId: session.id,
-      identityKind: identity.kind,
-      identityName: identity.name,
       toolName: toolCall.function.name,
       durationMs,
       error: failureError,
@@ -161,7 +150,6 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
       cwd: options.cwd,
       details: buildToolFinishedEventDetails({
         toolCall,
-        identity,
         durationMs,
         changedPathCount: metadata?.changedPaths?.length ?? 0,
         error: failureError ? formatToolFailureError(failureError) : undefined,
@@ -172,8 +160,6 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
         event: "tool.output",
         status: result.ok ? "completed" : "failed",
         sessionId: session.id,
-        identityKind: identity.kind,
-        identityName: identity.name,
         toolName: toolCall.function.name,
         durationMs,
         details: {
@@ -213,8 +199,6 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
       event: "tool.evidence",
       status: toolResult.status === "success" ? "completed" : "failed",
       sessionId: session.id,
-      identityKind: identity.kind,
-      identityName: identity.name,
       toolName: toolResult.toolName,
       durationMs,
       details: {
@@ -237,42 +221,6 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
     toolMessages: batchToolMessages,
     changedPaths: [...batchChangedPaths],
   });
-  const leadWaitExecutionIds = identity.kind === "lead"
-    ? collectNewLeadWaitExecutionIds(leadWaitExecutionsBefore, listLeadWaitExecutions(projectContext.stateRootDir))
-    : [];
-  if (leadWaitExecutionIds.length > 0) {
-    const ledger = new ControlPlaneLedger(projectContext.stateRootDir);
-    try {
-      ledger.taskLifecycle.appendExecutionWait({
-        sessionId: session.id,
-        executionIds: leadWaitExecutionIds,
-        reason: "yield.execution_wait",
-      });
-    } finally {
-      ledger.close();
-    }
-    const transition = createExecutionWaitYieldTransition({
-      executionIds: leadWaitExecutionIds,
-      toolNames: response.toolCalls.map((toolCall) => toolCall.function.name),
-    });
-    return {
-      session,
-      changedPaths,
-      evidence: {
-        toolCalls: response.toolCalls.map((toolCall) => ({
-          name: toolCall.function.name,
-          arguments: toolCall.function.arguments,
-        })),
-        modelOutputs: batchModelOutputs,
-        changedPaths: [...batchChangedPaths],
-      },
-      yieldResult: buildRunTurnResult({
-        session,
-        changedPaths,
-        transition,
-      }),
-    };
-  }
   return {
     session,
     changedPaths,
@@ -287,22 +235,16 @@ export async function processToolCallBatch(input: ProcessToolCallBatchInput): Pr
   };
 }
 
-function buildToolStartedEventDetails(
-  toolCall: ToolCallRecord,
-  identity: AgentIdentity,
-): SessionEventRecord["details"] {
+function buildToolStartedEventDetails(toolCall: ToolCallRecord): SessionEventRecord["details"] {
   return {
     toolName: toolCall.function.name,
     toolCallId: toolCall.id,
-    identityKind: identity.kind,
-    identityName: identity.name,
     argumentsPreview: previewToolArguments(toolCall.function.arguments),
   };
 }
 
 function buildToolFinishedEventDetails(input: {
   toolCall: ToolCallRecord;
-  identity: AgentIdentity;
   durationMs: number;
   changedPathCount: number;
   error?: string;
@@ -310,8 +252,6 @@ function buildToolFinishedEventDetails(input: {
   return {
     toolName: input.toolCall.function.name,
     toolCallId: input.toolCall.id,
-    identityKind: input.identity.kind,
-    identityName: input.identity.name,
     durationMs: input.durationMs,
     changedPathCount: input.changedPathCount,
     error: input.error,

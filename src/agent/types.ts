@@ -4,13 +4,6 @@ import type { RuntimeConfig, RuntimeTerminalTransition, SessionRecord, ToolCallR
 import type { FunctionToolDefinition } from "../tools/index.js";
 import type { ProviderMessage } from "../provider/contract.js";
 import type { PromptRuntimeState } from "./prompt/types.js";
-import type { RuntimeUiEvent } from "../runtime-ui/events.js";
-
-export interface AgentIdentity {
-  kind: "lead" | "subagent";
-  name: string;
-  role?: string;
-}
 
 export interface AgentCallbacks {
   onModelWaitStart?: () => void;
@@ -25,7 +18,6 @@ export interface AgentCallbacks {
   onToolCall?: (name: string, args: string) => void;
   onToolResult?: (name: string, output: string) => void;
   onToolError?: (name: string, error: string) => void;
-  onRuntimeUiEvent?: (event: RuntimeUiEvent) => void;
 
   /** Optional host callback to send a file back to the conversation (e.g. Telegram sendDocument). */
   enqueueFile?: (filePath: string, fileName?: string, caption?: string) => Promise<string | undefined>;
@@ -34,6 +26,7 @@ export interface AgentCallbacks {
 export interface RunTurnOptions {
   turnId?: string;
   turnOwnerToken?: string;
+  ownerSessionId?: string;
   input: string;
   inputSource?: "external" | "internal";
   cwd: string;
@@ -42,7 +35,6 @@ export interface RunTurnOptions {
   session: SessionRecord;
   sessionStore: SessionStoreLike;
   toolRegistry?: ToolRegistry;
-  identity?: AgentIdentity;
   runtimePromptState?: Partial<PromptRuntimeState>;
   abortSignal?: AbortSignal;
   callbacks?: AgentCallbacks;
@@ -72,8 +64,6 @@ export interface ModelRequestInput {
   observability?: {
     rootDir: string;
     sessionId: string;
-    identityKind?: string;
-    identityName?: string;
     configuredModel: string;
   };
 }

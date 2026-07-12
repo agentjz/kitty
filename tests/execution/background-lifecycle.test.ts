@@ -7,17 +7,17 @@ import {
   waitForBackgroundExecution,
 } from "../../src/execution/background.js";
 import { isAbortError } from "../../src/utils/abort.js";
-import { createTempWorkspace } from "../helpers.js";
+import { createTempWorkspace, TEST_EXECUTION_OWNER } from "../helpers.js";
 
 test("background execution store creates, starts, closes, and emits wake facts", async (t) => {
   const root = await createTempWorkspace("background-store", t);
   const store = new BackgroundExecutionStore(root);
 
   const job = store.create({
+    ...TEST_EXECUTION_OWNER,
     command: "node -e \"process.exit(0)\"",
     cwd: root,
-    requestedBy: "lead",
-    sessionId: "session-1",
+    requestedBy: "agent",
     timeoutMs: 10_000,
   });
 
@@ -43,9 +43,10 @@ test("background reconcile marks dead running pid as stale", async (t) => {
   const root = await createTempWorkspace("background-reconcile", t);
   const store = new BackgroundExecutionStore(root);
   const job = store.create({
+    ...TEST_EXECUTION_OWNER,
     command: "lost process",
     cwd: root,
-    requestedBy: "lead",
+    requestedBy: "agent",
   });
   store.markRunning(job.id, { pid: 999_999_999 });
 
@@ -61,9 +62,10 @@ test("background execution store records running output summaries", async (t) =>
   const root = await createTempWorkspace("background-running-output", t);
   const store = new BackgroundExecutionStore(root);
   const job = store.create({
+    ...TEST_EXECUTION_OWNER,
     command: "long command",
     cwd: root,
-    requestedBy: "lead",
+    requestedBy: "agent",
   });
   store.markRunning(job.id, { pid: process.pid });
 
@@ -84,9 +86,10 @@ test("background wait stops immediately when its caller aborts", async (t) => {
   const root = await createTempWorkspace("background-wait-abort", t);
   const store = new BackgroundExecutionStore(root);
   const job = store.create({
+    ...TEST_EXECUTION_OWNER,
     command: "long command",
     cwd: root,
-    requestedBy: "lead",
+    requestedBy: "agent",
   });
   store.markRunning(job.id, { pid: process.pid });
   const controller = new AbortController();

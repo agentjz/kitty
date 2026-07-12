@@ -29,10 +29,11 @@ const DEFAULT_RECENT_LIMIT = 10;
 export async function buildRuntimeStatus(
   rootDir: string,
   locale: KittyLocale = DEFAULT_LOCALE,
+  scope: { ownerSessionId?: string } = {},
 ): Promise<RuntimeStatus> {
   const paths = getProjectStatePaths(rootDir);
   reconcileExecutions(paths.rootDir);
-  const durable = readRuntimeLedgerSnapshot(paths.rootDir);
+  const durable = readRuntimeLedgerSnapshot(paths.rootDir, scope.ownerSessionId);
 
   const [projectMap, projectContext] = await Promise.all([
     buildProjectMap(paths.rootDir),
@@ -126,7 +127,7 @@ function summarizeSession(session: SessionRecord): RuntimeSessionSummary {
   };
 }
 
-function readRuntimeLedgerSnapshot(rootDir: string): {
+function readRuntimeLedgerSnapshot(rootDir: string, ownerSessionId?: string): {
   sessions: SessionRecord[];
   taskLifecycle?: TaskLifecycleRecord;
   executions: ExecutionRecord[];
@@ -136,13 +137,20 @@ function readRuntimeLedgerSnapshot(rootDir: string): {
   const ledger = new ControlPlaneLedger(rootDir);
   try {
     return ledger.transaction(() => {
-      const sessions = ledger.sessions.list(DEFAULT_RECENT_LIMIT);
+      const sessions = ownerSessionId
+        ? [ledger.sessions.load(ownerSessionId)].filter((session): session is SessionRecord => Boolean(session))
+        : ledger.sessions.list(DEFAULT_RECENT_LIMIT);
+      const executions = ledger.executions.list({ ownerSessionId });
+      const executionIds = new Set(executions.map((execution) => execution.id));
+      const eventSessionIds = new Set([
+        ...(ownerSessionId ? [ownerSessionId] : []),
+      ]);
       return {
         sessions,
         taskLifecycle: sessions[0] ? ledger.taskLifecycle.loadCurrent(sessions[0].id) : undefined,
-        executions: ledger.executions.list(),
-        wakeSignals: ledger.wakeSignals.list(),
-        events: ledger.runtimeEvents.list(200),
+        executions,
+        wakeSignals: ledger.wakeSignals.list().filter((signal) => executionIds.has(signal.executionId)),
+        events: ledger.runtimeEvents.list(200).filter((event) => !ownerSessionId || (event.sessionId && eventSessionIds.has(event.sessionId))),
       };
     });
   } finally {

@@ -125,7 +125,6 @@ test("tui runtime dock truncates long tool activity before the turn clock", asyn
         turnStartedAt: 10_000,
         activity: {
           kind: "tool",
-          channel: "lead",
           status: "running",
           summary: `bash ${"long-argument ".repeat(20)}TOOL_ARGUMENT_TAIL`,
           severity: "info",
@@ -158,7 +157,6 @@ test("tui runtime dock does not repeat thinking on both sides", async () => {
         turnStartedAt: 10_000,
         activity: {
           kind: "model",
-          channel: "lead",
           status: "running",
           summary: "思考中",
           severity: "info",
@@ -396,7 +394,6 @@ test("tui transcript renders user, reasoning, assistant, and system rows", async
   state = appendTranscriptEntry(state, { role: "user", text: "hello" }, viewport);
   state = appendTranscriptEntry(state, { role: "reasoning", text: "thinking" }, viewport);
   state = appendTranscriptEntry(state, { role: "assistant", text: "answer" }, viewport);
-  state = appendTranscriptEntry(state, { role: "subagent", text: "worker answer" }, viewport);
   state = appendTranscriptEntry(state, { role: "system", text: "notice" }, viewport);
 
   const output = ink.renderToString(
@@ -410,7 +407,6 @@ test("tui transcript renders user, reasoning, assistant, and system rows", async
   assert.match(output, /hello/);
   assert.match(output, /thinking/);
   assert.match(output, /answer/);
-  assert.match(output, /worker answer/);
   assert.match(output, /notice/);
 });
 
@@ -450,7 +446,6 @@ test("tui transcript aligns every message role content column", async () => {
   state = appendTranscriptEntry(state, { role: "user", text: "user text" }, viewport);
   state = appendTranscriptEntry(state, { role: "reasoning", text: "thinking text" }, viewport);
   state = appendTranscriptEntry(state, { role: "assistant", text: "assistant text" }, viewport);
-  state = appendTranscriptEntry(state, { role: "subagent", text: "subagent text" }, viewport);
   state = appendTranscriptEntry(state, { role: "system", text: "system text" }, viewport);
 
   const output = ink.renderToString(
@@ -464,12 +459,10 @@ test("tui transcript aligns every message role content column", async () => {
   const userColumn = readRenderedColumn(lines, "user text");
   const reasoningColumn = readRenderedColumn(lines, "思考:");
   const assistantColumn = readRenderedColumn(lines, "assistant text");
-  const subagentColumn = readRenderedColumn(lines, "subagent text");
   const systemColumn = readRenderedColumn(lines, "system text");
 
   assert.equal(userColumn, reasoningColumn);
   assert.equal(assistantColumn, reasoningColumn);
-  assert.equal(subagentColumn, reasoningColumn);
   assert.equal(systemColumn, reasoningColumn);
 });
 

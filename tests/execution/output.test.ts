@@ -1,19 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { ExecutionLifecycleError } from "../../src/execution/errors.js";
 import { readExecutionOutput } from "../../src/execution/output.js";
 import { ExecutionStore } from "../../src/execution/store.js";
-import { createTempWorkspace } from "../helpers.js";
+import { createTempWorkspace, TEST_EXECUTION_OWNER } from "../helpers.js";
 
 test("execution output reader is the shared contract for summary, tail, full, and kind checks", async (t) => {
   const root = await createTempWorkspace("execution-output-reader", t);
   const store = new ExecutionStore(root);
   const execution = store.create({
-    kind: "background",
+    ...TEST_EXECUTION_OWNER,
     command: "echo output",
     cwd: root,
-    requestedBy: "lead",
+    requestedBy: "agent",
   });
   store.close(execution.id, {
     status: "completed",
@@ -27,8 +26,4 @@ test("execution output reader is the shared contract for summary, tail, full, an
   assert.equal(full.output, "four\n");
   assert.equal(full.truncated, true);
 
-  assert.throws(
-    () => readExecutionOutput({ rootDir: root, id: execution.id, kind: "subagent" }),
-    (error: unknown) => error instanceof ExecutionLifecycleError && error.code === "EXECUTION_KIND_MISMATCH",
-  );
 });

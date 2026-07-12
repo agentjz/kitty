@@ -1,11 +1,10 @@
 import { handleCompletedAssistantResponse } from "./finalize.js";
-import type { AgentIdentity, AssistantResponse, RunTurnOptions, RunTurnResult } from "../types.js";
+import type { AssistantResponse, RunTurnOptions, RunTurnResult } from "../types.js";
 import type { RuntimeContinueTransition, SessionRecord } from "../../types.js";
 
 interface ResolveToollessTurnParams {
   session: SessionRecord;
   response: AssistantResponse;
-  identity: AgentIdentity;
   changedPaths: Set<string>;
   options: RunTurnOptions;
 }
@@ -26,7 +25,6 @@ export async function resolveToollessTurn(
   return handleCompletedAssistantResponse({
     session: params.session,
     response: params.response,
-    identity: params.identity,
     changedPaths: params.changedPaths,
     options: params.options,
   });

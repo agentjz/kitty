@@ -15,8 +15,6 @@ export interface ObservabilityEventRecord {
   executionId?: string;
   requestId?: string;
   attemptId?: string;
-  identityKind?: string;
-  identityName?: string;
   durationMs?: number;
   toolName?: string;
   model?: string;
@@ -34,8 +32,6 @@ export interface ObservabilityEventInput {
   executionId?: string;
   requestId?: string;
   attemptId?: string;
-  identityKind?: string;
-  identityName?: string;
   durationMs?: number;
   toolName?: string;
   model?: string;
@@ -69,8 +65,6 @@ export function buildObservabilityEventRecord(input: ObservabilityEventInput): O
     executionId: normalizeOptionalText(input.executionId),
     requestId: normalizeOptionalText(input.requestId),
     attemptId: normalizeOptionalText(input.attemptId),
-    identityKind: normalizeOptionalText(input.identityKind),
-    identityName: normalizeOptionalText(input.identityName),
     durationMs: normalizeOptionalNumber(input.durationMs),
     toolName: normalizeOptionalText(input.toolName),
     model: normalizeOptionalText(input.model),

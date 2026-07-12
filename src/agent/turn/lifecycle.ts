@@ -6,7 +6,7 @@ import {
 } from "../../session/title.js";
 import { recordObservabilityEvent } from "../../observability/writer.js";
 import type { createProviderClientPool } from "../../provider/client.js";
-import type { AgentIdentity, AssistantResponse, RunTurnOptions, RunTurnResult } from "../types.js";
+import type { AssistantResponse, RunTurnOptions, RunTurnResult } from "../types.js";
 
 export interface TurnLifecycleUpdateInput {
   session: RunTurnResult["session"];
@@ -15,7 +15,6 @@ export interface TurnLifecycleUpdateInput {
   options: RunTurnOptions;
   client: ReturnType<typeof createProviderClientPool>;
   requestModel: string;
-  identity: AgentIdentity;
   rootDir: string;
 }
 
@@ -52,8 +51,6 @@ export async function updateSessionTitleAfterTurn(
     observability: {
       rootDir: input.rootDir,
       sessionId: input.session.id,
-      identityKind: input.identity.kind,
-      identityName: input.identity.name,
       configuredModel: input.options.config.model,
     },
   };
@@ -62,8 +59,6 @@ export async function updateSessionTitleAfterTurn(
     event: "agent.session_title",
     status: "started",
     sessionId: input.session.id,
-    identityKind: input.identity.kind,
-    identityName: input.identity.name,
     model: input.requestModel,
   });
   input.options.callbacks?.onStatus?.("正在生成会话标题");
@@ -89,8 +84,6 @@ export async function updateSessionTitleAfterTurn(
         event: "agent.session_title",
         status: "skipped",
         sessionId: input.session.id,
-        identityKind: input.identity.kind,
-        identityName: input.identity.name,
         model: input.requestModel,
         details: { reason: "empty_model_response" },
       });
@@ -100,8 +93,6 @@ export async function updateSessionTitleAfterTurn(
       event: "agent.session_title",
       status: "completed",
       sessionId: session.id,
-      identityKind: input.identity.kind,
-      identityName: input.identity.name,
       model: input.requestModel,
       details: { title: session.title },
     });
@@ -111,8 +102,6 @@ export async function updateSessionTitleAfterTurn(
       event: "agent.session_title",
       status: "failed",
       sessionId: input.session.id,
-      identityKind: input.identity.kind,
-      identityName: input.identity.name,
       model: input.requestModel,
       error,
     });

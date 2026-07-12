@@ -24,7 +24,6 @@ const TASK_LIFECYCLE_STAGES = new Set<TaskLifecycleStage>([
   "normal_work",
   "deep_work",
   "background_wait",
-  "delegated_wait",
   "recovery",
   "completed",
 ]);
@@ -108,7 +107,7 @@ export class TaskLifecycleLedgerRepo {
     });
     return this.update({
       sessionId: input.sessionId,
-      stage: "delegated_wait",
+      stage: "background_wait",
       reason: input.reason,
       activeExecutionIds: [...current.activeExecutionIds, ...input.executionIds],
     });

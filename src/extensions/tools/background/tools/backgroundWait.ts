@@ -26,6 +26,7 @@ export const backgroundWaitTool: RegisteredTool = {
     const execution = await waitForBackgroundExecution({
       rootDir: context.projectContext.stateRootDir,
       id,
+      ownerSessionId: context.ownerSessionId,
       timeoutMs: clampNumber(args.timeout_ms, 0, 86_400_000, 60_000),
     });
     return okResult(JSON.stringify({

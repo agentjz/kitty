@@ -36,9 +36,9 @@
     },
     {
       entries: [
-        { role: '思考', text: '客人忌口需要读取另一批资料，我派一个独立上下文去确认。', kind: 'thought' },
-        { role: '子代理', text: 'subagent.run("确认客人忌口")', kind: 'tool' },
-        { role: '返回', text: '独立上下文完成：没有额外忌口。', kind: 'result' }
+        { role: '思考', text: '烹饪计时可以在后台运行，我继续整理后面的步骤。', kind: 'thought' },
+        { role: '工具', text: 'background_run("计时 3 分钟")', kind: 'tool' },
+        { role: '后台', text: '计时任务已启动，仍属于当前会话。', kind: 'result' }
       ]
     },
     {

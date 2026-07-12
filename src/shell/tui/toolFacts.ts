@@ -1,125 +1,62 @@
-import { buildToolCallDisplay, buildToolResultDisplay } from "../../runtime-ui/toolDisplay.js";
-import type { RuntimeUiChannel } from "../../runtime-ui/events.js";
+import { buildToolResultDisplay } from "../../runtime-ui/toolDisplay.js";
 import { tryParseJson } from "../../utils/json.js";
 import { createFailedActivity, createRunningActivity, type TuiActivity, type TuiActivityKind } from "./activity.js";
 
 export interface TuiToolCallFact {
   readonly activity: TuiActivity;
   readonly background?: string;
-  readonly subagent?: string;
 }
 
 export interface TuiToolResultFact {
   readonly activity: TuiActivity | undefined;
   readonly background?: string;
-  readonly subagent?: string;
   readonly transcript?: string;
 }
 
-export function projectTuiToolCallFact(
-  name: string,
-  rawArgs: string,
-  options: { channel?: RuntimeUiChannel; now?: number } = {},
-): TuiToolCallFact {
-  const summary = buildToolCallDisplay(name, rawArgs, 240).summary;
-  const channel = options.channel ?? "lead";
+export function projectTuiToolCallFact(name: string, _rawArgs: string, options: { now?: number } = {}): TuiToolCallFact {
   return {
     activity: createRunningActivity({
-      kind: readActivityKind(name, channel),
-      channel,
-      summary,
+      kind: readActivityKind(name),
+      summary: name,
       toolName: name,
-      blockingLead: channel === "subagent",
       now: options.now,
     }),
-    ...projectLiveExecutionFact(name, summary),
+    ...projectLiveBackgroundFact(name, name),
   };
 }
 
 export function projectTuiToolResultFact(name: string, rawOutput: string): TuiToolResultFact {
   const display = buildToolResultDisplay(name, rawOutput);
-  const runningSummary = readRunningSummary(name, rawOutput, display.summary);
   return {
     activity: undefined,
-    ...projectLiveExecutionFact(name, runningSummary),
+    ...projectLiveBackgroundFact(name, readRunningSummary(name, rawOutput)),
     transcript: name === "todo_write" ? display.preview : undefined,
   };
 }
 
-export function projectTuiToolErrorFact(name: string, error: string): TuiToolResultFact {
-  const summary = `${name}: ${shorten(error)}`;
+export function projectTuiToolErrorFact(name: string, _error: string): TuiToolResultFact {
   return {
-    activity: createFailedActivity({
-      kind: readActivityKind(name, "lead"),
-      summary,
-      toolName: name,
-    }),
-    ...projectLiveExecutionFact(name, summary),
+    activity: createFailedActivity({ kind: readActivityKind(name), summary: name, toolName: name }),
+    ...projectLiveBackgroundFact(name, name),
   };
 }
 
-export function projectTuiRuntimeStatusActivity(message: string, channel: RuntimeUiChannel): TuiActivity | undefined {
-  const summary = normalizeStatusMessage(message);
-  if (!summary) {
-    return undefined;
-  }
-  return createRunningActivity({
-    kind: "status",
-    channel,
-    summary,
-    blockingLead: channel === "subagent",
-  });
+export function projectTuiRuntimeStatusActivity(message: string): TuiActivity | undefined {
+  const summary = message.trim();
+  return summary ? createRunningActivity({ kind: "status", summary }) : undefined;
 }
 
-function projectLiveExecutionFact(
-  name: string,
-  value: string | undefined,
-): Pick<TuiToolCallFact, "background" | "subagent"> {
-  const normalized = name.toLowerCase();
-  if (normalized === "background_run") {
-    return { background: value };
-  }
-  if (normalized === "subagent_launch") {
-    return { subagent: value };
-  }
-  return {};
+function projectLiveBackgroundFact(name: string, value: string | undefined): Pick<TuiToolCallFact, "background"> {
+  return name.toLowerCase() === "background_run" ? { background: value } : {};
 }
 
-function readActivityKind(name: string, channel: RuntimeUiChannel): TuiActivityKind {
-  const normalized = name.toLowerCase();
-  if (normalized === "background_run") {
-    return "background";
-  }
-  if (channel === "subagent" || normalized === "subagent_launch") {
-    return "subagent";
-  }
-  return "tool";
+function readActivityKind(name: string): TuiActivityKind {
+  return name.toLowerCase() === "background_run" ? "background" : "tool";
 }
 
-function normalizeStatusMessage(message: string): string | undefined {
-  const trimmed = message.trim();
-  return trimmed || undefined;
-}
-
-function readRunningSummary(name: string, rawOutput: string, fallback: string): string | undefined {
+function readRunningSummary(name: string, rawOutput: string): string | undefined {
   const parsed = tryParseJson(rawOutput);
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return undefined;
-  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
   const status = (parsed as Record<string, unknown>).status;
-  if (status === "running" || status === "created") {
-    return `${fallback} ${status}`;
-  }
-  if (name === "background_run" || name === "subagent_launch") {
-    return undefined;
-  }
-  return undefined;
-}
-
-function shorten(value: string): string {
-  const normalized = value.replace(/\s+/g, " ").trim();
-  if (normalized.length <= 80) {
-    return normalized;
-  }
-  return `${normalized.slice(0, 77)}...`;
+  return status === "running" || status === "created" ? name : undefined;
 }

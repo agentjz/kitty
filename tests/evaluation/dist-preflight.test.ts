@@ -32,3 +32,24 @@ test("eval dist preflight passes when dist cli exists", () => {
 
   assert.equal(result.status, 0);
 });
+
+test("eval dist preflight rejects a bundle older than source", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "kitty-dist-stale-"));
+  const distPath = path.join(root, "dist", "cli.js");
+  const sourcePath = path.join(root, "src", "cli.ts");
+  fs.mkdirSync(path.dirname(distPath), { recursive: true });
+  fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
+  fs.writeFileSync(distPath, "", "utf8");
+  fs.writeFileSync(sourcePath, "", "utf8");
+  const now = new Date();
+  fs.utimesSync(distPath, new Date(now.getTime() - 2_000), new Date(now.getTime() - 2_000));
+  fs.utimesSync(sourcePath, now, now);
+
+  const result = spawnSync(process.execPath, [scriptPath], {
+    cwd: root,
+    encoding: "utf8",
+  });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /dist\/cli\.js is stale because src[\\/]cli\.ts is newer/);
+});

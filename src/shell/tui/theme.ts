@@ -11,7 +11,6 @@ export const TUI_COLORS = {
   accentBlue: "#8da9bd",
   user: "#d6bd86",
   assistant: "#edf0f2",
-  subagent: "#8da9bd",
   reasoning: "#a6abb0",
   thought: "#dfc992",
   system: "#a9b0b6",

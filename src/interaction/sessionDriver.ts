@@ -10,7 +10,7 @@ import type { HostTurnRunner } from "../host/types.js";
 import type { PromptRuntimeState } from "../agent/prompt/types.js";
 import type { RegisteredTool, ToolFilter } from "../tools/core/types.js";
 import type { RuntimeConfig, SessionRecord } from "../types.js";
-import { defaultInteractiveExitGuard, type InteractiveExitGuard, type InteractiveExitProcess } from "./exitGuard.js";
+import { defaultInteractiveExitGuard, type InteractiveExitGuard } from "./exitGuard.js";
 import { handleLocalCommand, type LocalCommandResult } from "./localCommands.js";
 import { getLocalCommandDefinition, normalizeLocalCommand } from "./localCommandDefinitions.js";
 import type { InteractionShell } from "./shell.js";
@@ -52,7 +52,7 @@ export class InteractiveSessionDriver {
   private readonly recoveryTimers = new Set<NodeJS.Timeout>();
   private lastInterruptNoticeAt = 0;
   private exitRequested = false;
-  private terminationInProgress = false;
+  private detachmentInProgress = false;
 
   constructor(private readonly options: InteractiveSessionDriverOptions) {
     this.session = options.session;
@@ -71,7 +71,7 @@ export class InteractiveSessionDriver {
         if (prompt.kind === "closed") {
           this.abortActiveTurns(true);
           await this.waitForActiveTurns();
-          await this.terminateRunningProcessesForForcedExit("Input closed. Stopping running processes before exit.");
+          await this.terminateOwnedProcesses();
           return this.session;
         }
 
@@ -82,8 +82,9 @@ export class InteractiveSessionDriver {
 
         const decision = await this.handleInput(input);
         if (decision === "quit") {
-          this.abortActiveTurns(false);
+          this.abortActiveTurns(true);
           await this.waitForActiveTurns();
+          await this.terminateOwnedProcesses();
           return this.session;
         }
         if (this.exitRequested) {
@@ -145,49 +146,8 @@ export class InteractiveSessionDriver {
   }
 
   private async handleQuitRequest(): Promise<LocalCommandResult> {
-    const exitGuard = this.options.exitGuard ?? defaultInteractiveExitGuard;
-
-    let runningProcesses: InteractiveExitProcess[];
-    try {
-      runningProcesses = await exitGuard.collectRunningProcesses(this.options.cwd);
-    } catch (error) {
-      this.options.shell.output.error(this.t("interaction.inspectProcessesFailed", { error: getErrorMessage(error) }));
-      return "handled";
-    }
-
-    if (runningProcesses.length === 0) {
-      this.options.shell.output.info(this.t("interaction.sessionSaved"));
-      return "quit";
-    }
-
-    this.options.shell.output.warn(this.t("interaction.runningProcesses"));
-    this.options.shell.output.plain(runningProcesses.map((process) => process.summary).join("\n"));
-
-    const confirmation = await this.options.shell.input.readInput(
-      this.t("interaction.killProcessesPrompt"),
-    );
-
-    if (confirmation.kind !== "submit" || !isYes(confirmation.value)) {
-      this.options.shell.output.info(this.t("interaction.exitCancelled"));
-      return "handled";
-    }
-
-    try {
-      const result = await exitGuard.terminateProcesses(runningProcesses, this.options.cwd);
-      if (result.failedPids.length > 0) {
-        this.options.shell.output.error(
-          this.t("interaction.stopProcessesPartial", { pids: result.failedPids.join(", ") }),
-        );
-        return "handled";
-      }
-
-      this.options.shell.output.warn(this.t("interaction.stoppedProcesses", { count: result.terminatedPids.length }));
-      this.options.shell.output.info(this.t("interaction.sessionSaved"));
-      return "quit";
-    } catch (error) {
-      this.options.shell.output.error(this.t("interaction.stopProcessesFailed", { error: getErrorMessage(error) }));
-      return "handled";
-    }
+    this.options.shell.output.info(this.t("interaction.sessionSaved"));
+    return "quit";
   }
 
   private handleInterrupt(): void {
@@ -219,9 +179,7 @@ export class InteractiveSessionDriver {
   private bindProcessTerminationCleanup(): () => void {
     const signals: NodeJS.Signals[] = ["SIGHUP", "SIGTERM", "SIGBREAK"];
     const handler = (signal: NodeJS.Signals): void => {
-      void this.terminateRunningProcessesForForcedExit(
-        `Received ${signal}. Stopping running processes before exit.`,
-      ).finally(() => {
+      void this.detachForForcedExit().finally(() => {
         process.exit(0);
       });
     };
@@ -237,36 +195,27 @@ export class InteractiveSessionDriver {
     };
   }
 
-  private async terminateRunningProcessesForForcedExit(reason: string): Promise<void> {
-    if (this.terminationInProgress) {
+  private async detachForForcedExit(): Promise<void> {
+    if (this.detachmentInProgress) {
       return;
     }
 
-    this.terminationInProgress = true;
+    this.detachmentInProgress = true;
     this.exitRequested = true;
     this.abortActiveTurns(true);
     await this.waitForActiveTurns();
+    await this.terminateOwnedProcesses();
+    this.options.shell.output.info(this.t("interaction.sessionSaved"));
+  }
 
+  private async terminateOwnedProcesses(): Promise<void> {
     const exitGuard = this.options.exitGuard ?? defaultInteractiveExitGuard;
-    try {
-      const runningProcesses = await exitGuard.collectRunningProcesses(this.options.cwd);
-      if (runningProcesses.length === 0) {
-        this.options.shell.output.info(this.t("interaction.sessionSaved"));
-        return;
-      }
-
-      this.options.shell.output.warn(reason);
-      this.options.shell.output.plain(runningProcesses.map((processInfo) => processInfo.summary).join("\n"));
-      const result = await exitGuard.terminateProcesses(runningProcesses, this.options.cwd);
-      if (result.failedPids.length > 0) {
-        this.options.shell.output.error(this.t("interaction.forcedStopPartial", { pids: result.failedPids.join(", ") }));
-        return;
-      }
-
-      this.options.shell.output.warn(this.t("interaction.forcedStopped", { count: result.terminatedPids.length }));
-      this.options.shell.output.info(this.t("interaction.sessionSaved"));
-    } catch (error) {
-      this.options.shell.output.error(this.t("interaction.forcedStopFailed", { error: getErrorMessage(error) }));
+    const running = await exitGuard.collectRunningProcesses(
+      this.options.cwd,
+        this.session.id,
+    );
+    if (running.length > 0) {
+      await exitGuard.terminateProcesses(running, this.options.cwd);
     }
   }
 

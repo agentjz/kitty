@@ -27,6 +27,7 @@ export const backgroundReadTool: RegisteredTool = {
       rootDir: context.projectContext.stateRootDir,
       id: readString(args.id, "id"),
       kind: "background",
+      ownerSessionId: context.ownerSessionId,
       mode: readOutputMode(args.mode),
       lines: clampNumber(args.lines, 1, 10_000, 80),
       maxChars: clampNumber(args.max_chars, 1, 1_000_000, 20_000),

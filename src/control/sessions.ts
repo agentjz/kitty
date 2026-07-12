@@ -80,7 +80,8 @@ export class SessionLedgerRepo {
   }
 
   list(limit: number): SessionRecord[] {
-    return (this.db.prepare("SELECT * FROM sessions ORDER BY updated_at DESC LIMIT ?").all(limit) as SessionRow[])
+    const rows = this.db.prepare("SELECT * FROM sessions ORDER BY updated_at DESC LIMIT ?").all(limit);
+    return (rows as SessionRow[])
       .map((row) => this.fromRow(row));
   }
 

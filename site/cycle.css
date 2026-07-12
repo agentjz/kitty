@@ -166,7 +166,7 @@
 }
 
 .agent-cycle[data-step="5"] .cycle-node-six .cycle-node-icon {
-  animation: subagent-context 1.4s ease-in-out infinite;
+  animation: background-pulse 1.4s ease-in-out infinite;
 }
 
 .cycle-output {
@@ -331,7 +331,7 @@
   transform: translateY(0);
 }
 
-@keyframes subagent-context {
+@keyframes background-pulse {
   0%,
   100% {
     box-shadow: 0 0 0 0 rgba(48, 58, 68, 0.2);

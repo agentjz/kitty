@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>如何设计一个智能体</title>
-<meta name="description" content="从工具循环、记忆、上下文、计划到子代理，理解一个智能体如何持续完成任务。">
+<meta name="description" content="从工具循环、记忆、上下文、计划到后台任务，理解一个智能体如何持续完成任务。">
 <meta property="og:title" content="如何设计一个智能体">
-<meta property="og:description" content="从工具循环、记忆、上下文、计划到子代理。">
+<meta property="og:description" content="从工具循环、记忆、上下文、计划到后台任务。">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet">
@@ -206,19 +206,16 @@ skill 细则：
       </div>
     </section>
 
-    <section class="chapter reveal" id="subagent">
+    <section class="chapter reveal" id="background">
       <div class="chapter-body">
-        <h2>子代理</h2>
-        <p>子代理是另一个拥有独立上下文的 agent。它把专项调查、大量文件和中间过程留在自己的上下文里，最后只把结论交回主 agent。这样主 agent 的上下文可以继续保留整个任务的目标、关键事实和决策。</p>
-        <p>历史压缩整理同一段会话里较早的信息；子代理隔离一块独立工作的上下文。两者分别处理时间方向和任务分支带来的上下文压力。</p>
-        <p>主 agent 给子代理一个明确目标、边界和期望结果；子代理带着自己的上下文和工具完成这块工作，再把压缩后的结果交回主 agent。</p>
+        <h2>后台任务</h2>
+        <p>长时间运行的命令可以进入后台。当前 agent 不需要停在原地等待，可以继续读取资料、修改文件或处理用户的新要求。</p>
+        <p>后台任务仍然属于当前会话。Kitty 记录它的进程、输出和终态；会话退出或终端异常关闭时，会回收属于这个会话的完整进程树。</p>
 
         <h3>具体例子</h3>
-        <p>主 agent 正在完成一个复杂任务，同时需要有人专门查看相关文件。它可以交给子代理：</p>
-        <pre><code>目标：查看相关文件，找出需要同步调整的地方。
-边界：只研究测试，不修改产品代码。
-期望结果：列出需要修改的测试文件和原因。</code></pre>
-        <p>Kitty 为子代理启动独立的 agent 循环。查看文件、工具结果和中间判断都留在子代理上下文；子代理完成后，把“需要修改的测试文件和原因”交回主 agent，再由主 agent 完成整个任务。</p>
+        <p>测试需要运行一段时间时，Kitty 可以启动后台命令：</p>
+        <pre><code>background_run("npm test")</code></pre>
+        <p>agent 继续处理其他工作，需要结果时再读取输出或等待终态。后台任务不会变成另一个 agent，也不会创建共享的对话记录。</p>
       </div>
     </section>
 
@@ -251,9 +248,9 @@ skill 细则：
               <span class="cycle-node-icon"><i class="bi bi-database-check" aria-hidden="true"></i></span>
               <span>记忆</span>
             </button>
-            <button class="cycle-node cycle-node-six" type="button" data-cycle-step="5" aria-label="查看子代理步骤">
-              <span class="cycle-node-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
-              <span>子代理</span>
+            <button class="cycle-node cycle-node-six" type="button" data-cycle-step="5" aria-label="查看后台任务步骤">
+              <span class="cycle-node-icon"><i class="bi bi-terminal" aria-hidden="true"></i></span>
+              <span>后台</span>
             </button>
             <button class="cycle-node cycle-node-seven" type="button" data-cycle-step="6" aria-label="查看生成计划步骤">
               <span class="cycle-node-icon"><i class="bi bi-list-check" aria-hidden="true"></i></span>

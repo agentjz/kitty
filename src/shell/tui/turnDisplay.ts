@@ -1,7 +1,5 @@
 import type { AgentCallbacks } from "../../agent/types.js";
 import type { InteractionTurnDisplay } from "../../interaction/shell.js";
-import type { RuntimeUiChannel, RuntimeUiEvent } from "../../runtime-ui/events.js";
-import { channelLabel } from "../../runtime-ui/theme.js";
 import type { TuiController } from "./controller.js";
 import type { TuiRuntimeDockState } from "./store.js";
 import { createRunningActivity } from "./activity.js";
@@ -29,28 +27,15 @@ export function createTuiTurnDisplay(options: {
       });
     }
   };
-  let visibleChannel: RuntimeUiChannel | undefined;
-  const ensureVisibleChannel = (channel: RuntimeUiChannel): void => {
-    if (visibleChannel === channel || isAborted()) {
-      return;
-    }
-    visibleChannel = channel;
-    options.controller.append("system", `[${channelLabel(channel, options.config.locale)}]`);
-  };
-
   options.abortSignal.addEventListener("abort", () => {
     aborted = true;
     finishTurn("aborted");
   });
 
   const callbacks: AgentCallbacks = {
-    onRuntimeUiEvent(event) {
-      renderRuntimeUiEvent(event);
-    },
     onModelWaitStart() {
       updateActivity(createRunningActivity({
         kind: "model",
-        channel: "lead",
         summary: translate(options.config.locale, "runtime.thinking"),
       }));
     },
@@ -116,7 +101,7 @@ export function createTuiTurnDisplay(options: {
       if (isAborted()) {
         return;
       }
-      const activity = projectTuiRuntimeStatusActivity(text, "system");
+      const activity = projectTuiRuntimeStatusActivity(text);
       options.controller.updateDock({
         activity,
       });
@@ -152,70 +137,17 @@ export function createTuiTurnDisplay(options: {
     });
   }
 
-  function renderRuntimeUiEvent(event: RuntimeUiEvent): void {
-    if (isAborted()) {
-      return;
-    }
-    ensureVisibleChannel(event.channel);
-    switch (event.kind) {
-      case "assistant_text":
-        if (event.message) {
-          options.controller.appendStreaming(event.channel === "subagent" ? "subagent" : "assistant", event.message);
-        }
-        return;
-      case "reasoning":
-        if (options.config.showReasoning && event.message) {
-          options.controller.appendStreaming(event.channel === "subagent" ? "subagent_reasoning" : "reasoning", event.message);
-        }
-        return;
-      case "status":
-        options.controller.updateDock({
-          activity: projectTuiRuntimeStatusActivity(event.message ?? "", event.channel),
-        });
-        return;
-      case "tool_call": {
-        const fact = projectTuiToolCallFact(event.toolName ?? "tool", event.payload ?? "{}", { channel: event.channel });
-        options.controller.updateDock(toDockPatch(fact));
-        return;
-      }
-      case "tool_result": {
-        const fact = projectTuiToolResultFact(event.toolName ?? "tool", event.payload ?? event.message ?? "");
-        options.controller.updateDock(toDockPatch(fact));
-        if (fact.transcript) {
-          options.controller.append("system", fact.transcript);
-        }
-        return;
-      }
-      case "tool_error": {
-        const fact = projectTuiToolErrorFact(event.toolName ?? "tool", event.payload ?? event.message ?? "");
-        options.controller.updateDock({
-          ...toDockPatch(fact),
-          activity: fact.activity
-            ? { ...fact.activity, channel: event.channel, blockingLead: event.channel === "subagent" }
-            : undefined,
-        });
-        options.controller.append("system", translate(options.config.locale, "runtime.toolFailed", {
-          name: event.toolName ?? "tool",
-        }));
-        return;
-      }
-    }
-  }
 }
 
 function toDockPatch(fact: {
   activity: TuiRuntimeDockState["activity"];
   background?: string;
-  subagent?: string;
 }): Partial<TuiRuntimeDockState> {
   const patch: Partial<TuiRuntimeDockState> = {
     activity: fact.activity,
   };
   if ("background" in fact) {
     patch.background = fact.background;
-  }
-  if ("subagent" in fact) {
-    patch.subagent = fact.subagent;
   }
   return patch;
 }

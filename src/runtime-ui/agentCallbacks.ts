@@ -4,7 +4,7 @@ import { createRuntimeUiEvent, type RuntimeUiChannel } from "./events.js";
 import { createRuntimeUiTerminalRenderer } from "./terminalRenderer.js";
 
 export function createRuntimeUiAgentCallbacks(input: {
-  channel: RuntimeUiChannel;
+  channel?: RuntimeUiChannel;
   cwd: string;
   config: Pick<RuntimeConfig, "locale" | "showReasoning"> & { terminalVerbosity?: "minimal" | "normal" | "verbose" };
   abortSignal?: AbortSignal;
@@ -42,30 +42,27 @@ export function createRuntimeUiAgentCallbacks(input: {
   return {
     flush: renderer.flush,
     callbacks: {
-      onRuntimeUiEvent(event) {
-        render(event);
-      },
       onReasoningDelta(delta) {
-        render(createRuntimeUiEvent({ channel: input.channel, kind: "reasoning", message: delta }));
+        render(createRuntimeUiEvent({ channel: input.channel ?? "agent", kind: "reasoning", message: delta }));
       },
       onReasoning(text) {
-        render(createRuntimeUiEvent({ channel: input.channel, kind: "reasoning", message: `${text}\n` }));
+        render(createRuntimeUiEvent({ channel: input.channel ?? "agent", kind: "reasoning", message: `${text}\n` }));
       },
       onAssistantDelta(delta) {
-        render(createRuntimeUiEvent({ channel: input.channel, kind: "assistant_text", message: delta }));
+        render(createRuntimeUiEvent({ channel: input.channel ?? "agent", kind: "assistant_text", message: delta }));
       },
       onAssistantStage(text) {
-        render(createRuntimeUiEvent({ channel: input.channel, kind: "assistant_text", message: text }));
+        render(createRuntimeUiEvent({ channel: input.channel ?? "agent", kind: "assistant_text", message: text }));
       },
       onAssistantText(text) {
-        render(createRuntimeUiEvent({ channel: input.channel, kind: "assistant_text", message: text }));
+        render(createRuntimeUiEvent({ channel: input.channel ?? "agent", kind: "assistant_text", message: text }));
       },
       onAssistantDone() {
         renderer.flush();
       },
       onToolCall(name, args) {
         render(createRuntimeUiEvent({
-          channel: input.channel,
+          channel: input.channel ?? "agent",
           kind: "tool_call",
           toolName: name,
           payload: args,
@@ -73,7 +70,7 @@ export function createRuntimeUiAgentCallbacks(input: {
       },
       onToolResult(name, output) {
         render(createRuntimeUiEvent({
-          channel: input.channel,
+          channel: input.channel ?? "agent",
           kind: "tool_result",
           toolName: name,
           payload: output,
@@ -81,7 +78,7 @@ export function createRuntimeUiAgentCallbacks(input: {
       },
       onToolError(name, error) {
         render(createRuntimeUiEvent({
-          channel: input.channel,
+          channel: input.channel ?? "agent",
           kind: "tool_error",
           toolName: name,
           payload: error,

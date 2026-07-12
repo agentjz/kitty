@@ -74,8 +74,6 @@ export const skillRunScriptTool: RegisteredTool = {
     });
     await recordSkillScriptUse(context.projectContext.stateRootDir, {
       sessionId: context.sessionId,
-      identityKind: context.identity.kind,
-      identityName: context.identity.name,
       skillName: skill.name,
       scriptPath: resource.path,
       ok: result.exitCode === 0 && !result.timedOut && !result.aborted && !result.stalled,
@@ -107,8 +105,6 @@ function normalizeResourcePath(value: string): string {
 
 async function recordSkillScriptUse(rootDir: string, input: {
   sessionId: string;
-  identityKind: string;
-  identityName: string;
   skillName: string;
   scriptPath: string;
   ok: boolean;
@@ -117,8 +113,6 @@ async function recordSkillScriptUse(rootDir: string, input: {
     event: "skill.script",
     status: input.ok ? "completed" : "failed",
     sessionId: input.sessionId,
-    identityKind: input.identityKind,
-    identityName: input.identityName,
     details: {
       skillName: input.skillName,
       scriptPath: input.scriptPath,

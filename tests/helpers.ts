@@ -91,10 +91,9 @@ export function createToolContext(root: string): ToolContext {
     config,
     cwd: root,
     sessionId: "test-session",
-    identity: {
-      kind: "lead",
-      name: "lead",
-    },
+    ownerSessionId: "test-session",
+    turnId: "test-turn",
+    toolCallId: "test-tool-call",
     runtimeState: {},
     projectContext: {
       rootDir: root,
@@ -113,6 +112,13 @@ export function createToolContext(root: string): ToolContext {
     }),
   };
 }
+
+export const TEST_EXECUTION_OWNER = {
+  ownerSessionId: "test-session",
+  createdBySessionId: "test-session",
+  parentTurnId: "test-turn",
+  originToolCallId: "test-tool-call",
+} as const;
 
 export function parseToolJson(output: string): Record<string, unknown> {
   return JSON.parse(output) as Record<string, unknown>;

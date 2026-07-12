@@ -7,7 +7,7 @@ import { translate } from "../../src/i18n/index.js";
 
 test("plain runtime renderer reads typed tool result state instead of formatted text", () => {
   const success = formatRuntimeUiEventLine(createRuntimeUiEvent({
-    channel: "lead",
+    channel: "agent",
     kind: "tool_result",
     toolName: "bash",
     payload: JSON.stringify({ ok: true, output: "done" }),
@@ -16,7 +16,7 @@ test("plain runtime renderer reads typed tool result state instead of formatted 
   assert.equal(success, "");
 
   const failed = formatRuntimeUiEventLine(createRuntimeUiEvent({
-    channel: "lead",
+    channel: "agent",
     kind: "tool_result",
     toolName: "bash",
     payload: JSON.stringify({ ok: true, output: "done" }),

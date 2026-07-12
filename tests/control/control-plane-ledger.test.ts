@@ -4,7 +4,7 @@ import test from "node:test";
 import { ControlPlaneLedger } from "../../src/control/ledger.js";
 import { createSessionRecord } from "../../src/session/store.js";
 import { ExecutionStore } from "../../src/execution/store.js";
-import { createTempWorkspace } from "../helpers.js";
+import { createTempWorkspace, TEST_EXECUTION_OWNER } from "../helpers.js";
 
 test("control plane ledger owns shell drafts independently from session messages", async (t) => {
   const root = await createTempWorkspace("control-interaction-draft", t);
@@ -28,12 +28,11 @@ test("control plane ledger persists execution lifecycle facts", async (t) => {
   const ledger = new ControlPlaneLedger(root);
 
   const created = ledger.executions.create({
-    kind: "background",
+    ...TEST_EXECUTION_OWNER,
     status: "created",
     command: "npm test",
     cwd: root,
-    requestedBy: "lead",
-    sessionId: "session-1",
+    requestedBy: "agent",
   });
 
   ledger.executions.markRunning(created.id, { pid: 1234 });
@@ -51,38 +50,9 @@ test("control plane ledger persists execution lifecycle facts", async (t) => {
   assert.equal(reloaded?.status, "completed");
   assert.equal(reloaded?.pid, 1234);
   assert.equal(reloaded?.exitCode, 0);
-  assert.equal(reloaded?.sessionId, "session-1");
-  assert.equal(reloaded?.waitPolicy?.lead, "none");
+  assert.equal(reloaded?.ownerSessionId, TEST_EXECUTION_OWNER.ownerSessionId);
   assert.ok(reloaded?.startedAt);
   assert.ok(reloaded?.finishedAt);
-
-  ledger.close();
-});
-
-test("control plane ledger persists execution wait policy facts", async (t) => {
-  const root = await createTempWorkspace("control-wait-policy", t);
-  const ledger = new ControlPlaneLedger(root);
-
-  const created = ledger.executions.create({
-    kind: "subagent",
-    status: "created",
-    prompt: "inspect context",
-    cwd: root,
-    requestedBy: "lead",
-    waitPolicy: {
-      lead: "while_execution_active",
-      wake: "required",
-      scope: "global",
-    },
-  });
-
-  const reader = new ControlPlaneLedger(root);
-  const reloaded = reader.executions.load(created.id);
-  reader.close();
-
-  assert.equal(reloaded?.waitPolicy?.lead, "while_execution_active");
-  assert.equal(reloaded?.waitPolicy?.wake, "required");
-  assert.equal(reloaded?.waitPolicy?.scope, "global");
 
   ledger.close();
 });
@@ -91,11 +61,11 @@ test("control plane ledger records wake signals as facts", async (t) => {
   const root = await createTempWorkspace("control-wake", t);
   const ledger = new ControlPlaneLedger(root);
   const execution = ledger.executions.create({
-    kind: "background",
+    ...TEST_EXECUTION_OWNER,
     status: "created",
     command: "long task",
     cwd: root,
-    requestedBy: "lead",
+    requestedBy: "agent",
   });
 
   const signal = ledger.wakeSignals.publish({
@@ -139,7 +109,7 @@ test("control plane ledger persists task lifecycle facts", async (t) => {
   reader.close();
 
   assert.equal(started.stage, "normal_work");
-  assert.equal(waiting.stage, "delegated_wait");
+  assert.equal(waiting.stage, "background_wait");
   assert.equal(completed.stage, "completed");
   assert.equal(reloaded?.id, started.id);
   assert.deepEqual(reloaded?.activeExecutionIds, []);
@@ -253,10 +223,10 @@ test("execution close publishes exactly one wake signal", async (t) => {
   const root = await createTempWorkspace("control-atomic-wake", t);
   const store = new ExecutionStore(root);
   const execution = store.create({
-    kind: "subagent",
-    prompt: "inspect",
+    ...TEST_EXECUTION_OWNER,
+    command: "inspect",
     cwd: root,
-    requestedBy: "lead",
+    requestedBy: "agent",
   });
   store.close(execution.id, { status: "completed", summary: "done" });
   store.close(execution.id, { status: "completed", summary: "done" });

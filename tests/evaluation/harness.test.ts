@@ -26,8 +26,7 @@ test("evaluation harness defines current local acceptance checks", () => {
     "tool-output-governance-ready",
     "production-scene-ready",
     "host-turn-boundary-runs",
-    "background-subagent-lifecycle-ready",
-    "delegation-behavior-boundary-ready",
+    "background-lifecycle-ready",
     "remote-entrypoints-available",
     "recovery-drills-pass",
   ]);
@@ -77,8 +76,7 @@ test("evaluation harness runs local machine-verifiable checks", async (t) => {
   assert.ok(result.checks.some((check) => check.id === "tool-output-governance-ready"));
   assert.ok(result.checks.some((check) => check.id === "production-scene-ready"));
   assert.ok(result.checks.some((check) => check.id === "host-turn-boundary-runs"));
-  assert.ok(result.checks.some((check) => check.id === "background-subagent-lifecycle-ready"));
-  assert.ok(result.checks.some((check) => check.id === "delegation-behavior-boundary-ready"));
+  assert.ok(result.checks.some((check) => check.id === "background-lifecycle-ready"));
   assert.ok(result.checks.some((check) => check.id === "remote-entrypoints-available"));
   assert.ok(result.checks.some((check) => check.id === "recovery-drills-pass"));
 });

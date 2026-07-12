@@ -72,13 +72,15 @@ export async function runProductionSceneCheck(id: EvaluationCheckId, rootDir: st
   const ledger = new ControlPlaneLedger(workspace);
   try {
     ledger.executions.create({
-      kind: "background",
       status: "running",
       command: "long production task",
       cwd: workspace,
-      requestedBy: "lead",
+      requestedBy: "eval",
       pid: process.pid,
-      sessionId: session.id,
+      ownerSessionId: session.id,
+      createdBySessionId: session.id,
+      parentTurnId: "scene-turn",
+      originToolCallId: "scene-tool-call",
     });
   } finally {
     ledger.close();

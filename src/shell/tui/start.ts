@@ -60,7 +60,9 @@ export async function startTuiChat(options: StartTuiChatOptions): Promise<void> 
   });
   controller.updateDock({
     ...projectRuntimeStatusToDock(
-      await buildRuntimeStatus(projectContext.stateRootDir, options.config.locale),
+      await buildRuntimeStatus(projectContext.stateRootDir, options.config.locale, {
+        ownerSessionId: selected.session.id,
+      }),
       selected.session,
     ),
     model: options.config.model,
@@ -70,6 +72,7 @@ export async function startTuiChat(options: StartTuiChatOptions): Promise<void> 
     readLiveDock: () => readTuiLiveExecutionDock({
       rootDir: projectContext.stateRootDir,
       cwd: selected.cwd,
+      ownerSessionId: selected.session.id,
     }),
   });
   const shell = createTuiInteractionShell(controller);

@@ -22,7 +22,7 @@ import type { RuntimeStatus } from "../../src/runtime/status.js";
 import { TuiTranscriptProjection } from "../../src/shell/tui/transcriptProjection.js";
 import type { SessionRecord } from "../../src/types.js";
 import type { TuiTranscriptEntry } from "../../src/shell/tui/store.js";
-import { createTempWorkspace } from "../helpers.js";
+import { createTempWorkspace, TEST_EXECUTION_OWNER } from "../helpers.js";
 
 const viewport: TuiViewport = {
   width: 20,
@@ -64,60 +64,13 @@ test("tui context budget defaults to zero before runtime facts arrive", () => {
   assert.equal(formatContextBudget(undefined), "0%");
 });
 
-test("tui dock projects background and subagent facts from runtime status", () => {
-  const dock = projectRuntimeStatusToDock({
-    sessions: {
-      latest: {
-        contextBudget: {
-          estimatedChars: 250,
-          limitChars: 1000,
-          usageRatio: 0.25,
-        },
-      },
-    },
-    scene: {
-      executions: [
-        { id: "bg", kind: "background", status: "running", risk: "watch", summary: "watch server" },
-        { id: "sub", kind: "subagent", status: "running", risk: "none", summary: "inspect files" },
-      ],
-    },
-  } as RuntimeStatus, undefined);
-
-  assert.notEqual(dock.background, undefined);
-  assert.notEqual(dock.subagent, undefined);
-  assert.equal(dock.context, "0%");
-});
-
 test("tui execution dock only keeps active control-plane lanes", () => {
   const dock = projectTuiExecutionDockFacts([
-    { kind: "background", status: "running", summary: "watch server", risk: "watch" },
-    { kind: "subagent", status: "completed", summary: "inspect files" },
+    { status: "running", risk: "watch" },
+    { status: "completed" },
   ]);
 
   assert.notEqual(dock.background, undefined);
-  assert.equal(dock.subagent, undefined);
-});
-
-test("tui live execution dock clears a completed subagent from the control plane", async (t) => {
-  const root = await createTempWorkspace("tui-live-execution-dock", t);
-  const store = new ExecutionStore(root);
-  const execution = store.create({
-    kind: "subagent",
-    assignment: {
-      objective: "inspect files",
-    },
-    cwd: root,
-    requestedBy: "lead",
-  });
-
-  assert.notEqual(readTuiLiveExecutionDock({ rootDir: root, cwd: root }).subagent, undefined);
-
-  store.close(execution.id, {
-    status: "completed",
-    summary: "inspection complete",
-  });
-
-  assert.equal(readTuiLiveExecutionDock({ rootDir: root, cwd: root }).subagent, undefined);
 });
 
 test("tui transcript sticks to bottom unless user scrolls history", () => {

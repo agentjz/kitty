@@ -2,6 +2,7 @@ import { mkdir, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { spawn } from "node:child_process";
+import { execFileSync } from "node:child_process";
 
 const mode = process.argv[2];
 if (mode !== "core" && mode !== "evaluation") {
@@ -39,6 +40,16 @@ const child = spawn(process.execPath, [
   windowsHide: true,
 });
 
+const shutdownSignals = ["SIGINT", "SIGTERM", "SIGHUP", "SIGBREAK"];
+for (const signal of shutdownSignals) {
+  process.once(signal, () => {
+    if (settled) return;
+    settled = true;
+    terminateChildTree(child.pid);
+    void cleanupGeneratedTestState().finally(() => process.exit(1));
+  });
+}
+
 let settled = false;
 child.on("error", async (error) => {
   if (settled) return;
@@ -58,6 +69,19 @@ child.on("exit", async (code, signal) => {
   }
   process.exit(code ?? 1);
 });
+
+function terminateChildTree(pid) {
+  if (!pid) return;
+  try {
+    if (process.platform === "win32") {
+      execFileSync("taskkill.exe", ["/PID", String(pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+    } else {
+      child.kill("SIGTERM");
+    }
+  } catch {
+    try { child.kill("SIGKILL"); } catch {}
+  }
+}
 
 async function cleanupGeneratedTestState() {
   await Promise.all([

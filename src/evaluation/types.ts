@@ -9,8 +9,7 @@ export type EvaluationCheckId =
   | "tool-output-governance-ready"
   | "production-scene-ready"
   | "host-turn-boundary-runs"
-  | "background-subagent-lifecycle-ready"
-  | "delegation-behavior-boundary-ready"
+  | "background-lifecycle-ready"
   | "remote-entrypoints-available"
   | "recovery-drills-pass";
 

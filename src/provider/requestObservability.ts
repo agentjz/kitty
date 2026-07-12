@@ -5,8 +5,6 @@ import { hasProviderUsageSnapshot } from "./usageNormalizer.js";
 export interface ProviderRequestObservability {
   rootDir: string;
   sessionId: string;
-  identityKind?: string;
-  identityName?: string;
   configuredModel: string;
   turnId?: string;
   requestId?: string;
@@ -39,8 +37,6 @@ export async function recordProviderRequestEvent(input: {
     turnId: observability.turnId,
     requestId: input.requestId ?? observability.requestId,
     attemptId: input.attemptId,
-    identityKind: observability.identityKind,
-    identityName: observability.identityName,
     model: input.request.model,
     durationMs: input.startedAt === undefined ? undefined : Date.now() - input.startedAt,
     error: input.error,

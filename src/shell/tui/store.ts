@@ -24,7 +24,6 @@ export type {
 export interface TuiRuntimeDockState {
   activity?: TuiActivity;
   background?: string;
-  subagent?: string;
   context: string;
   model?: string;
   turnStartedAt?: number;
@@ -150,8 +149,6 @@ export function appendTranscriptText(
   if (last && last.role === role && (
     role === "assistant"
     || role === "reasoning"
-    || role === "subagent"
-    || role === "subagent_reasoning"
   )) {
     const transcript = state.transcript.slice(0, -1);
     const next = {

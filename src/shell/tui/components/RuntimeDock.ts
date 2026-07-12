@@ -36,9 +36,6 @@ export function createRuntimeDockComponent(kit: Pick<InkRuntime, "React" | "Box"
     if (props.dock.background) {
       facts.push({ label: translate(locale, "tui.background"), value: props.dock.background });
     }
-    if (props.dock.subagent) {
-      facts.push({ label: translate(locale, "tui.subagent"), value: props.dock.subagent });
-    }
     const compactFacts = facts.map(({ label, value }) => `${label} ${value}`).join("  ·  ");
     return React.createElement(
       Box,
@@ -97,7 +94,6 @@ function renderActivityRow(
   }
 
   const label = readActivityLabel(activity, locale);
-  const blocker = activity.blockingLead ? `  ${translate(locale, "tui.blockingLead")}` : "";
   const detail = activity.detail ? `  ${activity.detail}` : "";
   return React.createElement(
     Box,
@@ -105,7 +101,6 @@ function renderActivityRow(
     React.createElement(Text, { color }, readActivityMarker(activity, animation)),
     React.createElement(Text, { color, bold: activity.status === "failed" }, `${label}：`),
     React.createElement(Text, { color: TUI_COLORS.text, wrap: "truncate-end" }, activity.summary),
-    blocker ? React.createElement(Text, { color: TUI_COLORS.warning }, blocker) : null,
     detail ? React.createElement(Text, { color: TUI_COLORS.muted, wrap: "truncate-end" }, detail) : null,
   );
 }
@@ -128,10 +123,7 @@ function readActivityLabel(activity: TuiActivity, locale: KittyLocale): string {
     return translate(locale, "tui.failed");
   }
   if (activity.status === "waiting") {
-    return translate(locale, activity.channel === "subagent" ? "tui.subagentWaiting" : "tui.waiting");
-  }
-  if (activity.channel === "subagent") {
-    return translate(locale, "tui.subagentRunning");
+    return translate(locale, "tui.waiting");
   }
   if (activity.kind === "background") {
     return translate(locale, "tui.backgroundRunning");

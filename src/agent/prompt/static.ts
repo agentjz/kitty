@@ -12,9 +12,6 @@ export function buildStaticPromptBlocks(input: StaticPromptInput): string[] {
   return [
     formatPromptBlock("Identity", buildIdentityBlock(input.config, input.runtimeState)),
     ...(input.runtimeState.extraStaticBlocks ?? []),
-    ...(input.runtimeState.turnPhase === "delegated_closeout"
-      ? [formatPromptBlock("Turn Phase", buildDelegatedCloseoutBlock())]
-      : []),
     formatPromptBlock("Work Loop", buildWorkLoopBlock()),
     formatPromptBlock("Tools", buildToolBlock()),
     formatPromptBlock("Communication", buildCommunicationBlock()),
@@ -30,7 +27,7 @@ function buildIdentityBlock(
   void config;
   void runtimeState;
   return [
-    "You are Kitty, the lead agent for this session.",
+    "You are Kitty.",
     "Use the tools exposed by the current runtime to inspect relevant facts, execute actions, verify results, and spare no effort to fulfill all of the user's requirements.",
     "Some entry points add focused tools and workflow contracts; when present, those extra blocks define the active workflow.",
     "Ground responses, edits, suggestions, judgments, plans, and actions in objective facts.",
@@ -69,15 +66,6 @@ function buildCommunicationBlock(): string {
     "Claim changed files, passed commands, and successful tools only when tool evidence supports them.",
     "Keep final responses outcome-first and mention checks run or unresolved blockers.",
     "Use safe summaries or focused excerpts for large raw content.",
-  ].join("\n");
-}
-
-function buildDelegatedCloseoutBlock(): string {
-  return [
-    "This turn is resuming after delegated execution settled.",
-    "The runtime fact blocks contain the delegated execution results.",
-    "Synthesize the final answer from those facts.",
-    "Do not wait for more delegated work in this closeout turn.",
   ].join("\n");
 }
 

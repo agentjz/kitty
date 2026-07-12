@@ -30,7 +30,7 @@ export async function runOneShotPrompt(
 ): Promise<OneShotPromptRunResult> {
   void options;
   const runtimeUi = createRuntimeUiAgentCallbacks({
-    channel: "lead",
+    channel: "agent",
     config,
     cwd,
     assistantLeadingBlankLine: false,

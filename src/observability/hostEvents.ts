@@ -3,26 +3,19 @@ import path from "node:path";
 import { recordObservabilityEvent } from "./writer.js";
 import { PROJECT_STATE_DIR_NAME } from "../project/statePaths.js";
 
-export interface HostIdentityInput {
-  identityKind?: string;
-  identityName?: string;
-}
-
 export async function recordHostTurnStarted(
   rootDir: string,
   input: {
     host: string;
     sessionId: string;
     cwd: string;
-  } & HostIdentityInput,
+  },
 ): Promise<void> {
   await recordObservabilityEvent(rootDir, {
     event: "host.turn",
     status: "started",
     host: input.host,
     sessionId: input.sessionId,
-    identityKind: input.identityKind,
-    identityName: input.identityName,
     details: {
       cwd: input.cwd,
     },
@@ -39,15 +32,13 @@ export async function recordHostTurnFinished(
     cwd: string;
     error?: unknown;
     details?: Record<string, unknown>;
-  } & HostIdentityInput,
+  },
 ): Promise<void> {
   await recordObservabilityEvent(rootDir, {
     event: "host.turn",
     status: input.status,
     host: input.host,
     sessionId: input.sessionId,
-    identityKind: input.identityKind,
-    identityName: input.identityName,
     durationMs: input.durationMs,
     error: input.error,
     details: {

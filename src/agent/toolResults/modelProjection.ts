@@ -45,14 +45,11 @@ function projectRawToolResultForModel(input: {
     case "bash":
       return projectBash(parsed);
     case "background_check":
-    case "subagent_check":
       return projectExecutionCheck(parsed);
     case "background_read":
-    case "subagent_read":
       return projectExecutionRead(parsed);
     case "background_wait":
     case "background_stop":
-    case "subagent_cancel":
       return projectExecutionAction(parsed);
     case "skill_load":
       return projectSkillLoad(parsed);

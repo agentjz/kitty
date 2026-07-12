@@ -1,6 +1,6 @@
 import type { TuiMarkdownLineKind } from "./markdown.js";
 
-export type TuiTranscriptRole = "user" | "assistant" | "reasoning" | "system" | "subagent" | "subagent_reasoning";
+export type TuiTranscriptRole = "user" | "assistant" | "reasoning" | "system";
 
 export interface TuiTranscriptEntry {
   id: string;
@@ -60,7 +60,6 @@ export interface TuiTranscriptTheme {
   muted: string;
   user: string;
   assistant: string;
-  subagent: string;
   reasoning: string;
   thought: string;
   system: string;

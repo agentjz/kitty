@@ -1,7 +1,7 @@
 import type { ChatCompletionTool } from "openai/resources/chat/completions";
 
 import type { ChangeStore } from "../../agent/changes/store.js";
-import type { AgentCallbacks, AgentIdentity } from "../../agent/types.js";
+import type { AgentCallbacks } from "../../agent/types.js";
 import type {
   ProjectContext,
   RuntimeConfig,
@@ -67,7 +67,9 @@ export interface ToolContext {
   config: RuntimeConfig;
   cwd: string;
   sessionId: string;
-  identity: AgentIdentity;
+  ownerSessionId: string;
+  turnId: string;
+  toolCallId: string;
   callbacks?: AgentCallbacks;
   abortSignal?: AbortSignal;
   runtimeState?: {

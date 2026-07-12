@@ -16,6 +16,7 @@ import type {
 } from "./types.js";
 import { summarizeChecks } from "./types.js";
 import { runProductionRepairCheck } from "./productionRepair.js";
+import { prepareCheckWorkspace } from "./workspace.js";
 
 export const PRODUCTION_EVALUATION_CHECK_IDS: readonly ProductionEvaluationCheckId[] = [
   "production-config-preflight",
@@ -152,7 +153,8 @@ async function runProductionEvaluationCheck(
         return await runProductionRepairCheck(id, rootDir);
       }
       case "production-runtime-status": {
-        const status = await buildRuntimeStatus(rootDir);
+        const workspace = await prepareCheckWorkspace(rootDir, "production-runtime-status");
+        const status = await buildRuntimeStatus(workspace);
         return passed(
           id,
           `production runtime status ready: sessions=${status.sessions.total}, executions=${status.executions.total}, skills=${status.skills.total}, headline="${status.scene.headline}", next="${status.scene.nextAction}"`,

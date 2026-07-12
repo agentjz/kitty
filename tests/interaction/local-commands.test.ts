@@ -13,7 +13,7 @@ import type { ShellOutputPort } from "../../src/interaction/shell.js";
 import { SessionEventStore } from "../../src/session/events.js";
 import { InProcessSessionStore, SessionStore, type SessionStoreLike } from "../../src/session/store.js";
 import type { SessionRecord } from "../../src/types.js";
-import { createTempWorkspace, createTestRuntimeConfig } from "../helpers.js";
+import { createTempWorkspace, createTestRuntimeConfig, TEST_EXECUTION_OWNER } from "../helpers.js";
 import { InteractiveSessionDriver } from "../../src/interaction/sessionDriver.js";
 import { TuiController } from "../../src/shell/tui/controller.js";
 import { createTuiInteractionShell } from "../../src/shell/tui/shell.js";
@@ -69,10 +69,12 @@ test("runtime slash commands are handled locally", async (t) => {
 
   const backgroundStore = new BackgroundExecutionStore(root);
   const execution = backgroundStore.create({
+    ...TEST_EXECUTION_OWNER,
     command: "echo slash-background",
     cwd: root,
     requestedBy: "test",
-    sessionId: context.session.id,
+    ownerSessionId: context.session.id,
+    createdBySessionId: context.session.id,
   });
   backgroundStore.close(execution.id, {
     status: "completed",

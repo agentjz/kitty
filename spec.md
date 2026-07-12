@@ -10,18 +10,18 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 
 产品目标是持久化的智能体工作能力：
 
-- 单一 lead agent 循环；
+- 每个 session 一个 agent loop；
 - 可持久保存的 session 与任务事实；
 - 支持长任务的有界上下文；
 - core 工具与可选 extension；
-- 后台命令与 subagent；
+- 后台命令；
 - 可观测、可恢复的宿主运行边界。
 
 核心规则：
 
 - 模型负责计划、优先级和语义取舍。
 - 机器模块负责执行、校验、持久化和暴露事实。
-- CLI、TUI、Telegram 和 worker 复用同一条 host turn 边界。
+- CLI、TUI、Telegram 和本地 API 复用同一条 host turn 边界。
 - 不保留兼容层、别名、旧状态或平行事实源。
 - 代码、测试、CLI 输出和本文档必须描述同一个当前产品事实。
 
@@ -89,7 +89,7 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 ### 职责
 
 - `src/agent/`：模型驱动的 turn 循环、prompt layer、profile、工具批次推进、turn 持久化和标题更新。
-- `src/host/`：所有宿主共用的生命周期、session 绑定、工具注册表创建、turn 事件、abort 处理、lead 等待与恢复。
+- `src/host/`：所有宿主共用的生命周期、session 绑定、工具注册表创建、turn 事件、abort 处理与恢复。
 - `src/interaction/`：宿主无关的交互输入输出驱动。
 
 本地命令名称、别名、分类、说明和解析只由 `src/interaction/localCommandDefinitions.ts` 持有。CLI/TUI 等壳可以采用不同呈现，但必须把规范输入交回 `InteractiveSessionDriver`；壳不能直接调用命令 handler 或维护第二张命令表。
@@ -103,9 +103,8 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 1. 将输入写入 durable turn queue。
 2. 按 session 队首原子 claim owner token，并维持 lease heartbeat。
 3. 记录带 turn ID 的 `turn.started` 事实并创建工具注册表。
-4. 运行 lead 或 worker agent turn；所有 session 写入和工具边界校验 owner token。
-5. 当 execution 拥有阻塞型 wait policy 时处理 lead 等待。
-6. 记录 completed、failed 或 aborted 终态并释放 lease。
+4. 运行当前 session 的 agent turn；所有 session 写入和工具边界校验 owner token。
+5. 记录 completed、failed 或 aborted 终态并释放 lease。
 
 `runAgentTurn()` 负责模型/工具循环。每一轮循环：
 
@@ -119,7 +118,7 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 
 交互宿主在 active turn 期间收到的普通外部输入不是新 turn，而是写入 SQLite `turn_steers` 的 durable steer。Steer 按 turn 内 sequence 排序，状态为 `pending`、`consumed` 或 `rejected`；agent 在下一次 context 构建前消费，并以确定 message ID 写入同一 session。Final answer 进入持久化前必须通过 turn `closing` 事务边界确认没有 pending steer；若同时到达新 steer，则保存当前 assistant 输出并继续同一 turn。
 
-`Ctrl+C` 是显式 abort：当前 turn 进入 aborted，未消费 steer 进入 rejected。中断清理尚未结束时的新输入必须 admit 为下一 durable turn，不能写到即将 aborted 的 owner。终端 EOF/关闭是 recoverable detach：停止本地执行但把 active turn 放回 queued，pending steer 保持 pending；进程强杀后由 lease expiry 完成同一 turn 恢复。任何时刻同一 session 只能有一个有效 execution owner。
+`Ctrl+C` 是显式 abort：当前 turn 进入 aborted，未消费 steer 进入 rejected。中断清理尚未结束时的新输入必须 admit 为下一 durable turn，不能写到即将 aborted 的 owner。`/exit`、终端 EOF/关闭和宿主终止信号把 active turn 放回 queued，同时只终止当前 session 的 background 进程；其他 session 不受影响。父进程被强杀时，background 的父死亡监护器负责终止目标进程树，重启后 lease reconcile 把未收口记录转成明确终态。任何时刻同一 session 只能有一个有效 turn owner。
 
 Provider request 是临时失败的唯一重试 owner：同一逻辑请求最多四次调用、总等待最多 90 秒，并优先采用服务端 `Retry-After`。Agent turn 不得重新发送已耗尽重试预算的请求。Abort 必须中断当前请求或等待，不能伪造正常完成。
 
@@ -196,7 +195,6 @@ Provider request 边界把 adapter、transport 和 SDK 失败归一为 `Provider
 - `worktree`：Git worktree 生命周期。
 - `network`：结构化 HTTP 工作。
 - `background`：可持久追踪的非阻塞命令执行。
-- `subagent`：聚焦的独立 agent execution。
 - `skills`：运行时 skill 发现与显式加载。
 
 Extension 只在配置启用时进入同一工具注册表。它们不是另一条 agent loop，也不是 core 工具。
@@ -208,15 +206,21 @@ Extension 只在配置启用时进入同一工具注册表。它们不是另一�
 ### 职责
 
 - `src/control/`：session、turn、tool call、context epoch、task lifecycle、execution、wake 和 runtime event 的 SQLite schema 与账本。
-- `src/execution/`：execution 启动、worker 生命周期、输出读取、reconcile、取消、lead wait 和进程树终止。
-- `src/subagent/`：subagent 专用 execution 构建。
+- `src/execution/`：后台 execution 启动、输出读取、reconcile、取消和进程树终止。
 
-`.kitty/control-plane.sqlite` 是运行事实的唯一持久主干。Execution 保存 kind、state、assignment、工作目录、pid、owner token、heartbeat、lease、output/summary、wait policy、timeout 和关闭事实。
+项目目录是持久化与管理员审阅边界；session 是运行所有权边界。每个 session 独立保存消息、turn、草稿和后台 execution，普通 session picker 只投影用户会话。
+
+每条 execution 必须持久化 `ownerSessionId`、`createdBySessionId`、`parentTurnId` 与 `originToolCallId`。这些字段从 host -> agent turn -> tool call -> background 显式传递；业务归属不能从 cwd、时间差、全局集合或异步隐藏上下文推断。Session-facing list/read/wait/stop/cancel、runtime status 与 TUI dock 必须从 `ownerSessionId` 查询。
+
+后台查询只读取当前 `ownerSessionId + parentTurnId + originToolCallIds` 创建的 execution，不能使用工具批次前后的全局集合差值。Turn/session 写入使用显式 turn-scoped store 与 lease token；execution lease 同样通过函数参数校验，不使用隐藏上下文提供业务事实。
+
+当前 control-plane schema 只支持当前数据模型。新项目重建不读取、不迁移、不修复旧数据库；旧 SQLite 文件直接删除后按当前 schema 创建。
+
+`.kitty/control-plane.sqlite` 是运行事实的唯一持久主干。Execution 保存 kind、state、command、工作目录、session/turn/tool-call ownership、pid、output/summary、timeout 和关闭事实。
 
 当前 execution kind：
 
 - `background`：非阻塞的本地命令执行。
-- `subagent`：独立 worker agent 执行。
 
 当前 state：
 
@@ -229,13 +233,9 @@ Extension 只在配置启用时进入同一工具注册表。它们不是另一�
 - `aborted`
 - `lost`
 
-### Background 与 Subagent 语义
+### Background 语义
 
-`background_run` 启动非阻塞 execution。读取、等待、停止和 CLI 命令都读取同一份 control-plane record。
-
-`subagent_launch` 记录 objective、boundary、expected output、worker identity 和阻塞型 lead wait policy。Subagent 运行时，lead host 让出当前轮。等待期间，worker runtime UI event 会复放到 lead 当前输出流。Execution 收束后，host 从终态 execution 构建 wake fact，并恢复 lead 做收口。
-
-Lead 不能根据工具名称或展示字符串猜测 execution 状态，只能读取 execution record。Deadline 到达时进入 cancelling，终止进程树，确认后进入 aborted 并唤醒 lead。
+`background_run` 启动非阻塞 execution。读取、等待、停止和 CLI 命令都读取同一份 control-plane record。Agent 不能根据工具名称或展示字符串猜测 execution 状态，只能读取 execution record。Deadline 到达时进入 cancelling，终止进程树，确认后进入 aborted 并发布 wake signal。
 
 ### 取消与恢复
 
@@ -275,7 +275,7 @@ Terminal log 使用 UTF-8，记录可读的用户输入、reasoning、assistant 
 - `src/host/localApi.ts`：本地 session/message/event/status API。
 - `src/telegram/`：Telegram polling host。
 
-`kitty`、`kitty tui`、`kitty agent`、Telegram 和 worker 命令都进入同一条 host/agent turn 主链路。`status`、`events`、`background`、`execution`、`doctor`、`eval` 等 CLI 命令暴露已存事实，不能创建平行生命周期语义。
+`kitty`、`kitty tui`、`kitty agent`、Telegram 和本地 API 都进入同一条 host/agent turn 主链路。`status`、`events`、`background`、`doctor`、`eval` 等 CLI 命令暴露已存事实，不能创建平行生命周期语义。
 
 ### TUI
 
@@ -292,19 +292,18 @@ TUI 规则：
 - 未提交草稿同步写入 SQLite `interaction_drafts`，以 session ID 和 shell 为 owner；只有数据库短暂占用时才进入待写重试。草稿不属于 session message 或模型上下文；提交时清除，正常退出时 flush，恢复时 clamp cursor。
 - 命令、历史和帮助共享一个判别式 overlay 状态；同一时刻只能有一个顶层交互，响应式行预算不能覆盖 composer、dock 或 transcript。
 - Transcript 滚动状态只能是 `follow` 或 `detached`。Detached 状态保存稳定 row anchor 和 unseen row count；流式追加、工具状态更新与 resize 不能把阅读位置拉回底部。
-- Input gateway 使用有状态 UTF-8 decoder 保留跨 chunk 的中文与 IME 提交，并对跨 chunk 的 SGR/X10 mouse press、drag、release 和 wheel 做完整 framing；鼠标序列不得进入 composer 键盘流。stdin EOF、close 或错误必须幂等关闭 controller 输入，让 active turn 进入 recoverable detach。Selection 使用渲染 row ID 与字符列，支持宽字符、跨行选择、边缘自动滚动和字符级高亮。
+- Input gateway 使用有状态 UTF-8 decoder 保留跨 chunk 的中文与 IME 提交，并对跨 chunk 的 SGR/X10 mouse press、drag、release 和 wheel 做完整 framing；鼠标序列不得进入 composer 键盘流。stdin EOF、close 或错误必须幂等关闭 controller 输入，让 active turn 进入 recoverable detach，并由 session driver 终止当前 root session tree 的进程。Selection 使用渲染 row ID 与字符列，支持宽字符、跨行选择、边缘自动滚动和字符级高亮。
 - 有 selection 时 `Ctrl+C` 复制，不触发 turn interrupt；无 selection 时才中断。Esc 清除 selection。Clipboard 优先使用平台 native provider，失败后在 TTY 使用 OSC52；复制失败必须保留 selection 并显示错误。
 - Session picker、TUI chrome、CLI/doctor/status/runtime UI、command/help、interaction 与 Telegram 提示读取 runtime locale 的 typed catalog。十二份 catalog 必须拥有完全一致的 key 与占位符集合，运行时不做语言 fallback。Locale 不能进入 prompt、session message、tool evidence 或 control-plane 状态；命令名、路径、provider/model、机器 JSON 和模型回复保持原文。
 
-- Transcript 的 user、assistant、reasoning、system、subagent、subagent-reasoning 使用同一个正文框架。Role 可以改变 gutter、颜色和强调，但不能改变正文起始列。
-- Footer 的 model 标签与 Runtime Dock 的 activity/background/subagent 标签使用同一个左侧内容 inset。
+- Transcript 的 user、assistant、reasoning、system 使用同一个正文框架。Role 可以改变 gutter、颜色和强调，但不能改变正文起始列。
+- Footer 的 model 标签与 Runtime Dock 的 activity/background 标签使用同一个左侧内容 inset。
 - Model metadata 位于 composer 下方左侧；context budget 位于右侧。Footer 不显示分隔点、斜杠命令或命令面板教学。
 - Context budget 必须属于当前选中的 session。项目全局 runtime status 不能用另一条最近已保存 session 的 budget 覆盖新建或已选 session。
 - 用户提交后到最终模型回答完成期间，TUI 在 Runtime Dock 第一行右侧显示本轮持续时间；思考、工具调用和后续模型请求不重置它。
-- Runtime Dock 保持稳定两行结构；第一行左侧展示当前 activity，过长摘要单行截断，右侧展示本轮持续时间；第二行展示 live background/subagent lane。
-- TUI 只显示 control-plane 状态为 `created`、`claimed`、`running` 或 `cancelling` 的 background/subagent lane。
+- Runtime Dock 保持稳定两行结构；第一行左侧展示当前 activity，右侧展示本轮持续时间；第二行展示 live background lane。activity 只显示工具名，不显示参数、命令或路径。
+- TUI 只显示 control-plane 状态为 `created`、`claimed`、`running` 或 `cancelling` 的 background lane。
 - 存在 live execution lane 时，TUI 轻量刷新 execution 账本。Execution 进入终态后必须清除 lane；启动时的 `running` 文案不能成为错误的当前状态。
-- 阻塞型 subagent 的 reasoning、工具动作和回答必须显示在当前 lead transcript，直到 lead 恢复。
 - 首屏 transcript 保持空白。User message 使用紧凑的低对比整行背景。Reasoning 是低强调信息。
 - Transcript 与 footer 之间使用一行空白背景，不使用显眼的分割线。
 
@@ -325,7 +324,7 @@ npm.cmd run test:build
 node --test .test-build/tests/shell/tui-command-menu.test.js .test-build/tests/shell/tui-external-editor.test.js .test-build/tests/shell/tui-gateway.test.js .test-build/tests/shell/tui-render.test.js .test-build/tests/shell/tui-store.test.js .test-build/tests/shell/tui-shell.test.js
 ```
 
-`scripts/run-tests.mjs` 统一运行 core/evaluation 测试。它为子进程提供仓库内隔离临时根，每个临时 workspace 建立独立项目发现边界，单项测试使用有界超时，并在结束或启动失败时清理生成状态。
+`scripts/run-tests.mjs` 统一运行 core/evaluation 测试。它为子进程提供仓库内隔离临时根，每个临时 workspace 建立独立项目发现边界，单项测试使用有界超时，并在结束、启动失败或收到终止信号时终止测试进程树并清理生成状态。会写 control plane 的 evaluation check 只在 `.test-tmp/evaluation` 隔离工作区运行，并在 suite 的 `finally` 中删除。
 
 显式产品验收：
 

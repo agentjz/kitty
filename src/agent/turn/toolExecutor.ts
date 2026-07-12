@@ -5,8 +5,7 @@ import { createToolRegistry } from "../../tools/index.js";
 import type { ProjectContext, SessionRecord, ToolCallRecord, ToolExecutionResult } from "../../types.js";
 import type { RunTurnOptions } from "../types.js";
 import { isAbortError } from "../../utils/abort.js";
-import { assertActiveTurnOwnership } from "../../control/turnOwnership.js";
-import { assertActiveExecutionOwnership } from "../../execution/ownership.js";
+import { ControlPlaneLedger } from "../../control/ledger.js";
 
 export async function executeToolCallWithRecovery(
   toolRegistry: ReturnType<typeof createToolRegistry>,
@@ -18,16 +17,14 @@ export async function executeToolCallWithRecovery(
   updateSession?: (session: SessionRecord) => Promise<void>,
 ): Promise<ToolExecutionResult> {
   try {
-  assertActiveTurnOwnership(session.id);
-  assertActiveExecutionOwnership();
+    assertExplicitOwnership(options, session);
     const result = await toolRegistry.execute(toolCall.function.name, toolCall.function.arguments, {
       config: options.config,
       cwd: options.cwd,
       sessionId: session.id,
-      identity: options.identity ?? {
-        kind: "lead",
-        name: "lead",
-      },
+      ownerSessionId: options.ownerSessionId ?? session.id,
+      turnId: options.turnId ?? "",
+      toolCallId: toolCall.id,
       callbacks: options.callbacks,
       abortSignal: options.abortSignal,
       runtimeState: {
@@ -50,11 +47,24 @@ export async function executeToolCallWithRecovery(
         await updateSession?.(session);
       },
     });
-  assertActiveTurnOwnership(session.id);
-  assertActiveExecutionOwnership();
+    assertExplicitOwnership(options, session);
     return result;
   } catch (error) {
     return buildToolExecutionFailureResult(toolCall, error);
+  }
+}
+
+function assertExplicitOwnership(options: RunTurnOptions, session: SessionRecord): void {
+  if (options.turnId && options.turnOwnerToken && options.stateRootDir) {
+    const ledger = new ControlPlaneLedger(options.stateRootDir);
+    try {
+      ledger.turns.assertOwner(options.turnId, options.turnOwnerToken);
+    } finally {
+      ledger.close();
+    }
+  }
+  if ((options.ownerSessionId ?? session.id) !== session.id) {
+    throw new Error(`Turn owner does not match session ${session.id}.`);
   }
 }
 

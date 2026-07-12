@@ -7,7 +7,7 @@ import { ControlPlaneLedger } from "../../src/control/ledger.js";
 import { appendObservabilityEvent } from "../../src/observability/writer.js";
 import { buildRuntimeStatus } from "../../src/runtime/status.js";
 import { SessionStore } from "../../src/session/store.js";
-import { createTempWorkspace, initGitRepo } from "../helpers.js";
+import { createTempWorkspace, initGitRepo, TEST_EXECUTION_OWNER } from "../helpers.js";
 
 test("runtime status projects the current project runtime facts", async (t) => {
   const root = await createTempWorkspace("runtime-status", t);
@@ -65,19 +65,13 @@ test("runtime status projects the current project runtime facts", async (t) => {
       reason: "turn_started",
     });
     const execution = ledger.executions.create({
-      kind: "subagent",
+      ...TEST_EXECUTION_OWNER,
       status: "running",
-      prompt: "Inspect runtime state.",
-      assignment: {
-        objective: "Inspect runtime visibility",
-        boundary: "Read-only runtime facts",
-        expectedOutput: "Concise summary",
-      },
+      command: "Inspect runtime state.",
       cwd: root,
-      requestedBy: "lead",
-      actorName: "alpha",
-      actorRole: "explorer",
-      sessionId: session.id,
+      requestedBy: "agent",
+      ownerSessionId: session.id,
+      createdBySessionId: session.id,
     });
     ledger.wakeSignals.publish({
       executionId: execution.id,
@@ -99,10 +93,9 @@ test("runtime status projects the current project runtime facts", async (t) => {
   assert.equal(status.sessions.latest?.workset?.files[0]?.path, "src/runtime/status.ts");
   assert.equal(status.executions.total, 1);
   assert.equal(status.executions.active.length, 1);
-  assert.equal(status.executions.active[0]?.assignment?.objective, "Inspect runtime visibility");
-  assert.equal(status.executions.active[0]?.health?.state, "running");
+  assert.equal(status.executions.active[0]?.health?.state, "no_output");
   assert.equal(status.wakeSignals.recent.length, 1);
-  assert.equal(status.scene.executions[0]?.risk, "none");
+  assert.equal(status.scene.executions[0]?.risk, "watch");
 });
 
 test("runtime status surfaces recent model request cache facts", async (t) => {
@@ -171,11 +164,11 @@ test("runtime status keeps the latest wake signals instead of stale history", as
   try {
     for (let index = 0; index < 11; index += 1) {
       const execution = ledger.executions.create({
-        kind: "subagent",
+        ...TEST_EXECUTION_OWNER,
         status: "created",
-        prompt: `task-${index}`,
+        command: `task-${index}`,
         cwd: root,
-        requestedBy: "lead",
+        requestedBy: "agent",
       });
       executionIds.push(execution.id);
       ledger.wakeSignals.publish({ executionId: execution.id, reason: "aborted" });
@@ -197,11 +190,11 @@ test("runtime status exposes background executions that are running without outp
   const ledger = new ControlPlaneLedger(root);
   try {
     ledger.executions.create({
-      kind: "background",
+      ...TEST_EXECUTION_OWNER,
       status: "running",
       command: "long task",
       cwd: root,
-      requestedBy: "lead",
+      requestedBy: "agent",
       pid: process.pid,
     });
   } finally {
@@ -222,11 +215,11 @@ test("runtime status marks lost background executions as blocked recovery work",
   const ledger = new ControlPlaneLedger(root);
   try {
     const execution = ledger.executions.create({
-      kind: "background",
+      ...TEST_EXECUTION_OWNER,
       status: "running",
       command: "long task",
       cwd: root,
-      requestedBy: "lead",
+      requestedBy: "agent",
     });
     ledger.executions.close(execution.id, {
       status: "lost",

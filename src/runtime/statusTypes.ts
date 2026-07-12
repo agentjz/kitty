@@ -190,19 +190,10 @@ export interface RuntimeExecutionSummary {
   id: string;
   kind: string;
   status: string;
-  assignment?: {
-    objective?: string;
-    boundary?: string;
-    expectedOutput?: string;
-  };
-  actorName?: string;
-  actorRole?: string;
   requestedBy: string;
-  sessionId?: string;
   pid?: number;
   command?: string;
   cwd: string;
-  waitPolicy?: string;
   summary?: string;
   outputPreview?: string;
   health?: RuntimeExecutionHealth;
@@ -210,7 +201,6 @@ export interface RuntimeExecutionSummary {
   lastOutputAt?: string;
   closeReason?: string;
   terminatedBy?: string;
-  changedPaths: string[];
   error?: string;
   updatedAt: string;
 }

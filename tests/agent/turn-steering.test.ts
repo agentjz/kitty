@@ -4,7 +4,7 @@ import test from "node:test";
 import { runAgentTurn } from "../../src/agent/turn/run.js";
 import { consumePendingTurnSteers } from "../../src/agent/turn/steering.js";
 import { ControlPlaneLedger } from "../../src/control/ledger.js";
-import { runWithTurnOwnership } from "../../src/control/turnOwnership.js";
+import { createTurnScopedSessionStore } from "../../src/host/turnSessionStore.js";
 import { SessionStore } from "../../src/session/store.js";
 import { createToolRegistry } from "../../src/tools/core/registry.js";
 import type { RegisteredTool } from "../../src/tools/core/types.js";
@@ -16,7 +16,7 @@ test("final output plus a pending steer continues the same turn with ordered his
   const completedOutputs: string[] = [];
   let requestCount = 0;
 
-  const result = await runWithTurnOwnership(fixture.ownership, () => runAgentTurn({
+  const result = await runAgentTurn({
     ...fixture.options,
     callbacks: {
       onAssistantDone: (text) => completedOutputs.push(text),
@@ -40,7 +40,7 @@ test("final output plus a pending steer continues the same turn with ordered his
       return response("adjusted answer");
     },
     fetchSessionTitleResponse: async () => response("steered task"),
-  }));
+  });
 
   assert.equal(requestCount, 2);
   assert.deepEqual(completedOutputs, ["initial answer", "adjusted answer"]);
@@ -89,7 +89,7 @@ test("steer accepted during tool execution enters the next model request without
     onlyNames: ["inspect_state"],
   });
 
-  const result = await runWithTurnOwnership(fixture.ownership, () => runAgentTurn({
+  const result = await runAgentTurn({
     ...fixture.options,
     toolRegistry: registry,
     fetchAssistantResponse: async ({ messages }) => {
@@ -109,7 +109,7 @@ test("steer accepted during tool execution enters the next model request without
       return response("verified both paths");
     },
     fetchSessionTitleResponse: async () => response("tool steer"),
-  }));
+  });
 
   assert.equal(requestCount, 2);
   assert.equal(toolCompleted, true);
@@ -132,6 +132,7 @@ async function createSteeringFixture(name: string, t: Parameters<typeof createTe
     turnId: claimed.id,
     ownerToken: claimed.ownerToken!,
   };
+  const scopedSessionStore = createTurnScopedSessionStore(sessionStore, ownership);
   return {
     root,
     sessionId: session.id,
@@ -145,7 +146,7 @@ async function createSteeringFixture(name: string, t: Parameters<typeof createTe
       stateRootDir: root,
       config,
       session,
-      sessionStore,
+      sessionStore: scopedSessionStore,
       steering: {
         consumePending: async (currentSession: typeof session) => {
           const consumed = await consumePendingTurnSteers({
@@ -153,7 +154,7 @@ async function createSteeringFixture(name: string, t: Parameters<typeof createTe
             turnId: claimed.id,
             ownerToken: claimed.ownerToken!,
             session: currentSession,
-            sessionStore,
+            sessionStore: scopedSessionStore,
           });
           return { session: consumed.session, inputs: consumed.steers.map((steer) => steer.input) };
         },

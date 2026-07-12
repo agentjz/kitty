@@ -39,8 +39,6 @@ export const skillLoadTool: RegisteredTool = {
 
     await recordSkillUse(context.projectContext.stateRootDir, {
       sessionId: context.sessionId,
-      identityKind: context.identity.kind,
-      identityName: context.identity.name,
       action: "load",
       skillName: skill.name,
     });
@@ -51,8 +49,6 @@ export const skillLoadTool: RegisteredTool = {
 
 async function recordSkillUse(rootDir: string, input: {
   sessionId: string;
-  identityKind: string;
-  identityName: string;
   action: string;
   skillName: string;
 }): Promise<void> {
@@ -60,8 +56,6 @@ async function recordSkillUse(rootDir: string, input: {
     event: "skill.usage",
     status: "completed",
     sessionId: input.sessionId,
-    identityKind: input.identityKind,
-    identityName: input.identityName,
     details: {
       action: input.action,
       skillName: input.skillName,

@@ -121,7 +121,7 @@ function createEmptyWrappedRow(): TuiTranscriptWrappedRow {
 }
 
 function readEntryDisplayRows(entry: TuiTranscriptEntry): TuiTranscriptSourceRow[] {
-  if (entry.role === "assistant" || entry.role === "reasoning" || entry.role === "subagent" || entry.role === "subagent_reasoning") {
+  if (entry.role === "assistant" || entry.role === "reasoning") {
     const markdownRows = renderMarkdownLines(entry.text);
     return markdownRows.length > 0
       ? markdownRows.map((row) => ({

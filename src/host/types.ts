@@ -1,5 +1,5 @@
 ﻿import type { RunTurnOptions } from "../agent/turn.js";
-import type { RunTurnResult, AgentCallbacks, AgentIdentity } from "../agent/types.js";
+import type { RunTurnResult, AgentCallbacks } from "../agent/types.js";
 import type { SessionStoreLike } from "../session/index.js";
 import type { RegisteredTool, ToolFilter, ToolRegistry } from "../tools/core/types.js";
 import type { RuntimeConfig, SessionRecord } from "../types.js";
@@ -17,7 +17,6 @@ export interface HostTurnOptions {
   sessionStore: SessionStoreLike;
   callbacks?: AgentCallbacks;
   abortSignal?: AbortSignal;
-  identity?: AgentIdentity;
   builtinToolFilter?: ToolFilter;
   extraTools?: readonly RegisteredTool[];
   runtimePromptState?: RunTurnOptions["runtimePromptState"];

@@ -18,8 +18,8 @@ export const backgroundCheckTool: RegisteredTool = {
   },
   async execute(rawArgs, context) {
     parseArgs(rawArgs || "{}");
-    const reconcile = reconcileBackgroundExecutions(context.projectContext.stateRootDir);
-    const jobs = new BackgroundExecutionStore(context.projectContext.stateRootDir).listAll();
+    const reconcile = reconcileBackgroundExecutions(context.projectContext.stateRootDir, context.ownerSessionId);
+    const jobs = new BackgroundExecutionStore(context.projectContext.stateRootDir).listAll(context.ownerSessionId);
     const summary = summarizeExecutionSet(jobs);
     return okResult(JSON.stringify({
       lost: reconcile.lostExecutions.map((item) => item.id),

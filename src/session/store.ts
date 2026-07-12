@@ -3,7 +3,6 @@ import path from "node:path";
 
 import { ControlPlaneLedger } from "../control/ledger.js";
 import { SessionRevisionConflictError } from "../control/sessions.js";
-import { assertActiveTurnOwnership } from "../control/turnOwnership.js";
 import type { SessionRecord, StoredMessage } from "../types.js";
 import { createEmptyCheckpoint } from "./checkpoint.js";
 import { createEmptyTaskState } from "./taskState.js";
@@ -43,7 +42,6 @@ export class SessionStore implements SessionStoreLike {
   }
 
   async save(session: SessionRecord): Promise<SessionRecord> {
-    assertActiveTurnOwnership(session.id);
     const updated = prepareSessionRecordForSave(session);
     const ledger = new ControlPlaneLedger(this.rootDir);
     try {
@@ -87,7 +85,6 @@ export class SessionStore implements SessionStoreLike {
   }
 
   async appendMessages(session: SessionRecord, messages: StoredMessage[]): Promise<SessionRecord> {
-    assertActiveTurnOwnership(session.id);
     const next = {
       ...session,
       messages: [...session.messages, ...messages],
@@ -155,8 +152,9 @@ export class InProcessSessionStore implements SessionStoreLike {
 
 export async function createSessionRecord(cwd: string): Promise<SessionRecord> {
   const timestamp = new Date().toISOString();
+  const id = createSessionId();
   return prepareSessionRecordForSave({
-    id: createSessionId(),
+    id,
     revision: 0,
     createdAt: timestamp,
     updatedAt: timestamp,

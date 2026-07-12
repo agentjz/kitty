@@ -6,13 +6,12 @@ import {
   createFinalizeTransition,
 } from "../runtimeTransition.js";
 import { persistCheckpointTransition } from "./persistence.js";
-import type { AgentIdentity, AssistantResponse, RunTurnOptions, RunTurnResult } from "../types.js";
+import type { AssistantResponse, RunTurnOptions, RunTurnResult } from "../types.js";
 import type { RuntimeContinueTransition, SessionRecord } from "../../types.js";
 
 interface HandleCompletedAssistantResponseParams {
   session: SessionRecord;
   response: AssistantResponse;
-  identity: AgentIdentity;
   changedPaths: Set<string>;
   options: RunTurnOptions;
 }
@@ -30,8 +29,6 @@ export async function handleCompletedAssistantResponse(
       result: RunTurnResult;
     }
 > {
-  void params.identity;
-
   const assistantMessage = createMessage("assistant", params.response.content ?? "", {
     reasoningContent: params.response.reasoningContent,
   });

@@ -1,47 +1,33 @@
 import type { ExecutionKind } from "../execution/kinds.js";
-import type { LeadWaitPolicy } from "../execution/leadWaitPolicy.js";
 
-export type ExecutionStatus = "created" | "claimed" | "running" | "cancelling" | "completed" | "failed" | "aborted" | "lost";
+export type ExecutionStatus = "created" | "running" | "completed" | "failed" | "aborted" | "lost";
 export type WakeSignalReason = "completed" | "failed" | "aborted" | "lost";
 
 export interface ExecutionRecord {
   id: string;
   kind: ExecutionKind;
   status: ExecutionStatus;
-  assignment?: ExecutionAssignment;
-  command?: string;
-  prompt?: string;
-  actorName?: string;
-  actorRole?: string;
+  command: string;
   cwd: string;
   requestedBy: string;
-  sessionId?: string;
+  ownerSessionId: string;
+  createdBySessionId: string;
+  parentTurnId: string;
+  originToolCallId: string;
   pid?: number;
   exitCode?: number | null;
   output?: string;
   summary?: string;
-  waitPolicy?: LeadWaitPolicy;
   deadlineAt?: string;
   lastOutputAt?: string;
   closeReason?: string;
   terminatedBy?: string;
-  changedPaths: string[];
   error?: string;
   createdAt: string;
   startedAt?: string;
   updatedAt: string;
   finishedAt?: string;
   timeoutMs?: number;
-  ownerToken?: string;
-  heartbeatAt?: string;
-  leaseExpiresAt?: string;
-  cancelRequestedAt?: string;
-}
-
-export interface ExecutionAssignment {
-  objective?: string;
-  boundary?: string;
-  expectedOutput?: string;
 }
 
 export interface WakeSignalRecord {
@@ -56,7 +42,6 @@ export type TaskLifecycleStage =
   | "normal_work"
   | "deep_work"
   | "background_wait"
-  | "delegated_wait"
   | "recovery"
   | "completed";
 

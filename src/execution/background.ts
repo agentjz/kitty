@@ -2,6 +2,7 @@ import { ControlPlaneLedger, type ExecutionRecord, type WakeSignalReason } from 
 import { isProcessAlive, terminatePid } from "./process.js";
 import { unknownExecution } from "./errors.js";
 import { sleepWithSignal, throwIfAborted } from "../utils/abort.js";
+import { watchProcessUntilParentExit } from "./parentDeathWatchdog.js";
 
 interface BackgroundProcessHandle {
   kill?: (signal?: NodeJS.Signals | number, error?: Error) => unknown;
@@ -22,18 +23,23 @@ export class BackgroundExecutionStore {
     command: string;
     cwd: string;
     requestedBy: string;
-    sessionId?: string;
+    ownerSessionId: string;
+    createdBySessionId: string;
+    parentTurnId: string;
+    originToolCallId: string;
     timeoutMs?: number;
   }): ExecutionRecord {
     const ledger = new ControlPlaneLedger(this.rootDir);
     try {
       return ledger.executions.create({
-        kind: "background",
         status: "created",
         command: input.command,
         cwd: input.cwd,
         requestedBy: input.requestedBy,
-        sessionId: input.sessionId,
+        ownerSessionId: input.ownerSessionId,
+        createdBySessionId: input.createdBySessionId,
+        parentTurnId: input.parentTurnId,
+        originToolCallId: input.originToolCallId,
         timeoutMs: input.timeoutMs,
       });
     } finally {
@@ -41,32 +47,32 @@ export class BackgroundExecutionStore {
     }
   }
 
-  load(id: string): ExecutionRecord | undefined {
+  load(id: string, ownerSessionId?: string): ExecutionRecord | undefined {
     const ledger = new ControlPlaneLedger(this.rootDir);
     try {
-      return ledger.executions.load(id);
+      return ownerSessionId ? ledger.executions.loadOwned(id, ownerSessionId) : ledger.executions.load(id);
     } finally {
       ledger.close();
     }
   }
 
-  listRunning(cwd?: string): ExecutionRecord[] {
+  listRunning(input: { cwd?: string; ownerSessionId?: string } = {}): ExecutionRecord[] {
     const ledger = new ControlPlaneLedger(this.rootDir);
     try {
       return ledger.executions.list({
-        kind: "background",
         statuses: ["running"],
-        cwd,
+        cwd: input.cwd,
+        ownerSessionId: input.ownerSessionId,
       });
     } finally {
       ledger.close();
     }
   }
 
-  listAll(): ExecutionRecord[] {
+  listAll(ownerSessionId?: string): ExecutionRecord[] {
     const ledger = new ControlPlaneLedger(this.rootDir);
     try {
-      return ledger.executions.list({ kind: "background" });
+      return ledger.executions.list({ ownerSessionId });
     } finally {
       ledger.close();
     }
@@ -141,10 +147,10 @@ export class BackgroundExecutionStore {
   }
 }
 
-export function reconcileBackgroundExecutions(rootDir: string): { lostExecutions: ExecutionRecord[] } {
+export function reconcileBackgroundExecutions(rootDir: string, ownerSessionId?: string): { lostExecutions: ExecutionRecord[] } {
   const store = new BackgroundExecutionStore(rootDir);
   const lostExecutions: ExecutionRecord[] = [];
-  for (const execution of store.listRunning()) {
+  for (const execution of store.listRunning({ ownerSessionId })) {
     if (typeof execution.pid !== "number" || isProcessAlive(execution.pid)) {
       continue;
     }
@@ -160,6 +166,7 @@ export function reconcileBackgroundExecutions(rootDir: string): { lostExecutions
 export async function waitForBackgroundExecution(input: {
   rootDir: string;
   id: string;
+  ownerSessionId?: string;
   timeoutMs?: number;
   pollIntervalMs?: number;
   abortSignal?: AbortSignal;
@@ -171,8 +178,8 @@ export async function waitForBackgroundExecution(input: {
 
   for (;;) {
     throwIfAborted(input.abortSignal, "Background wait aborted.");
-    reconcileBackgroundExecutions(input.rootDir);
-    const execution = store.load(input.id);
+    reconcileBackgroundExecutions(input.rootDir, input.ownerSessionId);
+    const execution = store.load(input.id, input.ownerSessionId);
     if (!execution) {
       throw unknownExecution(input.id);
     }
@@ -186,9 +193,9 @@ export async function waitForBackgroundExecution(input: {
   }
 }
 
-export function terminateBackgroundExecution(rootDir: string, id: string): ExecutionRecord {
+export function terminateBackgroundExecution(rootDir: string, id: string, ownerSessionId?: string): ExecutionRecord {
   const store = new BackgroundExecutionStore(rootDir);
-  const execution = store.load(id);
+  const execution = store.load(id, ownerSessionId);
   if (!execution) {
     throw unknownExecution(id);
   }
@@ -215,13 +222,19 @@ export function isBackgroundExecutionActive(execution: ExecutionRecord): boolean
 }
 
 export function registerBackgroundProcess(id: string, subprocess: BackgroundProcessHandle): void {
+  const pid = (subprocess as BackgroundProcessHandle & { pid?: number }).pid;
+  const stopWatchdog = typeof pid === "number" && pid > 0
+    ? watchProcessUntilParentExit({ parentPid: process.pid, targetPid: pid })
+    : () => undefined;
   const settled = Promise.resolve(subprocess)
     .then(() => undefined, () => undefined)
     .finally(() => {
+      stopWatchdog();
       activeBackgroundProcesses.delete(id);
     });
   activeBackgroundProcesses.set(id, {
     kill: () => {
+      stopWatchdog();
       subprocess.kill?.("SIGTERM");
     },
     settled,

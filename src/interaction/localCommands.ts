@@ -71,7 +71,9 @@ export async function handleLocalCommand(
 
   if (command === "status") {
     output.plain(formatRuntimeStatusText(
-      await buildRuntimeStatus(await resolveLocalStateRootDir(context)),
+      await buildRuntimeStatus(await resolveLocalStateRootDir(context), context.config.locale, {
+        ownerSessionId: context.session.id,
+      }),
       context.config.locale,
     ).trimEnd());
     return "handled";
@@ -136,7 +138,7 @@ async function formatBackgroundExecutionsForLocalCommand(context: LocalCommandCo
   const stateRootDir = await resolveLocalStateRootDir(context);
   const store = new BackgroundExecutionStore(stateRootDir);
   const executions = store
-    .listAll()
+    .listAll(context.session.id)
     .map(summarizeExecution)
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
   if (executions.length === 0) {

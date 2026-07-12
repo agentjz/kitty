@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { BackgroundExecutionStore, waitForRegisteredBackgroundProcess } from "../../src/execution/background.js";
 import { createBackgroundTools } from "../../src/extensions/tools/background/index.js";
-import { createToolContext, parseToolJson, createTempWorkspace } from "../helpers.js";
+import { createToolContext, parseToolJson, createTempWorkspace, TEST_EXECUTION_OWNER } from "../helpers.js";
 
 test("background extension exposes run, check, wait, stop, and terminate tools", async (t) => {
   const root = await createTempWorkspace("background-tools", t);
@@ -36,9 +36,10 @@ test("background read returns summary, tail, and full output from recorded execu
   const root = await createTempWorkspace("background-tool-read", t);
   const store = new BackgroundExecutionStore(root);
   const job = store.create({
+    ...TEST_EXECUTION_OWNER,
     command: "stream",
     cwd: root,
-    requestedBy: "lead",
+    requestedBy: "agent",
   });
   store.close(job.id, {
     status: "completed",
@@ -129,9 +130,10 @@ test("background wait returns settled execution facts", async (t) => {
   const root = await createTempWorkspace("background-tool-wait", t);
   const store = new BackgroundExecutionStore(root);
   const job = store.create({
+    ...TEST_EXECUTION_OWNER,
     command: "completed command",
     cwd: root,
-    requestedBy: "lead",
+    requestedBy: "agent",
   });
   store.close(job.id, {
     status: "completed",
@@ -158,9 +160,10 @@ test("background stop closes a running execution", async (t) => {
   const root = await createTempWorkspace("background-tool-stop", t);
   const store = new BackgroundExecutionStore(root);
   const job = store.create({
+    ...TEST_EXECUTION_OWNER,
     command: "long-running",
     cwd: root,
-    requestedBy: "lead",
+    requestedBy: "agent",
   });
   store.markRunning(job.id, { pid: process.pid });
   const tools = createBackgroundTools();
