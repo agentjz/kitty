@@ -1,50 +1,32 @@
 # 版本记录
 
-## 2026-07-12 - 全平台定型满意版本
+## 2026-07-12 - 界面定型与可维护性封顶满意版本
 
 状态：满意版本。
 
-包版本：`@jun133/kitty@0.0.33`。
-
-计划标记：`satisfied-final-platform-release-2026-07-12`。
+包版本：`@jun133/kitty@0.0.34`。
 
 验证结果：
 
-- GitHub Actions Verify workflow 全平台首次通过（Ubuntu 24.04 + Windows 2025）
-- 全部 334+ 测试无失败
+- GitHub Actions Verify workflow 全平台通过（Ubuntu 24.04 + Windows 2025）
+- 全部 340+ 测试无失败
 - `npm run typecheck`
 - `npm run build`
 - `npm publish`
 
 这个版本重要的原因：
 
-- TUI 设计达到满意基线：Composer 光标定位、Dock 布局、Runtime Dock turn-clock、交互流自然。
-- 测试基础设施全面硬化：Windows + Ubuntu 双平台 CI 全绿。
-- 修复 `isProcessAlive` 在 Linux 上的僵尸进程误报根因——`process.kill(pid, 0)` 对僵尸返回 true，导致进程树清理无限等待。通过 `/proc/<pid>/status` 检查 State 字段区分运行中与僵尸。
-- 修复 GitHub Pages 部署流程因 `history.md` 已删除而卡死的问题。
-- 修复 workset 路径分隔符在 Linux 上的跨平台兼容问题。
+- TUI 界面定型：Composer 光标定位、Dock 布局、Runtime Dock turn-clock、交互流自然流畅。
+- 可维护性封顶：Windows + Ubuntu 双平台 CI 基础设施硬化，跨平台兼容问题一劳永逸解决。
+- GitHub Pages 部署流程恢复，site 同步更新。
 - 后台任务（background_run）替代子代理作为标准长时间运行方案。
-- 项目文档、site、spec、代码、测试讲同一套当前事实。
-
-设计基线：
-
-- 主干维护事实，边缘负责呈现。
-- 每次改动前必须先做全局核心语义调查。
-- Caveman 原则：短、准、硬；少废话，不少判断。
-- 怀疑主义工作法：先质疑，悬置判断，直到证据收束。
-- 测试覆盖真实产品行为，不测试口号。
-- 文档、代码、测试必须讲同一个当前事实。
+- 项目文档、site、spec、代码、测试保持同一套事实，没有冗余和矛盾。
 
 后续维护：
 
 - 基础架构已定型，后续维护看心情。
 - 主要方向：长任务连续性、记忆沉淀、多 agent 协作体验、恢复能力。
 - 版本已发布到 npm，并同步推送到 GitHub。
-
-参考提交：
-
-- `54c4622` — `isProcessAlive` treats zombie processes as dead on Linux
-- `3be30e3` — fix pages deployment by removing stale history.md copy step
 
 ## 2026-07-05 - 真实生产路径验收与 0.0.19 发布
 
