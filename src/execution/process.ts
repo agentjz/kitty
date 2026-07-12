@@ -14,10 +14,16 @@ export interface ProcessIdentity {
 export function isProcessAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
-    return true;
   } catch {
     return false;
   }
+  if (process.platform === "linux") {
+    try {
+      const status = fs.readFileSync(`/proc/${pid}/status`, "utf8");
+      return !/^State:\s*Z/im.test(status);
+    } catch { /* /proc not available, treat as alive */ }
+  }
+  return true;
 }
 
 export function inspectProcessIdentity(pid: number): ProcessIdentity | undefined {
@@ -95,7 +101,9 @@ function terminatePosixProcessTree(pid: number): void {
   if (!targets.some(isProcessAlive)) return;
   sendPosixProcessGroupSignal(pid, "SIGKILL");
   sendPosixSignals(targets, "SIGKILL");
-  waitForProcessExitSync(pid, 1_000);
+  for (const targetPid of targets) {
+    waitForProcessExitSync(targetPid, 1_000);
+  }
   if (targets.some(isProcessAlive)) throw new Error(`Failed to terminate process tree rooted at pid ${pid}.`);
 }
 
