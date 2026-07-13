@@ -11,7 +11,7 @@
 <p>
   <a href="https://www.npmjs.com/package/@jun133/kitty"><img alt="npm" src="https://img.shields.io/npm/v/%40jun133%2Fkitty?color=111827&label=npm"></a>
   <a href="https://github.com/luckymaomi/kitty/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/luckymaomi/kitty?style=flat&amp;color=ca8a04"></a>
-  <img alt="Node.js" src="https://img.shields.io/badge/node-%3E%3D22-339933">
+  <img alt="Node.js" src="https://img.shields.io/badge/node-%3E%3D22.13-339933">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.9-3178C6">
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-0f766e"></a>
 </p>

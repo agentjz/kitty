@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import type Database from "better-sqlite3";
+import type { ControlDatabase } from "./sqlite.js";
 
 import type { ContextBudgetReport } from "../types.js";
 
@@ -26,7 +26,7 @@ interface ContextEpochRow {
 }
 
 export class ContextEpochLedgerRepo {
-  constructor(private readonly db: Database.Database) {}
+  constructor(private readonly db: ControlDatabase) {}
 
   record(input: Omit<ContextEpochRecord, "id" | "createdAt">): ContextEpochRecord {
     const latest = this.loadLatest(input.sessionId);
@@ -44,7 +44,16 @@ export class ContextEpochLedgerRepo {
         @id, @sessionId, @sourceMessageCount, @sourceLastMessageId,
         @sourcePrefixHash, @summary, @budgetJson, @createdAt
       )
-    `).run({ ...record, budgetJson: JSON.stringify(record.budget) });
+    `).run({
+      id: record.id,
+      sessionId: record.sessionId,
+      sourceMessageCount: record.sourceMessageCount,
+      sourceLastMessageId: record.sourceLastMessageId,
+      sourcePrefixHash: record.sourcePrefixHash,
+      summary: record.summary,
+      budgetJson: JSON.stringify(record.budget),
+      createdAt: record.createdAt,
+    });
     return record;
   }
 

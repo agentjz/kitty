@@ -1,10 +1,10 @@
 import crypto from "node:crypto";
-import type Database from "better-sqlite3";
+import type { ControlDatabase } from "./sqlite.js";
 
 import type { ObservabilityEventRecord } from "../observability/schema.js";
 
 export class RuntimeEventLedgerRepo {
-  constructor(private readonly db: Database.Database) {}
+  constructor(private readonly db: ControlDatabase) {}
 
   append(record: ObservabilityEventRecord): ObservabilityEventRecord {
     this.db.prepare(`
@@ -19,7 +19,19 @@ export class RuntimeEventLedgerRepo {
       )
     `).run({
       id: `event-${crypto.randomUUID()}`,
-      ...record,
+      timestamp: record.timestamp,
+      event: record.event,
+      status: record.status,
+      host: record.host,
+      sessionId: record.sessionId,
+      turnId: record.turnId,
+      itemId: record.itemId,
+      executionId: record.executionId,
+      requestId: record.requestId,
+      attemptId: record.attemptId,
+      durationMs: record.durationMs,
+      toolName: record.toolName,
+      model: record.model,
       errorJson: record.error ? JSON.stringify(record.error) : undefined,
       detailsJson: record.details ? JSON.stringify(record.details) : undefined,
     });

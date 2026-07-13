@@ -6,7 +6,7 @@
 
 Kitty 是一个智能体。它接收用户任务，构建上下文，调用模型，执行工具，保存工作状态，并能在同一任务现场继续工作。
 
-当前运行时最低版本是 Node.js 22。生产构建输出 CLI CJS 与 TUI ESM；Ink 的可选 `react-devtools-core` 保持 external，未安装时不影响 TUI 启动。
+当前运行时最低版本是 Node.js 22.13.0。控制平面使用 Node 内置的 `node:sqlite`，安装 Kitty 不下载或编译第三方 SQLite 原生扩展。生产构建输出 CLI CJS 与 TUI ESM；Ink 的可选 `react-devtools-core` 保持 external，未安装时不影响 TUI 启动。
 
 产品目标是持久化的智能体工作能力：
 

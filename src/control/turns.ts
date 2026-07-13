@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import type Database from "better-sqlite3";
+import type { ControlDatabase } from "./sqlite.js";
 
 export type TurnStatus = "queued" | "running" | "closing" | "completed" | "failed" | "aborted";
 
@@ -40,7 +40,7 @@ interface TurnRow {
 const LEASE_MS = 30_000;
 
 export class TurnLedgerRepo {
-  constructor(private readonly db: Database.Database) {}
+  constructor(private readonly db: ControlDatabase) {}
 
   admit(input: { sessionId: string; input: string; inputSource: "external" | "internal" }): TurnRecord {
     const now = new Date().toISOString();
@@ -57,7 +57,15 @@ export class TurnLedgerRepo {
     this.db.prepare(`
       INSERT INTO session_turns (id, session_id, input, input_source, status, created_at, updated_at)
       VALUES (@id, @sessionId, @input, @inputSource, @status, @createdAt, @updatedAt)
-    `).run(record);
+    `).run({
+      id: record.id,
+      sessionId: record.sessionId,
+      input: record.input,
+      inputSource: record.inputSource,
+      status: record.status,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+    });
     return record;
   }
 

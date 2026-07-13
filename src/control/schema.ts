@@ -1,10 +1,10 @@
-import type Database from "better-sqlite3";
+import type { ControlDatabase } from "./sqlite.js";
 
 export const CONTROL_PLANE_SCHEMA_VERSION = 2;
 
-export function initializeControlPlaneSchema(db: Database.Database): void {
+export function initializeControlPlaneSchema(db: ControlDatabase): void {
   const initialize = db.transaction(() => {
-    const version = db.pragma("user_version", { simple: true }) as number;
+    const version = Number(db.prepare<{ user_version: number }>("PRAGMA user_version").get()?.user_version ?? 0);
     if (version !== CONTROL_PLANE_SCHEMA_VERSION) {
       db.exec(`
         DROP TABLE IF EXISTS telegram_outbox;
@@ -258,7 +258,7 @@ export function initializeControlPlaneSchema(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_telegram_outbox_status ON telegram_outbox(status, created_at);
     `);
-    db.pragma(`user_version = ${CONTROL_PLANE_SCHEMA_VERSION}`);
+    db.exec(`PRAGMA user_version = ${CONTROL_PLANE_SCHEMA_VERSION}`);
   });
   initialize.exclusive();
 }

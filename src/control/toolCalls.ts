@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { ControlDatabase } from "./sqlite.js";
 
 import type { ToolEffect } from "../tools/core/types.js";
 import type { ToolResultEnvelope } from "../types.js";
@@ -40,7 +40,7 @@ interface ToolCallRow {
 }
 
 export class ToolCallLedgerRepo {
-  constructor(private readonly db: Database.Database) {}
+  constructor(private readonly db: ControlDatabase) {}
 
   start(input: {
     callId: string;

@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { ControlDatabase } from "./sqlite.js";
 
 import { createControlPlaneId } from "./shared.js";
 import type { WakeSignalReason, WakeSignalRecord } from "./types.js";
@@ -11,7 +11,7 @@ interface WakeSignalRow {
 }
 
 export class WakeSignalLedgerRepo {
-  constructor(private readonly db: Database.Database) {}
+  constructor(private readonly db: ControlDatabase) {}
 
   publish(input: { executionId: string; reason: WakeSignalReason; createdAt?: string }): WakeSignalRecord {
     const record: WakeSignalRecord = {

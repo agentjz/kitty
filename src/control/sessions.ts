@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import type Database from "better-sqlite3";
+import type { ControlDatabase } from "./sqlite.js";
 
 import type { SessionRecord, StoredMessage } from "../types.js";
 
@@ -25,7 +25,7 @@ export class SessionRevisionConflictError extends Error {
 }
 
 export class SessionLedgerRepo {
-  constructor(private readonly db: Database.Database) {}
+  constructor(private readonly db: ControlDatabase) {}
 
   save(session: SessionRecord): SessionRecord {
     return this.db.transaction(() => {

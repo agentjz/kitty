@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { ControlDatabase } from "./sqlite.js";
 
 import { createControlPlaneId } from "./shared.js";
 import type { TaskLifecycleRecord, TaskLifecycleStage } from "./types.js";
@@ -29,7 +29,7 @@ const TASK_LIFECYCLE_STAGES = new Set<TaskLifecycleStage>([
 ]);
 
 export class TaskLifecycleLedgerRepo {
-  constructor(private readonly db: Database.Database) {}
+  constructor(private readonly db: ControlDatabase) {}
 
   startTurn(input: {
     sessionId: string;

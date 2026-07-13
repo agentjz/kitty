@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import Database from "better-sqlite3";
 
 import {
   BackgroundExecutionStore,
@@ -11,6 +10,7 @@ import { isAbortError } from "../../src/utils/abort.js";
 import { executionOwnership } from "../../src/control/types.js";
 import { createTempWorkspace, TEST_EXECUTION_OWNER } from "../helpers.js";
 import { getProjectStatePaths } from "../../src/project/statePaths.js";
+import { openControlDatabase } from "../../src/control/sqlite.js";
 
 test("background execution store creates, starts, closes, and emits wake facts", async (t) => {
   const root = await createTempWorkspace("background-store", t);
@@ -53,7 +53,7 @@ test("background reconcile marks dead running pid as stale", async (t) => {
     requestedBy: "agent",
   });
   store.markRunning(job.id, executionOwnership(job), { pid: 999_999_999 });
-  const db = new Database(getProjectStatePaths(root).controlPlaneLedgerFile);
+  const db = openControlDatabase(getProjectStatePaths(root).controlPlaneLedgerFile);
   db.prepare("UPDATE executions SET controller_lease_expires_at = ? WHERE id = ?")
     .run("2000-01-01T00:00:00.000Z", job.id);
   db.close();

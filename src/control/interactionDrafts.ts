@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { ControlDatabase } from "./sqlite.js";
 
 export interface InteractionDraftRecord {
   sessionId: string;
@@ -17,7 +17,7 @@ interface InteractionDraftRow {
 }
 
 export class InteractionDraftLedgerRepo {
-  constructor(private readonly db: Database.Database) {}
+  constructor(private readonly db: ControlDatabase) {}
 
   load(sessionId: string, shell: string): InteractionDraftRecord | undefined {
     const row = this.db.prepare(`

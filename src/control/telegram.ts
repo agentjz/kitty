@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import type Database from "better-sqlite3";
+import type { ControlDatabase } from "./sqlite.js";
 import { TurnLedgerRepo } from "./turns.js";
 
 export interface ServiceLeaseRecord {
@@ -26,7 +26,7 @@ export interface TelegramOutboxRecord {
 }
 
 export class ServiceLeaseLedgerRepo {
-  constructor(private readonly db: Database.Database) {}
+  constructor(private readonly db: ControlDatabase) {}
 
   acquire(input: { name: string; processId: number; processIdentity?: Record<string, unknown>; leaseMs?: number }): ServiceLeaseRecord {
     return this.db.transaction(() => {
@@ -53,7 +53,8 @@ export class ServiceLeaseLedgerRepo {
           updated_at=excluded.updated_at
         WHERE service_leases.lease_expires_at <= @now
       `).run({
-        ...input,
+        name: input.name,
+        processId: input.processId,
         ownerToken,
         generation,
         processIdentityJson: input.processIdentity ? JSON.stringify(input.processIdentity) : null,
@@ -71,7 +72,13 @@ export class ServiceLeaseLedgerRepo {
     const result = this.db.prepare(`
       UPDATE service_leases SET heartbeat_at=@now, lease_expires_at=@expires, updated_at=@now
       WHERE name=@name AND owner_token=@ownerToken AND generation=@generation AND lease_expires_at > @now
-    `).run({ ...lease, now: now.toISOString(), expires: new Date(now.getTime() + leaseMs).toISOString() });
+    `).run({
+      name: lease.name,
+      ownerToken: lease.ownerToken,
+      generation: lease.generation,
+      now: now.toISOString(),
+      expires: new Date(now.getTime() + leaseMs).toISOString(),
+    });
     if (result.changes !== 1) throw new Error(`Service ${lease.name} lost ownership.`);
     return this.load(lease.name)!;
   }
@@ -81,7 +88,12 @@ export class ServiceLeaseLedgerRepo {
     this.db.prepare(`
       UPDATE service_leases SET lease_expires_at=@now, updated_at=@now
       WHERE name=@name AND owner_token=@ownerToken AND generation=@generation
-    `).run({ ...lease, now });
+    `).run({
+      name: lease.name,
+      ownerToken: lease.ownerToken,
+      generation: lease.generation,
+      now,
+    });
   }
 
   load(name: string): ServiceLeaseRecord | undefined {
@@ -99,7 +111,7 @@ export class ServiceLeaseLedgerRepo {
 }
 
 export class TelegramLedgerRepo {
-  constructor(private readonly db: Database.Database) {}
+  constructor(private readonly db: ControlDatabase) {}
 
   claimInbox(updateId: number, peerKey?: string): boolean {
     return this.db.transaction(() => {
@@ -149,7 +161,15 @@ export class TelegramLedgerRepo {
     this.db.prepare(`
       INSERT INTO telegram_outbox (id, chat_id, kind, payload_json, status, created_at, updated_at)
       VALUES (@id, @chatId, @kind, @payloadJson, @status, @createdAt, @updatedAt)
-    `).run({ ...record, payloadJson: JSON.stringify(record.payload) });
+    `).run({
+      id: record.id,
+      chatId: record.chatId,
+      kind: record.kind,
+      payloadJson: JSON.stringify(record.payload),
+      status: record.status,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+    });
     return record;
   }
 

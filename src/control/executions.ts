@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { ControlDatabase } from "./sqlite.js";
 import crypto from "node:crypto";
 import path from "node:path";
 
@@ -9,7 +9,7 @@ import type { ExecutionOwnership, ExecutionRecord, ExecutionStatus } from "./typ
 import type { ExecutionKind } from "../execution/kinds.js";
 
 export class ExecutionLedgerRepo {
-  constructor(private readonly db: Database.Database) {}
+  constructor(private readonly db: ControlDatabase) {}
 
   create(input: {
     id?: string;
@@ -170,6 +170,8 @@ export class ExecutionLedgerRepo {
       throw new Error(`Execution ${record.id} rejected transition ${persisted.status} -> ${record.status}.`);
     }
     const next = { ...record, version: record.version + 1 };
+    const row = toExecutionRow(record);
+    delete row.kind;
     const result = this.db.prepare(`
       UPDATE executions SET
         status=@status, version=@nextVersion, command=@command, cwd=@cwd, requested_by=@requestedBy,
@@ -185,7 +187,7 @@ export class ExecutionLedgerRepo {
       WHERE id=@id AND version=@version
         AND controller_token=@controllerToken AND controller_generation=@controllerGeneration
         AND controller_lease_expires_at > @now
-    `).run({ ...toExecutionRow(record), nextVersion: next.version, now: new Date().toISOString() });
+    `).run({ ...row, nextVersion: next.version, now: new Date().toISOString() });
     if (result.changes !== 1) {
       throw new Error(`Execution ${record.id} rejected a stale version ${record.version} transition.`);
     }

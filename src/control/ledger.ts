@@ -1,4 +1,3 @@
-import Database from "better-sqlite3";
 import fs from "node:fs";
 
 import { getProjectStatePaths } from "../project/statePaths.js";
@@ -14,6 +13,7 @@ import { RuntimeEventLedgerRepo } from "./runtimeEvents.js";
 import { InteractionDraftLedgerRepo } from "./interactionDrafts.js";
 import { TurnSteerLedgerRepo } from "./turnSteers.js";
 import { ServiceLeaseLedgerRepo, TelegramLedgerRepo } from "./telegram.js";
+import { openControlDatabase, type ControlDatabase } from "./sqlite.js";
 
 export type {
   ExecutionRecord,
@@ -42,18 +42,18 @@ export class ControlPlaneLedger {
   readonly turnSteers: TurnSteerLedgerRepo;
   readonly serviceLeases: ServiceLeaseLedgerRepo;
   readonly telegram: TelegramLedgerRepo;
-  private readonly db: Database.Database;
+  private readonly db: ControlDatabase;
 
   constructor(rootDir: string) {
     const statePaths = getProjectStatePaths(rootDir);
     fs.mkdirSync(statePaths.kittyDir, { recursive: true });
-    this.db = new Database(statePaths.controlPlaneLedgerFile);
-    this.db.pragma("journal_mode = WAL");
-    this.db.pragma("synchronous = FULL");
-    this.db.pragma("busy_timeout = 5000");
-    this.db.pragma("foreign_keys = OFF");
+    this.db = openControlDatabase(statePaths.controlPlaneLedgerFile);
+    this.db.exec("PRAGMA busy_timeout = 5000");
+    this.db.exec("PRAGMA journal_mode = WAL");
+    this.db.exec("PRAGMA synchronous = FULL");
+    this.db.exec("PRAGMA foreign_keys = OFF");
     initializeControlPlaneSchema(this.db);
-    this.db.pragma("foreign_keys = ON");
+    this.db.exec("PRAGMA foreign_keys = ON");
     this.executions = new ExecutionLedgerRepo(this.db);
     this.wakeSignals = new WakeSignalLedgerRepo(this.db);
     this.taskLifecycle = new TaskLifecycleLedgerRepo(this.db);

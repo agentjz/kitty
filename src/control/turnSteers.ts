@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import type Database from "better-sqlite3";
+import type { ControlDatabase } from "./sqlite.js";
 
 export type TurnSteerStatus = "pending" | "consumed" | "rejected";
 
@@ -34,7 +34,7 @@ interface TurnSteerRow {
 }
 
 export class TurnSteerLedgerRepo {
-  constructor(private readonly db: Database.Database) {}
+  constructor(private readonly db: ControlDatabase) {}
 
   admit(input: { turnId: string; sessionId: string; text: string }): TurnSteerRecord | undefined {
     return this.db.transaction(() => {
@@ -121,7 +121,7 @@ export class TurnSteerLedgerRepo {
       const owner = this.db.prepare(`
         SELECT owner_generation AS generation FROM session_turns
         WHERE id=@turnId AND owner_token=@ownerToken
-      `).get(input) as { generation: number } | undefined;
+      `).get({ turnId: input.turnId, ownerToken: input.ownerToken }) as { generation: number } | undefined;
       if (existing?.status === "consumed" && owner && existing.consumedGeneration === owner.generation) return existing;
       throw new Error(`Steer ${input.steerId} cannot be consumed without the active turn lease.`);
     }
