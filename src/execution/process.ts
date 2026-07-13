@@ -12,16 +12,26 @@ export interface ProcessIdentity {
 }
 
 export function isProcessAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-  } catch {
-    return false;
-  }
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  if (!canSignalProcess(pid)) return false;
   if (process.platform === "linux") {
     try {
       const status = fs.readFileSync(`/proc/${pid}/status`, "utf8");
       return !/^State:\s*Z/im.test(status);
-    } catch { /* /proc not available, treat as alive */ }
+    } catch {
+      return canSignalProcess(pid);
+    }
+  }
+  if (process.platform !== "win32") {
+    try {
+      const status = execFileSync("ps", ["-o", "stat=", "-p", String(pid)], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim();
+      return status.length > 0 && !/^Z/i.test(status);
+    } catch {
+      return canSignalProcess(pid);
+    }
   }
   return true;
 }
@@ -62,8 +72,15 @@ export function isSameProcess(identity: ProcessIdentity): boolean {
 
 export function terminatePid(pid: number, expectedIdentity?: ProcessIdentity): void {
   if (pid === process.pid || !Number.isInteger(pid) || pid <= 0) return;
-  if (expectedIdentity && !isSameProcess(expectedIdentity)) {
-    throw new Error(`Refusing to terminate pid ${pid}: process identity changed.`);
+  if (expectedIdentity) {
+    const currentIdentity = inspectProcessIdentity(pid);
+    if (!currentIdentity) {
+      if (!isProcessAlive(pid)) return;
+      throw new Error(`Refusing to terminate pid ${pid}: process identity could not be verified.`);
+    }
+    if (currentIdentity.platform !== expectedIdentity.platform || currentIdentity.creationMarker !== expectedIdentity.creationMarker) {
+      throw new Error(`Refusing to terminate pid ${pid}: process identity changed.`);
+    }
   }
   if (process.platform === "win32") {
     terminateWindowsProcessTree(pid);
@@ -148,6 +165,15 @@ function sendPosixSignals(pids: readonly number[], signal: NodeJS.Signals): void
 
 function uniquePids(pids: readonly number[]): number[] {
   return [...new Set(pids.filter((pid) => pid !== process.pid))];
+}
+
+function canSignalProcess(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function sleepSync(ms: number): void {

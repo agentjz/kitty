@@ -79,6 +79,24 @@ test("terminatePid refuses a reused process identity", async (t) => {
   await waitForProcessExit(child.pid);
 });
 
+test("terminatePid treats an already exited expected process as settled", async (t) => {
+  const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore", windowsHide: true });
+  assert.ok(child.pid);
+  t.after(() => forceKillTestProcess(child.pid));
+  const identity = inspectProcessIdentity(child.pid);
+  assert.ok(identity);
+
+  const exited = new Promise<void>((resolve, reject) => {
+    child.once("exit", () => resolve());
+    child.once("error", reject);
+  });
+  process.kill(child.pid, "SIGKILL");
+  await exited;
+
+  assert.equal(isProcessAlive(child.pid), false);
+  assert.doesNotThrow(() => terminatePid(child.pid!, identity));
+});
+
 async function spawnProcessTree(platform: "windows" | "posix"): Promise<{
   parent: ReturnType<typeof spawn>;
   childPidPath: string;
