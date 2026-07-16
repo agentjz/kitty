@@ -111,6 +111,11 @@ function projectToolTranscript(
           ...presentation.diffLines.map((line) => `  ${line}`),
         ].join("\n"),
       };
+    case "document-change":
+      return {
+        role: "change",
+        text: `${translate(locale, presentation.action === "created" ? "tui.tool.created" : "tui.tool.updated")} ${presentation.path}`,
+      };
     case "read": {
       const range = presentation.startLine !== undefined && presentation.endLine !== undefined
         ? ` · ${presentation.startLine}-${presentation.endLine}`

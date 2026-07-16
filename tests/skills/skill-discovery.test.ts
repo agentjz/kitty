@@ -29,12 +29,21 @@ test("project runtime skills do not load development skills from .agents", async
   assert.equal(context.skills[0]?.health.resourceGroups.references, 1);
 });
 
-test("repository runtime skills expose the current four-stage workflow", async () => {
+test("repository runtime skills expose one development workflow", async () => {
   const context = await loadProjectContext(process.cwd(), { projectDocMaxBytes: 24_576 });
   const runtimeSkillNames = context.skills.map((skill) => skill.name);
 
-  assert.deepEqual(runtimeSkillNames, ["do", "plan", "research", "verification"]);
+  assert.deepEqual(runtimeSkillNames, ["dev"]);
   assert.equal(runtimeSkillNames.includes("development"), false);
+  const dev = context.skills[0];
+  assert.ok(dev);
+  assert.match(dev.description, /完整开发工作流/);
+  assert.match(dev.body, /## 一、调研/);
+  assert.match(dev.body, /## 二、计划/);
+  assert.match(dev.body, /## 三、实施/);
+  assert.match(dev.body, /## 四、验证/);
+  assert.match(dev.body, /中断、崩溃与恶劣用户路径/);
+  assert.match(dev.body, /# \[任务名\] Plan/);
 });
 
 test("runtime prompt shows the skill index without loading full skill bodies", async (t) => {

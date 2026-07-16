@@ -122,7 +122,7 @@ function buildSharedToolCallDisplay(
         : presentation.limit === undefined
           ? `:${presentation.offset}`
           : `:${presentation.offset}-${Math.max(presentation.offset, presentation.offset + presentation.limit - 1)}`;
-      return { summary: `read ${target}${range}` };
+      return { summary: `${presentation.name} ${target}${range}` };
     }
     case "command":
       return {

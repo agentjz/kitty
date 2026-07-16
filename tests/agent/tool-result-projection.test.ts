@@ -66,6 +66,34 @@ test("background run projection preserves the execution id needed by follow-up w
   assert.match(projection, /running/);
 });
 
+test("document projections preserve extracted evidence and continuation arguments", () => {
+  const readProjection = projectToolResultForModel({
+    toolName: "document_read",
+    result: {
+      ok: true,
+      output: JSON.stringify({
+        path: "manual.pdf",
+        unit: "page",
+        startUnit: 2,
+        endUnit: 3,
+        content: "[Page 2]\nDOCUMENT_SENTINEL",
+        warnings: ["font fallback used"],
+        continuation: { continuationArgs: { path: "manual.pdf", start: 4, limit: 2 } },
+      }),
+    },
+  });
+  assert.match(readProjection, /manual\.pdf \(pages 2-3\)/);
+  assert.match(readProjection, /DOCUMENT_SENTINEL/);
+  assert.match(readProjection, /warnings: font fallback used/);
+  assert.match(readProjection, /document_read.*"start":4/);
+
+  const writeProjection = projectToolResultForModel({
+    toolName: "document_write",
+    result: { ok: true, output: JSON.stringify({ path: "result.docx", existed: false, bytes: 1234 }) },
+  });
+  assert.equal(writeProjection, "created Word document result.docx (1234 bytes)");
+});
+
 test("tool result envelope keeps model, compact, provenance, and recovery evidence together", () => {
   const envelope = buildToolResultEnvelope({
     callId: "call-1",

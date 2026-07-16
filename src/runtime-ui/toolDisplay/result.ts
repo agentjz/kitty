@@ -63,9 +63,14 @@ function buildSharedToolResultDisplay(
         summary: `${presentation.name} ${normalizeDisplayPath(presentation.path, cwd) ?? presentation.path}`,
         preview: truncateBlock(presentation.diffLines.join("\n"), 1_600),
       };
+    case "document-change":
+      return {
+        summary: `${presentation.name} ${normalizeDisplayPath(presentation.path, cwd) ?? presentation.path}`,
+        preview: `${presentation.action}${presentation.bytes === undefined ? "" : ` (${presentation.bytes} bytes)`}`,
+      };
     case "read":
       return {
-        summary: `read ${normalizeDisplayPath(presentation.path, cwd) ?? presentation.path}`,
+        summary: `${presentation.name} ${normalizeDisplayPath(presentation.path, cwd) ?? presentation.path}`,
         preview: presentation.content
           ? truncateBlock(rewriteAbsolutePaths(presentation.content, cwd), 1_600)
           : undefined,

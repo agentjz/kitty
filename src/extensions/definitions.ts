@@ -1,5 +1,6 @@
 import type { RegisteredTool } from "../tools/core/types.js";
 import { createBackgroundTools } from "./tools/background/index.js";
+import { createDocumentTools } from "./tools/documents/index.js";
 import { createNetworkTools } from "./tools/network/index.js";
 import { createSkillTools } from "./tools/skills/index.js";
 import { createTodoTools } from "./tools/todo/index.js";
@@ -79,6 +80,21 @@ export const EXTENSION_DEFINITIONS = [
         "running long local commands without blocking the current turn",
         "reading, checking, waiting for, or terminating recorded background executions",
         "watching services, test matrices, or commands that produce output over time",
+      ],
+      cost: "medium",
+    },
+  },
+  {
+    id: "documents",
+    envKey: "KITTY_EXTENSION_DOCUMENTS",
+    defaultEnabled: true,
+    summary: "Bounded DOCX and text-based PDF reading plus Word document writing.",
+    createTools: createDocumentTools,
+    capability: {
+      description: "Read DOCX and text-based PDF content in ranges, and create Word DOCX files.",
+      bestFor: [
+        "extracting text from local Word and PDF documents",
+        "creating Word documents from plain text or simple Markdown",
       ],
       cost: "medium",
     },

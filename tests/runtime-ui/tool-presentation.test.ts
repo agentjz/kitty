@@ -15,6 +15,46 @@ test("shared tool call presentation exposes only stable target facts", () => {
     projectToolCallPresentation("bash", JSON.stringify({ command: "echo secret" })),
     { kind: "command", name: "bash", command: "echo secret", cwd: undefined },
   );
+  assert.deepEqual(
+    projectToolCallPresentation("document_write", JSON.stringify({ path: "report.docx", content: "SECRET_BODY" })),
+    { kind: "change", name: "document_write", target: "report.docx", operationCount: undefined },
+  );
+});
+
+test("shared document presentation exposes ranges without replaying source content", () => {
+  const read = projectToolResultPresentation("document_read", JSON.stringify({
+    path: "manual.pdf",
+    unit: "page",
+    startUnit: 4,
+    endUnit: 6,
+    content: "document evidence",
+    truncated: true,
+  }));
+  assert.deepEqual(read, {
+    kind: "read",
+    name: "document_read",
+    path: "manual.pdf",
+    startLine: undefined,
+    endLine: undefined,
+    startUnit: 4,
+    endUnit: 6,
+    unit: "page",
+    content: "document evidence",
+    truncated: true,
+  });
+
+  const write = projectToolResultPresentation("document_write", JSON.stringify({
+    path: "report.docx",
+    existed: false,
+    bytes: 4096,
+  }));
+  assert.deepEqual(write, {
+    kind: "document-change",
+    name: "document_write",
+    action: "created",
+    path: "report.docx",
+    bytes: 4096,
+  });
 });
 
 test("shared tool result presentation preserves every diff hunk and its counts", () => {

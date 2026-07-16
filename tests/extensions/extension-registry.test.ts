@@ -25,6 +25,14 @@ test("extension registry is driven by one toggle map", async (t) => {
   for (const name of getExtensionDefinition("skills").createTools().map((tool) => tool.definition.function.name)) {
     assert.equal(names.includes(name), true, `${name} should be registered`);
   }
+  for (const name of getExtensionDefinition("documents").createTools().map((tool) => tool.definition.function.name)) {
+    assert.equal(names.includes(name), true, `${name} should be registered`);
+  }
+});
+
+test("documents extension registry exposes document reading and Word writing", () => {
+  const names = getExtensionDefinition("documents").createTools().map((tool) => tool.definition.function.name);
+  assert.deepEqual(names, ["document_read", "document_write"]);
 });
 
 test("disabled extensions are not callable", async (t) => {

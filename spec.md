@@ -198,11 +198,13 @@ Provider request 边界把 adapter、transport 和 SDK 失败归一为 `Provider
 - `worktree`：Git worktree 生命周期。
 - `network`：结构化 HTTP 工作。
 - `background`：可持久追踪的非阻塞命令执行。
+- `documents`：分页读取 DOCX 与带文字层 PDF，并以原子写和二进制变更记录创建 Word DOCX。
 - `skills`：运行时 skill 发现与显式加载。
 
 Extension 只在配置启用时进入同一工具注册表。它们不是另一条 agent loop，也不是 core 工具。
 
 运行时 skill 是项目能力包。Context 只暴露 skill 清单；模型在相关时显式加载 skill 或资源。Skill 不自动路由模型行为。
+仓库当前只提供一个运行时 `dev` skill，将 research、按需计划、实现和验证收束为一条开发工作流。
 
 ## 8. Control Plane 与 Execution
 

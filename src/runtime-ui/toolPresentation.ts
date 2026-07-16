@@ -5,16 +5,17 @@ import { tryParseJson } from "../utils/json.js";
 export type ToolCallPresentation =
   | {
     readonly kind: "change";
-    readonly name: "write" | "edit";
+    readonly name: "write" | "edit" | "document_write";
     readonly target?: string;
     readonly operationCount?: number;
   }
   | {
     readonly kind: "read";
-    readonly name: "read";
+    readonly name: "read" | "document_read";
     readonly target?: string;
     readonly offset?: number;
     readonly limit?: number;
+    readonly unit?: "line" | "unit";
   }
   | {
     readonly kind: "command";
@@ -42,12 +43,22 @@ export type ToolResultPresentation =
   }
   | {
     readonly kind: "read";
-    readonly name: "read";
+    readonly name: "read" | "document_read";
     readonly path: string;
     readonly startLine?: number;
     readonly endLine?: number;
+    readonly startUnit?: number;
+    readonly endUnit?: number;
+    readonly unit?: string;
     readonly content?: string;
     readonly truncated: boolean;
+  }
+  | {
+    readonly kind: "document-change";
+    readonly name: "document_write";
+    readonly action: "created" | "updated";
+    readonly path: string;
+    readonly bytes?: number;
   }
   | {
     readonly kind: "command";
@@ -71,7 +82,7 @@ export function projectToolCallPresentation(name: string, rawArgs: string): Tool
   const normalizedName = name.toLowerCase();
   const args = readObject(rawArgs);
   const target = readString(args?.path);
-  if (normalizedName === "write" || normalizedName === "edit") {
+  if (normalizedName === "write" || normalizedName === "edit" || normalizedName === "document_write") {
     return {
       kind: "change",
       name: normalizedName,
@@ -86,6 +97,17 @@ export function projectToolCallPresentation(name: string, rawArgs: string): Tool
       target,
       offset: readNumber(args?.offset),
       limit: readNumber(args?.limit),
+      unit: "line",
+    };
+  }
+  if (normalizedName === "document_read") {
+    return {
+      kind: "read",
+      name: "document_read",
+      target,
+      offset: readNumber(args?.start),
+      limit: readNumber(args?.limit),
+      unit: "unit",
     };
   }
   if (normalizedName === "bash") {
@@ -124,17 +146,34 @@ export function projectToolResultPresentation(name: string, rawOutput: string): 
     };
   }
 
-  if (normalizedName === "read") {
+  if (normalizedName === "document_write") {
+    const path = readString(output.path);
+    if (!path) {
+      return { kind: "none", name };
+    }
+    return {
+      kind: "document-change",
+      name: "document_write",
+      action: output.existed === false ? "created" : "updated",
+      path,
+      bytes: readNumber(output.bytes),
+    };
+  }
+
+  if (normalizedName === "read" || normalizedName === "document_read") {
     const path = readString(output.path);
     if (!path) {
       return { kind: "none", name };
     }
     return {
       kind: "read",
-      name: "read",
+      name: normalizedName,
       path,
       startLine: readNumber(output.startLine),
       endLine: readNumber(output.endLine),
+      startUnit: readNumber(output.startUnit),
+      endUnit: readNumber(output.endUnit),
+      unit: readString(output.unit),
       content: readString(output.content),
       truncated: output.truncated === true,
     };

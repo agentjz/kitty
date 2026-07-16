@@ -5,6 +5,7 @@ const DEFAULT_MAX_CHARS = 4_000;
 const DIFF_MAX_CHARS = 3_000;
 const OUTPUT_MAX_CHARS = 1_500;
 const SKILL_BODY_MAX_CHARS = 16_000;
+const DOCUMENT_CONTENT_MAX_CHARS = 16_000;
 export function projectToolResultForModel(input: {
   toolName: string;
   result: ToolExecutionResult;
@@ -38,10 +39,14 @@ function projectRawToolResultForModel(input: {
   switch (input.toolName) {
     case "read":
       return projectRead(parsed);
+    case "document_read":
+      return projectDocumentRead(parsed);
     case "edit":
       return projectEdit(parsed);
     case "write":
       return projectWrite(parsed);
+    case "document_write":
+      return projectDocumentWrite(parsed);
     case "bash":
       return projectBash(parsed);
     case "background_check":
@@ -58,6 +63,27 @@ function projectRawToolResultForModel(input: {
     default:
       return projectGenericSuccess(parsed, input.result.output);
   }
+}
+
+function projectDocumentRead(payload: Record<string, unknown>): string {
+  const path = readString(payload.path) ?? "document";
+  const start = readNumber(payload.startUnit);
+  const end = readNumber(payload.endUnit);
+  const unit = readString(payload.unit) ?? "unit";
+  const continuationArgs = readObject(readObject(payload.continuation)?.continuationArgs);
+  const warnings = readArray(payload.warnings)?.filter((warning): warning is string => typeof warning === "string");
+  return joinLines([
+    `${path}${start !== undefined && end !== undefined ? ` (${unit}s ${start}-${end})` : ""}`,
+    readString(payload.content) ? truncateText(readString(payload.content) ?? "", DOCUMENT_CONTENT_MAX_CHARS) : undefined,
+    warnings && warnings.length > 0 ? `warnings: ${warnings.join("; ")}` : undefined,
+    continuationArgs ? `next: document_read ${JSON.stringify(continuationArgs)}` : undefined,
+  ]);
+}
+
+function projectDocumentWrite(payload: Record<string, unknown>): string {
+  const path = readString(payload.path) ?? "document";
+  const bytes = readNumber(payload.bytes);
+  return `${payload.existed === true ? "wrote" : "created"} Word document ${path}${bytes === undefined ? "" : ` (${bytes} bytes)`}`;
 }
 
 function projectExecutionRead(payload: Record<string, unknown>): string {
