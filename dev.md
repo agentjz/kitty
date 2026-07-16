@@ -2,7 +2,7 @@
 
 `dev.md` 是 Kitty 当前开发纪律。它约束如何改 Kitty，不描述 Kitty 对用户运行时的能力。
 
-`docs/history.md` 保留演进证据和失败路径。`spec.md` 保留当前产品事实。`dev.md` 保留当前工程节奏。
+`VERSION_LOG.md` 与 Git 历史保留演进证据。`spec.md` 保留当前产品事实。`dev.md` 保留当前工程节奏。
 
 ## 1. 改动原则
 
@@ -26,7 +26,7 @@
 2. 当前 `spec.md`。
 3. 当前确定性测试和 production eval。
 4. 当前运行日志和状态文件。
-5. `docs/history.md` 里的演进证据。
+5. `VERSION_LOG.md` 与 Git 历史里的演进证据。
 6. 用户偏好和旧讨论。
 
 历史只能解释为什么，不自动决定现在保留什么。
@@ -152,6 +152,14 @@ Presenter 不能重新计算事实。UI 不能保存第二套生命周期。测�
 - 用户连续重复操作时，状态机是否仍只有一条合法路径。
 
 ## 9. 发布规则
+
+源码开发入口使用与发布包相同的构建合同：
+
+```powershell
+npm.cmd run dev -- --help
+```
+
+`dev` 先生成当前 CLI CJS 与 TUI ESM，再启动 `dist/cli.js`。不要增加只在源码执行器中成立、发布 bundle 不成立的第二套模块语义。
 
 普通提交前：
 

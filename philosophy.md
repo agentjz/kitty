@@ -11,16 +11,16 @@
 小猫智能体把上下文分层：
 
 - 同一个 session 的近场可见对话原样进入当前轮，负责“模型一直在场”的自然连续体验。
-- 同一个 session 的更长对话脉络由模型写出的 session memory 进入当前轮，负责长任务连续性。
+- 同一个 session 的较早对话在预算压力下由 context compression 摘要并写入 context epoch，负责有边界地保留长任务脉络。
 - 当前任务工作记忆自动进入当前轮，负责执行连续性。
 - 项目地图把目录、入口、脚本、测试、项目文档和 git 状态作为机器事实进入当前轮，负责快速定向。
 - checkpoint、工具产物、运行事件和文件变更记录留在证据里，只在需要取证或恢复时使用。
-- 当前上下文是模型当下工作的桌面，只放近场可见对话、同 session 记忆、当前任务工作记忆、项目地图和必要工作集。
+- 当前上下文是模型当下工作的桌面，只放近场可见对话、压缩后的较早对话、当前任务工作记忆、项目地图和必要工作集。
 - 上下文预算是机器测量事实：limit、estimated、remaining、usage ratio、压缩模式、来源分桶和 prompt hotspots 会进入 session 和 status，帮助用户看到当前上下文压力。
 - Cost Kernel 把稳定前缀、易变尾部、大输出压缩、按需 skill 和 provider usage 统一成省 token 主线。一个模型也要省钱；省钱来自上下文结构和缓存命中，不来自模型路由。
 - 长期原则写进可审阅的项目文档、测试和源码。
 
-近场对话负责在场感，模型写记忆负责续命，历史负责取证，上下文负责当下推理。
+近场对话负责在场感，session 事实与 context epoch 负责续接，历史负责取证，上下文负责当下推理。
 
 这条边界同时保护两件事：用户的任务有连续性，模型的当前工作焦点有清晰边界。
 
@@ -38,7 +38,7 @@ Agent 应该更忠于用户，还是更忠于事实？
 
 默认能力越多，模型越容易分心，用户也越难判断系统到底在做什么。
 
-小猫智能体的核心固定为 `read / edit / write / bash`。这四个工具负责基础编程闭环。
+小猫智能体的核心固定为 `read / write / edit / bash / send_file`。前四个工具负责基础编程闭环，`send_file` 在宿主支持时交付本地文件。
 
 复杂能力通过 extension 独立存在。当前 extension 是 `todo`、`worktree`、`network`、`background`、`skills`。它们可启用、可禁用，打开后进入同一个 agent 工具面，关闭后从工具面移除。
 
@@ -54,7 +54,7 @@ Skill 默认不把正文和资源塞进上下文。索引负责发现，加载�
 
 复杂任务应该只是聊天里的临时文字，还是应该成为可审阅的执行合同？
 
-小猫智能体把复杂任务交给 `plan.md`。它不是另一个运行模式，也不是隐藏工作流；它是当前任务的单文件总管。
+小猫智能体提供按需加载的 `plan` skill。模型确认任务需要中大型执行合同时，才创建当前任务的 `plan.md`；它不是另一个运行模式，也不是隐藏工作流。
 
 `plan.md` 同时承担需求、事实、失败测试、目标、设计、任务、验证和收口。用户能看懂要解决什么，开发者能按它改代码，后续接手者能知道已经完成什么、还剩什么。
 
@@ -62,25 +62,20 @@ Plan 只服务当前现实。它不保留旧兼容，不写不存在的入口，
 
 Plan 的价值不是制造流程，而是把模糊目标压成可验证合同：做什么、为什么做、怎么做、怎么证明完成。
 
-## 💾 记忆与沉淀
+## 💾 连续性与沉淀
 
-记忆应该留在哪里？
+长任务事实应该留在哪里？
 
-只留在模型上下文里，下一轮容易丢。只留在日志里，模型不容易用。全量塞回上下文，又会把旧目标拖回现在。
+只留在模型上下文里，下一轮容易丢。全量塞回上下文，又会把旧目标拖回现在。
 
-小猫智能体把记忆分成运行连续性和长期资产：
+小猫智能体当前不维护自动长期 memory。运行连续性由明确 owner 的事实组成：
 
-- session memory 由模型在 turn 收口时根据事实写出，并采用固定 Markdown 区块。
-- working memory 保存模型写出的当前工作焦点、todo、近期工具批次和执行连续性事实。
-- `.kitty/memory/sessions/*.md` 保存同 session 连续记忆。
-- `.kitty/memory/project/*.md` 保存项目经验。
-- `.kitty/memory/user/*.md` 保存用户画像。
-- `.kitty/memory/evidence/*.md` 保存可审阅证据资产。
-- memory asset 暴露 kind、id、title、scope、tags、路径和 evidence references，可以被用户创建、读取、搜索、删除，也可以沉淀到 runtime skill `references/`。
+- append-only session messages 保存同一会话的可见对话和工具结果。
+- working memory 从 task state、todo、checkpoint、workset 和近期工具批次投影当前焦点。
+- context epoch 保存压缩来源、消息边界、hash、摘要和预算事实。
+- tool journal、execution、wake、runtime event 和 session event 保存可恢复、可审阅的机器事实。
 
-Memory 搜索是候选召回，不是语义裁判。机器按文本 token、路径、标签和证据引用暴露命中行；是否采用这些记忆，由模型结合当前请求判断。
-
-固定区块包括当前工作焦点、用户约束、决策、未结事项、验证事实和可复用经验。机器维护格式、保存文本和文件位置。模型判断哪些经验值得复用，哪些历史只适合取证。
+需要长期保留的原则、经验和方法进入用户可审阅的项目文档或 runtime skill。机器不自动把旧会话升级成长期真理，模型也不能把 runtime event 伪装成用户的新要求。
 
 工作集是当前 session 的现场索引。文件被 `read` 成功读取时进入工作集，被 `edit` / `write` 成功变更时记录变更次数和 change id。工作集回答“这轮任务实际碰过哪些文件”，不回答“哪些文件最重要”。
 
@@ -92,7 +87,7 @@ Memory 搜索是候选召回，不是语义裁判。机器按文本 token、路�
 
 小猫智能体用 control plane 保存这些死事实：turn、tool effect、foreground/background execution、pid identity、状态、退出码、输出摘要、lease 和 wake signal。
 
-`kitty status` 让用户看到运行现场：当前焦点、下一步、阻塞项、session、context budget、memory、skills、project map、execution、wake。它先呈现用户能理解的当前现场，再呈现机器账本细节；它只呈现事实，不替模型做判断。
+`kitty status` 让用户看到运行现场：当前焦点、下一步、阻塞项、session、context budget、skills、project map、execution、wake 和最近模型请求。它先呈现用户能理解的当前现场，再呈现机器账本细节；它只呈现事实，不替模型做判断。
 
 Background 是长任务现场。它记录运行输出摘要，能检查、终止、reconcile，也能在完成后把事实暴露给当前 session 的 Agent。
 
@@ -118,7 +113,7 @@ Session events 是宿主和未来入口共享的事件边界。它记录 session
 
 Agent 不能只靠单元测试证明成熟。
 
-小猫智能体用 evaluation harness 暴露真实体验场景：简单问题不疯狂工作、长会话不失忆、旧目标不回灌、项目地图帮助定向、memory 可审阅可追溯、background 可恢复可终止、plan 能形成可验证执行合同。
+小猫智能体用 evaluation harness 暴露真实体验场景：项目地图帮助定向、长会话有界压缩、旧目标不伪装成新要求、工具证据可恢复、background 可终止、host turn 可持久闭环、plan skill 能形成可验证执行合同。
 
 Evaluation harness 是开发期产品验收合同。`npm run eval:local` 运行本地可验证检查，也会用假 provider 跑真实 host turn golden 场景，检查工具、session、workset 和 events 的闭环。`npm run eval:production` 是显式生产路径验收入口，独立于普通 `npm test`，可以使用当前项目真实配置。它不替模型打分，也不把口号写成测试。
 

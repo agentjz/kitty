@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { resolveRuntimeConfig } from "../config/store.js";
+import { ControlPlaneLedger } from "../control/ledger.js";
 import { runHostTurn } from "../host/turn.js";
 import { SessionEventStore } from "../session/events.js";
 import { SessionStore } from "../session/store.js";
@@ -81,24 +82,64 @@ export async function runProductionRepairCheck(
     return Array.isArray(changedPaths) && changedPaths.some((changedPath) =>
       changedPath.replace(/\\/g, "/").endsWith("/status.txt") || changedPath === "status.txt");
   });
+  const durableFacts = (() => {
+    const ledger = new ControlPlaneLedger(workspace);
+    try {
+      return {
+        session: ledger.sessions.load(outcome.session.id),
+        turns: ledger.turns.listBySession(outcome.session.id),
+        toolCalls: ledger.toolCalls.listBySession(outcome.session.id),
+        executions: ledger.executions.list({ ownerSessionId: outcome.session.id }),
+        wakeSignals: ledger.wakeSignals.list(),
+      };
+    } finally {
+      ledger.close();
+    }
+  })();
+  const durableSession = durableFacts.session;
+  const durableTurns = durableFacts.turns;
+  const durableToolCalls = durableFacts.toolCalls;
+  const durableExecutions = durableFacts.executions;
+  const durableWakeSignals = durableFacts.wakeSignals;
+  const turnIds = new Set(durableTurns.map((turn) => turn.id));
+  const toolCallIds = new Set(durableToolCalls.map((toolCall) => toolCall.callId));
+  const wakeExecutionIds = new Set(durableWakeSignals.map((wake) => wake.executionId));
+  const foregroundExecutions = durableExecutions.filter((execution) => execution.kind === "foreground");
+  const supervisedExecutions = foregroundExecutions.filter((execution) =>
+    typeof execution.pid === "number" && Boolean(execution.processIdentity));
+  const durableLedgerComplete = Boolean(durableSession && durableSession.revision > 0) &&
+    durableTurns.length === 1 && durableTurns.every((turn) => turn.status === "completed") &&
+    durableToolCalls.length >= toolMessages.length &&
+    durableToolCalls.every((toolCall) => toolCall.status === "success" || toolCall.status === "error") &&
+    foregroundExecutions.length >= 2 && foregroundExecutions.every((execution) =>
+      (execution.status === "completed" || execution.status === "failed") &&
+      execution.ownerSessionId === outcome.session.id &&
+      execution.createdBySessionId === outcome.session.id &&
+      turnIds.has(execution.parentTurnId) &&
+      toolCallIds.has(execution.originToolCallId) &&
+      (typeof execution.pid === "number") === Boolean(execution.processIdentity) &&
+      execution.controllerGeneration >= 1 &&
+      wakeExecutionIds.has(execution.id)) &&
+    supervisedExecutions.length >= 1;
 
   if (
     assistantToolCalls.length < 1 || toolMessages.length < 3 || !finalAssistant ||
     !String(finalAssistant.content).includes("PRODUCTION_REPAIR_SENTINEL") || repairedValue !== "READY" ||
     !failedVerification || !passedVerification || !changedTarget ||
+    !durableLedgerComplete ||
     !eventTypes.includes("tool.completed") || !eventTypes.includes("tool.failed") ||
     !eventTypes.includes("turn.completed")
   ) {
     return {
       id,
       status: "failed",
-      fact: `production repair incomplete: calls=${assistantToolCalls.length}, tools=${toolMessages.length}, repaired=${repairedValue}, failedEvidence=${failedVerification}, passedEvidence=${passedVerification}, changedTarget=${changedTarget}, final=${finalAssistant?.content ?? "none"}, events=${eventTypes.join(",") || "none"}`,
+      fact: `production repair incomplete: calls=${assistantToolCalls.length}, tools=${toolMessages.length}, repaired=${repairedValue}, failedEvidence=${failedVerification}, passedEvidence=${passedVerification}, changedTarget=${changedTarget}, durableLedger=${durableLedgerComplete}, turns=${durableTurns.length}, toolCalls=${durableToolCalls.length}, foregroundExecutions=${foregroundExecutions.length}, supervisedExecutions=${supervisedExecutions.length}, wakes=${durableWakeSignals.length}, final=${finalAssistant?.content ?? "none"}, events=${eventTypes.join(",") || "none"}`,
     };
   }
 
   return passed(
     id,
-    `production repair ready: calls=${assistantToolCalls.length}, reasoningReplay=${assistantReasoningReplay.length}, tools=${toolMessages.length}, failedEvidence=preserved, repaired=${repairedValue}, verification=passed, final="${finalAssistant.content}"`,
+    `production repair ready: calls=${assistantToolCalls.length}, reasoningReplay=${assistantReasoningReplay.length}, tools=${toolMessages.length}, failedEvidence=preserved, repaired=${repairedValue}, verification=passed, sqliteRevision=${durableSession!.revision}, turns=${durableTurns.length}, toolCalls=${durableToolCalls.length}, foregroundExecutions=${foregroundExecutions.length}, supervisedExecutions=${supervisedExecutions.length}, wakes=${durableWakeSignals.length}, final="${finalAssistant.content}"`,
   );
 }
 

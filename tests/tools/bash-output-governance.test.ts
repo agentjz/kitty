@@ -22,6 +22,7 @@ test("bash tool records governed output and recoverable raw output", async (t) =
   assert.equal(executions.length, 1);
   assert.equal(executions[0]?.kind, "foreground");
   assert.equal(executions[0]?.status, "completed");
+  assert.equal(typeof executions[0]?.pid === "number", Boolean(executions[0]?.processIdentity));
 
   assert.equal(result.ok, true);
   assert.ok(result.metadata?.outputGovernance);

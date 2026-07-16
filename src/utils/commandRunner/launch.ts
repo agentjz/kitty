@@ -52,7 +52,7 @@ export async function launchCommand(
       });
   const pid = subprocess.pid;
   const processIdentity = typeof pid === "number" ? inspectProcessIdentity(pid) : undefined;
-  const stopParentDeathWatchdog = typeof pid === "number"
+  const stopParentDeathWatchdog = typeof pid === "number" && processIdentity
     ? watchProcessUntilParentExit({ parentPid: process.pid, targetPid: pid, targetIdentity: processIdentity })
     : () => undefined;
   return { subprocess: subprocess as LaunchedCommand, processIdentity, stopParentDeathWatchdog };

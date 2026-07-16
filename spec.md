@@ -8,6 +8,8 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 
 当前运行时最低版本是 Node.js 22.13.0。控制平面使用 Node 内置的 `node:sqlite`，安装 Kitty 不下载或编译第三方 SQLite 原生扩展。生产构建输出 CLI CJS 与 TUI ESM；Ink 的可选 `react-devtools-core` 保持 external，未安装时不影响 TUI 启动。
 
+源码开发入口 `npm run dev` 先执行同一生产构建，再启动 `dist/cli.js`。开发入口与发布入口必须共享模块解析、CLI bundle 和 TUI chunk 合同，不维护只对 TypeScript 源码执行器成立的第二套运行路径。
+
 产品目标是持久化的智能体工作能力：
 
 - 每个 session 一个 agent loop；
@@ -245,7 +247,7 @@ Execution stop/cancel 必须终止完整进程树：
 
 Reconcile 以 lease 和 heartbeat 判断 ownership；PID 只用于诊断和进程树终止。进程消失或 lease 丢失且无法确认正常终态时关闭为 `lost`。Execution 终态与 wake signal 在同一事务内幂等提交。
 
-每个 execution controller 持有随机 token、单调 generation 和有限 lease。PID 同时保存平台 creation identity；停止前必须确认 identity，避免 PID 复用误杀。普通 status、wait 和 UI projection 不取得 recovery ownership；只有 lease 过期后 recovery 才能提升 generation。
+每个 execution controller 持有随机 token、单调 generation 和有限 lease。任何进入 active 状态并持久化 PID 的 execution 必须同时保存平台 creation identity；无法取得 identity 的存活进程不能进入 running，已经在登记前结束的极短进程可以从 created 直接结算 terminal 且不保存 PID。停止前必须确认 identity，避免 PID 复用误杀。普通 status、wait 和 UI projection 不取得 recovery ownership；只有 lease 过期后 recovery 才能提升 generation。
 
 ## 9. Runtime 事实与 Observability
 
@@ -328,6 +330,13 @@ npm.cmd run verify
 
 `npm.cmd run verify` 执行 typecheck、build 和编译后的 core test。Core test 不调用真实 provider。
 
+开发入口 smoke：
+
+```powershell
+npm.cmd run dev -- --help
+npm.cmd run dev -- --version
+```
+
 TUI 定向验证：
 
 ```powershell
@@ -347,6 +356,8 @@ npm.cmd run eval:production
 `eval:production` 使用当前 `.kitty/.env`，可能消耗真实 API；它不能进入普通确定性测试。
 
 Production tool acceptance 是真实修复任务，不是固定字符串工具演示。隔离工作区先处于失败状态；真实模型必须检查文件、运行失败验证、从长输出尾部读取根因、修改目标、重新验证通过，并在最终回答中引用成功 sentinel。缺少失败证据、真实变更、复验通过或最终消费中的任一项都判失败。
+
+该真实任务还必须在当前 SQLite 控制平面留下 completed turn、terminal tool calls、带明确 session/turn/tool-call ownership 的 foreground executions 与对应 wake signals。真实 provider 任务证明生产主链路；hard kill、lease 过期、stale generation、PID identity 和进程树终止由确定性 recovery 测试证明，不能用一个平台的结果冒充另一个平台实机验收。
 
 ## 12. Agent 修改纪律
 

@@ -1,6 +1,6 @@
 import { executionOwnership, type ExecutionOwnership } from "../control/types.js";
 import { ControlPlaneLedger } from "../control/ledger.js";
-import { inspectProcessIdentity, terminatePid, type ProcessIdentity } from "./process.js";
+import { terminatePid, type ProcessIdentity } from "./process.js";
 import { ExecutionStore } from "./store.js";
 
 const HEARTBEAT_INTERVAL_MS = 10_000;
@@ -52,7 +52,7 @@ export class ForegroundExecutionController {
     this.ownership = executionOwnership(execution);
   }
 
-  start(pid: number, identity = inspectProcessIdentity(pid)): void {
+  start(pid: number, identity: ProcessIdentity): void {
     this.identity = identity;
     this.store.markRunning(this.id, this.ownership, {
       pid,

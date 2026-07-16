@@ -2,7 +2,7 @@ import { isAbortError } from "../abort.js";
 import { createBashOutputCapture } from "../../tools/outputCapture.js";
 import { launchCommand } from "./launch.js";
 import { normalizeCommandOutput } from "./output.js";
-import { inspectProcessIdentity, terminatePid } from "../../execution/process.js";
+import { inspectProcessIdentity, isProcessAlive, terminatePid } from "../../execution/process.js";
 import {
   ForegroundExecutionController,
   type ForegroundExecutionInput,
@@ -74,7 +74,24 @@ async function runCommandOnce(options: CommandRunOptions): Promise<CommandRunRes
   }
   const pid = subprocess.pid;
   const identity = launched.processIdentity ?? (typeof pid === "number" ? inspectProcessIdentity(pid) : undefined);
-  if (typeof pid === "number") {
+  if (typeof pid === "number" && execution && !identity && isProcessAlive(pid)) {
+    const error = new Error(`Foreground process ${pid} could not be registered with a creation identity.`);
+    try {
+      terminatePid(pid);
+      execution.failBeforeStart(error);
+      throw error;
+    } catch (terminationError) {
+      const failure = terminationError === error
+        ? error
+        : new AggregateError([error, terminationError], `Foreground process ${pid} registration and cleanup failed.`);
+      execution.failBeforeStart(failure);
+      throw failure;
+    } finally {
+      await outputCapture.finalize().catch(() => undefined);
+      launched.stopParentDeathWatchdog();
+    }
+  }
+  if (typeof pid === "number" && identity) {
     try {
       execution?.start(pid, identity);
     } catch (error) {
