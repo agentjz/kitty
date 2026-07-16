@@ -16,12 +16,14 @@ import type {
 } from "./types.js";
 import { summarizeChecks } from "./types.js";
 import { runProductionRepairCheck } from "./productionRepair.js";
+import { runProductionBackgroundCheck } from "./productionBackground.js";
 import { prepareCheckWorkspace } from "./workspace.js";
 
 export const PRODUCTION_EVALUATION_CHECK_IDS: readonly ProductionEvaluationCheckId[] = [
   "production-config-preflight",
   "production-provider-probe",
   "production-real-turn",
+  "production-background-turn",
   "production-tool-turn",
   "production-runtime-status",
 ];
@@ -47,6 +49,13 @@ export const PRODUCTION_EVALUATION_SCENARIOS: readonly EvaluationScenario[] = [
     title: "真实 provider 多轮对话可完成",
     userPath: "维护者显式运行生产验收时，Kitty 用当前 provider 跑隔离 session 的两轮真实对话，验证 turn、session 和 events 主链路。",
     evidence: "创建隔离 eval workspace，运行两次 runHostTurn，确认用户/assistant 消息、turn events 和 runtime status 都可审阅。",
+  },
+  {
+    id: "production-background-turn",
+    suite: "production",
+    title: "真实 provider 后台等待可完成",
+    userPath: "维护者显式运行生产验收时，Kitty 在同一 turn 启动渐进输出任务，只在进度和终态变化后继续判断。",
+    evidence: "确认真实 provider 调用 background_run、至少两次 background_wait，消费 running progress 和 settled sentinel，并留下唯一 durable wake。",
   },
   {
     id: "production-tool-turn",
@@ -79,6 +88,7 @@ export async function runProductionEvaluationChecks(rootDir: string): Promise<Ev
   if (preflight.status === "passed") {
     checks.push(await runProductionEvaluationCheck("production-provider-probe", rootDir));
     checks.push(await runProductionEvaluationCheck("production-real-turn", rootDir));
+    checks.push(await runProductionEvaluationCheck("production-background-turn", rootDir));
     checks.push(await runProductionEvaluationCheck("production-tool-turn", rootDir));
   } else {
     checks.push({
@@ -90,6 +100,11 @@ export async function runProductionEvaluationChecks(rootDir: string): Promise<Ev
       id: "production-real-turn",
       status: "skipped",
       fact: "production real turn skipped because project config is not ready",
+    });
+    checks.push({
+      id: "production-background-turn",
+      status: "skipped",
+      fact: "production background turn skipped because project config is not ready",
     });
     checks.push({
       id: "production-tool-turn",
@@ -148,6 +163,9 @@ async function runProductionEvaluationCheck(
       }
       case "production-real-turn": {
         return await runProductionRealTurnCheck(id, rootDir);
+      }
+      case "production-background-turn": {
+        return await runProductionBackgroundCheck(id, rootDir);
       }
       case "production-tool-turn": {
         return await runProductionRepairCheck(id, rootDir);

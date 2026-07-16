@@ -47,6 +47,25 @@ test("tool result projection never returns an empty model message", () => {
   );
 });
 
+test("background run projection preserves the execution id needed by follow-up waits", () => {
+  const projection = projectToolResultForModel({
+    toolName: "background_run",
+    result: {
+      ok: true,
+      output: JSON.stringify({
+        id: "exec-production-background",
+        command: "node staged-background.cjs",
+        status: "running",
+        pid: 4321,
+      }),
+    },
+  });
+
+  assert.match(projection, /exec-production-background/);
+  assert.match(projection, /node staged-background\.cjs/);
+  assert.match(projection, /running/);
+});
+
 test("tool result envelope keeps model, compact, provenance, and recovery evidence together", () => {
   const envelope = buildToolResultEnvelope({
     callId: "call-1",

@@ -3,6 +3,7 @@ import { clampNumber, okResult, parseArgs, readString } from "../../../../tools/
 import type { RegisteredTool } from "../../../../tools/core/types.js";
 
 export const backgroundReadTool: RegisteredTool = {
+  effect: "read",
   definition: {
     type: "function",
     function: {

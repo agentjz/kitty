@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 
-import { BackgroundExecutionStore, terminateBackgroundExecution, waitForBackgroundExecution, waitForRegisteredBackgroundProcess } from "../../execution/background.js";
+import { BackgroundExecutionStore, terminateBackgroundExecution, waitForRegisteredBackgroundProcess } from "../../execution/background.js";
+import { waitForBackgroundExecutionChange } from "../../execution/backgroundWait.js";
 import { readExecutionOutput } from "../../execution/output.js";
 import { summarizeExecution } from "../../runtime/executionSummary.js";
 import type { RuntimeExecutionSummary } from "../../runtime/statusTypes.js";
@@ -66,11 +67,18 @@ export function registerBackgroundCommand(
       }
 
       if (normalizedAction === "wait") {
-        const execution = summarizeExecution(await waitForBackgroundExecution({
-          rootDir: runtime.stateRootDir,
-          id,
-          timeoutMs: commandOptions.timeoutMs,
-        }));
+        const timeoutMs = Math.max(0, Math.trunc(commandOptions.timeoutMs ?? 60_000));
+        const deadline = Date.now() + timeoutMs;
+        let waited;
+        do {
+          waited = await waitForBackgroundExecutionChange({
+            rootDir: runtime.stateRootDir,
+            id,
+            consumerId: `cli-background-wait:${process.pid}:${id}`,
+            timeoutMs: Math.max(0, deadline - Date.now()),
+          });
+        } while (waited.reason === "progress" && Date.now() < deadline);
+        const execution = summarizeExecution(waited.execution);
         printBackgroundExecutions([execution], Boolean(commandOptions.json), runtime.config.locale);
         return;
       }

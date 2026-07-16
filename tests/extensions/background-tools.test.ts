@@ -12,6 +12,15 @@ test("background extension exposes run, check, wait, stop, and terminate tools",
   const names = tools.map((tool) => tool.definition.function.name).sort();
 
   assert.deepEqual(names, ["background_check", "background_read", "background_run", "background_stop", "background_terminate", "background_wait"]);
+  assert.deepEqual(Object.fromEntries(tools.map((tool) => [tool.definition.function.name, tool.effect])), {
+    background_run: "process",
+    background_check: "read",
+    background_read: "read",
+    background_wait: "read",
+    background_stop: "process",
+    background_terminate: "process",
+  });
+  assert.equal(tools.find((tool) => tool.definition.function.name === "background_wait")?.parallelSafe, false);
 
   const context = createToolContext(root);
   const run = tools.find((tool) => tool.definition.function.name === "background_run");
@@ -153,6 +162,8 @@ test("background wait returns settled execution facts", async (t) => {
   }), context)).output);
 
   const waitedExecution = readExecutionPayload(waited);
+  assert.equal((waited.wait as Record<string, unknown>).reason, "settled");
+  assert.equal((waited.wait as Record<string, unknown>).changed, true);
   assert.equal(waitedExecution.status, "completed");
   assert.match(String(waitedExecution.outputPreview), /wait-ok/);
 });

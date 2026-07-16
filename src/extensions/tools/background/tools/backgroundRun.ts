@@ -5,8 +5,10 @@ import { clampNumber, okResult, parseArgs, readString } from "../../../../tools/
 import { BackgroundExecutionStore, registerBackgroundProcess, terminateBackgroundExecution } from "../../../../execution/background.js";
 import type { RegisteredTool } from "../../../../tools/core/types.js";
 import { executionOwnership } from "../../../../control/types.js";
+import { registerBackgroundExecutionObserver } from "../../../../execution/backgroundSignals.js";
 
 export const backgroundRunTool: RegisteredTool = {
+  effect: "process",
   definition: {
     type: "function",
     function: {
@@ -59,7 +61,12 @@ export const backgroundRunTool: RegisteredTool = {
       if (typeof subprocess.pid !== "number" || subprocess.pid <= 0) {
         throw new Error("Background command started without a process identifier.");
       }
-      store.markRunning(job.id, ownership, { pid: subprocess.pid, processIdentity });
+      const running = store.markRunning(job.id, ownership, { pid: subprocess.pid, processIdentity });
+      registerBackgroundExecutionObserver({
+        rootDir: context.projectContext.stateRootDir,
+        execution: running,
+        consumerId: context.turnId,
+      });
     } catch (error) {
       try { terminateBackgroundExecution(context.projectContext.stateRootDir, job.id, context.ownerSessionId); }
       catch { /* durable recovery owns the remaining uncertain launch */ }
@@ -170,7 +177,8 @@ function createBackgroundOutputTracker(onOutput: (output: string) => void): {
   flush: () => void;
 } {
   let buffer = "";
-  let lastPublishedLength = 0;
+  let pendingChars = 0;
+  let lastPublishedOutput = "";
 
   return {
     append(chunk) {
@@ -178,14 +186,17 @@ function createBackgroundOutputTracker(onOutput: (output: string) => void): {
         return;
       }
       buffer = truncateHead(`${buffer}${chunk}`, BACKGROUND_OUTPUT_PREVIEW_CHARS);
-      if (buffer.length - lastPublishedLength >= BACKGROUND_OUTPUT_UPDATE_CHARS) {
-        lastPublishedLength = buffer.length;
+      pendingChars += chunk.length;
+      if (pendingChars >= BACKGROUND_OUTPUT_UPDATE_CHARS) {
+        pendingChars = 0;
+        lastPublishedOutput = buffer;
         onOutput(buffer);
       }
     },
     flush() {
-      if (buffer.length > 0 && buffer.length !== lastPublishedLength) {
-        lastPublishedLength = buffer.length;
+      if (buffer.length > 0 && buffer !== lastPublishedOutput) {
+        pendingChars = 0;
+        lastPublishedOutput = buffer;
         onOutput(buffer);
       }
     },

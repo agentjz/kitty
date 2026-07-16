@@ -17,6 +17,7 @@ export type ProductionEvaluationCheckId =
   | "production-config-preflight"
   | "production-provider-probe"
   | "production-real-turn"
+  | "production-background-turn"
   | "production-tool-turn"
   | "production-runtime-status";
 

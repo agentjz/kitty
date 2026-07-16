@@ -33,6 +33,7 @@ test("evaluation harness defines explicit production acceptance checks", () => {
     "production-config-preflight",
     "production-provider-probe",
     "production-real-turn",
+    "production-background-turn",
     "production-tool-turn",
     "production-runtime-status",
   ]);

@@ -48,8 +48,10 @@ function projectRawToolResultForModel(input: {
       return projectExecutionCheck(parsed);
     case "background_read":
       return projectExecutionRead(parsed);
+    case "background_run":
     case "background_wait":
     case "background_stop":
+    case "background_terminate":
       return projectExecutionAction(parsed);
     case "skill_load":
       return projectSkillLoad(parsed);
@@ -72,7 +74,10 @@ function projectExecutionRead(payload: Record<string, unknown>): string {
 
 function projectExecutionAction(payload: Record<string, unknown>): string {
   const execution = readObject(payload.execution) ?? payload;
+  const wait = readObject(payload.wait);
   return joinLines([
+    wait && readString(wait.reason) ? `wait: ${readString(wait.reason)}` : undefined,
+    wait && readNumber(wait.waitedMs) !== undefined ? `waited: ${readNumber(wait.waitedMs)}ms` : undefined,
     readString(execution.id) ?? "execution",
     readString(execution.kind),
     readString(execution.status),

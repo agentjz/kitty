@@ -4,6 +4,7 @@ import { okResult, parseArgs, readString } from "../../../../tools/core/shared.j
 import type { RegisteredTool } from "../../../../tools/core/types.js";
 
 export const backgroundStopTool: RegisteredTool = {
+  effect: "process",
   definition: {
     type: "function",
     function: {

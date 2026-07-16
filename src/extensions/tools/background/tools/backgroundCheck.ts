@@ -4,6 +4,7 @@ import { okResult, parseArgs } from "../../../../tools/core/shared.js";
 import type { RegisteredTool } from "../../../../tools/core/types.js";
 
 export const backgroundCheckTool: RegisteredTool = {
+  effect: "read",
   definition: {
     type: "function",
     function: {

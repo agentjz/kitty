@@ -119,6 +119,8 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 
 交互宿主在 active turn 期间收到的普通外部输入不是新 turn，而是写入 SQLite `turn_steers` 的 durable steer。Steer 按 turn 内 sequence 排序，状态为 `pending`、`consumed` 或 `rejected`；agent 在下一次 context 构建前消费，并以确定 message ID 写入同一 session。Final answer 进入持久化前必须通过 turn `closing` 事务边界确认没有 pending steer；若同时到达新 steer，则保存当前 assistant 输出并继续同一 turn。
 
+后台命令与 agent loop 在同一 turn 并行。`background_wait` 没有短、中、长任务分支；它在 execution 出现可见进度、进入终态、当前 turn 收到 pending steer 或显式安静等待上限到达时返回，模型再根据这些事实继续等待或收束。无变化期间不发起 provider 请求。Steer 只唤醒 wait，仍由上述唯一消费边界写入 session。
+
 `Ctrl+C` 是显式 abort：当前 turn 进入 aborted，未消费 steer 进入 rejected。中断清理尚未结束时的新输入必须 admit 为下一 durable turn，不能写到即将 aborted 的 owner。`/exit`、终端 EOF/关闭和宿主终止信号把 active turn 放回 queued，同时终止当前 session 的 foreground/background 进程树；其他 session 不受影响。关闭有固定 deadline，重复信号升级为强制退出。父进程被强杀时，父死亡监护器负责终止目标进程树，重启后 lease reconcile 把未收口记录转成明确终态。任何时刻同一 session 只能有一个有效 turn owner generation。
 
 Provider request 是临时失败的唯一重试 owner：同一逻辑请求最多四次调用、总等待最多 90 秒，并优先采用服务端 `Retry-After`。Agent turn 不得重新发送已耗尽重试预算的请求。Abort 必须中断当前请求或等待，不能伪造正常完成。
@@ -238,6 +240,10 @@ Extension 只在配置启用时进入同一工具注册表。它们不是另一�
 
 `background_run` 启动非阻塞 execution。读取、等待、停止和 CLI 命令都读取同一份 control-plane record。Agent 不能根据工具名称或展示字符串猜测 execution 状态，只能读取 execution record。Deadline 到达时进入 cancelling，终止进程树，确认后进入 aborted 并发布 wake signal。
 
+`background_wait` 是非并行的 read effect，返回 `progress`、`settled`、`steer` 或 `quiet_timeout` 以及最新 execution snapshot。Running output 的密集变化先合并再返回，避免逐 chunk 请求模型。`background_run`、stop 和 terminate 是 process effect；check、read 和 wait 是 read effect。CLI `background wait` 复用同一个 change wait owner，但保持“等待终态或总 timeout”命令语义。
+
+进程内 signal 只负责降低同进程唤醒延迟，不保存业务状态。每次唤醒都重新读取 SQLite；跨进程变化、遗漏通知和宿主重启依靠有界 SQLite fallback，因此进程内 observer 消失不会丢失 execution 事实。本产品不为该能力新增 continuation scheduler、daemon 或宿主退出后继续运行的独立服务。
+
 ### 取消与恢复
 
 Execution stop/cancel 必须终止完整进程树：
@@ -246,6 +252,8 @@ Execution stop/cancel 必须终止完整进程树：
 - POSIX：先终止进程组和子孙进程，短暂等待后升级为 `SIGKILL`。
 
 Reconcile 以 lease 和 heartbeat 判断 ownership；PID 只用于诊断和进程树终止。进程消失或 lease 丢失且无法确认正常终态时关闭为 `lost`。Execution 终态与 wake signal 在同一事务内幂等提交。
+
+Ctrl+C 或 controlled detach 通过 turn AbortSignal 立即中断正在等待的 `background_wait`，不伪造成功结果，也不改写 execution 终态。宿主强杀或断电后，进程内 signal 丢失；watchdog、turn/execution lease 和 tool journal 继续负责恢复。已激活但未落结果的 wait 按 read effect 结算为 `interrupted`，不能升级为未知副作用，也不能触发 `background_run` 重放。
 
 每个 execution controller 持有随机 token、单调 generation 和有限 lease。任何进入 active 状态并持久化 PID 的 execution 必须同时保存平台 creation identity；无法取得 identity 的存活进程不能进入 running，已经在登记前结束的极短进程可以从 created 直接结算 terminal 且不保存 PID。停止前必须确认 identity，避免 PID 复用误杀。普通 status、wait 和 UI projection 不取得 recovery ownership；只有 lease 过期后 recovery 才能提升 generation。
 
@@ -356,6 +364,8 @@ npm.cmd run eval:production
 `eval:production` 使用当前 `.kitty/.env`，可能消耗真实 API；它不能进入普通确定性测试。
 
 Production tool acceptance 是真实修复任务，不是固定字符串工具演示。隔离工作区先处于失败状态；真实模型必须检查文件、运行失败验证、从长输出尾部读取根因、修改目标、重新验证通过，并在最终回答中引用成功 sentinel。缺少失败证据、真实变更、复验通过或最终消费中的任一项都判失败。
+
+Production background acceptance 使用真实 provider 和真实渐进输出子进程。真实模型必须在一个 turn 中调用 `background_run`、至少两次 `background_wait`，分别消费 running progress 与 settled sentinel，并在最终回答引用终态 sentinel；SQLite 必须留下一个 completed turn、terminal tool calls、正确 ownership 的 completed background execution 和唯一 wake signal。
 
 该真实任务还必须在当前 SQLite 控制平面留下 completed turn、terminal tool calls、带明确 session/turn/tool-call ownership 的 foreground executions 与对应 wake signals。真实 provider 任务证明生产主链路；hard kill、lease 过期、stale generation、PID identity 和进程树终止由确定性 recovery 测试证明，不能用一个平台的结果冒充另一个平台实机验收。
 

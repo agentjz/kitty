@@ -119,8 +119,7 @@ export async function runProductionRepairCheck(
       toolCallIds.has(execution.originToolCallId) &&
       (typeof execution.pid === "number") === Boolean(execution.processIdentity) &&
       execution.controllerGeneration >= 1 &&
-      wakeExecutionIds.has(execution.id)) &&
-    supervisedExecutions.length >= 1;
+      wakeExecutionIds.has(execution.id));
 
   if (
     assistantToolCalls.length < 1 || toolMessages.length < 3 || !finalAssistant ||

@@ -2,8 +2,8 @@ import { ControlPlaneLedger, type ExecutionRecord, type WakeSignalReason } from 
 import { executionOwnership, type ExecutionOwnership } from "../control/types.js";
 import { inspectProcessIdentity, isProcessAlive, isSameProcess, terminatePid, type ProcessIdentity } from "./process.js";
 import { unknownExecution } from "./errors.js";
-import { sleepWithSignal, throwIfAborted } from "../utils/abort.js";
 import { watchProcessUntilParentExit } from "./parentDeathWatchdog.js";
+import { notifyBackgroundExecutionChange } from "./backgroundSignals.js";
 
 interface BackgroundProcessHandle {
   kill?: (signal?: NodeJS.Signals | number, error?: Error) => unknown;
@@ -14,8 +14,6 @@ const activeBackgroundProcesses = new Map<string, {
   kill: () => void;
   settled: Promise<void>;
 }>();
-
-const DEFAULT_BACKGROUND_WAIT_INTERVAL_MS = 250;
 
 export class BackgroundExecutionStore {
   constructor(private readonly rootDir: string) {}
@@ -32,7 +30,7 @@ export class BackgroundExecutionStore {
   }): ExecutionRecord {
     const ledger = new ControlPlaneLedger(this.rootDir);
     try {
-      return ledger.executions.create({
+      const execution = ledger.executions.create({
         status: "created",
         command: input.command,
         cwd: input.cwd,
@@ -43,6 +41,8 @@ export class BackgroundExecutionStore {
         originToolCallId: input.originToolCallId,
         timeoutMs: input.timeoutMs,
       });
+      notifyBackgroundExecutionChange(this.rootDir, execution.id);
+      return execution;
     } finally {
       ledger.close();
     }
@@ -83,10 +83,12 @@ export class BackgroundExecutionStore {
   markRunning(id: string, ownership: ExecutionOwnership, input: { pid: number; processIdentity?: ProcessIdentity }): ExecutionRecord {
     const ledger = new ControlPlaneLedger(this.rootDir);
     try {
-      return ledger.executions.markRunning(id, ownership, {
+      const execution = ledger.executions.markRunning(id, ownership, {
         ...input,
         processIdentity: input.processIdentity ?? inspectProcessIdentity(input.pid),
       });
+      notifyBackgroundExecutionChange(this.rootDir, id);
+      return execution;
     } finally {
       ledger.close();
     }
@@ -115,13 +117,15 @@ export class BackgroundExecutionStore {
       if (execution.status !== "running") {
         return execution;
       }
-      return ledger.executions.save({
+      const updated = ledger.executions.save({
         ...execution,
         output: input.output ?? execution.output,
         summary: input.summary ?? execution.summary,
         lastOutputAt: input.lastOutputAt ?? new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
+      notifyBackgroundExecutionChange(this.rootDir, id);
+      return updated;
     } finally {
       ledger.close();
     }
@@ -138,7 +142,7 @@ export class BackgroundExecutionStore {
   }): ExecutionRecord {
     const ledger = new ControlPlaneLedger(this.rootDir);
     try {
-      return ledger.transaction(() => {
+      const closed = ledger.transaction(() => {
         const closed = ledger.executions.close(id, ownership, input);
         ledger.wakeSignals.publish({
           executionId: id,
@@ -146,6 +150,8 @@ export class BackgroundExecutionStore {
         });
         return closed;
       });
+      notifyBackgroundExecutionChange(this.rootDir, id, { terminal: true });
+      return closed;
     } finally {
       ledger.close();
     }
@@ -201,36 +207,6 @@ export function reconcileBackgroundExecutions(
     }));
   }
   return { lostExecutions };
-}
-
-export async function waitForBackgroundExecution(input: {
-  rootDir: string;
-  id: string;
-  ownerSessionId?: string;
-  timeoutMs?: number;
-  pollIntervalMs?: number;
-  abortSignal?: AbortSignal;
-}): Promise<ExecutionRecord> {
-  const store = new BackgroundExecutionStore(input.rootDir);
-  const startedAt = Date.now();
-  const timeoutMs = Math.max(0, Math.trunc(input.timeoutMs ?? 60_000));
-  const pollIntervalMs = Math.max(25, Math.trunc(input.pollIntervalMs ?? DEFAULT_BACKGROUND_WAIT_INTERVAL_MS));
-
-  for (;;) {
-    throwIfAborted(input.abortSignal, "Background wait aborted.");
-    reconcileBackgroundExecutions(input.rootDir, input.ownerSessionId);
-    const execution = store.load(input.id, input.ownerSessionId);
-    if (!execution) {
-      throw unknownExecution(input.id);
-    }
-    if (!isBackgroundExecutionActive(execution)) {
-      return execution;
-    }
-    if (Date.now() - startedAt >= timeoutMs) {
-      return execution;
-    }
-    await sleepWithSignal(pollIntervalMs, input.abortSignal);
-  }
 }
 
 export function terminateBackgroundExecution(rootDir: string, id: string, ownerSessionId?: string): ExecutionRecord {

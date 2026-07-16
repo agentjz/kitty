@@ -13,6 +13,7 @@ import type { RuntimeConfig, SessionRecord } from "../types.js";
 import { defaultInteractiveExitGuard, type InteractiveExitGuard } from "./exitGuard.js";
 import { handleLocalCommand, type LocalCommandResult } from "./localCommands.js";
 import { normalizeLocalCommand } from "./localCommandDefinitions.js";
+import { notifyBackgroundWaitersForConsumer } from "../execution/backgroundSignals.js";
 import type { InteractionShell } from "./shell.js";
 import { ControlPlaneLedger } from "../control/ledger.js";
 import { translate, type MessageKey } from "../i18n/index.js";
@@ -277,6 +278,7 @@ export class InteractiveSessionDriver {
             text: input,
           });
           if (steer) {
+            notifyBackgroundWaitersForConsumer(this.options.stateRootDir, active.turnId);
             this.options.shell.output.plain(formatSubmittedInput(input));
             this.options.shell.output.info(this.t("interaction.steerAccepted"));
             return;
