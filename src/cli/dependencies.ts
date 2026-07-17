@@ -23,6 +23,13 @@ export interface CliProgramDependencies {
     run(signal?: AbortSignal): Promise<void>;
     stop?(): void;
   }>;
+  createWeixinService?: (options: {
+    cwd: string;
+    config: RuntimeConfig;
+  }) => Promise<{
+    run(signal?: AbortSignal): Promise<void>;
+    stop?(): void;
+  }>;
   runOneShot?: (options: {
     prompt: string;
     cwd: string;
@@ -32,6 +39,7 @@ export interface CliProgramDependencies {
   }) => Promise<OneShotPromptRunResult>;
   acquireProcessLock?: (options: { stateDir: string }) => Promise<{
     leaseName: string;
+    signal?: AbortSignal;
     release(): Promise<void>;
   }>;
   resolveRuntime?: typeof resolveCliRuntime;

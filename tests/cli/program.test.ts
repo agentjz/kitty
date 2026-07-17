@@ -22,7 +22,7 @@ import { createTestRuntimeConfig, TEST_EXECUTION_OWNER } from "../helpers.js";
 
 test("cli exposes only the current public command surface", () => {
   const commands = buildCliProgram().commands.map((command) => command.name()).sort();
-  assert.deepEqual(commands, ["background", "init", "resume", "run", "status", "telegram", "undo"]);
+  assert.deepEqual(commands, ["background", "init", "resume", "run", "status", "telegram", "undo", "weixin"]);
 });
 
 test("init bootstraps project templates without loading runtime config", async () => {

@@ -34,14 +34,14 @@ test("duplicate telegram update binds exactly one durable turn", async (t) => {
   const root = await createTempWorkspace("telegram-update-turn", t);
   const ledger = new ControlPlaneLedger(root);
   const session = ledger.sessions.save(await createSessionRecord(root));
-  assert.equal(ledger.telegram.claimInbox(42, "peer-1"), true);
-  const first = ledger.telegram.bindTurn({ updateId: 42, sessionId: session.id, text: "do work" });
-  assert.equal(ledger.telegram.claimInbox(42, "peer-1"), true);
-  const second = ledger.telegram.bindTurn({ updateId: 42, sessionId: session.id, text: "do work again" });
+  assert.equal(ledger.remoteMessages.claimInbox({ host: "telegram", messageId: "42", peerKey: "peer-1" }), true);
+  const first = ledger.remoteMessages.bindTurn({ host: "telegram", messageId: "42", sessionId: session.id, text: "do work" });
+  assert.equal(ledger.remoteMessages.claimInbox({ host: "telegram", messageId: "42", peerKey: "peer-1" }), true);
+  const second = ledger.remoteMessages.bindTurn({ host: "telegram", messageId: "42", sessionId: session.id, text: "do work again" });
   assert.equal(second, first);
   assert.equal(ledger.turns.listBySession(session.id).length, 1);
-  ledger.telegram.markInbox(42, "completed");
-  assert.equal(ledger.telegram.claimInbox(42, "peer-1"), false);
+  ledger.remoteMessages.markInbox({ host: "telegram", messageId: "42", status: "completed" });
+  assert.equal(ledger.remoteMessages.claimInbox({ host: "telegram", messageId: "42", peerKey: "peer-1" }), false);
   ledger.close();
 });
 
@@ -66,6 +66,6 @@ test("telegram outbox exposes uncertain delivery and never blindly retries it", 
   assert.equal(calls, 1);
   assert.equal((await queue.listPending()).length, 1);
   const ledger = new ControlPlaneLedger(root);
-  assert.equal(ledger.telegram.listOutbox()[0]?.status, "uncertain");
+  assert.equal(ledger.remoteMessages.listOutbox("telegram")[0]?.status, "uncertain");
   ledger.close();
 });

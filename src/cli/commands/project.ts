@@ -39,6 +39,13 @@ export function registerProjectCommands(
         }
       }
 
+      if (result.updated.length > 0) {
+        ui.success(translate(options.locale, "cli.init.updated", { count: result.updated.length }));
+        for (const filePath of result.updated) {
+          writeStdoutLine(filePath);
+        }
+      }
+
       if (result.skipped.length > 0) {
         ui.info(translate(options.locale, "cli.init.skipped", { count: result.skipped.length }));
         for (const filePath of result.skipped) {

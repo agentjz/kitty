@@ -5,6 +5,8 @@ import type { Command } from "commander";
 import { getErrorMessage } from "../agent/errors.js";
 import type { CliOverrides, RuntimeConfig } from "../types.js";
 import { translate, type KittyLocale } from "../i18n/index.js";
+import { runRemoteServiceWithLock } from "../remote/serviceLifecycle.js";
+import { writeRemoteServiceIntro } from "../shell/remoteServiceIntro.js";
 
 export async function createTelegramService(options: {
   cwd: string;
@@ -113,39 +115,16 @@ export function registerTelegramCommands(
       const lock = await acquireProcessLock({
         stateDir: runtime.config.telegram.stateDir,
       });
-      let releaseSignals: (() => void) | undefined;
-      try {
-        const service = await serviceFactory({ cwd: runtime.cwd, config: runtime.config });
-        console.log(
-          `[telegram] starting private chat service allowed=${runtime.config.telegram.allowedUserIds.join(",")} state=${runtime.config.telegram.stateDir} proxy=${runtime.config.telegram.proxyUrl || "direct"}`,
-        );
-        const controller = new AbortController();
-        const stop = () => {
-          controller.abort();
-          service.stop?.();
-        };
-        releaseSignals = bindShutdownSignals(stop);
-        lock.signal?.addEventListener("abort", stop, { once: true });
-        const runSignal = lock.signal
-          ? AbortSignal.any([controller.signal, lock.signal])
-          : controller.signal;
-        await service.run(runSignal);
-      } finally {
-        releaseSignals?.();
-        await lock.release();
-      }
+      await runRemoteServiceWithLock({
+        lock,
+        createService: () => serviceFactory({ cwd: runtime.cwd, config: runtime.config }),
+        onStarted: () => writeRemoteServiceIntro({
+          product: "telegram",
+          locale: runtime.config.locale,
+          stateDir: runtime.config.telegram.stateDir,
+          allowedUserCount: runtime.config.telegram.allowedUserIds.length,
+          transport: runtime.config.telegram.proxyUrl ? "Bot API / proxy" : "Bot API / direct",
+        }),
+      });
     });
-}
-
-function bindShutdownSignals(onShutdown: () => void): () => void {
-  const handler = () => {
-    onShutdown();
-  };
-  process.once("SIGINT", handler);
-  process.once("SIGTERM", handler);
-
-  return () => {
-    process.off("SIGINT", handler);
-    process.off("SIGTERM", handler);
-  };
 }

@@ -1,6 +1,6 @@
 import { KITTY_ENV } from "./envKeys.js";
 import { EXTENSION_DEFINITIONS } from "../extensions/definitions.js";
-import { INITIAL_TELEGRAM_CONFIG } from "./hosts.js";
+import { INITIAL_TELEGRAM_CONFIG, INITIAL_WEIXIN_CONFIG } from "./hosts.js";
 import { INITIAL_PROJECT_DOC_MAX_BYTES } from "./projectDocs.js";
 import { getInitialRuntimeConfig } from "./initialConfig.js";
 import { getDefaultProviderPreset, getProviderPresetBaseUrl, PROVIDER_PRESETS } from "./providerPresets.js";
@@ -50,6 +50,17 @@ function formatCommonEnvSections(input: {
         }),
         "",
       ]),
+    "# Weixin iLink private chat",
+    `${KITTY_ENV.weixinBaseUrl}=${INITIAL_WEIXIN_CONFIG.baseUrl}`,
+    `${KITTY_ENV.weixinCdnBaseUrl}=${INITIAL_WEIXIN_CONFIG.cdnBaseUrl}`,
+    `${KITTY_ENV.weixinAllowedUserIds}=`,
+    `${KITTY_ENV.weixinPollingTimeoutMs}=${INITIAL_WEIXIN_CONFIG.pollingTimeoutMs}`,
+    `${KITTY_ENV.weixinPollingRetryBackoffMs}=${INITIAL_WEIXIN_CONFIG.pollingRetryBackoffMs}`,
+    `${KITTY_ENV.weixinMessageChunkBytes}=${INITIAL_WEIXIN_CONFIG.messageChunkBytes}`,
+    `${KITTY_ENV.weixinTypingIntervalMs}=${INITIAL_WEIXIN_CONFIG.typingIntervalMs}`,
+    `${KITTY_ENV.weixinQrTimeoutMs}=${INITIAL_WEIXIN_CONFIG.qrTimeoutMs}`,
+    `${KITTY_ENV.weixinRouteTag}=${INITIAL_WEIXIN_CONFIG.routeTag}`,
+    "",
     "# Telegram private chat",
     `${KITTY_ENV.telegramToken}=${activeTelegramToken}`,
     `${KITTY_ENV.telegramAllowedUserIds}=${activeTelegramAllowedUsers}`,

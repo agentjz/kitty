@@ -5,7 +5,7 @@ import type { TestContext } from "node:test";
 
 import { ChangeStore } from "../src/agent/changes/store.js";
 import { getAppPaths } from "../src/config/paths.js";
-import { resolveTelegramRuntimeConfig } from "../src/config/hosts.js";
+import { resolveTelegramRuntimeConfig, resolveWeixinRuntimeConfig } from "../src/config/hosts.js";
 import { getInitialRuntimeConfig } from "../src/config/initialConfig.js";
 import type { ToolContext } from "../src/tools/core/types.js";
 import type { RuntimeConfig } from "../src/types.js";
@@ -78,6 +78,7 @@ export function createTestRuntimeConfig(root: string): RuntimeConfig {
     model: "gpt-5.5",
     thinking: "enabled",
     telegram: resolveTelegramRuntimeConfig(initialConfig.telegram, root),
+    weixin: resolveWeixinRuntimeConfig(initialConfig.weixin, root),
     extensions: {
       ...initialConfig.extensions,
     },

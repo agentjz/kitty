@@ -9,6 +9,7 @@ import { registerBackgroundCommand } from "./commands/background.js";
 import { registerSessionCommands } from "./commands/session.js";
 import { writeStderr, writeStdout } from "../utils/stdio.js";
 import { registerTelegramCommands } from "../telegram/cli.js";
+import { registerWeixinCommands } from "../weixin/cli.js";
 import { DEFAULT_LOCALE, translate, type KittyLocale } from "../i18n/index.js";
 
 export { type CliProgramDependencies } from "./dependencies.js";
@@ -60,6 +61,13 @@ export function buildCliProgram(
     getCliOverrides,
     resolveRuntime,
     createTelegramService: dependencies.createTelegramService,
+    acquireProcessLock: dependencies.acquireProcessLock,
+  });
+  registerWeixinCommands(program, {
+    locale,
+    getCliOverrides,
+    resolveRuntime,
+    createWeixinService: dependencies.createWeixinService,
     acquireProcessLock: dependencies.acquireProcessLock,
   });
   return program;

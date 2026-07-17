@@ -125,8 +125,9 @@ export async function runTelegramTurn(options: {
     const ledger = new ControlPlaneLedger(stateRootDir);
     let admittedTurnId: string;
     try {
-      admittedTurnId = ledger.telegram.bindTurn({
-        updateId: options.message.updateId,
+      admittedTurnId = ledger.remoteMessages.bindTurn({
+        host: "telegram",
+        messageId: String(options.message.updateId),
         sessionId: session.id,
         text: input,
       });

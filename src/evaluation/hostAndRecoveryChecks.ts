@@ -13,7 +13,7 @@ export async function runHostTurnBoundaryCheck(id: EvaluationCheckId, rootDir: s
   const { runHostTurn } = await import("../host/turn.js");
   const { SessionEventStore } = await import("../session/events.js");
   const { SessionStore } = await import("../session/store.js");
-  const { resolveTelegramRuntimeConfig } = await import("../config/hosts.js");
+  const { resolveTelegramRuntimeConfig, resolveWeixinRuntimeConfig } = await import("../config/hosts.js");
   const { getInitialRuntimeConfig } = await import("../config/initialConfig.js");
   const { getAppPaths } = await import("../config/paths.js");
   const workspace = await prepareCheckWorkspace(rootDir, "host-turn-boundary");
@@ -22,6 +22,7 @@ export async function runHostTurnBoundaryCheck(id: EvaluationCheckId, rootDir: s
     ...initial,
     apiKey: "eval-key",
     telegram: resolveTelegramRuntimeConfig(initial.telegram, workspace),
+    weixin: resolveWeixinRuntimeConfig(initial.weixin, workspace),
     paths: getAppPaths(workspace),
   };
   const sessionStore = new SessionStore(config.paths.sessionsDir);

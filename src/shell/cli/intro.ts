@@ -3,7 +3,7 @@ import chalk from "chalk";
 import { listSlashCommands } from "../../interaction/localCommandDefinitions.js";
 import type { ShellOutputPort } from "../../interaction/shell.js";
 import type { SessionRecord } from "../../types.js";
-import { renderKittyBanner } from "../banner.js";
+import { renderKittyBanner } from "../../runtime-ui/banner.js";
 import { translate, type KittyLocale } from "../../i18n/index.js";
 
 export function writeCliInteractiveIntro(options: {

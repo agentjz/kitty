@@ -1,4 +1,4 @@
-import { INITIAL_TELEGRAM_CONFIG } from "./hosts.js";
+import { INITIAL_TELEGRAM_CONFIG, INITIAL_WEIXIN_CONFIG } from "./hosts.js";
 import { getInitialExtensionSwitches } from "./extensions.js";
 import { getDefaultProviderPreset, getProviderPresetBaseUrl } from "./providerPresets.js";
 import type { AppConfig } from "../types.js";
@@ -22,6 +22,7 @@ export function getInitialRuntimeConfig(): AppConfig {
     commandStallTimeoutMs: 30_000,
     showReasoning: true,
     telegram: structuredClone(INITIAL_TELEGRAM_CONFIG),
+    weixin: structuredClone(INITIAL_WEIXIN_CONFIG),
     extensions: getInitialExtensionSwitches(),
   };
 }

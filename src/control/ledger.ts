@@ -12,7 +12,8 @@ import { ContextEpochLedgerRepo } from "./contextEpochs.js";
 import { RuntimeEventLedgerRepo } from "./runtimeEvents.js";
 import { InteractionDraftLedgerRepo } from "./interactionDrafts.js";
 import { TurnSteerLedgerRepo } from "./turnSteers.js";
-import { ServiceLeaseLedgerRepo, TelegramLedgerRepo } from "./telegram.js";
+import { ServiceLeaseLedgerRepo } from "./serviceLeases.js";
+import { RemoteMessageLedgerRepo } from "./remoteMessages.js";
 import { openControlDatabase, type ControlDatabase } from "./sqlite.js";
 
 export type {
@@ -41,7 +42,7 @@ export class ControlPlaneLedger {
   readonly interactionDrafts: InteractionDraftLedgerRepo;
   readonly turnSteers: TurnSteerLedgerRepo;
   readonly serviceLeases: ServiceLeaseLedgerRepo;
-  readonly telegram: TelegramLedgerRepo;
+  readonly remoteMessages: RemoteMessageLedgerRepo;
   private readonly db: ControlDatabase;
 
   constructor(rootDir: string) {
@@ -65,7 +66,7 @@ export class ControlPlaneLedger {
     this.interactionDrafts = new InteractionDraftLedgerRepo(this.db);
     this.turnSteers = new TurnSteerLedgerRepo(this.db);
     this.serviceLeases = new ServiceLeaseLedgerRepo(this.db);
-    this.telegram = new TelegramLedgerRepo(this.db);
+    this.remoteMessages = new RemoteMessageLedgerRepo(this.db);
   }
 
   transaction<T>(operation: () => T): T {
@@ -88,7 +89,7 @@ export class ControlPlaneLedger {
       }
       for (const table of [
         "turn_steers", "tool_calls", "context_epochs", "interaction_drafts", "runtime_events",
-        "telegram_inbox", "telegram_outbox", "service_leases",
+        "remote_inbox", "remote_outbox", "service_leases",
         "task_lifecycle", "session_turns", "session_messages", "wake_signals", "executions", "sessions",
       ]) {
         this.db.prepare(`DELETE FROM ${table}`).run();

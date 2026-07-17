@@ -29,6 +29,15 @@ export const KITTY_BASE_ENV = {
   telegramDeliveryMaxRetries: "KITTY_TELEGRAM_DELIVERY_MAX_RETRIES",
   telegramDeliveryBaseDelayMs: "KITTY_TELEGRAM_DELIVERY_BASE_DELAY_MS",
   telegramDeliveryMaxDelayMs: "KITTY_TELEGRAM_DELIVERY_MAX_DELAY_MS",
+  weixinBaseUrl: "KITTY_WEIXIN_BASE_URL",
+  weixinCdnBaseUrl: "KITTY_WEIXIN_CDN_BASE_URL",
+  weixinAllowedUserIds: "KITTY_WEIXIN_ALLOWED_USER_IDS",
+  weixinPollingTimeoutMs: "KITTY_WEIXIN_POLLING_TIMEOUT_MS",
+  weixinPollingRetryBackoffMs: "KITTY_WEIXIN_POLLING_RETRY_BACKOFF_MS",
+  weixinMessageChunkBytes: "KITTY_WEIXIN_MESSAGE_CHUNK_BYTES",
+  weixinTypingIntervalMs: "KITTY_WEIXIN_TYPING_INTERVAL_MS",
+  weixinQrTimeoutMs: "KITTY_WEIXIN_QR_TIMEOUT_MS",
+  weixinRouteTag: "KITTY_WEIXIN_ROUTE_TAG",
 } as const;
 
 export const KITTY_ENV = {

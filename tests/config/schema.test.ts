@@ -6,6 +6,7 @@ import { MODEL_REASONING_EFFORTS, MODEL_THINKING_MODES } from "../../src/config/
 import { getDefaultProviderPreset, getProviderPresetBaseUrl } from "../../src/config/providerPresets.js";
 import { ConfigError } from "../../src/config/errors.js";
 import { normalizeRuntimeConfig } from "../../src/config/schema.js";
+import { INITIAL_WEIXIN_CONFIG, resolveWeixinRuntimeConfig } from "../../src/config/hosts.js";
 
 test("runtime config schema normalizes model, context, telegram, and extensions", () => {
   const defaultPreset = getDefaultProviderPreset();
@@ -81,4 +82,12 @@ test("runtime config schema defaults a missing locale but rejects an explicit un
     () => normalizeRuntimeConfig({ ...config, locale: "fr" }),
     /KITTY_LOCALE must be one of/,
   );
+});
+
+test("weixin runtime config resolves an omitted section from current defaults", () => {
+  const resolved = resolveWeixinRuntimeConfig(undefined, ".");
+  assert.equal(resolved.baseUrl, INITIAL_WEIXIN_CONFIG.baseUrl);
+  assert.equal(resolved.pollingTimeoutMs, INITIAL_WEIXIN_CONFIG.pollingTimeoutMs);
+  assert.deepEqual(resolved.allowedUserIds, []);
+  assert.match(resolved.credentialsFile, /[\\/]\.kitty[\\/]weixin[\\/]credentials\.json$/u);
 });

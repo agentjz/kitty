@@ -1,4 +1,4 @@
-import type { TelegramConfig, TelegramRuntimeConfig } from "../config/hosts.js";
+import type { TelegramConfig, TelegramRuntimeConfig, WeixinConfig, WeixinRuntimeConfig } from "../config/hosts.js";
 import type { ExtensionToggleConfig } from "../config/extensions.js";
 import type { KittyLocale } from "../i18n/index.js";
 
@@ -31,6 +31,7 @@ export interface AppConfig {
   commandStallTimeoutMs: number;
   showReasoning: boolean;
   telegram: TelegramConfig;
+  weixin: WeixinConfig;
   extensions: ExtensionToggleConfig;
 }
 
@@ -38,6 +39,7 @@ export interface RuntimeConfig extends AppConfig {
   apiKey: string;
   paths: AppPaths;
   telegram: TelegramRuntimeConfig;
+  weixin: WeixinRuntimeConfig;
 }
 
 export interface CliOverrides {

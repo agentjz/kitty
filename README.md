@@ -99,12 +99,17 @@ Kitty 会调查事实、判断边界、调用工具、检查结果，并把已�
 | `kitty resume [sessionId]` | 恢复最近或指定会话 |
 | `kitty status` | 查看当前运行现场 |
 | `kitty background` | 查看或控制后台执行 |
-| `kitty telegram` | 启动 Telegram 私聊服务 |
+| `kitty telegram serve` | 启动 Telegram 私聊服务 |
+| `kitty weixin login` | 扫码登录微信 iLink |
+| `kitty weixin serve` | 启动微信私聊服务 |
+| `kitty weixin logout` | 清除微信 iLink 登录状态 |
 | `kitty --version` | 查看版本 |
 
 在 TUI 输入 `/` 可以查看 `/status`、`/export` 和 `/exit`；空输入时按 `?` 可以查看键位。
 
 支持中文、英文、日文和韩文四种语言。
+
+远程入口只接受白名单私聊。Telegram 需要设置 `KITTY_TELEGRAM_TOKEN` 和 `KITTY_TELEGRAM_ALLOWED_USER_IDS`；微信先运行 `kitty weixin login`，再在 `.kitty/.env` 设置 `KITTY_WEIXIN_ALLOWED_USER_IDS` 并运行 `kitty weixin serve`。两个入口共用同一套持久消息与中断恢复生命周期。
 
 ## 继续了解
 

@@ -18,6 +18,7 @@ test("project env template provides a complete active runtime configuration", ()
   assert.equal(local.get(KITTY_ENV.model), initialConfig.model);
   assert.equal(local.get(KITTY_ENV.thinking), initialConfig.thinking);
   assert.equal(local.get(KITTY_ENV.reasoningEffort), initialConfig.reasoningEffort);
+  assert.ok(template.indexOf("# Weixin iLink private chat") < template.indexOf("# Telegram private chat"));
 });
 
 function readEnvAssignments(content: string): Map<string, string> {

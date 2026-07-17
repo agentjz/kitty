@@ -26,6 +26,71 @@ export interface TelegramRuntimeConfig extends TelegramConfig {
   stateDir: string;
 }
 
+export interface WeixinConfig {
+  baseUrl: string;
+  cdnBaseUrl: string;
+  allowedUserIds: string[];
+  pollingTimeoutMs: number;
+  pollingRetryBackoffMs: number;
+  messageChunkBytes: number;
+  typingIntervalMs: number;
+  qrTimeoutMs: number;
+  routeTag: string;
+}
+
+export interface WeixinRuntimeConfig extends WeixinConfig {
+  stateDir: string;
+  credentialsFile: string;
+  syncBufFile: string;
+  sessionMapFile: string;
+  attachmentStoreFile: string;
+  contextTokenFile: string;
+}
+
+export const INITIAL_WEIXIN_CONFIG: WeixinConfig = {
+  baseUrl: "https://ilinkai.weixin.qq.com",
+  cdnBaseUrl: "https://novac2c.cdn.weixin.qq.com/c2c",
+  allowedUserIds: [],
+  pollingTimeoutMs: 30_000,
+  pollingRetryBackoffMs: 1_000,
+  messageChunkBytes: 3_500,
+  typingIntervalMs: 4_000,
+  qrTimeoutMs: 480_000,
+  routeTag: "",
+};
+
+export function normalizeWeixinConfig(config: Partial<WeixinConfig> = {}): WeixinConfig {
+  return {
+    baseUrl: normalizeUrl(config.baseUrl, INITIAL_WEIXIN_CONFIG.baseUrl),
+    cdnBaseUrl: normalizeUrl(config.cdnBaseUrl, INITIAL_WEIXIN_CONFIG.cdnBaseUrl),
+    allowedUserIds: normalizeStringIds(config.allowedUserIds),
+    pollingTimeoutMs: clampNumber(config.pollingTimeoutMs ?? INITIAL_WEIXIN_CONFIG.pollingTimeoutMs, 1_000, 120_000, "weixin.pollingTimeoutMs"),
+    pollingRetryBackoffMs: clampNumber(config.pollingRetryBackoffMs ?? INITIAL_WEIXIN_CONFIG.pollingRetryBackoffMs, 250, 60_000, "weixin.pollingRetryBackoffMs"),
+    messageChunkBytes: clampNumber(config.messageChunkBytes ?? INITIAL_WEIXIN_CONFIG.messageChunkBytes, 128, 12_000, "weixin.messageChunkBytes"),
+    typingIntervalMs: clampNumber(config.typingIntervalMs ?? INITIAL_WEIXIN_CONFIG.typingIntervalMs, 500, 60_000, "weixin.typingIntervalMs"),
+    qrTimeoutMs: clampNumber(config.qrTimeoutMs ?? INITIAL_WEIXIN_CONFIG.qrTimeoutMs, 30_000, 900_000, "weixin.qrTimeoutMs"),
+    routeTag: String(config.routeTag ?? INITIAL_WEIXIN_CONFIG.routeTag).trim(),
+  };
+}
+
+export function resolveWeixinRuntimeConfig(config: Partial<WeixinConfig> | undefined, stateRootDir: string): WeixinRuntimeConfig {
+  const normalized = normalizeWeixinConfig(config);
+  const stateDir = path.join(getProjectStatePaths(stateRootDir).kittyDir, "weixin");
+  return {
+    ...normalized,
+    stateDir,
+    credentialsFile: path.join(stateDir, "credentials.json"),
+    syncBufFile: path.join(stateDir, "sync-buf.json"),
+    sessionMapFile: path.join(stateDir, "session-map.json"),
+    attachmentStoreFile: path.join(stateDir, "attachments.json"),
+    contextTokenFile: path.join(stateDir, "context-tokens.json"),
+  };
+}
+
+export function parseWeixinAllowedUserIds(raw: string | undefined): string[] {
+  return normalizeStringIds(raw?.split(/[,\r\n]+/u));
+}
+
 export const INITIAL_TELEGRAM_CONFIG: TelegramConfig = {
   token: "",
   apiBaseUrl: "https://api.telegram.org",
@@ -131,6 +196,14 @@ function normalizeApiBaseUrl(raw: string | undefined): string {
 function normalizeProxyUrl(raw: string | undefined): string {
   const value = String(raw ?? "").trim();
   return value.replace(/\/+$/u, "");
+}
+
+function normalizeUrl(raw: string | undefined, fallback: string): string {
+  return String(raw ?? fallback).trim().replace(/\/+$/u, "") || fallback;
+}
+
+function normalizeStringIds(values: readonly string[] | undefined): string[] {
+  return [...new Set((values ?? []).map((value) => String(value).trim()).filter(Boolean))];
 }
 
 function normalizeAllowedUserIds(values: readonly number[] | undefined): number[] {

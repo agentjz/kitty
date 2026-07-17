@@ -1,14 +1,14 @@
 import type { ControlDatabase } from "./sqlite.js";
 
-export const CONTROL_PLANE_SCHEMA_VERSION = 2;
+export const CONTROL_PLANE_SCHEMA_VERSION = 3;
 
 export function initializeControlPlaneSchema(db: ControlDatabase): void {
   const initialize = db.transaction(() => {
     const version = Number(db.prepare<{ user_version: number }>("PRAGMA user_version").get()?.user_version ?? 0);
     if (version !== CONTROL_PLANE_SCHEMA_VERSION) {
       db.exec(`
-        DROP TABLE IF EXISTS telegram_outbox;
-        DROP TABLE IF EXISTS telegram_inbox;
+        DROP TABLE IF EXISTS remote_outbox;
+        DROP TABLE IF EXISTS remote_inbox;
         DROP TABLE IF EXISTS service_leases;
         DROP TABLE IF EXISTS runtime_events;
         DROP TABLE IF EXISTS context_epochs;
@@ -233,30 +233,33 @@ export function initializeControlPlaneSchema(db: ControlDatabase): void {
       updated_at TEXT NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS telegram_inbox (
-      update_id INTEGER PRIMARY KEY,
+    CREATE TABLE IF NOT EXISTS remote_inbox (
+      host TEXT NOT NULL,
+      message_id TEXT NOT NULL,
       status TEXT NOT NULL,
       peer_key TEXT,
       turn_id TEXT,
       error TEXT,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY(host, message_id)
     );
 
-    CREATE TABLE IF NOT EXISTS telegram_outbox (
+    CREATE TABLE IF NOT EXISTS remote_outbox (
       id TEXT PRIMARY KEY,
-      chat_id INTEGER NOT NULL,
+      host TEXT NOT NULL,
+      recipient_key TEXT NOT NULL,
       kind TEXT NOT NULL,
       payload_json TEXT NOT NULL,
       status TEXT NOT NULL,
       delivery_token TEXT,
-      remote_message_id INTEGER,
+      remote_message_id TEXT,
       error TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
 
-    CREATE INDEX IF NOT EXISTS idx_telegram_outbox_status ON telegram_outbox(status, created_at);
+    CREATE INDEX IF NOT EXISTS idx_remote_outbox_status ON remote_outbox(host, status, created_at);
     `);
     db.exec(`PRAGMA user_version = ${CONTROL_PLANE_SCHEMA_VERSION}`);
   });

@@ -82,7 +82,7 @@ export async function runCacheEconomyCheck(id: EvaluationCheckId): Promise<Evalu
   const { renderPromptLayers } = await import("../agent/prompt/format.js");
   const { getInitialRuntimeConfig } = await import("../config/initialConfig.js");
   const { getAppPaths } = await import("../config/paths.js");
-  const { resolveTelegramRuntimeConfig } = await import("../config/hosts.js");
+  const { resolveTelegramRuntimeConfig, resolveWeixinRuntimeConfig } = await import("../config/hosts.js");
 
   const deepSeek = normalizeProviderUsage({
     prompt_tokens: 1000,
@@ -106,6 +106,7 @@ export async function runCacheEconomyCheck(id: EvaluationCheckId): Promise<Evalu
     apiKey: "eval-key",
     model: "gpt-5.5",
     telegram: resolveTelegramRuntimeConfig(getInitialRuntimeConfig().telegram, process.cwd()),
+    weixin: resolveWeixinRuntimeConfig(getInitialRuntimeConfig().weixin, process.cwd()),
     paths: getAppPaths(process.cwd()),
   };
   const projectContext = {

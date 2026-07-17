@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { getAppPaths } from "../../src/config/paths.js";
-import { resolveTelegramRuntimeConfig } from "../../src/config/hosts.js";
+import { resolveTelegramRuntimeConfig, resolveWeixinRuntimeConfig } from "../../src/config/hosts.js";
 import { getInitialRuntimeConfig } from "../../src/config/initialConfig.js";
 import type {
   RuntimeConfig,
@@ -21,6 +21,7 @@ test("public type barrel exposes runtime, session, transition, and tool result c
     model: "gpt-5.5",
     thinking: "enabled",
     telegram: resolveTelegramRuntimeConfig(initialConfig.telegram, "."),
+    weixin: resolveWeixinRuntimeConfig(initialConfig.weixin, "."),
     extensions: { ...initialConfig.extensions },
     paths: getAppPaths("."),
   } satisfies RuntimeConfig;

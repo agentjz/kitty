@@ -17,6 +17,7 @@ const PRODUCER_DIRECTORIES = [
   "observability",
   "project",
   "provider",
+  "remote",
   "runtime",
   "runtime-ui",
   "session",
@@ -25,7 +26,7 @@ const PRODUCER_DIRECTORIES = [
   "types",
   "utils",
 ] as const;
-const ADAPTER_DIRECTORIES = ["cli", "shell", "telegram"] as const;
+const ADAPTER_DIRECTORIES = ["cli", "shell", "telegram", "weixin"] as const;
 
 test("runtime producers never import interface adapters", async () => {
   const forbiddenRoots = ADAPTER_DIRECTORIES.map((directory) => path.join(SOURCE_ROOT, directory));

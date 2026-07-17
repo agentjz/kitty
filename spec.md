@@ -23,7 +23,7 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 
 - 模型负责计划、优先级和语义取舍。
 - 机器模块负责执行、校验、持久化和暴露事实。
-- CLI、TUI、Telegram 和本地 API 复用同一条 host turn 边界。
+- CLI、TUI、Telegram、微信 iLink 和本地 API 复用同一条 host turn 边界。
 - 不保留兼容层、别名、旧状态或平行事实源。
 - 代码、测试、CLI 输出和本文档必须描述同一个当前产品事实。
 
@@ -77,13 +77,13 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 - `KITTY_API_KEY`
 - thinking、reasoning effort、输出和上下文限制
 - extension 开关
-- Telegram 配置
+- Telegram 与微信 iLink 配置
 
 未知 provider、不支持的 provider/model 组合、缺失必填项和非法值必须在配置 schema 显式失败。运行时不能静默猜测 model 或 provider。
 
 默认 provider profile 是 Agnes AI。当前具名 provider profile 还包括 NVIDIA NIM、Groq、Cerebras、Gemini、DeepSeek、OpenAI、YLS 和 TTAPI。`openai-compatible` 仅用于用户明确配置的高级兼容 endpoint；它不是任何具名 provider 的别名。
 
-`kitty init` 创建项目状态模板。`kitty status` 展示无密钥运行配置、session、execution、event 与 skill 事实。
+`kitty init` 创建 `.kitty/.env`、`.env.example` 与 `.kittyignore`；env 模板把微信 iLink 与 Telegram 放在相邻区段，微信在前。文件已存在时只向两个 env 文件补充当前模板缺失的配置键，不覆盖已有值、自定义内容或 ignore 规则。`kitty status` 展示无密钥运行配置、session、execution、event 与 skill 事实。
 
 ## 4. Agent 与 Host Turn
 
@@ -210,8 +210,9 @@ Extension 只在配置启用时进入同一工具注册表。它们不是另一�
 
 ### 职责
 
-- `src/control/`：session、turn、tool call、context epoch、task lifecycle、execution、wake 和 runtime event 的 SQLite schema 与账本。
+- `src/control/`：session、turn、tool call、context epoch、task lifecycle、execution、remote message、service lease、wake 和 runtime event 的 SQLite schema 与账本。
 - `src/execution/`：前台与后台 execution 的启动、identity、watchdog、heartbeat、reconcile、取消和进程树终止。
+- `src/remote/`：Telegram 与微信共用的 service lifecycle、per-peer command queue、turn state、process lock 和 durable delivery queue。
 
 项目目录是持久化与管理员审阅边界；session 是运行所有权边界。每个 session 独立保存消息、turn、草稿和后台 execution，普通 session picker 只投影用户会话。
 
@@ -287,10 +288,18 @@ Terminal log 使用 UTF-8，记录可读的用户输入、reasoning、assistant 
 - `src/cli/`：命令解析与 presenter。
 - `src/host/localApi.ts`：本地 session/message/event/status API。
 - `src/telegram/`：Telegram polling host。
+- `src/weixin/`：微信 iLink 扫码登录、消息轮询、媒体收发和最终回复投影。
+- `src/remote/`：远程宿主共用的进程所有权、排队、turn 状态与投递生命周期。
 
-`kitty` TUI、`kitty run`、`kitty resume`、Telegram 和本地 API 都进入同一条 host/agent turn 主链路。`status` 与 `background` CLI 命令只暴露已存事实，不能创建平行生命周期语义。Evaluation harness 是开发脚本，不属于公共 CLI。
+`kitty` TUI、`kitty run`、`kitty resume`、Telegram、微信和本地 API 都进入同一条 host/agent turn 主链路。`status` 与 `background` CLI 命令只暴露已存事实，不能创建平行生命周期语义。Evaluation harness 是开发脚本，不属于公共 CLI。
 
-Telegram service 使用 SQLite service lease 的 token、generation 与 heartbeat 保证单 owner；lease 丢失立即停止 service。Update ID 进入 durable inbox，并与唯一 turn ID 绑定。回复进入 durable outbox，状态为 queued、sending、sent 或 uncertain；远端调用后无法确认本地提交时不得自动盲重试。
+Telegram 与微信 service 使用同一套 SQLite service lease、signal shutdown、per-peer queue、turn state、durable inbox 和 durable outbox。每个 host 的 token、generation 与 heartbeat 保证单 owner；lease 丢失立即停止 service。远端消息 ID 按 host 分区进入 `remote_inbox` 并与唯一 turn ID 绑定；`processing` 在崩溃后可重新 claim，`completed` 与 `failed` 是终态。回复和显式文件进入 `remote_outbox`，状态为 queued、sending、sent 或 uncertain；远端调用后无法确认本地提交时不得自动盲重试。发送前缺少微信 context token 时保持 queued，等待后续入站消息补全协议上下文。
+
+Telegram 使用 Bot API 长轮询。微信使用 iLink SDK：`kitty weixin login` 扫码取得项目本地凭证，`kitty weixin serve` 使用 sync buffer 长轮询私聊消息，`kitty weixin logout` 清除凭证、sync buffer 与 context token。微信只接受白名单私聊，不处理群聊；文本、图片、视频、语音和文件进入同一 host turn，入站二进制先持久化为本地附件。微信正常 turn 只投影最后一条 assistant 回复和 `send_file` 显式文件，不投影 reasoning、tool、todo 或中间 assistant 文本。
+
+两个远程 service 在 TTY 启动时复用 TUI 的 Kitty 字标事实，分别显示 `kitty weixin` 与 `kitty telegram` banner；非 TTY 日志降级为单行。启动事实只包含版本、状态目录、白名单数量与连接方式，不输出 token 或用户 ID。
+
+SIGINT、SIGTERM 或 service lease 丢失会 abort active turn，并在固定等待上限后清理该 host 活动 session 的 execution 进程树。进程强杀、终端关闭、断电或主机重启不能依赖 finally：`remote_inbox` 保留已接收消息，`remote_outbox` 的遗留 `sending` 在新 owner 启动时转为 `uncertain`，不会把可能已经送达的回复或文件盲目重发。iLink SDK 的底层长轮询不提供原生 AbortSignal；宿主会立即停止等待，但底层请求最多仍可存活到协议超时。
 
 ### TUI
 
@@ -310,13 +319,13 @@ TUI 规则：
 - Transcript 滚动状态只能是 `follow` 或 `detached`。Detached 状态保存稳定 row anchor 和 unseen row count；流式追加、工具状态更新与 resize 不能把阅读位置拉回底部。
 - Input gateway 使用有状态 UTF-8 decoder 保留跨 chunk 的中文与 IME 提交，并对跨 chunk 的 SGR/X10 mouse press、drag、release 和 wheel 做完整 framing；鼠标序列不得进入 composer 键盘流。stdin EOF、close 或错误必须幂等关闭 controller 输入，让 active turn 进入 recoverable detach，并由 session driver 终止当前 root session tree 的进程。Selection 使用渲染 row ID 与字符列，支持宽字符、跨行选择、边缘自动滚动和字符级高亮。
 - 有 selection 时 `Ctrl+C` 复制，不触发 turn interrupt；无 selection 时才中断。Esc 清除 selection。Clipboard 优先使用平台 native provider，失败后在 TTY 使用 OSC52；复制失败必须保留 selection 并显示错误。Windows native provider 必须通过 PowerShell 显式把 stdin 设为 UTF-8 后写入 Unicode clipboard，不得把 UTF-8 字节交给按本地代码页解码的 `clip.exe`。
-- Session picker、TUI chrome、CLI/status/runtime UI、command/help、interaction 与 Telegram 提示读取 runtime locale 的 typed catalog。简体中文、英文、日文、韩文四份 catalog 必须拥有完全一致的 key 与占位符集合，运行时不做语言 fallback。Locale 不能进入 prompt、session message、tool evidence 或 control-plane 状态；命令名、路径、provider/model、机器 JSON 和模型回复保持原文。
+- Session picker、TUI chrome、CLI/status/runtime UI、command/help、interaction、Telegram 与微信提示读取 runtime locale 的 typed catalog。简体中文、英文、日文、韩文四份 catalog 必须拥有完全一致的 key 与占位符集合，运行时不做语言 fallback。Locale 不能进入 prompt、session message、tool evidence 或 control-plane 状态；命令名、路径、provider/model、机器 JSON 和模型回复保持原文。
 - Welcome 品牌版本直接读取发布包版本；标识上方只显示版本，不显示项目地址或额外入口。Kitty 文本标识与一行 `猫咪：尽情地探索并享受吧！` 组成独立品牌身份，正文由 typed locale catalog 提供。版本行不参与标识居中；窄终端可以隐藏签名，但不得挤压 session choice 或 composer。
 - Session picker 从 TUI composition root 显式接收当前 runtime config 的 model，只在底部控制行左侧显示 typed 模型标签与模型名，右侧保留选择/打开/退出控制。Picker 不读取配置、不推断模型，也不把显示事实写回 session 或 runtime。
 
 - Transcript 的 user、assistant、reasoning、system、tool、change、plan 使用同一个正文框架。Role 可以改变颜色和强调，但不能改变正文起始列；user、reasoning、tool、change 与 plan 不绘制装饰性左侧竖线。Composer 只使用 panel padding 作为左边界，不绘制输入竖线。
 - Assistant Markdown 以 `marked` GFM AST 为语法事实，并在当前正文宽度重新投影；嵌套/任务列表必须保留层级，宽表格降级为 key/value records，确认含表格的 `md` / `markdown` fence 才展开。Resize 必须从原始 source 重排，不能缓存旧换行。
-- `runtime-ui/toolPresentation.ts` 把核心工具调用和结果规范化为宿主无关的 typed presentation facts。CLI、TUI、Telegram 和 Local API 只消费这些事实；壳不能重新解析工具 JSON、猜测状态或定义第二份工具语义。Agent、provider、host、session、execution、tools 与共享 runtime/presentation 模块不得 import TUI/CLI/Telegram adapter；依赖只能从 composition root 和壳指向端口与运行事实。
+- `runtime-ui/toolPresentation.ts` 把核心工具调用和结果规范化为宿主无关的 typed presentation facts。CLI、TUI、Telegram、微信和 Local API 只消费这些事实；壳不能重新解析工具 JSON、猜测状态或定义第二份工具语义。Agent、provider、host、session、execution、tools 与共享 runtime/presentation 模块不得 import TUI/CLI/Telegram/微信 adapter；依赖只能从 composition root 和壳指向端口与运行事实。
 - `write` / `edit` 成功后，共享投影从工具结果的 path 与标准 unified diff hunk 生成 change fact；所有 hunk 都保留，未修改的文件区段不进入该事实。TUI 仅为新增、删除和上下文行添加样式，不做第二次隐式裁剪；上游若限制证据，必须携带显式 truncation/artifact recovery。不得从未完成的流式参数推断变更结果。
 - `read` / `bash` 完成后只展示紧凑工具摘要。TUI 不保存第二份详情、没有工具全文展开状态，也不监听工具展开快捷键；原始工具结果继续由 session/evidence 事实保存。`write` / `edit` 的 typed change fact 和所有相关 diff hunk 不受此规则影响。
 - `todo_write` 完成后直接消费共享 fact 中的 typed items，显示计划完成数与 pending / in_progress / completed 层级；完成项使用删除线。TUI 不解析 `preview` 文本推断计划状态。

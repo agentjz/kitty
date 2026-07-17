@@ -1,4 +1,4 @@
-import { renderKittyAgentWordmark } from "../../banner.js";
+import { renderKittyAgentWordmark } from "../../../runtime-ui/banner.js";
 import packageJson from "../../../../package.json";
 import { TUI_COLORS } from "../theme.js";
 import type { InkRuntime } from "./kit.js";

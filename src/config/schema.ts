@@ -1,4 +1,4 @@
-import { normalizeTelegramConfig } from "../config/hosts.js";
+import { normalizeTelegramConfig, normalizeWeixinConfig } from "../config/hosts.js";
 import { resolveModelProfile } from "../provider/catalog.js";
 import { normalizeModelReasoningEffort, normalizeModelThinkingMode } from "./modelOptions.js";
 import { normalizeExtensions } from "./extensions.js";
@@ -36,6 +36,7 @@ export function normalizeRuntimeConfig(
     commandStallTimeoutMs: clampNumber(config.commandStallTimeoutMs, 2_000, 300_000, "commandStallTimeoutMs"),
     showReasoning: requireBooleanConfig(config.showReasoning, "showReasoning"),
     telegram: normalizeTelegramConfig(config.telegram),
+    weixin: normalizeWeixinConfig(config.weixin),
     extensions: normalizeExtensions(config.extensions),
   };
 
