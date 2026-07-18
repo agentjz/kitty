@@ -5,10 +5,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 $Root = "D:\AI\llama.cpp"
-$Models = Join-Path $Root "models"
+$ModelsDir = Join-Path $Root "models"
 $LogDir = Join-Path $Root "logs"
 $Manifest = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot "models.json") | ConvertFrom-Json
-New-Item -ItemType Directory -Force -Path $Models,$LogDir | Out-Null
+New-Item -ItemType Directory -Force -Path $ModelsDir,$LogDir | Out-Null
 
 if ($OnlyModel) {
   $Manifest = @($Manifest | Where-Object { $_.file -eq $OnlyModel })
@@ -20,24 +20,29 @@ function Get-ExpectedPart([int64]$start, [int64]$end) {
 }
 
 $progressStartedAt = @{}
+$progressStartedBytes = @{}
 $lastProgressAt = Get-Date
 
 function Get-ModelDownloadedBytes($model) {
-  $target = Join-Path $Models $model.file
+  $target = Join-Path $ModelsDir $model.file
   $total = if (Test-Path -LiteralPath $target) { [int64](Get-Item -LiteralPath $target).Length } else { 0L }
-  $parts = Get-ChildItem -LiteralPath $Models -Filter "$($model.file).part-*" -File -ErrorAction SilentlyContinue
+  $parts = Get-ChildItem -LiteralPath $ModelsDir -Filter "$($model.file).part-*" -File -ErrorAction SilentlyContinue
   foreach ($part in $parts) { $total += [int64]$part.Length }
   return [Math]::Min($total, [int64]$model.bytes)
 }
 
-function Write-ProgressSnapshot([object[]]$models) {
+function Write-ProgressSnapshot([object[]]$modelsToReport) {
   $now = Get-Date
-  foreach ($model in $models) {
-    if (-not $progressStartedAt.ContainsKey($model.file)) { $progressStartedAt[$model.file] = $now }
+  foreach ($model in $modelsToReport) {
     $downloaded = Get-ModelDownloadedBytes $model
+    if (-not $progressStartedAt.ContainsKey($model.file)) {
+      $progressStartedAt[$model.file] = $now
+      $progressStartedBytes[$model.file] = $downloaded
+    }
     $expected = [int64]$model.bytes
     $elapsed = [Math]::Max(0.001, ($now - $progressStartedAt[$model.file]).TotalSeconds)
-    $rate = $downloaded / $elapsed
+    $transferred = [Math]::Max(0L, $downloaded - [int64]$progressStartedBytes[$model.file])
+    $rate = $transferred / $elapsed
     $remaining = [Math]::Max(0L, $expected - $downloaded)
     $eta = if ($rate -gt 0 -and $remaining -gt 0) { [TimeSpan]::FromSeconds($remaining / $rate).ToString('hh\:mm\:ss') } elseif ($remaining -eq 0) { '00:00:00' } else { '--:--:--' }
     $percent = if ($expected -gt 0) { [Math]::Round(($downloaded / $expected) * 100, 2) } else { 0 }
@@ -45,13 +50,13 @@ function Write-ProgressSnapshot([object[]]$models) {
   }
 }
 
-function Wait-DownloadJobs([object[]]$jobs, [object[]]$models) {
+function Wait-DownloadJobs([object[]]$jobs, [object[]]$modelsToReport) {
   while ($true) {
     $running = @($jobs | Where-Object { $_.Process.Refresh(); -not $_.Process.HasExited })
     if ($running.Count -eq 0) { break }
     $now = Get-Date
     if (($now - $script:lastProgressAt).TotalSeconds -ge 10) {
-      Write-ProgressSnapshot $models
+      Write-ProgressSnapshot $modelsToReport
       $script:lastProgressAt = $now
     }
     Start-Sleep -Seconds 1
@@ -59,8 +64,11 @@ function Wait-DownloadJobs([object[]]$jobs, [object[]]$models) {
 }
 
 foreach ($model in $Manifest) {
-  if (-not $progressStartedAt.ContainsKey($model.file)) { $progressStartedAt[$model.file] = Get-Date }
-  $target = Join-Path $Models $model.file
+  if (-not $progressStartedAt.ContainsKey($model.file)) {
+    $progressStartedAt[$model.file] = Get-Date
+    $progressStartedBytes[$model.file] = Get-ModelDownloadedBytes $model
+  }
+  $target = Join-Path $ModelsDir $model.file
   $prefix = if (Test-Path -LiteralPath $target) { (Get-Item -LiteralPath $target).Length } else { 0 }
   if ($prefix -gt [int64]$model.bytes) { throw "Model is larger than its manifest size: $target" }
   if ($prefix -eq [int64]$model.bytes) {
