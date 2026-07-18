@@ -1,9 +1,11 @@
 import { formatPromptBlock } from "../prompt/format.js";
 import { INTP_PROFILE } from "./intp/index.js";
+import { SHARP_PROFILE } from "./sharp/index.js";
 import type { AgentProfile } from "./types.js";
 
 const PROFILES = new Map<string, AgentProfile>([
   [INTP_PROFILE.id, INTP_PROFILE],
+  [SHARP_PROFILE.id, SHARP_PROFILE],
 ]);
 
 export function resolveAgentProfile(id: string): AgentProfile {

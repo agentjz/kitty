@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kitty Web</title>
+  <link rel="stylesheet" href="/vendor/bootstrap-icons.css">
+  <style>
+    :root { color-scheme: dark; --page:#090a0b; --surface:#121518; --surface-soft:#0d0f11; --ink:#edf0f2; --muted:#8f999f; --line:#30383d; --gold:#d6bd86; --blue:#8da9bd; --green:#82bd95; --red:#d98282; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { display:flex; flex-direction:column; margin:0; overflow:hidden; background:var(--page); color:var(--ink); font-family:Inter,"Noto Sans SC","Microsoft YaHei",system-ui,sans-serif; }
+    button, textarea { font:inherit; }
+    .web-main { width:min(100%, 960px); flex:1; min-height:0; margin:0 auto; padding:1.25rem 1rem 0; }
+    .web-status-line { min-height:1.25rem; color:var(--muted); text-align:right; font-size:.78rem; }
+    .web-transcript { height:100%; overflow-y:auto; padding:0 .25rem 1rem; }
+    .web-empty { display:grid; min-height:100%; place-items:center; color:var(--muted); text-align:center; }
+    .message { display:flex; margin:0 0 1rem; }
+    .message.user { justify-content:flex-end; }
+    .message.assistant { justify-content:flex-start; }
+    .message-card { max-width:min(90%, 760px); padding:.85rem 1rem; border:1px solid var(--line); border-radius:10px; background:var(--surface); line-height:1.7; overflow-wrap:anywhere; }
+    .user .message-card { border-color:#5f543b; background:#211d15; }
+    .message-label { display:block; margin-bottom:.3rem; color:var(--muted); font-size:.72rem; font-weight:700; }
+    .message-body > :first-child { margin-top:0; }
+    .message-body > :last-child { margin-bottom:0; }
+    .message-body pre { max-width:100%; overflow:auto; padding:.75rem; border-radius:6px; background:var(--surface-soft); white-space:pre-wrap; }
+    .message-body code { color:#c9d4dc; }
+    .message-body img { max-width:100%; height:auto; }
+    .reasoning { display:flex; margin:0 0 .9rem; }
+    .reasoning-card { max-width:min(88%, 720px); padding:.35rem 0 .35rem .8rem; border-left:2px solid #8d7950; color:#cfc29c; line-height:1.6; }
+    .reasoning-label { display:block; margin-bottom:.2rem; color:var(--gold); font-size:.75rem; font-weight:700; }
+    .tool-event { display:flex; margin:0 0 .75rem; }
+    .tool-card { width:min(100%, 760px); padding:.65rem .8rem; border:1px solid var(--line); border-radius:7px; background:var(--surface-soft); color:var(--blue); font-family:"Cascadia Mono","SFMono-Regular",Consolas,monospace; font-size:.82rem; }
+    .tool-card.done { color:var(--green); }
+    .tool-card.failed { color:var(--red); }
+    .tool-title { display:flex; align-items:center; gap:.55rem; }
+    .tool-emoji { flex:0 0 auto; font-family:"Segoe UI Emoji","Apple Color Emoji",sans-serif; }
+    .tool-summary { overflow-wrap:anywhere; }
+    .web-activity { min-height:1.4rem; padding:.15rem 0 .45rem; color:var(--muted); font-size:.78rem; }
+    .web-composer { padding:1rem; border-top:1px solid var(--line); background:var(--surface-soft); }
+    .web-form { display:flex; align-items:flex-end; gap:.65rem; width:min(100%, 960px); margin:0 auto; }
+    .web-input { min-height:3.1rem; max-height:12rem; flex:1; resize:none; padding:.8rem .9rem; border:1px solid var(--line); border-radius:7px; outline:0; background:var(--surface); color:var(--ink); }
+    .web-input:focus { border-color:var(--blue); }
+    .web-button { display:inline-flex; width:3rem; height:3rem; flex:0 0 auto; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:7px; background:var(--surface); color:var(--ink); cursor:pointer; }
+    .web-button.send { border-color:var(--gold); background:var(--gold); color:#111311; }
+    .web-button.stop { color:var(--red); }
+    .web-button:disabled { cursor:default; opacity:.45; }
+    @media (max-width:575px) { .web-main { padding:1rem .7rem 0; } .message-card, .reasoning-card { max-width:96%; } .web-composer { padding:.7rem; } .web-form { gap:.45rem; } }
+  </style>
+</head>
+<body>
+  <main class="web-main"><div class="web-status-line" id="web-status" aria-live="polite"></div><section class="web-transcript" id="web-transcript" aria-live="polite"><div class="web-empty" id="web-empty"></div></section><div class="web-activity" id="web-activity" aria-live="polite"></div></main>
+  <footer class="web-composer"><form class="web-form" id="web-form"><textarea class="web-input" id="web-input" rows="1" disabled></textarea><button class="web-button stop" id="web-stop" type="button" disabled><i class="bi bi-stop-fill" aria-hidden="true"></i></button><button class="web-button send" id="web-send" type="submit" disabled><i class="bi bi-send-fill" aria-hidden="true"></i></button></form></footer>
+  <script type="module">
+    import { marked } from "/vendor/marked.esm.js";
+
+    const params = new URLSearchParams(location.search);
+    const token = params.get("token") || "";
+    const transcript = document.querySelector("#web-transcript");
+    const empty = document.querySelector("#web-empty");
+    const input = document.querySelector("#web-input");
+    const send = document.querySelector("#web-send");
+    const stop = document.querySelector("#web-stop");
+    const status = document.querySelector("#web-status");
+    const activity = document.querySelector("#web-activity");
+    let labels = {};
+    let socket;
+    let activeAssistant;
+    let activeReasoning;
+    const tools = new Map();
+
+    function scrollToBottom() { transcript.scrollTop = transcript.scrollHeight; }
+    function showContent() { empty?.remove(); }
+    function markdown(target, text) { target.innerHTML = marked.parse(text || "", { breaks: true }); }
+    function addMessage(kind, text, label) {
+      showContent();
+      const row = document.createElement("article"); row.className = `message ${kind}`;
+      const card = document.createElement("div"); card.className = "message-card";
+      if (label) { const heading = document.createElement("span"); heading.className = "message-label"; heading.textContent = label; card.append(heading); }
+      const body = document.createElement("div"); body.className = "message-body"; markdown(body, text); card.append(body); row.append(card); transcript.append(row); scrollToBottom();
+      return body;
+    }
+    function appendReasoning(text) {
+      showContent();
+      if (!activeReasoning) { const row = document.createElement("article"); row.className = "reasoning"; const card = document.createElement("div"); card.className = "reasoning-card"; const label = document.createElement("span"); label.className = "reasoning-label"; label.textContent = `🐶 ${labels.reasoning || ""}`; const body = document.createElement("div"); card.append(label, body); row.append(card); transcript.append(row); activeReasoning = body; }
+      activeReasoning.textContent += text || ""; scrollToBottom();
+    }
+    function addTool(id, summary) {
+      showContent();
+      const row = document.createElement("article"); row.className = "tool-event"; row.dataset.toolId = String(id || "");
+      const card = document.createElement("div"); card.className = "tool-card"; const title = document.createElement("div"); title.className = "tool-title"; const icon = document.createElement("span"); icon.className = "tool-emoji"; icon.textContent = "🔧"; const text = document.createElement("span"); text.className = "tool-summary"; text.textContent = summary || labels.toolCalling || ""; title.append(icon, text); card.append(title); row.append(card); transcript.append(row); tools.set(id, { card, text }); scrollToBottom();
+    }
+    function updateTool(id, summary, failed) { const tool = tools.get(id); if (!tool) return addTool(id, summary); tool.text.textContent = summary || "工具已完成"; tool.card.classList.add(failed ? "failed" : "done"); scrollToBottom(); }
+    function handle(message) {
+      if (message.type === "presentation") { labels = message.labels || {}; document.querySelector("#web-empty").textContent = labels.empty || ""; input.placeholder = labels.inputPlaceholder || ""; send.title = labels.send || ""; stop.title = labels.stop || ""; }
+      else if (message.type === "user") { addMessage("user", message.text, ""); activeAssistant = undefined; activeReasoning = undefined; }
+      else if (message.type === "reasoning" || message.type === "reasoning_delta") appendReasoning(message.text);
+      else if (message.type === "delta") { if (!activeAssistant) activeAssistant = addMessage("assistant", "", `🐱 ${labels.assistant || ""}`); activeAssistant.innerHTML += marked.parseInline(message.text || ""); scrollToBottom(); }
+      else if (message.type === "message") { if (!activeAssistant) activeAssistant = addMessage("assistant", message.text, `🐱 ${labels.assistant || ""}`); else markdown(activeAssistant, message.text); }
+      else if (message.type === "tool_call") { addTool(message.id, message.summary); activeAssistant = undefined; activeReasoning = undefined; }
+      else if (message.type === "tool_result") { updateTool(message.id, message.summary, false); }
+      else if (message.type === "tool_error") { updateTool(message.id, message.summary, true); }
+      else if (message.type === "status") activity.textContent = message.text || "";
+      else if (message.type === "done" || message.type === "interrupt") { activeAssistant = undefined; activeReasoning = undefined; stop.disabled = true; activity.textContent = message.type === "interrupt" ? (message.text || labels.stopped || "") : ""; }
+    }
+    function sendMessage(text) { if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "input", text })); }
+    function connect() { socket = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/web?token=${encodeURIComponent(token)}`); socket.addEventListener("open", () => { status.textContent = labels.connected || ""; input.disabled = false; send.disabled = false; input.focus(); }); socket.addEventListener("message", (event) => { try { handle(JSON.parse(event.data)); } catch {} }); socket.addEventListener("close", () => { status.textContent = labels.disconnected || ""; input.disabled = true; send.disabled = true; stop.disabled = true; }); }
+    document.querySelector("#web-form").addEventListener("submit", (event) => { event.preventDefault(); const text = input.value.trim(); if (!text) return; input.value = ""; input.style.height = "auto"; stop.disabled = false; sendMessage(text); });
+    stop.addEventListener("click", () => { if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "interrupt" })); });
+    input.addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); document.querySelector("#web-form").requestSubmit(); } });
+    input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = `${Math.min(input.scrollHeight, 192)}px`; });
+    connect();
+  </script>
+</body>
+</html>

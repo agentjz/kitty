@@ -13,13 +13,16 @@ export function localizeDocument(locale, messages) {
   }
 }
 
-export function renderRuntimeSettings(extensions, runtimeFields, values) {
+export function renderExtensionSettings(extensions, values) {
   document.querySelector("#extension-switches").innerHTML = extensions.map((extension) => `
     <label class="switch-item" for="ext-${extension.id}">
       <span><strong>${escapeHtml(extension.id)}</strong><small>${escapeHtml(extension.summary)}</small></span>
       <span class="form-check form-switch"><input class="form-check-input" type="checkbox" id="ext-${extension.id}" data-env="${escapeAttribute(extension.envKey)}" ${values[extension.envKey] === "true" ? "checked" : ""}></span>
     </label>`).join("");
-  document.querySelector("#advanced-settings").innerHTML = runtimeFields.map((field) => {
+}
+
+export function renderSettings(selector, runtimeFields, values) {
+  document.querySelector(selector).innerHTML = runtimeFields.map((field) => {
     const id = `env-${field.envKey}`;
     const current = values[field.envKey] ?? "";
     const control = field.options

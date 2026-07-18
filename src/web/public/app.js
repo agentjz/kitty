@@ -1,5 +1,5 @@
-import { appendChannelEvent, initializeChannelStreams } from "/channelStream.js";
-import { escapeAttribute, escapeHtml, localizeDocument, renderRuntimeSettings, renderSkillList, resolveMessage } from "/workflowViews.js";
+import { appendChannelEvent, appendChannelHistory, initializeChannelStreams } from "/channelStream.js";
+import { escapeAttribute, escapeHtml, localizeDocument, renderExtensionSettings, renderSettings, renderSkillList, resolveMessage } from "/workflowViews.js";
 
 const params = new URLSearchParams(location.search);
 const token = params.get("token") || sessionStorage.getItem("kitty-console-token") || "";
@@ -22,6 +22,8 @@ let state;
 let eventSource;
 let eventConnectionFailed = false;
 const observedChannelStatus = new Map();
+const loadedChannelHistory = new Set();
+const loadingChannelHistory = new Map();
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -48,15 +50,16 @@ function render() {
   text("#kitty-wordmark-agent", state.brand.wordmark.agent);
   text("#config-location", state.configuration.file);
   text("#model-summary", `${values[ENV.provider] || message("common.notConfigured")} · ${values[ENV.model] || message("common.notConfigured")}`);
+  text("#plugins-summary", `${state.extensions.filter((extension) => values[extension.envKey] === "true").length} / ${state.extensions.length}`);
   text("#weixin-summary", describeChannel(state.channels.weixin, state.channels.weixinLogin?.status));
   text("#telegram-summary", describeChannel(state.channels.telegram));
-  text("#skills-summary", message("common.skills", { count: state.skills.length }));
+  document.querySelector("#open-web-shell").href = `/web?token=${encodeURIComponent(token)}`;
 
   document.querySelector("#provider-preset").innerHTML = `<option value="">${escapeHtml(message("common.custom"))}</option>` + state.providers
-    .map((item, index) => `<option value="${index}">${escapeHtml(item.label)}</option>`).join("");
-  const presetIndex = state.providers.findIndex((item) => item.provider === values[ENV.provider]
+    .map((item) => `<option value="${escapeAttribute(item.provider)}">${escapeHtml(item.label)}</option>`).join("");
+  const preset = state.providers.find((item) => item.provider === values[ENV.provider]
     && item.model === values[ENV.model] && item.baseUrl === values[ENV.baseUrl]);
-  value("#provider-preset", presetIndex >= 0 ? String(presetIndex) : "");
+  value("#provider-preset", preset?.provider ?? "");
   value("#model-provider", values[ENV.provider]);
   value("#model-name", values[ENV.model]);
   value("#model-url", values[ENV.baseUrl]);
@@ -72,7 +75,9 @@ function render() {
   value("#telegram-users", values[ENV.telegramUsers]);
   value("#telegram-token", values[ENV.telegramToken]);
   renderChannels(state.channels, false);
-  renderRuntimeSettings(state.extensions, state.messages.runtime.fields, values);
+  renderExtensionSettings(state.extensions, values);
+  renderSettings("#model-settings", state.messages.runtime.modelFields, values);
+  renderSettings("#other-settings", state.messages.runtime.otherFields, values);
   renderSkillList(state.skills, message("skills.empty"));
   initializeChannelStreams({ ...state.messages.stream, eventUpdated: state.messages.common.eventUpdated });
   syncWorkflowFromLocation();
@@ -127,6 +132,7 @@ function openWorkflow(name, updateLocation = true) {
     panel.classList.toggle("d-none", panel.dataset.workflowPanel !== name);
   }
   if (updateLocation && location.hash !== `#${name}`) history.pushState(null, "", `#${name}`);
+  if (name === "weixin" || name === "telegram") void loadChannelHistory(name);
   window.scrollTo({ top: 0, behavior: "instant" });
 }
 
@@ -142,6 +148,23 @@ function syncWorkflowFromLocation() {
   const known = [...document.querySelectorAll("[data-workflow-panel]")].some((panel) => panel.dataset.workflowPanel === name);
   if (known) openWorkflow(name, false);
   else backHome(false);
+}
+
+async function loadChannelHistory(host) {
+  if (loadedChannelHistory.has(host)) return;
+  const pending = loadingChannelHistory.get(host);
+  if (pending) return pending;
+  const request = api(`/api/channels/${host}/history`)
+    .then((result) => {
+      appendChannelHistory(host, result.items);
+      loadedChannelHistory.add(host);
+    })
+    .catch((error) => {
+      appendChannelEvent(host, { kind: "error", text: error.message, createdAt: new Date().toISOString() });
+    })
+    .finally(() => loadingChannelHistory.delete(host));
+  loadingChannelHistory.set(host, request);
+  return request;
 }
 
 window.addEventListener("popstate", syncWorkflowFromLocation);
@@ -174,24 +197,40 @@ document.addEventListener("click", async (event) => {
 });
 
 document.querySelector("#provider-preset").addEventListener("change", (event) => {
-  const preset = state.providers[Number(event.target.value)];
+  const preset = state.providers.find((item) => item.provider === event.target.value);
   if (!preset) return;
   value("#model-provider", preset.provider);
   value("#model-name", preset.model);
   value("#model-url", preset.baseUrl);
+  value("#model-key", preset.provider === state.configuration.values[ENV.provider]
+    ? state.configuration.values[ENV.apiKey]
+    : "");
 });
 
-document.querySelector("#config-form").addEventListener("submit", async (event) => {
+document.querySelector("#model-form").addEventListener("submit", async (event) => {
   event.preventDefault();
+  const provider = field("#model-provider");
+  const apiKey = field("#model-key");
   const values = Object.fromEntries([
-    [ENV.provider, field("#model-provider")],
+    [ENV.provider, provider],
     [ENV.model, field("#model-name")],
     [ENV.baseUrl, field("#model-url")],
-    [ENV.apiKey, field("#model-key")],
-    ...[...document.querySelectorAll("#extension-switches [data-env]")].map((input) => [input.dataset.env, String(input.checked)]),
-    ...[...document.querySelectorAll("#advanced-settings [data-env]")].map((input) => [input.dataset.env, input.value]),
+    [ENV.apiKey, apiKey],
+    ...readSettings("#model-settings"),
   ]);
   await submitConfig(values, "#config-result", "config.saved");
+});
+
+document.querySelector("#plugins-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const values = Object.fromEntries([...document.querySelectorAll("#extension-switches [data-env]")]
+    .map((input) => [input.dataset.env, String(input.checked)]));
+  await submitConfig(values, "#plugins-result", "plugins.saved");
+});
+
+document.querySelector("#other-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await submitConfig(Object.fromEntries(readSettings("#other-settings")), "#other-result", "other.saved");
 });
 
 document.querySelector("#weixin-form").addEventListener("submit", async (event) => {
@@ -207,9 +246,9 @@ document.querySelector("#telegram-form").addEventListener("submit", async (event
   }, "#telegram-config-result", "telegram.saved");
 });
 
-async function submitConfig(values, resultSelector, successMessagePath) {
+async function submitConfig(values, resultSelector, successMessagePath, clear = []) {
   try {
-    await api("/api/config", { method: "PUT", body: JSON.stringify({ values }) });
+    await api("/api/config", { method: "PUT", body: JSON.stringify({ values, clear }) });
     await refresh();
     showResult(resultSelector, message(successMessagePath), true);
   } catch (error) {
@@ -295,6 +334,10 @@ function showResult(selector, content, success) {
 
 function message(path, values = {}) {
   return resolveMessage(state.messages, path, values);
+}
+
+function readSettings(selector) {
+  return [...document.querySelectorAll(`${selector} [data-env]`)].map((input) => [input.dataset.env, input.value]);
 }
 
 function field(selector) { return document.querySelector(selector).value.trim(); }

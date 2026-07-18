@@ -18,7 +18,7 @@ export function registerProjectCommands(
       paths: RuntimeConfig["paths"];
       overrides: CliOverrides;
     }>;
-    startLocalConsole?: (cwd: string) => Promise<{ url: string; close(): Promise<void>; wait(): Promise<void> }>;
+    startLocalConsole?: (cwd: string) => Promise<{ url: string; webUrl?: string; close(): Promise<void>; wait(): Promise<void> }>;
     openBrowser?: (url: string) => boolean | Promise<boolean>;
   },
 ): void {
@@ -37,6 +37,7 @@ export function registerProjectCommands(
       const consoleHandle = await startConsole(cwd);
       ui.success(translate(options.locale, "cli.start.ready"));
       writeStdoutLine(consoleHandle.url);
+      if (consoleHandle.webUrl) writeStdoutLine(consoleHandle.webUrl);
       if (!await open(consoleHandle.url)) ui.info(translate(options.locale, "cli.start.browserFailed"));
 
       let closing = false;

@@ -46,6 +46,7 @@ button, input, select, textarea { font: inherit; }
 .github-link:hover, .github-link:focus-visible { color: var(--kitty-text); outline: 0; }
 .workflow-list { width: min(100%, 860px); display: grid; grid-template-columns: 1fr; gap: 10px; margin-inline: auto; }
 .workflow-card { width: 100%; min-height: 104px; display: grid; grid-template-columns: 52px minmax(0, 1fr); align-items: center; gap: 18px; padding: 16px 20px; border: 1px solid var(--kitty-border); border-radius: 8px; background: var(--kitty-panel); color: var(--kitty-text); text-align: left; transition: border-color .15s ease, background-color .15s ease, transform .15s ease; }
+.workflow-card[href] { text-decoration: none; }
 .workflow-card:hover, .workflow-card:focus-visible { border-color: var(--kitty-blue); background: var(--kitty-panel-strong); outline: 0; transform: translateY(-1px); }
 .workflow-icon { width: 52px; height: 52px; display: grid; place-items: center; border: 1px solid var(--kitty-border); border-radius: 8px; color: var(--kitty-gold); background: var(--kitty-bg); font-size: 1.35rem; }
 .workflow-copy { min-width: 0; display: flex; flex-direction: column; gap: 9px; }
@@ -132,6 +133,10 @@ button, input, select, textarea { font: inherit; }
 .sticky-actions .inline-result { margin-top: 0; }
 
 .skill-list { display: grid; gap: 10px; }
+.skill-section { margin-top: 40px; padding-top: 30px; border-top: 1px solid var(--kitty-border); }
+.section-heading { margin-bottom: 18px; }
+.section-heading h2 { margin: 0 0 8px; font-size: 1.2rem; }
+.section-heading p { margin: 0; color: var(--kitty-muted); line-height: 1.6; }
 .skill-item { width: 100%; min-height: 76px; display: flex; align-items: center; gap: 20px; padding: 14px 18px; border: 1px solid var(--kitty-border); border-radius: 8px; background: var(--kitty-panel); color: var(--kitty-text); text-align: left; }
 .skill-item:hover, .skill-item:focus-visible { border-color: var(--kitty-blue); outline: 0; }
 .skill-item span { min-width: 0; display: flex; flex-direction: column; gap: 5px; }

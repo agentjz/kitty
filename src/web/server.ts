@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import http, { type IncomingMessage, type ServerResponse } from "node:http";
 import path from "node:path";
+import { WebSocketServer } from "ws";
 
 import packageJson from "../../package.json";
 import { EXTENSION_DEFINITIONS } from "../extensions/definitions.js";
@@ -10,6 +11,10 @@ import { resolveRuntimeConfig } from "../config/runtime.js";
 import { probeProviderConnection } from "../provider/connection.js";
 import { resolveProjectRoots } from "../context/repoRoots.js";
 import { ensureScheduledTaskRuntime } from "../scheduler/runtime.js";
+import { InteractiveSessionDriver } from "../interaction/sessionDriver.js";
+import { createPersistedSession } from "../host/session.js";
+import { SessionStore } from "../session/store.js";
+import type { SessionRecord } from "../types.js";
 import { subscribeRemoteRuntimeEvents } from "../remote/events.js";
 import { DEFAULT_LOCALE, parseKittyLocale } from "../i18n/index.js";
 import { renderKittyAgentWordmark } from "../runtime-ui/banner.js";
@@ -17,12 +22,16 @@ import { WebChannelManager } from "./channelManager.js";
 import { WebConfigService } from "./configService.js";
 import { WebEventHub } from "./events.js";
 import { buildWebMessages } from "./messages.js";
+import { loadChannelHistory, type WebChannelName } from "./channelHistory.js";
+import { WebChatShell } from "./chatShell.js";
+import { WebSessionBindingStore } from "./sessionBinding.js";
 import { WebSkillService } from "./skillService.js";
 
 const MAX_BODY_BYTES = 1_000_000;
 
 export interface LocalConsoleHandle {
   url: string;
+  webUrl: string;
   token: string;
   close(): Promise<void>;
   wait(): Promise<void>;
@@ -37,6 +46,29 @@ export async function startLocalConsole(cwd: string): Promise<LocalConsoleHandle
   const skills = new WebSkillService(cwd);
   const scheduler = ensureScheduledTaskRuntime(stateRootDir);
   const channels = new WebChannelManager(cwd, events);
+  const runtime = await resolveRuntimeConfig({ cwd });
+  const presentation = buildWebMessages(runtime.locale);
+  const sessionStore = new SessionStore(runtime.paths.sessionsDir);
+  const sessionBinding = new WebSessionBindingStore(path.join(stateRootDir, ".kitty", "web", "session.json"));
+  const existingSessionId = await sessionBinding.load();
+  let webSession: SessionRecord | null = existingSessionId ? await sessionStore.load(existingSessionId).catch(() => null) : null;
+  if (!webSession) {
+    webSession = await createPersistedSession(sessionStore, cwd);
+    await sessionBinding.save(webSession.id);
+  }
+  const webShell = new WebChatShell(presentation.shell);
+  const webSockets = new WebSocketServer({ noServer: true });
+  const webDriver = new InteractiveSessionDriver({
+    cwd,
+    config: runtime,
+    session: webSession,
+    sessionStore,
+    shell: webShell,
+    stateRootDir,
+    onSessionChanged: (session) => { webSession = session; void sessionBinding.save(session.id); },
+    onSessionUpdated: (session) => { webSession = session; void sessionBinding.save(session.id); },
+  });
+  const webDriverTask = webDriver.run().catch(() => undefined);
   const unsubscribeRemote = subscribeRemoteRuntimeEvents((event) => {
     if (path.resolve(event.rootDir) === path.resolve(stateRootDir)) events.publish("transcript", event);
   });
@@ -49,6 +81,18 @@ export async function startLocalConsole(cwd: string): Promise<LocalConsoleHandle
     void route(request, response).catch((error) => {
       sendJson(response, statusForRequestError(request), { error: error instanceof Error ? error.message : String(error) });
     });
+  });
+  server.on("upgrade", (request, socket, head) => {
+    const url = new URL(request.url ?? "/", "http://127.0.0.1");
+    if (url.pathname !== "/web" || url.searchParams.get("token") !== token) {
+      socket.destroy();
+      return;
+    }
+    webSockets.handleUpgrade(request, socket, head, (client) => webSockets.emit("connection", client, request));
+  });
+  webShell.attach(webSockets, async (send) => {
+    const current = webSession ? await sessionStore.load(webSession.id).catch(() => webSession) : null;
+    if (current) webShell.replaySession(current, send);
   });
 
   async function route(request: IncomingMessage, response: ServerResponse): Promise<void> {
@@ -89,6 +133,10 @@ export async function startLocalConsole(cwd: string): Promise<LocalConsoleHandle
         skills: skillList,
         channels: await channels.refreshStatus(),
       });
+    }
+    const historyMatch = url.pathname.match(/^\/api\/channels\/(weixin|telegram)\/history$/u);
+    if (request.method === "GET" && historyMatch) {
+      return sendJson(response, 200, { items: await loadChannelHistory(cwd, historyMatch[1] as WebChannelName) });
     }
     if (request.method === "PUT" && url.pathname === "/api/config") {
       const body = await readJsonBody(request);
@@ -146,10 +194,14 @@ export async function startLocalConsole(cwd: string): Promise<LocalConsoleHandle
       unsubscribeRemote();
       await channels.stopAll();
       await scheduler.stop();
+      webShell.dispose();
+      await webDriverTask;
+      await new Promise<void>((resolve) => webSockets.close(() => resolve()));
       events.close();
       await new Promise<void>((resolve) => server.close(() => resolve()));
       resolveClosed();
     },
+    webUrl: `${origin}/web?token=${encodeURIComponent(token)}`,
   };
 }
 
@@ -157,6 +209,8 @@ async function serveStatic(pathname: string, response: ServerResponse): Promise<
   const files: Record<string, [string, string]> = {
     "/": ["index.html", "text/html; charset=utf-8"],
     "/index.html": ["index.html", "text/html; charset=utf-8"],
+    "/web": ["chat.html", "text/html; charset=utf-8"],
+    "/web/": ["chat.html", "text/html; charset=utf-8"],
     "/app.js": ["app.js", "text/javascript; charset=utf-8"],
     "/channelStream.js": ["channelStream.js", "text/javascript; charset=utf-8"],
     "/workflowViews.js": ["workflowViews.js", "text/javascript; charset=utf-8"],
@@ -172,12 +226,28 @@ async function serveStatic(pathname: string, response: ServerResponse): Promise<
     : files[pathname];
   if (!entry) return sendJson(response, 404, { error: "Not found." });
   try {
-    const body = await fs.readFile(path.join(__dirname, "web", entry[0]));
+    const body = await readStaticAsset(entry[0]);
     response.writeHead(200, { "content-type": entry[1], "cache-control": "no-store" });
     response.end(body);
   } catch {
     sendJson(response, 404, { error: "Local console asset is missing." });
   }
+}
+
+async function readStaticAsset(relativePath: string): Promise<Buffer> {
+  const roots = [
+    path.join(__dirname, "web"),
+    path.resolve(process.cwd(), "src", "web", "public"),
+  ];
+  let lastError: unknown;
+  for (const root of roots) {
+    try {
+      return await fs.readFile(path.join(root, relativePath));
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError ?? new Error(`Static asset not found: ${relativePath}`);
 }
 
 function authorized(request: IncomingMessage, url: URL, token: string): boolean {

@@ -1,4 +1,5 @@
 import { KITTY_BASE_ENV } from "../config/envKeys.js";
+import { listAgentProfiles } from "../agent/profiles/registry.js";
 import type { ExtensionId } from "../extensions/definitions.js";
 import { SUPPORTED_LOCALES, translate, type KittyLocale, type MessageKey } from "../i18n/index.js";
 
@@ -8,40 +9,41 @@ interface RuntimeFieldDefinition {
   envKey: (typeof KITTY_BASE_ENV)[keyof typeof KITTY_BASE_ENV];
   labelKey: MessageKey;
   control: RuntimeControl;
-  option?: "locale" | "thinking" | "reasoning" | "boolean";
+  option?: "locale" | "profile" | "thinking" | "reasoning" | "boolean";
+  group: "model" | "other";
 }
 
 const RUNTIME_FIELDS = [
-  { envKey: KITTY_BASE_ENV.locale, labelKey: "web.runtime.locale", control: "select", option: "locale" },
-  { envKey: KITTY_BASE_ENV.profile, labelKey: "web.runtime.profile", control: "text" },
-  { envKey: KITTY_BASE_ENV.thinking, labelKey: "web.runtime.thinking", control: "select", option: "thinking" },
-  { envKey: KITTY_BASE_ENV.reasoningEffort, labelKey: "web.runtime.reasoningEffort", control: "select", option: "reasoning" },
-  { envKey: KITTY_BASE_ENV.maxOutputTokens, labelKey: "web.runtime.maxOutputTokens", control: "number" },
-  { envKey: KITTY_BASE_ENV.contextWindowMessages, labelKey: "web.runtime.contextWindowMessages", control: "number" },
-  { envKey: KITTY_BASE_ENV.maxContextChars, labelKey: "web.runtime.maxContextChars", control: "number" },
-  { envKey: KITTY_BASE_ENV.contextSummaryChars, labelKey: "web.runtime.contextSummaryChars", control: "number" },
-  { envKey: KITTY_BASE_ENV.maxReadBytes, labelKey: "web.runtime.maxReadBytes", control: "number" },
-  { envKey: KITTY_BASE_ENV.projectDocMaxBytes, labelKey: "web.runtime.projectDocMaxBytes", control: "number" },
-  { envKey: KITTY_BASE_ENV.commandStallTimeoutMs, labelKey: "web.runtime.commandStallTimeoutMs", control: "number" },
-  { envKey: KITTY_BASE_ENV.showReasoning, labelKey: "web.runtime.showReasoning", control: "select", option: "boolean" },
-  { envKey: KITTY_BASE_ENV.telegramApiBaseUrl, labelKey: "web.runtime.telegramApiBaseUrl", control: "url" },
-  { envKey: KITTY_BASE_ENV.telegramProxyUrl, labelKey: "web.runtime.telegramProxyUrl", control: "url" },
-  { envKey: KITTY_BASE_ENV.telegramPollingTimeoutSeconds, labelKey: "web.runtime.telegramPollingTimeoutSeconds", control: "number" },
-  { envKey: KITTY_BASE_ENV.telegramPollingLimit, labelKey: "web.runtime.telegramPollingLimit", control: "number" },
-  { envKey: KITTY_BASE_ENV.telegramPollingRetryBackoffMs, labelKey: "web.runtime.telegramPollingRetryBackoffMs", control: "number" },
-  { envKey: KITTY_BASE_ENV.telegramMessageChunkChars, labelKey: "web.runtime.telegramMessageChunkChars", control: "number" },
-  { envKey: KITTY_BASE_ENV.telegramTypingIntervalMs, labelKey: "web.runtime.telegramTypingIntervalMs", control: "number" },
-  { envKey: KITTY_BASE_ENV.telegramDeliveryMaxRetries, labelKey: "web.runtime.telegramDeliveryMaxRetries", control: "number" },
-  { envKey: KITTY_BASE_ENV.telegramDeliveryBaseDelayMs, labelKey: "web.runtime.telegramDeliveryBaseDelayMs", control: "number" },
-  { envKey: KITTY_BASE_ENV.telegramDeliveryMaxDelayMs, labelKey: "web.runtime.telegramDeliveryMaxDelayMs", control: "number" },
-  { envKey: KITTY_BASE_ENV.weixinBaseUrl, labelKey: "web.runtime.weixinBaseUrl", control: "url" },
-  { envKey: KITTY_BASE_ENV.weixinCdnBaseUrl, labelKey: "web.runtime.weixinCdnBaseUrl", control: "url" },
-  { envKey: KITTY_BASE_ENV.weixinPollingTimeoutMs, labelKey: "web.runtime.weixinPollingTimeoutMs", control: "number" },
-  { envKey: KITTY_BASE_ENV.weixinPollingRetryBackoffMs, labelKey: "web.runtime.weixinPollingRetryBackoffMs", control: "number" },
-  { envKey: KITTY_BASE_ENV.weixinMessageChunkBytes, labelKey: "web.runtime.weixinMessageChunkBytes", control: "number" },
-  { envKey: KITTY_BASE_ENV.weixinTypingIntervalMs, labelKey: "web.runtime.weixinTypingIntervalMs", control: "number" },
-  { envKey: KITTY_BASE_ENV.weixinQrTimeoutMs, labelKey: "web.runtime.weixinQrTimeoutMs", control: "number" },
-  { envKey: KITTY_BASE_ENV.weixinRouteTag, labelKey: "web.runtime.weixinRouteTag", control: "text" },
+  { envKey: KITTY_BASE_ENV.locale, labelKey: "web.runtime.locale", control: "select", option: "locale", group: "other" },
+  { envKey: KITTY_BASE_ENV.profile, labelKey: "web.runtime.profile", control: "select", option: "profile", group: "other" },
+  { envKey: KITTY_BASE_ENV.thinking, labelKey: "web.runtime.thinking", control: "select", option: "thinking", group: "model" },
+  { envKey: KITTY_BASE_ENV.reasoningEffort, labelKey: "web.runtime.reasoningEffort", control: "select", option: "reasoning", group: "model" },
+  { envKey: KITTY_BASE_ENV.maxOutputTokens, labelKey: "web.runtime.maxOutputTokens", control: "number", group: "model" },
+  { envKey: KITTY_BASE_ENV.contextWindowMessages, labelKey: "web.runtime.contextWindowMessages", control: "number", group: "other" },
+  { envKey: KITTY_BASE_ENV.maxContextChars, labelKey: "web.runtime.maxContextChars", control: "number", group: "other" },
+  { envKey: KITTY_BASE_ENV.contextSummaryChars, labelKey: "web.runtime.contextSummaryChars", control: "number", group: "other" },
+  { envKey: KITTY_BASE_ENV.maxReadBytes, labelKey: "web.runtime.maxReadBytes", control: "number", group: "other" },
+  { envKey: KITTY_BASE_ENV.projectDocMaxBytes, labelKey: "web.runtime.projectDocMaxBytes", control: "number", group: "other" },
+  { envKey: KITTY_BASE_ENV.commandStallTimeoutMs, labelKey: "web.runtime.commandStallTimeoutMs", control: "number", group: "other" },
+  { envKey: KITTY_BASE_ENV.showReasoning, labelKey: "web.runtime.showReasoning", control: "select", option: "boolean", group: "model" },
+  { envKey: KITTY_BASE_ENV.telegramApiBaseUrl, labelKey: "web.runtime.telegramApiBaseUrl", control: "url", group: "other" },
+  { envKey: KITTY_BASE_ENV.telegramProxyUrl, labelKey: "web.runtime.telegramProxyUrl", control: "url", group: "other" },
+  { envKey: KITTY_BASE_ENV.telegramPollingTimeoutSeconds, labelKey: "web.runtime.telegramPollingTimeoutSeconds", control: "number", group: "other" },
+  { envKey: KITTY_BASE_ENV.telegramPollingLimit, labelKey: "web.runtime.telegramPollingLimit", control: "number", group: "other" },
+  { envKey: KITTY_BASE_ENV.telegramPollingRetryBackoffMs, labelKey: "web.runtime.telegramPollingRetryBackoffMs", control: "number", group: "other" },
+  { envKey: KITTY_BASE_ENV.telegramMessageChunkChars, labelKey: "web.runtime.telegramMessageChunkChars", control: "number", group: "other" },
+  { envKey: KITTY_BASE_ENV.telegramTypingIntervalMs, labelKey: "web.runtime.telegramTypingIntervalMs", control: "number", group: "other" },
+  { envKey: KITTY_BASE_ENV.telegramDeliveryMaxRetries, labelKey: "web.runtime.telegramDeliveryMaxRetries", control: "number", group: "other" },
+  { envKey: KITTY_BASE_ENV.telegramDeliveryBaseDelayMs, labelKey: "web.runtime.telegramDeliveryBaseDelayMs", control: "number", group: "other" },
+  { envKey: KITTY_BASE_ENV.telegramDeliveryMaxDelayMs, labelKey: "web.runtime.telegramDeliveryMaxDelayMs", control: "number", group: "other" },
+  { envKey: KITTY_BASE_ENV.weixinBaseUrl, labelKey: "web.runtime.weixinBaseUrl", control: "url", group: "other" },
+  { envKey: KITTY_BASE_ENV.weixinCdnBaseUrl, labelKey: "web.runtime.weixinCdnBaseUrl", control: "url", group: "other" },
+  { envKey: KITTY_BASE_ENV.weixinPollingTimeoutMs, labelKey: "web.runtime.weixinPollingTimeoutMs", control: "number", group: "other" },
+  { envKey: KITTY_BASE_ENV.weixinPollingRetryBackoffMs, labelKey: "web.runtime.weixinPollingRetryBackoffMs", control: "number", group: "other" },
+  { envKey: KITTY_BASE_ENV.weixinMessageChunkBytes, labelKey: "web.runtime.weixinMessageChunkBytes", control: "number", group: "other" },
+  { envKey: KITTY_BASE_ENV.weixinTypingIntervalMs, labelKey: "web.runtime.weixinTypingIntervalMs", control: "number", group: "other" },
+  { envKey: KITTY_BASE_ENV.weixinQrTimeoutMs, labelKey: "web.runtime.weixinQrTimeoutMs", control: "number", group: "other" },
+  { envKey: KITTY_BASE_ENV.weixinRouteTag, labelKey: "web.runtime.weixinRouteTag", control: "text", group: "other" },
 ] as const satisfies readonly RuntimeFieldDefinition[];
 
 const EXTENSION_SUMMARY_KEYS = {
@@ -75,10 +77,11 @@ export function buildWebMessages(locale: KittyLocale) {
       waiting: t("web.login.waiting"), scanned: t("web.login.scanned"), connected: t("web.login.connected"), failed: t("web.login.failed"),
     },
     workflow: {
-      config: t("web.workflow.config"), weixin: t("web.workflow.weixin"), telegram: t("web.workflow.telegram"), skills: t("web.workflow.skills"),
+      basic: t("web.workflow.basic"), config: t("web.workflow.config"), plugins: t("web.workflow.plugins"), other: t("web.workflow.other"),
+      weixin: t("web.workflow.weixin"), telegram: t("web.workflow.telegram"), skills: t("web.workflow.skills"), web: t("web.workflow.web"),
       loadingConfig: t("web.workflow.loadingConfig"), loadingService: t("web.workflow.loadingService"), loadingSkills: t("web.workflow.loadingSkills"),
-      configNote: t("web.workflow.configNote"), weixinNote: t("web.workflow.weixinNote"),
-      telegramNote: t("web.workflow.telegramNote"), skillsNote: t("web.workflow.skillsNote"),
+      basicNote: t("web.workflow.basicNote"), configNote: t("web.workflow.configNote"), pluginsNote: t("web.workflow.pluginsNote"), otherNote: t("web.workflow.otherNote"), otherSummary: t("web.workflow.otherSummary"),
+      weixinNote: t("web.workflow.weixinNote"), telegramNote: t("web.workflow.telegramNote"), skillsNote: t("web.workflow.skillsNote"), webNote: t("web.workflow.webNote"),
       guide: t("web.workflow.guide"),
     },
     config: {
@@ -89,6 +92,9 @@ export function buildWebMessages(locale: KittyLocale) {
       baseUrl: t("web.config.baseUrl"), apiKey: t("web.config.apiKey"), apiKeyHint: t("web.config.apiKeyHint"),
       currentLoaded: t("web.config.currentLoaded"), saved: t("web.config.saved"), probeSuccess: t("web.config.probeSuccess"),
     },
+    basic: { description: t("web.basic.description"), saved: t("web.basic.saved") },
+    plugins: { description: t("web.plugins.description"), saved: t("web.plugins.saved") },
+    other: { description: t("web.other.description"), saved: t("web.other.saved") },
     weixin: {
       description: t("web.weixin.description"), allowedTitle: t("web.weixin.allowedTitle"), userId: t("web.weixin.userId"),
       usersPlaceholder: t("web.weixin.usersPlaceholder"), saved: t("web.weixin.saved"), loginTitle: t("web.weixin.loginTitle"),
@@ -112,13 +118,19 @@ export function buildWebMessages(locale: KittyLocale) {
       assistant: t("web.stream.assistant"), final: t("web.stream.final"), toolCall: t("web.stream.toolCall"),
       toolProgress: t("web.stream.toolProgress"), toolResult: t("web.stream.toolResult"), toolError: t("web.stream.toolError"), error: t("web.stream.error"),
     },
+    shell: {
+      connected: t("web.shell.connected"), disconnected: t("web.shell.disconnected"), thinking: t("web.shell.thinking"), stopped: t("web.shell.stopped"),
+      inputPlaceholder: t("web.shell.inputPlaceholder"), send: t("web.shell.send"), stop: t("web.shell.stop"), empty: t("web.shell.empty"),
+      reasoning: t("web.shell.reasoning"), user: t("web.shell.user"), assistant: t("web.shell.assistant"),
+      toolUpdating: t("web.shell.toolUpdating"), toolWriting: t("web.shell.toolWriting"), toolReading: t("web.shell.toolReading"),
+      toolReadingGeneric: t("web.shell.toolReadingGeneric"), toolRunning: t("web.shell.toolRunning"), toolRunningGeneric: t("web.shell.toolRunningGeneric"),
+      toolCalling: t("web.shell.toolCalling"), toolUpdated: t("web.shell.toolUpdated"), toolCreated: t("web.shell.toolCreated"),
+      toolRead: t("web.shell.toolRead"), toolDone: t("web.shell.toolDone"), toolFailed: t("web.shell.toolFailed"), toolPlan: t("web.shell.toolPlan"),
+      commandDone: t("web.shell.commandDone"), commandFailed: t("web.shell.commandFailed"),
+    },
     runtime: {
-      fields: RUNTIME_FIELDS.map((field) => ({
-        envKey: field.envKey,
-        label: t(field.labelKey),
-        control: field.control,
-        options: buildOptions(locale, "option" in field ? field.option : undefined),
-      })),
+      modelFields: projectRuntimeFields(locale, "model", t),
+      otherFields: projectRuntimeFields(locale, "other", t),
     },
     extensionSummaries: Object.fromEntries(
       Object.entries(EXTENSION_SUMMARY_KEYS).map(([id, key]) => [id, t(key)]),
@@ -126,10 +138,22 @@ export function buildWebMessages(locale: KittyLocale) {
   };
 }
 
+function projectRuntimeFields(locale: KittyLocale, group: RuntimeFieldDefinition["group"], t: (key: MessageKey) => string) {
+  return RUNTIME_FIELDS.filter((field) => field.group === group).map((field) => ({
+    envKey: field.envKey,
+    label: t(field.labelKey),
+    control: field.control,
+    options: buildOptions(locale, "option" in field ? field.option : undefined),
+  }));
+}
+
 function buildOptions(locale: KittyLocale, option: RuntimeFieldDefinition["option"]) {
   if (!option) return undefined;
   if (option === "locale") {
     return SUPPORTED_LOCALES.map((value) => ({ value, label: translate(locale, `web.locale.${value}` as MessageKey) }));
+  }
+  if (option === "profile") {
+    return listAgentProfiles().map((profile) => ({ value: profile.id, label: profile.name }));
   }
   const values = option === "thinking"
     ? ["enabled", "disabled"]

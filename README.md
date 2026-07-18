@@ -71,6 +71,8 @@ kitty
 
 Kitty 会打开会话界面。你可以新建任务，也可以回到之前保存的现场。
 
+`kitty start` 的工作台还提供 Kitty Web：它连接同一个本地 session，实时显示思考、工具调用和回复，不会创建第二套 Agent 运行时。
+
 第一次使用 Windows 命令行、不熟悉项目目录或不知道如何填写配置，可以按 [小白快速启动](docs/quickstart.md) 一步一步操作。
 
 ## 直接执行一次任务
@@ -96,7 +98,7 @@ Kitty 会调查事实、判断边界、调用工具、检查结果，并把已�
 | 命令 | 用途 |
 | --- | --- |
 | `kitty` | 启动 Kitty |
-| `kitty start` | 初始化项目并打开本地控制台 |
+| `kitty start` | 初始化项目并打开本地工作台与 Kitty Web |
 | `kitty run <prompt>` | 执行一次明确任务 |
 | `kitty resume [sessionId]` | 恢复最近或指定会话 |
 | `kitty status` | 查看当前运行现场 |

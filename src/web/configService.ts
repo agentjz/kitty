@@ -13,7 +13,10 @@ const KNOWN_KEYS: ReadonlySet<string> = new Set<string>([
   ...Object.values(KITTY_BASE_ENV),
   ...Object.values(KITTY_ENV.extensions),
 ]);
-const SECRET_KEYS: ReadonlySet<string> = new Set<string>([KITTY_ENV.apiKey, KITTY_ENV.telegramToken]);
+const SECRET_KEYS: ReadonlySet<string> = new Set<string>([
+  KITTY_ENV.apiKey,
+  KITTY_ENV.telegramToken,
+]);
 
 export class WebConfigService {
   private readonly envPath: string;

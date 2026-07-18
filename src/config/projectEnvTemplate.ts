@@ -35,6 +35,7 @@ function formatCommonEnvSections(input: {
     `${KITTY_ENV.profile}=${input.initialConfig.profile}`,
     "",
     "# Active provider",
+    "# Switching providers requires replacing KITTY_API_KEY before saving.",
     ...formatProviderPreset(input.defaultPreset, {
       apiKey: input.providerKey,
       commented: false,

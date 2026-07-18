@@ -2,9 +2,9 @@
 
 更新时间：2026-07-18
 
-当前代码锚点：`4.0.1` 发布提交与 2026-07-18 当前工作树
+当前代码锚点：`4.0.6` 发布提交与 2026-07-18 当前工作树
 
-当前包版本：`@jun133/kitty@4.0.1`
+当前包版本：`@jun133/kitty@4.0.6`
 
 用途：给后续窗口继续理解 Kitty。它不是 `spec/`，不是 README，也不是产品宣传。它记录从前身项目到当前版本的开发轨迹：做了什么，没做什么，试过什么，删过什么，失败在哪里，最后证明什么是对的。
 
@@ -64,6 +64,9 @@ hajimi -> DeepSeek CLI / deepseekcli -> Universe -> camera -> Athlete -> Deadmou
 | 22 | 2026-07-17 | 4.0.0 版本跳跃 | 仅版本元数据跳跃，不代表核心架构另起一套 |
 | 23 | 2026-07-17 | 4.0.1 远程宿主 | 微信 iLink 与 Telegram 共用 durable remote lifecycle |
 | 24 | 2026-07-18 | 本地工作流与机器调度 | `kitty start`、引导式 Web、统一远程命令、持久 scheduler 与恶劣路径恢复 |
+| 25 | 2026-07-18 | 官网结构收敛 | 深色 Hero、自然流式演示、真实 TUI 资源与单一展示事实 |
+| 26 | 2026-07-18 | 官网首屏回到单一 Hero | 移除 banner 专用结构与版本展示，保留居中标题、安装、源码和演示 |
+| 27 | 2026-07-18 | Web 壳、配置边界与人格 registry | WebSocket session 壳、分组设置、单一 provider 密钥与“毒舌” profile |
 
 ## 阶段 00：前身谱系，Kitty 不是凭空开始的
 
@@ -1650,6 +1653,37 @@ HTML 只声明一组稳定 slot：任务、追加要求、思考、结果、计�
 阶段 25 的 ANSI banner 在移动端仍然制造独立高度和空间竞争。当前官网首屏改为单一的居中 `Kitty Agent` Hero 标题，保留主张、操作按钮、安装命令和演示 GIF；移除 banner 专用结构、版本号展示和对应的注册表请求。桌面与移动端使用明确断点字号和独立内边距，标题不再依赖压缩布局保持完整。
 
 本阶段继续遵守：一个展示事实只保留一个 owner；不为视觉结构保留无消费者的状态、网络请求或历史 DOM。
+
+## 阶段 27：Web 壳、配置边界与人格 registry 收敛
+
+时间：2026-07-18
+
+这一阶段把 `kitty start` 的浏览器部分从单纯的配置页扩展为两个边界清楚的壳：工作台继续负责配置、渠道控制和状态投影；`/web` 提供一个直接连接本机 session 的 WebSocket 聊天壳。WebSocket 只承载浏览器交互和流式事件，微信与 Telegram 仍保持各自的 HTTP 长轮询，远程渠道监控仍使用 SSE。两个壳都复用 `InteractiveSessionDriver`、同一个 session store 和 typed runtime facts，不复制 Agent turn loop。
+
+旧 Web 版本曾把 UI、模型调用和生命周期揉成一套独立实现。它看起来能跑，实际上会制造第二个事实源：一个壳显示了消息，另一个壳的 session 却没有同样的记录。当前实现让 Web session 由 `.kitty/web/session.json` 持久绑定，浏览器重新连接时从 SQLite 回放已有消息；输入、中断、reasoning、工具调用、工具结果、最终回答和错误都沿同一个 driver 进入持久现场。
+
+配置页也停止把所有东西塞进一个“基础设置”表单。当前分成：
+
+- 语言模型设置：Provider、模型、密钥、连接测试和思考行为；
+- 插件和 Skill：Extension 开关与项目 Skill 只读浏览；
+- 其他设置：语言、人格、上下文、文件和渠道参数；
+- 微信、Telegram：各自独立的服务工作流。
+
+人格和语言不再单独占一个首页模块。它们属于低频的其他设置，且字段仍由 typed catalog 和当前 profile registry 投影。外部 Web 壳不再把 tool payload 当作聊天内容：assistant 使用 Markdown 渲染，思考是一条可增长的状态流，工具调用与结果共享一条紧凑记录，只显示已整理的名称、目标、进度和结果摘要。所有四种 locale 的 Web 文案通过 WebSocket 首包进入壳，静态 HTML 不拥有第二套中文文案。
+
+Provider 密钥最终保持单一事实：`KITTY_API_KEY` 同时是 runtime 和持久配置唯一使用的当前密钥。曾尝试为每个 Provider 增加记忆字段，但它扩大了配置面和使用者的心智负担，因此没有保留。Web 选择其他 Provider 时清空密钥输入，并要求保存前填入对应密钥；注释模板只提供人工参考，不进入运行或展示判断。
+
+Provider 下拉框直接使用 Provider ID，不再通过数组下标间接映射。完整往返测试先保存 DeepSeek，再切换并保存 Agnes，确认最终生效的 Provider、模型、Base URL 和 API Key 全部属于 Agnes。源模板、`.kitty/.env.example` 与本地 `.kitty/.env` 由同一生成器产出；完整验证共 387 项测试，386 通过、0 失败、1 项平台跳过。
+
+人格不是前端文案开关，而是 `src/agent/profiles/registry.ts` 的真实 profile。新增的 `sharp` profile 在下拉框中显示为“毒舌”，要求证据优先、直接指出需求矛盾和代码缺陷、按严重性排序，并明确禁止攻击人。选中后，`runAgentTurn` 通过同一 registry 将其 persona 注入 prompt；没有第二套 agent 逻辑。
+
+本阶段留下的规则：
+
+```txt
+壳可以多，事实 owner 只能一个。
+配置可以分组，运行时 profile 只能从 registry 来。
+流式可以实时，session 仍必须可恢复。
+```
 
 ## 当前结论
 

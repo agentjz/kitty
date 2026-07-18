@@ -26,9 +26,17 @@
         <a class="github-link" href="https://github.com/luckymaomi/kitty" target="_blank" rel="noreferrer" data-message-title="common.github"><i class="bi bi-github" aria-hidden="true"></i></a>
       </div>
       <div class="workflow-list" role="list">
-        <button class="workflow-card" type="button" data-open-workflow="config" role="listitem">
+        <a class="workflow-card" id="open-web-shell" href="/web" role="listitem">
+          <span class="workflow-icon"><i class="bi bi-window"></i></span>
+          <span class="workflow-copy"><span class="workflow-title"><strong data-message="workflow.web"></strong><small data-message="workflow.webNote"></small></span><small>Session · WebSocket</small></span>
+        </a>
+        <button class="workflow-card" type="button" data-open-workflow="model" role="listitem">
           <span class="workflow-icon"><i class="bi bi-cpu"></i></span>
           <span class="workflow-copy"><span class="workflow-title"><strong data-message="workflow.config"></strong><small data-message="workflow.configNote"></small></span><small id="model-summary" data-message="workflow.loadingConfig"></small><code id="config-location"></code></span>
+        </button>
+        <button class="workflow-card" type="button" data-open-workflow="plugins" role="listitem">
+          <span class="workflow-icon"><i class="bi bi-toggles"></i></span>
+          <span class="workflow-copy"><span class="workflow-title"><strong data-message="workflow.plugins"></strong><small data-message="workflow.pluginsNote"></small></span><small id="plugins-summary"></small></span>
         </button>
         <button class="workflow-card" type="button" data-open-workflow="weixin" role="listitem">
           <span class="workflow-icon"><i class="bi bi-wechat"></i></span>
@@ -38,9 +46,9 @@
           <span class="workflow-icon"><i class="bi bi-telegram"></i></span>
           <span class="workflow-copy"><span class="workflow-title"><strong data-message="workflow.telegram"></strong><small data-message="workflow.telegramNote"></small></span><small id="telegram-summary" data-message="workflow.loadingService"></small></span>
         </button>
-        <button class="workflow-card" type="button" data-open-workflow="skills" role="listitem">
-          <span class="workflow-icon"><i class="bi bi-puzzle"></i></span>
-          <span class="workflow-copy"><span class="workflow-title"><strong data-message="workflow.skills"></strong><small data-message="workflow.skillsNote"></small></span><small id="skills-summary" data-message="workflow.loadingSkills"></small></span>
+        <button class="workflow-card" type="button" data-open-workflow="other" role="listitem">
+          <span class="workflow-icon"><i class="bi bi-three-dots"></i></span>
+          <span class="workflow-copy"><span class="workflow-title"><strong data-message="workflow.other"></strong><small data-message="workflow.otherNote"></small></span><small data-message="workflow.otherSummary"></small></span>
         </button>
       </div>
     </section>
@@ -48,9 +56,9 @@
     <section id="workflow-detail" class="d-none" aria-live="polite">
       <button class="back-button" type="button" data-action="back-home"><i class="bi bi-grid-3x3-gap-fill"></i><span data-message="common.back"></span></button>
 
-      <article class="workflow-panel d-none" data-workflow-panel="config">
+      <article class="workflow-panel d-none" data-workflow-panel="model">
         <div class="detail-heading"><h1 data-message="workflow.config"></h1><p data-message="config.description"></p></div>
-        <form id="config-form">
+        <form id="model-form">
           <ol class="flow-steps">
             <li class="flow-step">
               <div class="step-number">1</div>
@@ -66,26 +74,31 @@
                   <div><label class="form-label" for="model-provider" data-message="config.provider"></label><input class="form-control" id="model-provider" required></div>
                   <div><label class="form-label" for="model-name" data-message="config.model"></label><input class="form-control" id="model-name" required></div>
                   <div class="span-2"><label class="form-label" for="model-url" data-message="config.baseUrl"></label><input class="form-control" id="model-url" type="url" required></div>
-                  <div class="span-2"><label class="form-label" for="model-key" data-message="config.apiKey"></label><input class="form-control font-monospace" id="model-key" type="text" autocomplete="off"><div class="form-text" data-message="config.apiKeyHint"></div></div>
+                  <div class="span-2"><label class="form-label" for="model-key" data-message="config.apiKey"></label><input class="form-control font-monospace" id="model-key" type="text" autocomplete="off" required><div class="form-text" data-message="config.apiKeyHint"></div></div>
                 </div>
               </div>
             </li>
             <li class="flow-step">
               <div class="step-number">3</div>
-              <div class="step-content"><h2 data-message="config.validationTitle"></h2><p class="step-hint" data-message="config.validationHint"></p><button class="btn btn-outline-kitty" type="button" data-action="probe-provider"><i class="bi bi-send"></i><span data-message="common.sendTest"></span></button><div id="provider-result" class="inline-result d-none" role="status"></div></div>
-            </li>
-            <li class="flow-step">
-              <div class="step-number">4</div>
               <div class="step-content">
                 <h2 data-message="config.settingsTitle"></h2>
                 <p class="step-hint" data-message="config.settingsHint"></p>
-                <section class="settings-section"><h2 data-message="config.extensionsTitle"></h2><div id="extension-switches" class="switch-grid"></div></section>
-                <section class="settings-section"><h2 data-message="config.runtimeTitle"></h2><div id="advanced-settings" class="form-grid"></div></section>
+                <div id="model-settings" class="form-grid"></div>
                 <div class="sticky-actions"><button class="btn btn-kitty" type="submit"><i class="bi bi-save"></i><span data-message="common.save"></span></button><div id="config-result" class="inline-result d-none" role="status"></div></div>
               </div>
             </li>
+            <li class="flow-step">
+              <div class="step-number">4</div>
+              <div class="step-content"><h2 data-message="config.validationTitle"></h2><p class="step-hint" data-message="config.validationHint"></p><button class="btn btn-outline-kitty" type="button" data-action="probe-provider"><i class="bi bi-send"></i><span data-message="common.sendTest"></span></button><div id="provider-result" class="inline-result d-none" role="status"></div></div>
+            </li>
           </ol>
         </form>
+      </article>
+
+      <article class="workflow-panel d-none" data-workflow-panel="plugins">
+        <div class="detail-heading"><h1 data-message="workflow.plugins"></h1><p data-message="plugins.description"></p></div>
+        <form id="plugins-form"><div id="extension-switches" class="switch-grid"></div><div class="sticky-actions"><button class="btn btn-kitty" type="submit"><i class="bi bi-save"></i><span data-message="common.save"></span></button><div id="plugins-result" class="inline-result d-none" role="status"></div></div></form>
+        <section class="skill-section"><div class="section-heading"><h2 data-message="workflow.skills"></h2><p data-message="skills.description"></p></div><div id="skill-list" class="skill-list"></div><section id="skill-reader" class="skill-reader d-none"><div class="skill-reader-heading"><div><p class="eyebrow" data-message="skills.source"></p><h2 id="skill-reader-title"></h2></div></div><pre id="skill-source"></pre></section></section>
       </article>
 
       <article class="workflow-panel d-none" data-workflow-panel="weixin">
@@ -106,10 +119,9 @@
         </ol>
       </article>
 
-      <article class="workflow-panel d-none" data-workflow-panel="skills">
-        <div class="detail-heading"><h1 data-message="workflow.skills"></h1><p data-message="skills.description"></p></div>
-        <div id="skill-list" class="skill-list"></div>
-        <section id="skill-reader" class="skill-reader d-none"><div class="skill-reader-heading"><div><p class="eyebrow" data-message="skills.source"></p><h2 id="skill-reader-title"></h2></div></div><pre id="skill-source"></pre></section>
+      <article class="workflow-panel d-none" data-workflow-panel="other">
+        <div class="detail-heading"><h1 data-message="workflow.other"></h1><p data-message="other.description"></p></div>
+        <form id="other-form"><div id="other-settings" class="form-grid"></div><div class="sticky-actions"><button class="btn btn-kitty" type="submit"><i class="bi bi-save"></i><span data-message="common.save"></span></button><div id="other-result" class="inline-result d-none" role="status"></div></div></form>
       </article>
     </section>
   </main>

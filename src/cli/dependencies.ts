@@ -6,6 +6,7 @@ import type { RuntimeConfig, SessionRecord } from "../types.js";
 export interface CliProgramDependencies {
   startLocalConsole?: (cwd: string) => Promise<{
     url: string;
+    webUrl?: string;
     close(): Promise<void>;
     wait(): Promise<void>;
   }>;

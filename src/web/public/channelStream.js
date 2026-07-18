@@ -31,6 +31,10 @@ export function appendChannelEvent(host, item) {
   if (followLatest) stream.scrollTop = stream.scrollHeight;
 }
 
+export function appendChannelHistory(host, items) {
+  for (const item of items || []) appendChannelEvent(host, item);
+}
+
 function createEventElement(item, kind, message, format) {
   const presentation = item.presentation;
   const element = document.createElement("article");

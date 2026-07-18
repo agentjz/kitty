@@ -57,7 +57,11 @@ test("the Web presentation projects every supported runtime locale", () => {
   for (const locale of SUPPORTED_LOCALES) {
     const messages = buildWebMessages(locale);
     assert.equal(messages.welcome, translate(locale, "tui.authorTip"));
-    assert.equal(messages.runtime.fields.some((field) => field.envKey === "KITTY_LOCALE" && field.label.length > 0), true);
+    const runtimeFields = [...messages.runtime.modelFields, ...messages.runtime.otherFields];
+    assert.equal(runtimeFields.some((field) => field.envKey === "KITTY_LOCALE" && field.label.length > 0), true);
+    const profileField = messages.runtime.otherFields.find((field) => field.envKey === "KITTY_PROFILE");
+    assert.ok(profileField);
+    assert.equal(profileField.options?.some((option) => option.value === "sharp" && option.label === "毒舌"), true);
     assert.equal(Object.values(messages.extensionSummaries).every((summary) => summary.length > 0), true);
   }
 });
