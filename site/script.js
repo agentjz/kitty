@@ -2,7 +2,6 @@
   'use strict';
 
   var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var versionTarget = document.getElementById('kitty-version');
   var cycle = document.querySelector('[data-agent-cycle]');
   var cycleStepIntervalMs = 2000;
   var cycleSteps = [
@@ -62,21 +61,6 @@
   var streamComplete = true;
   var visible = false;
   var playing = false;
-
-  if (versionTarget && typeof window.fetch === 'function') {
-    window.fetch('https://registry.npmjs.org/%40jun133%2Fkitty/latest', {
-      headers: { Accept: 'application/json' }
-    }).then(function (response) {
-      if (!response.ok) throw new Error('Unable to read the latest Kitty version.');
-      return response.json();
-    }).then(function (metadata) {
-      if (metadata && typeof metadata.version === 'string' && metadata.version.trim()) {
-        versionTarget.textContent = 'v' + metadata.version.trim();
-      }
-    }).catch(function () {
-      versionTarget.textContent = 'latest';
-    });
-  }
 
   function clearLineTimers() {
     streamVersion += 1;
