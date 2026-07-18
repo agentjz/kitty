@@ -61,13 +61,15 @@ npm install -g @jun133/kitty@latest
 kitty start
 ```
 
-Kitty 会补齐项目文件并打开只监听本机的工作台。Web 与 TUI 使用同源的版本、ANSI Compact `Kitty Agent` 双艺术字和欢迎语品牌区，页面跟随 `KITTY_LOCALE` 使用简体中文、英文、日文或韩文，默认简体中文。打开“基础设置”，确认当前 Provider、模型、Base URL 和 API Key，在同一个表单调整 Extension 与运行参数，然后通过唯一的“保存配置”一次提交；连接测试单独执行。首页同时提供微信控制、Telegram 控制和只读能力包，并通过 GitHub 图标进入当前仓库。浏览器没有自动打开时，手动打开终端输出的本地地址。配置完成后启动 TUI：
+Kitty 会补齐项目文件并打开配置界面。配置完成后启动 TUI：
 
 ```bash
 kitty
 ```
 
 Kitty 会打开会话界面。你可以新建任务，也可以回到之前保存的现场。
+
+![kitty TUI 运行界面](site/kitty-tui-demo.gif)
 
 第一次使用 Windows 命令行、不熟悉项目目录或不知道如何填写配置，可以按 [小白快速启动](docs/quickstart.md) 一步一步操作。
 
@@ -108,10 +110,6 @@ Kitty 会调查事实、判断边界、调用工具、检查结果，并把已�
 在 TUI 输入 `/` 可以查看 `/status`、`/export`、`/stop`、`/new` 和 `/exit`；空输入时按 `?` 可以查看键位。
 
 支持中文、英文、日文和韩文四种语言。
-
-远程入口只接受白名单私聊。可以在 `kitty start` 页面配置、测试、启动和停止 Telegram/微信，也可以继续使用各自 CLI。两个入口共用 `/help`、`/status`、`/stop`、`/new` 和同一套持久消息、中断恢复生命周期。
-
-定时任务由 Agent 的 scheduler 工具新增、查看、启停、修改和删除。等待与到点判断由 SQLite 和本机计时器完成，不轮询模型；到点只投递预先确认的提醒，或运行预先写好的本地命令，不会在触发时偷偷让 Agent 再判断一次。
 
 ## 继续了解
 

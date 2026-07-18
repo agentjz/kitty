@@ -115,20 +115,34 @@ h1 {
   background: var(--surface-soft);
 }
 
-.install-copy {
-  display: grid;
-  gap: 0.2rem;
-  margin-bottom: 0.8rem;
-}
-
-.install-copy strong {
-  color: var(--gold);
-  font-size: 0.95rem;
-}
-
-.install-copy span {
+.install-intro {
+  margin: 0 0 0.7rem;
+  padding: 0;
   color: var(--muted);
   font-size: 0.92rem;
+  text-align: left;
+}
+
+.install-intro code {
+  padding: 0.08rem 0.3rem;
+  border: 1px solid #d9dfe5;
+  border-radius: 4px;
+  background: #f0f2f4;
+  color: #27313b;
+  font-size: 0.9em;
+}
+
+.install-command + .install-command {
+  margin-top: 0.5rem;
+}
+
+.hero-demo {
+  display: block;
+  width: 100%;
+  max-width: 740px;
+  margin: 1.5rem auto 1.5rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
 }
 
 .install-command {
@@ -206,8 +220,7 @@ h1 {
   margin-top: 2.25rem;
 }
 
-.chapter code:not(pre code),
-.install-copy code {
+.chapter code:not(pre code) {
   padding: 0.08rem 0.3rem;
   border: 1px solid #d9dfe5;
   border-radius: 4px;
@@ -660,10 +673,6 @@ pre:hover {
   .install-panel {
     margin-top: 1.45rem;
     padding: 0.8rem;
-  }
-
-  .install-copy span {
-    font-size: 0.86rem;
   }
 
   .install-command {

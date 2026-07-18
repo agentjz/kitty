@@ -29,19 +29,29 @@
   <header class="hero">
     <div class="container hero-inner">
       <h1>如何设计一个智能体</h1>
-      <div class="install-panel" aria-label="Kitty Agent 安装命令">
-        <div class="install-copy">
-          <strong>Kitty Agent 一键全局安装</strong>
-          <span>安装后运行 <code>kitty start</code> 初始化项目并打开本地控制台，配置完成后运行 <code>kitty</code>。</span>
-        </div>
+      <div class="install-panel" aria-label="Kitty Agent 安装与配置">
+        <p class="install-intro">先执行 <code>npm install -g @jun133/kitty</code> 安装，再执行 <code>kitty start</code> 在 Web 界面填写配置，最后运行 <code>kitty</code>。</p>
         <div class="install-command">
           <code>npm install -g @jun133/kitty@latest</code>
           <button class="copy-install" type="button" data-copy="npm install -g @jun133/kitty@latest" aria-label="复制安装命令" title="复制安装命令">
             <i class="bi bi-clipboard" aria-hidden="true"></i>
           </button>
         </div>
+        <div class="install-command">
+          <code>kitty start</code>
+          <button class="copy-install" type="button" data-copy="kitty start" aria-label="复制配置命令" title="复制配置命令">
+            <i class="bi bi-clipboard" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="install-command">
+          <code>kitty</code>
+          <button class="copy-install" type="button" data-copy="kitty" aria-label="复制运行命令" title="复制运行命令">
+            <i class="bi bi-clipboard" aria-hidden="true"></i>
+          </button>
+        </div>
       </div>
     </div>
+    <img src="kitty-tui-demo.gif" alt="kitty TUI 运行界面" class="hero-demo">
   </header>
 
   <article class="guide container" aria-label="如何设计一个智能体">
@@ -226,7 +236,6 @@ skill 细则：
         <div class="agent-cycle" data-agent-cycle data-step="0" tabindex="0" role="group" aria-label="西红柿炒鸡蛋 Agent 循环。点击环上的步骤可以查看模型在该步骤的判断和动作。">
           <div class="cycle-orbit">
             <div class="cycle-track" aria-hidden="true"></div>
-            <span class="cycle-cursor" aria-hidden="true"></span>
 
             <button class="cycle-node cycle-node-one is-active" type="button" data-cycle-step="0" aria-label="查看上一轮现场">
               <span class="cycle-node-icon"><i class="bi bi-chat-left-text" aria-hidden="true"></i></span>
