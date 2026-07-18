@@ -26,11 +26,13 @@ button, input, select, textarea { font: inherit; }
 .workspace { width: min(100% - 40px, 1040px); margin-inline: auto; }
 
 .kitty-banner { border-bottom: 1px solid var(--kitty-border); background: #0d0f11; }
-.banner-layout { min-height: 156px; display: flex; align-items: center; flex-direction: column; justify-content: center; gap: 12px; text-align: center; }
-.kitty-lockup { display: flex; align-items: flex-end; gap: 12px; color: var(--kitty-brand); }
-.kitty-wordmark { max-width: 100%; margin: 0; overflow: hidden; color: var(--kitty-brand); font: 700 14px/1 "Cascadia Mono", "SFMono-Regular", Consolas, monospace; white-space: pre; }
-.kitty-lockup > span { padding-bottom: 2px; color: var(--kitty-gold); font: 700 .86rem/1 "Cascadia Mono", "SFMono-Regular", Consolas, monospace; }
-.kitty-welcome { margin: 0; color: var(--kitty-muted); font-size: .9rem; }
+.banner-layout { min-height: 240px; display: flex; align-items: center; justify-content: center; }
+.kitty-identity { max-width: 100%; display: flex; align-items: flex-start; flex-direction: column; gap: 16px; }
+.kitty-version { color: var(--kitty-blue); font: .84rem/1 "Cascadia Mono", "SFMono-Regular", Consolas, monospace; }
+.kitty-lockup { max-width: 100%; display: flex; align-items: flex-end; gap: 2ch; color: var(--kitty-brand); }
+.kitty-wordmark { margin: 0; overflow: hidden; color: var(--kitty-brand); font: 700 14px/1 "Cascadia Mono", "SFMono-Regular", Consolas, monospace; white-space: pre; }
+.kitty-welcome { align-self: center; margin: 0; color: var(--kitty-muted); font-size: .9rem; }
+.kitty-welcome strong { color: var(--kitty-gold); }
 
 .main-workspace { padding-block: 36px 80px; }
 .eyebrow { margin: 0 0 10px; color: var(--kitty-gold); font: 700 .76rem/1.2 "Cascadia Mono", Consolas, monospace; }
@@ -141,10 +143,9 @@ button, input, select, textarea { font: inherit; }
 
 @media (max-width: 720px) {
   .workspace { width: min(100% - 28px, 1040px); }
-  .banner-layout { min-height: 138px; }
-  .kitty-lockup { gap: 8px; }
+  .banner-layout { min-height: 190px; }
+  .kitty-identity { gap: 12px; }
   .kitty-wordmark { font-size: 10px; }
-  .kitty-lockup > span { font-size: .72rem; }
   .main-workspace { padding-block: 32px 56px; }
   .detail-heading h1 { font-size: 1.6rem; }
   .workflow-card { grid-template-columns: 44px minmax(0, 1fr); gap: 14px; padding: 14px; }
@@ -157,4 +158,9 @@ button, input, select, textarea { font: inherit; }
   .compact-form .btn { width: 100%; }
   .step-title-row, .sticky-actions { align-items: flex-start; flex-direction: column; }
   .channel-stream { height: 320px; }
+}
+
+@media (max-width: 380px) {
+  .kitty-wordmark { font-size: 7px; }
+  .kitty-version, .kitty-welcome { font-size: .76rem; }
 }

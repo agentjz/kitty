@@ -61,7 +61,7 @@ npm install -g @jun133/kitty@latest
 kitty start
 ```
 
-Kitty 会补齐项目文件并打开只监听本机的工作台。Web 使用 CLI 同源 Kitty 字形组成完整 `Kitty Agent` 标识，页面跟随 `KITTY_LOCALE` 使用简体中文、英文、日文或韩文，默认简体中文。打开“基础设置”，确认当前 Provider、模型、Base URL 和 API Key，在同一个表单调整 Extension 与运行参数，然后通过唯一的“保存配置”一次提交；连接测试单独执行。首页同时提供微信控制、Telegram 控制和只读能力包，并通过 GitHub 图标进入当前仓库。浏览器没有自动打开时，手动打开终端输出的本地地址。配置完成后启动 TUI：
+Kitty 会补齐项目文件并打开只监听本机的工作台。Web 与 TUI 使用同源的版本、ANSI Compact `Kitty Agent` 双艺术字和欢迎语品牌区，页面跟随 `KITTY_LOCALE` 使用简体中文、英文、日文或韩文，默认简体中文。打开“基础设置”，确认当前 Provider、模型、Base URL 和 API Key，在同一个表单调整 Extension 与运行参数，然后通过唯一的“保存配置”一次提交；连接测试单独执行。首页同时提供微信控制、Telegram 控制和只读能力包，并通过 GitHub 图标进入当前仓库。浏览器没有自动打开时，手动打开终端输出的本地地址。配置完成后启动 TUI：
 
 ```bash
 kitty

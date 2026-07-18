@@ -6,7 +6,8 @@ import test from "node:test";
 import { initializeProjectFiles } from "../../src/config/init.js";
 import { KITTY_ENV } from "../../src/config/envKeys.js";
 import { startLocalConsole } from "../../src/web/server.js";
-import { renderKittyBanner } from "../../src/runtime-ui/banner.js";
+import { renderKittyAgentWordmark } from "../../src/runtime-ui/banner.js";
+import packageJson from "../../package.json";
 import { createTempWorkspace } from "../helpers.js";
 
 test("local console binds loopback, authenticates API, and rejects foreign write origins", async (t) => {
@@ -23,7 +24,10 @@ test("local console binds loopback, authenticates API, and rejects foreign write
   assert.equal(bootstrap.response.status, 200);
   assert.equal(bootstrap.body.locale, "zh-CN");
   assert.equal((bootstrap.body.messages as { welcome: string }).welcome, "尽情地探索并享受吧！");
-  assert.equal((bootstrap.body.brand as { banner: string }).banner, renderKittyBanner());
+  assert.deepEqual(bootstrap.body.brand, {
+    version: packageJson.version,
+    wordmark: renderKittyAgentWordmark(),
+  });
   assert.equal((bootstrap.body.configuration as { file: string }).file, ".kitty/.env");
 
   const foreign = await fetch(new URL("/api/config", url), {

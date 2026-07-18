@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import http, { type IncomingMessage, type ServerResponse } from "node:http";
 import path from "node:path";
 
+import packageJson from "../../package.json";
 import { EXTENSION_DEFINITIONS } from "../extensions/definitions.js";
 import { getProviderPresetBaseUrl, PROVIDER_PRESETS } from "../config/providerPresets.js";
 import { resolveRuntimeConfig } from "../config/runtime.js";
@@ -11,7 +12,7 @@ import { resolveProjectRoots } from "../context/repoRoots.js";
 import { ensureScheduledTaskRuntime } from "../scheduler/runtime.js";
 import { subscribeRemoteRuntimeEvents } from "../remote/events.js";
 import { DEFAULT_LOCALE, parseKittyLocale } from "../i18n/index.js";
-import { renderKittyBanner } from "../runtime-ui/banner.js";
+import { renderKittyAgentWordmark } from "../runtime-ui/banner.js";
 import { WebChannelManager } from "./channelManager.js";
 import { WebConfigService } from "./configService.js";
 import { WebEventHub } from "./events.js";
@@ -75,7 +76,7 @@ export async function startLocalConsole(cwd: string): Promise<LocalConsoleHandle
       return sendJson(response, 200, {
         locale,
         messages,
-        brand: { banner: renderKittyBanner() },
+        brand: { version: packageJson.version, wordmark: renderKittyAgentWordmark() },
         configuration,
         preflight,
         providers: PROVIDER_PRESETS.map((preset) => ({ ...preset, baseUrl: getProviderPresetBaseUrl(preset) })),

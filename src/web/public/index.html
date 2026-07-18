@@ -11,8 +11,11 @@
 <body>
   <header class="kitty-banner">
     <div class="workspace banner-layout">
-      <div class="kitty-lockup" aria-label="Kitty Agent"><pre id="kitty-wordmark" class="kitty-wordmark"></pre><span>Agent</span></div>
-      <p class="kitty-welcome" data-message="welcome"></p>
+      <div class="kitty-identity">
+        <span id="kitty-version" class="kitty-version"></span>
+        <div class="kitty-lockup" aria-label="Kitty Agent"><pre id="kitty-wordmark-kitty" class="kitty-wordmark" aria-hidden="true"></pre><pre id="kitty-wordmark-agent" class="kitty-wordmark" aria-hidden="true"></pre></div>
+        <p class="kitty-welcome"><strong>猫咪：</strong><span data-message="welcome"></span></p>
+      </div>
     </div>
   </header>
 

@@ -43,7 +43,9 @@ async function refresh() {
 function render() {
   const values = state.configuration.values;
   localizeDocument(state.locale, state.messages);
-  text("#kitty-wordmark", state.brand.banner);
+  text("#kitty-version", `v${state.brand.version}`);
+  text("#kitty-wordmark-kitty", state.brand.wordmark.kitty);
+  text("#kitty-wordmark-agent", state.brand.wordmark.agent);
   text("#config-location", state.configuration.file);
   text("#model-summary", `${values[ENV.provider] || message("common.notConfigured")} · ${values[ENV.model] || message("common.notConfigured")}`);
   text("#weixin-summary", describeChannel(state.channels.weixin, state.channels.weixinLogin?.status));
