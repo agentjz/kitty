@@ -1,177 +1,107 @@
 .agent-cycle {
-  position: relative;
-  margin: 1.7rem 0 0;
-  padding: 1.25rem;
-  border: 1px solid #d9dfe5;
-  border-radius: 8px;
-  background: #fbfcfd;
+  margin: 2rem 0 0;
+  color: var(--ink);
 }
 
 .agent-cycle:focus-visible {
-  outline: 2px solid #87929c;
-  outline-offset: 3px;
+  outline: 2px solid var(--kitty-blue);
+  outline-offset: 4px;
 }
 
 .cycle-orbit {
-  position: relative;
-  width: min(100%, 42rem);
-  aspect-ratio: 1;
-  margin: 0 auto;
-}
-
-.cycle-track {
-  position: absolute;
-  inset: 4.6rem;
-  border: 1px solid #cbd2d8;
-  border-radius: 50%;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
 }
 
 .cycle-node {
-  --node-angle: 0deg;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  z-index: 4;
-  display: grid;
-  justify-items: center;
-  gap: 0.38rem;
-  width: 6rem;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: #596570;
-  font-size: 0.76rem;
-  font-weight: 800;
-  line-height: 1.25;
-  text-align: center;
-  transform: translate(-50%, -50%) rotate(var(--node-angle)) translateY(-18.7rem) rotate(calc(-1 * var(--node-angle)));
-}
-
-.cycle-node-one {
-  --node-angle: 0deg;
-}
-
-.cycle-node-two {
-  --node-angle: 45deg;
-}
-
-.cycle-node-three {
-  --node-angle: 90deg;
-}
-
-.cycle-node-four {
-  --node-angle: 135deg;
-}
-
-.cycle-node-five {
-  --node-angle: 180deg;
-}
-
-.cycle-node-six {
-  --node-angle: 225deg;
-}
-
-.cycle-node-seven {
-  --node-angle: 270deg;
-}
-
-.cycle-node-eight {
-  --node-angle: 315deg;
-}
-
-.cycle-node-icon {
-  display: inline-flex;
+  display: flex;
+  min-width: 0;
   align-items: center;
   justify-content: center;
-  width: 3.25rem;
-  height: 3.25rem;
-  border: 1px solid #cfd6dc;
-  border-radius: 50%;
-  background: #ffffff;
-  color: #6f7b86;
-  font-size: 1.15rem;
-  transition: border-color 180ms ease, background 180ms ease, color 180ms ease, transform 180ms ease;
+  gap: 0.4rem;
+  padding: 0.75rem 0.35rem;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 750;
+  line-height: 1;
+  white-space: nowrap;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
 }
 
-.cycle-node:hover .cycle-node-icon,
-.cycle-node:focus-visible .cycle-node-icon {
-  border-color: #8c969f;
-  color: #303a44;
-  transform: scale(1.04);
-}
-
+.cycle-node:hover,
 .cycle-node:focus-visible {
+  background: var(--surface);
+  color: var(--ink);
   outline: 0;
 }
 
-.cycle-node.is-complete .cycle-node-icon {
-  border-color: #aeb8c1;
-  background: #f1f3f5;
-  color: #3f4b55;
+.cycle-node.is-complete {
+  color: var(--kitty-blue);
 }
 
 .cycle-node.is-active {
-  color: #1f2932;
+  color: var(--ink);
 }
 
-.cycle-node.is-active .cycle-node-icon {
-  border-color: #303a44;
-  background: #303a44;
-  color: #ffffff;
-  transform: scale(1.08);
+.cycle-node-index {
+  color: var(--kitty-blue);
+  font: 800 0.58rem/1 "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
 }
 
-.agent-cycle[data-step="5"] .cycle-node-six .cycle-node-icon {
-  animation: background-pulse 1.4s ease-in-out infinite;
+.cycle-node.is-active .cycle-node-index {
+  color: var(--kitty-gold);
 }
 
 .cycle-output {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  z-index: 2;
   display: flex;
+  height: 32rem;
   flex-direction: column;
-  width: 20rem;
-  height: 19rem;
-  padding: 1rem;
-  border: 1px solid #d9dfe5;
+  margin-top: 1rem;
+  padding: 1rem 1.2rem 1.2rem;
+  border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fbfcfd;
-  transform: translate(-50%, -50%);
+  background: var(--surface);
 }
 
 .cycle-model {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 0.45rem;
+  display: flex;
+  min-height: 2.35rem;
   align-items: center;
-  padding-bottom: 0.65rem;
-  border-bottom: 1px solid #e1e5e9;
-  color: #65717d;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.5rem;
   font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
-  font-size: 0.72rem;
+}
+
+.cycle-model-identity {
+  color: var(--kitty-brand);
+  font-size: 0.8rem;
   font-weight: 800;
 }
 
 .cycle-controls {
   display: inline-flex;
-  gap: 0.55rem;
   align-items: center;
+  gap: 0.45rem;
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 800;
 }
 
 .cycle-action {
   display: inline-flex;
+  width: 1.9rem;
+  height: 1.9rem;
   align-items: center;
   justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
   padding: 0;
-  border: 1px solid #cfd6dc;
-  border-radius: 50%;
-  background: #ffffff;
-  color: #46535e;
-  font-size: 0.85rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: var(--page);
+  color: var(--ink-soft);
+  font-size: 0.78rem;
   line-height: 1;
   transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
 }
@@ -179,13 +109,13 @@
 .cycle-action:hover:not(:disabled),
 .cycle-action:focus-visible,
 .cycle-action[aria-pressed="true"] {
-  border-color: #303a44;
-  background: #303a44;
-  color: #ffffff;
+  border-color: var(--kitty-blue);
+  background: var(--surface-soft);
+  color: var(--ink);
 }
 
 .cycle-action:focus-visible {
-  outline: 2px solid #87929c;
+  outline: 2px solid var(--kitty-blue);
   outline-offset: 2px;
 }
 
@@ -195,48 +125,112 @@
 }
 
 .cycle-stream {
+  display: flex;
   flex: 1;
+  flex-direction: column;
+  gap: 0.9rem;
   min-height: 0;
-  padding: 0.35rem 0;
+  padding: 0.9rem 0.15rem 0.15rem;
   overflow-y: auto;
-  scrollbar-color: #c2c9cf transparent;
+  scrollbar-color: var(--line-strong) transparent;
   scrollbar-width: thin;
 }
 
-.cycle-stream-line {
-  display: grid;
-  grid-template-columns: 3.8rem minmax(0, 1fr);
-  gap: 0.5rem;
-  padding: 0.52rem 0;
-  border-bottom: 1px solid #edf0f2;
-  animation: cycle-stream-in 180ms ease-out both;
+.cycle-slot {
+  min-width: 0;
+  padding: 0.2rem 0.1rem;
+  color: var(--ink-soft);
+  transition: opacity 140ms ease;
 }
 
-.cycle-stream-line:last-child {
-  border-bottom: 0;
-}
-
-.cycle-stream-line > span {
-  color: #7a858f;
-  font-size: 0.67rem;
+.cycle-slot > span {
+  display: block;
+  margin-bottom: 0.38rem;
+  color: var(--muted);
+  font-size: 0.66rem;
   font-weight: 800;
-  line-height: 1.55;
+  line-height: 1;
 }
 
-.cycle-stream-line p {
+.cycle-slot p {
   margin: 0;
-  color: #303a44;
-  font-size: 0.76rem;
-  font-weight: 700;
-  line-height: 1.55;
+  color: inherit;
+  font-size: 0.8rem;
+  font-weight: 650;
+  line-height: 1.62;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
-.cycle-stream.is-streaming .cycle-stream-line:last-child p::after {
+.cycle-slot.is-empty {
+  display: none;
+}
+
+.cycle-slot.is-user,
+.cycle-slot.is-steer {
+  align-self: stretch;
+  padding: 0.68rem 0.75rem;
+  border-radius: 5px;
+  background: var(--dark-soft);
+  color: var(--ink);
+}
+
+.cycle-slot.is-user > span,
+.cycle-slot.is-steer > span {
+  display: none;
+}
+
+.cycle-slot.is-reasoning {
+  color: #cbd0d3;
+}
+
+.cycle-slot.is-reasoning > span {
+  color: var(--kitty-gold);
+}
+
+.cycle-slot.is-tool {
+  width: min(100%, 34rem);
+  align-self: flex-start;
+  margin-top: 0.35rem;
+}
+
+.cycle-slot.is-plan,
+.cycle-slot.is-tool {
+  color: #dce2e6;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.cycle-slot.is-plan > span,
+.cycle-slot.is-tool > span {
+  color: var(--kitty-blue);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.cycle-slot.is-plan p,
+.cycle-slot.is-tool p {
+  font-family: inherit;
+  font-size: 0.74rem;
+}
+
+.cycle-slot.is-result > span,
+.cycle-slot.is-background > span {
+  color: #9ac7a6;
+}
+
+.cycle-slot.is-assistant {
+  color: var(--ink);
+}
+
+.cycle-slot.is-assistant > span {
+  color: var(--kitty-brand);
+}
+
+.cycle-slot.is-streaming p::after {
   display: inline-block;
   width: 0.08rem;
-  height: 0.9em;
-  margin-left: 0.18rem;
-  background: #68747f;
+  height: 0.95em;
+  margin-left: 0.2rem;
+  background: var(--kitty-gold);
   content: "";
   vertical-align: -0.08em;
   animation: cycle-caret 720ms steps(1, end) infinite;
@@ -248,206 +242,64 @@
   }
 }
 
-.cycle-stream-line.is-tool p {
-  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
-  font-size: 0.69rem;
-}
-
-.cycle-stream-line.is-result > span,
-.cycle-stream-line.is-memory > span {
-  color: #46535e;
-}
-
-@keyframes cycle-stream-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.cycle-dish {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 0.65rem;
-  align-items: center;
-  min-height: 0;
-  margin-top: 0;
-  overflow: hidden;
-  opacity: 0;
-  transform: translateY(0.35rem);
-  transition: min-height 260ms ease, margin-top 260ms ease, opacity 260ms ease, transform 260ms ease;
-}
-
-.agent-cycle.is-finished .cycle-dish {
-  min-height: 4.7rem;
-  margin-top: 0.55rem;
-  opacity: 1;
-  transform: translateY(0);
-}
-
-@keyframes background-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(48, 58, 68, 0.2);
-  }
-  50% {
-    box-shadow: 0 0 0 0.55rem rgba(48, 58, 68, 0);
-  }
-}
-
-.dish-caption {
-  color: #303a44;
-  font-size: 0.8rem;
-  font-weight: 800;
-}
-
-.dish-plate {
-  position: relative;
-  width: 4.5rem;
-  height: 4.5rem;
-  border: 0.38rem solid #e5e9ec;
-  border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 4px 10px rgba(44, 54, 62, 0.1);
-}
-
-.dish-egg,
-.dish-tomato {
-  position: absolute;
-  display: block;
-}
-
-.dish-egg {
-  width: 1.5rem;
-  height: 1.15rem;
-  border-radius: 55% 45% 52% 48%;
-  background: #f2c94c;
-}
-
-.dish-egg-one {
-  top: 0.65rem;
-  left: 0.55rem;
-  transform: rotate(-18deg);
-}
-
-.dish-egg-two {
-  right: 0.45rem;
-  bottom: 0.7rem;
-  transform: rotate(22deg);
-}
-
-.dish-tomato {
-  width: 1.15rem;
-  height: 0.9rem;
-  border-radius: 45% 55% 50% 46%;
-  background: #d85c4a;
-}
-
-.dish-tomato-one {
-  top: 0.55rem;
-  right: 0.55rem;
-  transform: rotate(16deg);
-}
-
-.dish-tomato-two {
-  bottom: 0.55rem;
-  left: 0.65rem;
-  transform: rotate(-12deg);
-}
-
-.dish-tomato-three {
-  top: 1.65rem;
-  left: 1.45rem;
-  transform: rotate(34deg);
-}
-
 @media (max-width: 767.98px) {
-  .agent-cycle {
-    margin-right: -0.1rem;
-    margin-left: -0.1rem;
-    padding: 0.7rem;
-  }
-
   .cycle-orbit {
-    width: 21rem;
-    max-width: 100%;
+    grid-template-columns: repeat(8, 4.5rem);
+    overflow-x: auto;
+    scrollbar-width: none;
   }
 
-  .cycle-track {
-    inset: 3.25rem;
-  }
-
-  .cycle-node {
-    width: 4.3rem;
-    gap: 0.25rem;
-    font-size: 0.65rem;
-    transform: translate(-50%, -50%) rotate(var(--node-angle)) translateY(-9.2rem) rotate(calc(-1 * var(--node-angle)));
-  }
-
-  .cycle-node-icon {
-    width: 2.55rem;
-    height: 2.55rem;
-    font-size: 0.95rem;
+  .cycle-orbit::-webkit-scrollbar {
+    display: none;
   }
 
   .cycle-output {
-    position: relative;
-    top: auto;
-    left: auto;
-    width: min(100%, 24rem);
-    height: 16rem;
-    margin: 0.9rem auto 0;
-    padding: 0.75rem;
-    transform: none;
+    height: 32rem;
+    padding: 0.85rem;
+  }
+
+  .cycle-slot p {
+    font-size: 0.76rem;
+  }
+
+  .cycle-slot.is-tool p,
+  .cycle-slot.is-plan p {
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .cycle-node {
+    padding-block: 0.65rem;
+  }
+
+  .cycle-output {
+    height: 32rem;
   }
 
   .cycle-model {
-    font-size: 0.7rem;
+    gap: 0.6rem;
   }
 
-  .cycle-stream-line {
-    grid-template-columns: 3.2rem minmax(0, 1fr);
-    gap: 0.35rem;
-    padding: 0.4rem 0;
+  .cycle-controls {
+    gap: 0.3rem;
   }
 
-  .cycle-stream-line > span {
-    font-size: 0.62rem;
-  }
-
-  .cycle-stream-line p,
-  .cycle-stream-line.is-tool p {
-    font-size: 0.71rem;
-  }
-
-  .agent-cycle.is-finished .cycle-dish {
-    min-height: 3.8rem;
-    gap: 0.4rem;
-  }
-
-  .dish-plate {
-    width: 3.4rem;
-    height: 3.4rem;
-    border-width: 0.3rem;
-    transform: scale(0.82);
-    transform-origin: right center;
-  }
-
-  .dish-caption {
-    margin-right: -0.45rem;
-    font-size: 0.68rem;
+  .cycle-action {
+    width: 1.8rem;
+    height: 1.8rem;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cycle-node-icon,
-  .cycle-dish {
+  .cycle-node,
+  .cycle-action {
     transition: none;
   }
 
-  .agent-cycle[data-step="5"] .cycle-node-six .cycle-node-icon {
+  .cycle-slot,
+  .cycle-slot.is-streaming p::after {
     animation: none;
+    transition: none;
   }
 }

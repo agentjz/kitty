@@ -113,7 +113,7 @@ Kitty 会调查事实、判断边界、调用工具、检查结果，并把已�
 
 ## 继续了解
 
-- [官网：如何设计一个智能体](https://luckymaomi.github.io/kitty/)
+- [官网：Kitty Agent](https://luckymaomi.github.io/kitty/)
 - [小白快速启动](docs/quickstart.md)
 - [当前技术事实](spec.md)
 - [设计哲学](philosophy.md)

@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>如何设计一个智能体</title>
-<meta name="description" content="从工具循环、记忆、上下文、计划到后台任务，理解一个智能体如何持续完成任务。">
-<meta property="og:title" content="如何设计一个智能体">
-<meta property="og:description" content="从工具循环、记忆、上下文、计划到后台任务。">
+<title>Kitty Agent</title>
+<meta name="description" content="让模型真正开始做事。认识 Kitty Agent，免费安装，查看源码，理解一个智能体如何运转。">
+<meta property="og:title" content="Kitty Agent">
+<meta property="og:description" content="让模型真正开始做事。开源、免费安装，由你选择模型。">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet">
@@ -18,43 +18,100 @@
 
 <nav class="site-topbar">
   <div class="container topbar-inner">
-    <a class="navbar-brand" href="#top" aria-label="回到页面顶部">Kitty Agent</a>
-    <a class="github-link" href="https://github.com/luckymaomi/kitty" target="_blank" rel="noopener" aria-label="在 GitHub 打开 Kitty Agent" title="GitHub">
-      <i class="bi bi-github" aria-hidden="true"></i>
+    <a class="navbar-brand" href="#top" aria-label="回到页面顶部">
+      <span>Kitty Agent</span>
     </a>
+    <div class="topbar-actions">
+      <div class="topbar-links" aria-label="页面导航">
+        <a href="#demo">演示</a>
+        <a href="#get-started">开始</a>
+        <a href="#how-it-works">原理</a>
+      </div>
+      <a class="github-link" href="https://github.com/luckymaomi/kitty" target="_blank" rel="noopener" aria-label="在 GitHub 打开 Kitty Agent" title="GitHub">
+        <i class="bi bi-github" aria-hidden="true"></i>
+      </a>
+    </div>
   </div>
 </nav>
 
 <main>
   <header class="hero">
-    <div class="container hero-inner">
-      <h1>如何设计一个智能体</h1>
-      <div class="install-panel" aria-label="Kitty Agent 安装与配置">
-        <p class="install-intro">先执行 <code>npm install -g @jun133/kitty</code> 安装，再执行 <code>kitty start</code> 在 Web 界面填写配置，最后运行 <code>kitty</code>。</p>
-        <div class="install-command">
-          <code>npm install -g @jun133/kitty@latest</code>
-          <button class="copy-install" type="button" data-copy="npm install -g @jun133/kitty@latest" aria-label="复制安装命令" title="复制安装命令">
-            <i class="bi bi-clipboard" aria-hidden="true"></i>
-          </button>
-        </div>
-        <div class="install-command">
-          <code>kitty start</code>
-          <button class="copy-install" type="button" data-copy="kitty start" aria-label="复制配置命令" title="复制配置命令">
-            <i class="bi bi-clipboard" aria-hidden="true"></i>
-          </button>
-        </div>
-        <div class="install-command">
-          <code>kitty</code>
-          <button class="copy-install" type="button" data-copy="kitty" aria-label="复制运行命令" title="复制运行命令">
-            <i class="bi bi-clipboard" aria-hidden="true"></i>
-          </button>
+    <div class="hero-brand">
+      <div class="container hero-brand-inner">
+        <div class="kitty-identity">
+          <span id="kitty-version" class="kitty-version" aria-label="Kitty 最新版本">latest</span>
+          <pre class="kitty-wordmark" role="img" aria-label="Kitty Agent">▄▄ ▄▄ ▄▄ ▄▄▄▄▄▄ ▄▄▄▄▄▄ ▄▄ ▄▄    ▄▄▄   ▄▄▄▄ ▄▄▄▄▄ ▄▄  ▄▄ ▄▄▄▄▄▄
+██▄█▀ ██   ██     ██   ▀███▀   ██▀██ ██ ▄▄ ██▄▄  ███▄██   ██
+██ ██ ██   ██     ██     █     ██▀██ ▀███▀ ██▄▄▄ ██ ▀██   ██</pre>
         </div>
       </div>
     </div>
-    <img src="kitty-tui-demo.gif" alt="kitty TUI 运行界面" class="hero-demo">
+    <div class="container hero-inner">
+      <h1 class="visually-hidden">Kitty Agent</h1>
+      <div class="hero-message">
+        <p class="hero-statement">让模型真正开始做事。</p>
+        <p class="hero-summary">把目标交给 Kitty。它会理解局面、拆开难题、调动合适的能力，让每一步都有回应，让进展自然发生。</p>
+      </div>
+      <div class="hero-actions">
+        <a class="button button-primary" href="#get-started"><i class="bi bi-terminal" aria-hidden="true"></i>开始使用</a>
+        <a class="button button-secondary" href="https://github.com/luckymaomi/kitty" target="_blank" rel="noopener"><i class="bi bi-github" aria-hidden="true"></i>查看源码</a>
+      </div>
+      <div class="hero-command" aria-label="Kitty Agent 安装命令">
+        <span class="command-prompt" aria-hidden="true">$</span>
+        <code>npm install -g @jun133/kitty@latest</code>
+        <button class="copy-install" type="button" data-copy="npm install -g @jun133/kitty@latest" aria-label="复制安装命令" title="复制安装命令">
+          <i class="bi bi-clipboard" aria-hidden="true"></i>
+        </button>
+      </div>
+    </div>
+    <div class="container hero-visual" id="demo" aria-label="Kitty TUI 演示">
+      <img src="kitty-tui-demo.gif" alt="Kitty TUI 运行界面" class="hero-demo">
+    </div>
   </header>
 
-  <article class="guide container" aria-label="如何设计一个智能体">
+  <section class="start-band" id="get-started">
+    <div class="container section-shell">
+      <div class="section-heading start-heading">
+        <h2>三步，Kitty 就位。</h2>
+        <p>进入你准备开始的目录，安装、配置，然后打开 Kitty。</p>
+      </div>
+      <div class="start-steps">
+        <article class="start-step">
+          <div class="step-heading"><span>01</span><h3>安装</h3></div>
+          <div class="install-command">
+            <code>npm install -g @jun133/kitty@latest</code>
+            <button class="copy-install" type="button" data-copy="npm install -g @jun133/kitty@latest" aria-label="复制安装命令" title="复制安装命令">
+              <i class="bi bi-clipboard" aria-hidden="true"></i>
+            </button>
+          </div>
+        </article>
+        <article class="start-step">
+          <div class="step-heading"><span>02</span><h3>配置</h3></div>
+          <div class="install-command">
+            <code>kitty start</code>
+            <button class="copy-install" type="button" data-copy="kitty start" aria-label="复制配置命令" title="复制配置命令">
+              <i class="bi bi-clipboard" aria-hidden="true"></i>
+            </button>
+          </div>
+        </article>
+        <article class="start-step">
+          <div class="step-heading"><span>03</span><h3>开始</h3></div>
+          <div class="install-command">
+            <code>kitty</code>
+            <button class="copy-install" type="button" data-copy="kitty" aria-label="复制运行命令" title="复制运行命令">
+              <i class="bi bi-clipboard" aria-hidden="true"></i>
+            </button>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <article class="guide container" aria-label="Kitty Agent 工作原理">
+    <header class="guide-intro" id="how-it-works">
+      <h2>它为什么会做事？</h2>
+      <p>从最小的工具循环开始，把记忆、上下文、计划和后台任务一层层装进来。下面拆开 Kitty，看看一个智能体是怎样运转的。</p>
+    </header>
     <section class="chapter reveal" id="tool-loop">
       <div class="chapter-body">
         <h2>工具循环</h2>
@@ -177,8 +234,13 @@ skill 细则：
 【长期记忆】长期规则是先看事实，再做判断，再行动；可用 skill 是“文档修改 skill”。
 【工具定义】你可以使用两个工具：read 用来读取文件，edit 用来修改文件。
 【用户输入】这个项目已经写完了，请把 README 重写一下。</code></pre>
-        <p>系统把这六块拼成一段完整输入，发给模型：</p>
-        <pre><code>你是本 session 的主导 agent。你是一位重视结构和事实的工程师，表达短、准、清楚。上一轮已经确认项目的主要功能完成，README 还是旧说明。项目要求先看事实，再做判断，再行动；当前有一份“文档修改 skill”可用。你可以使用两个工具：read 用来读取文件，edit 用来修改文件。现在用户说：这个项目已经写完了，请把 README 重写一下。</code></pre>
+        <div class="passage-heading">
+          <p>系统把这六块拼成一段完整输入，发给模型：</p>
+          <button class="passage-copy" type="button" data-copy-target="#assembled-context" aria-label="复制完整输入" title="复制完整输入">
+            <i class="bi bi-clipboard" aria-hidden="true"></i>
+          </button>
+        </div>
+        <p class="assembled-context" id="assembled-context">你是本 session 的主导 agent。你是一位重视结构和事实的工程师，表达短、准、清楚。上一轮已经确认项目的主要功能完成，README 还是旧说明。项目要求先看事实，再做判断，再行动；当前有一份“文档修改 skill”可用。你可以使用两个工具：read 用来读取文件，edit 用来修改文件。现在用户说：这个项目已经写完了，请把 README 重写一下。</p>
         <p>模型拿到这段话后，知道该先用 <code>read</code> 打开旧 README，了解真实内容；再用 <code>edit</code> 重写说明。</p>
         <p>完成后，它会回答：</p>
         <pre><code>我已经根据现有内容重写了 README。</code></pre>
@@ -231,50 +293,48 @@ skill 细则：
 
     <section class="chapter complete-example reveal" id="complete-example">
       <div class="chapter-body">
-        <p>下面把前面讲的东西放回同一个西红柿炒鸡蛋任务里。这个任务已经进行了几轮。</p>
+        <h2>一次任务，完整展开</h2>
+        <p>判断、行动和结果，不藏在一句“完成了”后面。这里是一段可以暂停、回看和继续播放的 Kitty 运行过程。</p>
 
-        <div class="agent-cycle" data-agent-cycle data-step="0" tabindex="0" role="group" aria-label="西红柿炒鸡蛋 Agent 循环。点击环上的步骤可以查看模型在该步骤的判断和动作。">
+        <div class="agent-cycle" data-agent-cycle data-step="0" tabindex="0" role="group" aria-label="Kitty Agent 运行过程。选择阶段可以查看对应的判断与动作。">
           <div class="cycle-orbit">
-            <div class="cycle-track" aria-hidden="true"></div>
-
-            <button class="cycle-node cycle-node-one is-active" type="button" data-cycle-step="0" aria-label="查看上一轮现场">
-              <span class="cycle-node-icon"><i class="bi bi-chat-left-text" aria-hidden="true"></i></span>
-              <span>用户任务</span>
+            <button class="cycle-node cycle-node-one is-active" type="button" data-cycle-step="0" aria-label="查看用户任务">
+              <span class="cycle-node-index">01</span>
+              <span>任务</span>
             </button>
             <button class="cycle-node cycle-node-two" type="button" data-cycle-step="1" aria-label="查看模型判断步骤">
-              <span class="cycle-node-icon"><i class="bi bi-cpu" aria-hidden="true"></i></span>
-              <span>模型判断</span>
+              <span class="cycle-node-index">02</span>
+              <span>判断</span>
             </button>
             <button class="cycle-node cycle-node-three" type="button" data-cycle-step="2" aria-label="查看读取食材步骤">
-              <span class="cycle-node-icon"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></span>
-              <span>read</span>
+              <span class="cycle-node-index">03</span>
+              <span>读取</span>
             </button>
             <button class="cycle-node cycle-node-four" type="button" data-cycle-step="3" aria-label="查看加载 skill 步骤">
-              <span class="cycle-node-icon"><i class="bi bi-journal-check" aria-hidden="true"></i></span>
-              <span>skill</span>
+              <span class="cycle-node-index">04</span>
+              <span>Skill</span>
             </button>
-            <button class="cycle-node cycle-node-five" type="button" data-cycle-step="4" aria-label="查看短期和长期记忆步骤">
-              <span class="cycle-node-icon"><i class="bi bi-database-check" aria-hidden="true"></i></span>
+            <button class="cycle-node cycle-node-five" type="button" data-cycle-step="4" aria-label="查看短期和长期记忆">
+              <span class="cycle-node-index">05</span>
               <span>记忆</span>
             </button>
             <button class="cycle-node cycle-node-six" type="button" data-cycle-step="5" aria-label="查看后台任务步骤">
-              <span class="cycle-node-icon"><i class="bi bi-terminal" aria-hidden="true"></i></span>
+              <span class="cycle-node-index">06</span>
               <span>后台</span>
             </button>
             <button class="cycle-node cycle-node-seven" type="button" data-cycle-step="6" aria-label="查看生成计划步骤">
-              <span class="cycle-node-icon"><i class="bi bi-list-check" aria-hidden="true"></i></span>
+              <span class="cycle-node-index">07</span>
               <span>计划</span>
             </button>
             <button class="cycle-node cycle-node-eight" type="button" data-cycle-step="7" aria-label="查看执行完成和最终回答">
-              <span class="cycle-node-icon"><i class="bi bi-check2-circle" aria-hidden="true"></i></span>
+              <span class="cycle-node-index">08</span>
               <span>回答</span>
             </button>
           </div>
 
           <div class="cycle-output">
             <div class="cycle-model">
-              <i class="bi bi-cpu" aria-hidden="true"></i>
-              <span>Kitty</span>
+              <strong class="cycle-model-identity">Kitty</strong>
               <div class="cycle-controls">
                 <span id="cycle-count">1 / 8</span>
                 <button class="cycle-action" type="button" data-cycle-copy aria-label="复制当前输出" title="复制当前输出">
@@ -286,27 +346,34 @@ skill 细则：
               </div>
             </div>
             <div class="cycle-stream" id="cycle-stream" role="log" aria-live="polite" aria-label="Agent 运行过程">
-              <div class="cycle-stream-line">
-                <span>用户</span>
-                <p>做一盘西红柿炒鸡蛋。</p>
-              </div>
-            </div>
-            <div class="cycle-dish" aria-label="完成的西红柿炒鸡蛋">
-              <span class="dish-caption">西红柿炒鸡蛋</span>
-              <div class="dish-plate" aria-hidden="true">
-                <span class="dish-egg dish-egg-one"></span>
-                <span class="dish-egg dish-egg-two"></span>
-                <span class="dish-tomato dish-tomato-one"></span>
-                <span class="dish-tomato dish-tomato-two"></span>
-                <span class="dish-tomato dish-tomato-three"></span>
-              </div>
+              <div class="cycle-slot is-user" data-cycle-slot="user"><span data-cycle-label>用户</span><p data-cycle-content>做一盘西红柿炒鸡蛋。</p></div>
+              <div class="cycle-slot is-steer is-empty" data-cycle-slot="steer"><span data-cycle-label>追加要求</span><p data-cycle-content></p></div>
+              <div class="cycle-slot is-reasoning is-empty" data-cycle-slot="reasoning"><span data-cycle-label>思考</span><p data-cycle-content></p></div>
+              <div class="cycle-slot is-result is-empty" data-cycle-slot="result"><span data-cycle-label>结果</span><p data-cycle-content></p></div>
+              <div class="cycle-slot is-plan is-empty" data-cycle-slot="plan"><span data-cycle-label>计划</span><p data-cycle-content></p></div>
+              <div class="cycle-slot is-background is-empty" data-cycle-slot="background"><span data-cycle-label>后台</span><p data-cycle-content></p></div>
+              <div class="cycle-slot is-tool is-empty" data-cycle-slot="tool"><span data-cycle-label>工具</span><p data-cycle-content></p></div>
+              <div class="cycle-slot is-assistant is-empty" data-cycle-slot="assistant"><span data-cycle-label>Kitty</span><p data-cycle-content></p></div>
             </div>
           </div>
         </div>
       </div>
     </section>
   </article>
+
 </main>
+
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <a class="footer-brand" href="#top"><span>Kitty Agent</span></a>
+    <div class="footer-links">
+      <a href="https://github.com/luckymaomi/kitty" target="_blank" rel="noopener">源码</a>
+      <a href="https://github.com/luckymaomi/kitty/blob/master/docs/quickstart.md" target="_blank" rel="noopener">快速开始</a>
+      <a href="https://github.com/luckymaomi/kitty/blob/master/spec.md" target="_blank" rel="noopener">技术规格</a>
+      <span>MIT License</span>
+    </div>
+  </div>
+</footer>
 
 <script src="script.js"></script>
 </body>
