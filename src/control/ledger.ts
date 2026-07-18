@@ -14,6 +14,7 @@ import { InteractionDraftLedgerRepo } from "./interactionDrafts.js";
 import { TurnSteerLedgerRepo } from "./turnSteers.js";
 import { ServiceLeaseLedgerRepo } from "./serviceLeases.js";
 import { RemoteMessageLedgerRepo } from "./remoteMessages.js";
+import { ScheduledTaskLedgerRepo } from "./scheduledTasks.js";
 import { openControlDatabase, type ControlDatabase } from "./sqlite.js";
 
 export type {
@@ -43,6 +44,7 @@ export class ControlPlaneLedger {
   readonly turnSteers: TurnSteerLedgerRepo;
   readonly serviceLeases: ServiceLeaseLedgerRepo;
   readonly remoteMessages: RemoteMessageLedgerRepo;
+  readonly scheduledTasks: ScheduledTaskLedgerRepo;
   private readonly db: ControlDatabase;
 
   constructor(rootDir: string) {
@@ -67,6 +69,7 @@ export class ControlPlaneLedger {
     this.turnSteers = new TurnSteerLedgerRepo(this.db);
     this.serviceLeases = new ServiceLeaseLedgerRepo(this.db);
     this.remoteMessages = new RemoteMessageLedgerRepo(this.db);
+    this.scheduledTasks = new ScheduledTaskLedgerRepo(this.db);
   }
 
   transaction<T>(operation: () => T): T {
@@ -89,7 +92,7 @@ export class ControlPlaneLedger {
       }
       for (const table of [
         "turn_steers", "tool_calls", "context_epochs", "interaction_drafts", "runtime_events",
-        "remote_inbox", "remote_outbox", "service_leases",
+        "remote_inbox", "remote_outbox", "scheduled_triggers", "scheduled_tasks", "service_leases",
         "task_lifecycle", "session_turns", "session_messages", "wake_signals", "executions", "sessions",
       ]) {
         this.db.prepare(`DELETE FROM ${table}`).run();

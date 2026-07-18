@@ -12,7 +12,8 @@ import { filterTuiCommandMenu } from "../../src/shell/tui/commandMenu.js";
 import { getTuiShortcutHelp } from "../../src/shell/tui/keyboardHelp.js";
 import { buildCliProgram } from "../../src/cli/program.js";
 import { formatConfigPreflightReport } from "../../src/config/preflight.js";
-import { formatTelegramHelp } from "../../src/telegram/helpText.js";
+import { formatRemoteCommandHelp } from "../../src/remote/commands.js";
+import { buildWebMessages } from "../../src/web/messages.js";
 
 test("locale parsing accepts only the declared presentation locales", () => {
   assert.equal(DEFAULT_LOCALE, "zh-CN");
@@ -52,6 +53,15 @@ test("typed catalogs interpolate dynamic values in every supported locale", () =
   }
 });
 
+test("the Web presentation projects every supported runtime locale", () => {
+  for (const locale of SUPPORTED_LOCALES) {
+    const messages = buildWebMessages(locale);
+    assert.equal(messages.welcome, translate(locale, "tui.authorTip"));
+    assert.equal(messages.runtime.fields.some((field) => field.envKey === "KITTY_LOCALE" && field.label.length > 0), true);
+    assert.equal(Object.values(messages.extensionSummaries).every((summary) => summary.length > 0), true);
+  }
+});
+
 test("TUI command discovery and keyboard help use the selected locale", () => {
   assert.equal(filterTuiCommandMenu("current project status", "en")[0]?.name, "/status");
   assert.equal(getTuiShortcutHelp("en")[0]?.title, "Discovery");
@@ -62,7 +72,7 @@ test("CLI, preflight, and Telegram presenters use the selected locale", () => {
   const locale = "ko";
   const help = buildCliProgram({}, locale).helpInformation();
   assert.equal(help.includes(translate(locale, "cli.program.description")), true);
-  assert.equal(formatTelegramHelp(locale).includes(translate(locale, "telegram.help.stop")), true);
+  assert.equal(formatRemoteCommandHelp("telegram", locale).includes(translate(locale, "remote.command.stop.description")), true);
   const report = formatConfigPreflightReport({
     rootDir: "C:/repo",
     kittyDir: "C:/repo/.kitty",

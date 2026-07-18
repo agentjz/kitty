@@ -30,8 +30,10 @@ test("extension config normalizes known extension ids", () => {
 });
 
 test("extension config requires every current switch to be explicit", () => {
+  const incomplete = getInitialExtensionSwitches();
+  delete (incomplete as Partial<typeof incomplete>).worktree;
   assert.throws(
-    () => normalizeExtensions({ todo: true }),
+    () => normalizeExtensions(incomplete),
     /Missing or invalid extension switch: worktree/,
   );
 });

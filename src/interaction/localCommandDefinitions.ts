@@ -1,7 +1,7 @@
 import { DEFAULT_LOCALE, translate, type KittyLocale, type MessageKey } from "../i18n/index.js";
 
-export type LocalCommandId = "exit" | "export" | "help" | "status";
-export type LocalCommandSurface = "telegram" | "tui";
+export type LocalCommandId = "exit" | "export" | "help" | "new" | "status" | "stop";
+export type LocalCommandSurface = "telegram" | "tui" | "weixin" | "web";
 export type LocalCommandCategory = "runtime" | "session" | "system";
 
 export interface LocalCommandDefinition {
@@ -18,7 +18,7 @@ export const LOCAL_COMMAND_DEFINITIONS = [
     category: "runtime",
     slashName: "status",
     descriptionKey: "command.status.description",
-    surfaces: ["tui", "telegram"],
+    surfaces: ["tui", "telegram", "weixin", "web"],
   },
   {
     id: "export",
@@ -39,7 +39,21 @@ export const LOCAL_COMMAND_DEFINITIONS = [
     category: "system",
     slashName: "help",
     descriptionKey: "command.help.description",
-    surfaces: ["telegram"],
+    surfaces: ["telegram", "weixin", "web"],
+  },
+  {
+    id: "stop",
+    category: "runtime",
+    slashName: "stop",
+    descriptionKey: "remote.command.stop.description",
+    surfaces: ["tui", "telegram", "weixin", "web"],
+  },
+  {
+    id: "new",
+    category: "session",
+    slashName: "new",
+    descriptionKey: "remote.command.new.description",
+    surfaces: ["tui", "telegram", "weixin", "web"],
   },
 ] as const satisfies readonly LocalCommandDefinition[];
 

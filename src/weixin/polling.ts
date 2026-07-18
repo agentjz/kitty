@@ -13,5 +13,6 @@ export class WeixinPollingSource implements WeixinPollingSourceLike {
     if (batch.longPollingTimeoutMs && batch.longPollingTimeoutMs > 0) this.timeoutMs = Math.trunc(batch.longPollingTimeoutMs);
     return batch;
   }
+  stage(syncBuf: string | null): void { if (syncBuf) this.syncBuf = syncBuf; }
   async commit(syncBuf: string | null): Promise<void> { if (syncBuf) { await this.store.save(syncBuf); this.syncBuf = syncBuf; } }
 }

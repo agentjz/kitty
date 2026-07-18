@@ -56,7 +56,7 @@ export const EVALUATION_SCENARIOS: readonly EvaluationScenario[] = [
     id: "config-preflight-readable",
     suite: "local",
     title: "首次配置路径清楚",
-    userPath: "用户运行 `kitty init` / `kitty status` 后，能知道 `.kitty/.env` 是否完整、下一步补什么。",
+    userPath: "用户运行 `kitty start` / `kitty status` 后，能知道 `.kitty/.env` 是否完整、下一步补什么。",
     evidence: "执行 config preflight，并确认本地模板和 env contract 可检查。",
   },
   {

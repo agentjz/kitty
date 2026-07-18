@@ -1,6 +1,6 @@
 {
   "name": "@jun133/kitty",
-  "version": "4.0.1",
+  "version": "4.0.2",
   "description": "Agent",
   "license": "MIT",
   "keywords": [
@@ -17,6 +17,7 @@
     "dist/*.js",
     "dist/*.mjs",
     "dist/*.map",
+    "dist/web/**",
     "README.md",
     "scripts/postinstall.cjs"
   ],
@@ -44,6 +45,8 @@
   },
   "dependencies": {
     "@openilink/openilink-sdk-node": "^0.6.0",
+    "bootstrap": "^5.3.8",
+    "bootstrap-icons": "^1.13.1",
     "chalk": "^5.6.2",
     "commander": "^14.0.1",
     "diff": "^8.0.2",
@@ -57,6 +60,7 @@
     "marked": "^15.0.7",
     "openai": "^6.4.0",
     "pdfjs-dist": "^6.1.200",
+    "qrcode": "^1.5.4",
     "react": "^19.2.7",
     "silk-wasm": "^3.7.1",
     "string-width": "^8.2.1",
@@ -64,6 +68,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.5.2",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.17",
     "tsup": "^8.5.0",
     "typescript": "^5.9.2"

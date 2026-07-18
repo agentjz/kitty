@@ -72,39 +72,23 @@ cd /d D:\kitty-demo
 cd /d "D:\My Project"
 ```
 
-## 阶段五：初始化 Kitty
+## 阶段五：打开 Kitty 本地控制台
 
 确认 CMD 已经进入项目目录，然后输入：
 
 ```cmd
-kitty init
+kitty start
 ```
 
-Kitty 会在当前项目创建 `.kitty` 文件夹。它保存这个项目自己的配置和运行现场。
+Kitty 会在当前项目创建 `.kitty` 文件夹，并自动打开只连接本机的配置页面。它保存这个项目自己的配置和运行现场。浏览器没有自动打开时，手动打开终端显示的地址。
 
-## 阶段六：填写 API Key
+## 阶段六：配置并测试模型
 
-用记事本打开配置：
-
-```cmd
-notepad .kitty\.env
-```
-
-找到：
-
-```dotenv
-KITTY_API_KEY=
-```
-
-把你的 provider API key 填在等号后面，例如：
-
-```dotenv
-KITTY_API_KEY=你的APIKey
-```
+页面默认使用简体中文，也可以在运行参数的“界面语言”中选择英文、日文或韩文。打开“基础设置”，页面会显示短配置位置 `.kitty/.env`；确认当前 Provider、模型、Base URL 和 API Key，同一表单下方可以调整 Extension 与运行参数，唯一的“保存配置”会一次写入这些设置。保存后再点击“发送测试请求”。API Key 留空不会清除当前值。
 
 不要把真实 API key 发给别人，也不要把 `.kitty/.env` 上传到公开仓库。
 
-保存记事本并关闭。
+配置完成后可以关闭网页和运行 `kitty start` 的终端；需要登录或运行微信、Telegram，调整运行设置或查看 Skill 时，再运行 `kitty start`。定时任务由 Kitty 对话中的 scheduler 工具管理。
 
 ## 阶段七：启动 Kitty
 
@@ -131,7 +115,7 @@ kitty
 | 命令 | 作用 |
 | --- | --- |
 | `kitty` | 启动 Kitty |
-| `kitty init` | 初始化当前项目 |
+| `kitty start` | 初始化项目并打开本地控制台 |
 | `kitty resume` | 继续最近会话 |
 | `kitty status` | 查看当前现场 |
 | `kitty run <prompt>` | 在新会话中执行一次任务 |

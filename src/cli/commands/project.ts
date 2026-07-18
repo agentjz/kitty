@@ -18,44 +18,40 @@ export function registerProjectCommands(
       paths: RuntimeConfig["paths"];
       overrides: CliOverrides;
     }>;
+    startLocalConsole?: (cwd: string) => Promise<{ url: string; close(): Promise<void>; wait(): Promise<void> }>;
+    openBrowser?: (url: string) => boolean | Promise<boolean>;
   },
 ): void {
   registerRuntimeStatusCommand(program, options);
 
   program
-    .command("init")
-    .description(translate(options.locale, "cli.command.init"))
+    .command("start")
+    .description(translate(options.locale, "cli.command.start"))
     .action(async () => {
       const overrides = options.getCliOverrides();
       const cwd = overrides.cwd ? path.resolve(overrides.cwd) : process.cwd();
       const { initializeProjectFiles } = await import("../../config/init.js");
-      const { formatConfigPreflightReport } = await import("../../config/preflight.js");
-      const result = await initializeProjectFiles(cwd);
+      await initializeProjectFiles(cwd);
+      const startConsole = options.startLocalConsole ?? (await import("../../web/server.js")).startLocalConsole;
+      const open = options.openBrowser ?? (await import("../../web/openBrowser.js")).openBrowser;
+      const consoleHandle = await startConsole(cwd);
+      ui.success(translate(options.locale, "cli.start.ready"));
+      writeStdoutLine(consoleHandle.url);
+      if (!await open(consoleHandle.url)) ui.info(translate(options.locale, "cli.start.browserFailed"));
 
-      if (result.created.length > 0) {
-        ui.success(translate(options.locale, "cli.init.created", { count: result.created.length }));
-        for (const filePath of result.created) {
-          writeStdoutLine(filePath);
-        }
-      }
-
-      if (result.updated.length > 0) {
-        ui.success(translate(options.locale, "cli.init.updated", { count: result.updated.length }));
-        for (const filePath of result.updated) {
-          writeStdoutLine(filePath);
-        }
-      }
-
-      if (result.skipped.length > 0) {
-        ui.info(translate(options.locale, "cli.init.skipped", { count: result.skipped.length }));
-        for (const filePath of result.skipped) {
-          writeStdoutLine(filePath);
-        }
-      }
-
-      ui.heading(translate(options.locale, "preflight.status"));
-      for (const line of formatConfigPreflightReport(result.preflight, options.locale)) {
-        writeStdoutLine(line);
+      let closing = false;
+      const close = () => {
+        if (closing) return;
+        closing = true;
+        void consoleHandle.close();
+      };
+      process.once("SIGINT", close);
+      process.once("SIGTERM", close);
+      try { await consoleHandle.wait(); }
+      finally {
+        process.off("SIGINT", close);
+        process.off("SIGTERM", close);
+        await consoleHandle.close();
       }
     });
 

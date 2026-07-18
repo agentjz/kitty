@@ -1,6 +1,6 @@
 import type { ControlDatabase } from "./sqlite.js";
 
-export const CONTROL_PLANE_SCHEMA_VERSION = 3;
+export const CONTROL_PLANE_SCHEMA_VERSION = 4;
 
 export function initializeControlPlaneSchema(db: ControlDatabase): void {
   const initialize = db.transaction(() => {
@@ -9,6 +9,8 @@ export function initializeControlPlaneSchema(db: ControlDatabase): void {
       db.exec(`
         DROP TABLE IF EXISTS remote_outbox;
         DROP TABLE IF EXISTS remote_inbox;
+        DROP TABLE IF EXISTS scheduled_triggers;
+        DROP TABLE IF EXISTS scheduled_tasks;
         DROP TABLE IF EXISTS service_leases;
         DROP TABLE IF EXISTS runtime_events;
         DROP TABLE IF EXISTS context_epochs;
@@ -260,6 +262,43 @@ export function initializeControlPlaneSchema(db: ControlDatabase): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_remote_outbox_status ON remote_outbox(host, status, created_at);
+
+    CREATE TABLE IF NOT EXISTS scheduled_tasks (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      enabled INTEGER NOT NULL,
+      action_json TEXT NOT NULL,
+      schedule_json TEXT NOT NULL,
+      next_run_at TEXT,
+      creator_session_id TEXT,
+      last_trigger_at TEXT,
+      run_count INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_due
+      ON scheduled_tasks(enabled, next_run_at);
+
+    CREATE TABLE IF NOT EXISTS scheduled_triggers (
+      id TEXT PRIMARY KEY,
+      task_id TEXT NOT NULL,
+      scheduled_for TEXT NOT NULL,
+      status TEXT NOT NULL,
+      claim_token TEXT NOT NULL,
+      claim_expires_at TEXT NOT NULL,
+      execution_id TEXT,
+      result_json TEXT,
+      error TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      finished_at TEXT,
+      FOREIGN KEY(task_id) REFERENCES scheduled_tasks(id) ON DELETE CASCADE,
+      UNIQUE(task_id, scheduled_for)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_scheduled_triggers_recovery
+      ON scheduled_triggers(status, claim_expires_at);
     `);
     db.exec(`PRAGMA user_version = ${CONTROL_PLANE_SCHEMA_VERSION}`);
   });

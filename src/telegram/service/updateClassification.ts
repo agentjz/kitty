@@ -1,9 +1,5 @@
 import type { TelegramIgnoredUpdate } from "../types.js";
 
-export function isStopCommand(input: string): boolean {
-  return input.trim().toLowerCase() === "/stop";
-}
-
 export function describeIgnoredTelegramUpdate(update: TelegramIgnoredUpdate): string {
   const fragments = [`update=${update.updateId}`, `reason=${update.reason}`];
 

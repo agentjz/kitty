@@ -35,6 +35,11 @@ test("documents extension registry exposes document reading and Word writing", (
   assert.deepEqual(names, ["document_read", "document_write"]);
 });
 
+test("scheduler extension exposes one durable CRUD surface", () => {
+  const names = getExtensionDefinition("scheduler").createTools().map((tool) => tool.definition.function.name);
+  assert.deepEqual(names, ["schedule_create", "schedule_list", "schedule_update", "schedule_delete"]);
+});
+
 test("disabled extensions are not callable", async (t) => {
   const root = await createTempWorkspace("disabled-extension", t);
   const context = createToolContext(root);

@@ -6,7 +6,7 @@
 
 Kitty 是一个智能体。它接收用户任务，构建上下文，调用模型，执行工具，保存工作状态，并能在同一任务现场继续工作。
 
-当前运行时最低版本是 Node.js 22.13.0。控制平面使用 Node 内置的 `node:sqlite`，安装 Kitty 不下载或编译第三方 SQLite 原生扩展。生产构建输出 CLI CJS 与 TUI ESM；Ink 的可选 `react-devtools-core` 保持 external，未安装时不影响 TUI 启动。
+当前运行时最低版本是 Node.js 22.13.0。控制平面使用 Node 内置的 `node:sqlite`，安装 Kitty 不下载或编译第三方 SQLite 原生扩展。生产构建输出 CLI CJS、TUI ESM 与本地 Web 静态资产；Ink 的可选 `react-devtools-core` 保持 external，未安装时不影响 TUI 启动。
 
 源码开发入口 `npm run dev` 先执行同一生产构建，再启动 `dist/cli.js`。开发入口与发布入口必须共享模块解析、CLI bundle 和 TUI chunk 合同，不维护只对 TypeScript 源码执行器成立的第二套运行路径。
 
@@ -17,6 +17,7 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 - 支持长任务的有界上下文；
 - core 工具与可选 extension；
 - 后台命令；
+- 机器驱动的持久定时任务；
 - 可观测、可恢复的宿主运行边界。
 
 核心规则：
@@ -83,7 +84,9 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 
 默认 provider profile 是 Agnes AI。当前具名 provider profile 还包括 NVIDIA NIM、Groq、Cerebras、Gemini、DeepSeek、OpenAI、YLS 和 TTAPI。`openai-compatible` 仅用于用户明确配置的高级兼容 endpoint；它不是任何具名 provider 的别名。
 
-`kitty init` 创建 `.kitty/.env`、`.env.example` 与 `.kittyignore`；env 模板把微信 iLink 与 Telegram 放在相邻区段，微信在前。文件已存在时只向两个 env 文件补充当前模板缺失的配置键，不覆盖已有值、自定义内容或 ignore 规则。`kitty status` 展示无密钥运行配置、session、execution、event 与 skill 事实。
+`kitty start` 是唯一初始化与本地控制台入口。它创建或补齐 `.kitty/.env`、`.env.example` 与 `.kittyignore`，再监听 `127.0.0.1` 随机端口并尝试打开浏览器；浏览器失败只保留可手动打开的 URL，不停止服务。文件已存在时只向两个 env 文件补充当前模板缺失的配置键，不覆盖已有值、自定义内容或 ignore 规则。独立 `kitty init` 不存在。
+
+本地控制台是引导式工作流壳：品牌区从 `runtime-ui/banner.ts` 读取与 CLI 终端相同的 ANSI Compact Kitty 字形，并与紧凑 `Agent` 字标组成完整 `Kitty Agent` 锁定标识，在下方显示当前语言欢迎语。Banner 与模块之间只有一条本地化短指引和指向 `https://github.com/luckymaomi/kitty` 的 GitHub 图标。首页以基础设置、微信控制、Telegram 控制和能力包四个单列模块呈现用途与当前状态，不显示项目绝对路径、说明标题或方向箭头；基础设置额外显示配置服务返回的短位置 `.kitty/.env`。点击模块后进入单任务的配置、验证与运行详情，不使用后台管理侧栏；详情通过非方向性的工作台按钮返回。Skill 内容直接在列表下方只读展开，不使用箭头或关闭叉。渠道信息流在用户位于底部时继续跟随，离开底部后保持阅读位置，用户通过原生滚动回到底部，不显示浮动“最新消息”控制。模型、Extension 与运行参数位于同一个基础设置表单，并由唯一保存动作一次提交；Provider 探测是独立的非保存动作。Web 从 `KITTY_LOCALE` 读取 `zh-CN`、`en`、`ja` 或 `ko`，由现有 typed catalog 投影页面、运行参数、Extension 说明、状态和事件 presentation；默认简体中文，provider/model、env key、Skill 内容与模型输出保持原文。后端拥有配置、Provider 探测、微信登录、channel lifecycle 和只读 Skill API；定时任务只通过 Agent scheduler 工具管理，不进入 Web。写请求必须携带启动期随机 token 且 Origin 必须等于当前 loopback origin；配置只接受已知 env key。这个 loopback 页面读取并显示 `.kitty/.env` 的当前值，包括 API Key 和 Bot Token；空 secret 更新保留原值，显式 clear 才删除。所有写入只在用户点击保存后发生，SSE 只把远程运行事实投影到对应渠道的信息流，不自动保存或切换模型。
 
 ## 4. Agent 与 Host Turn
 
@@ -198,6 +201,7 @@ Provider request 边界把 adapter、transport 和 SDK 失败归一为 `Provider
 - `worktree`：Git worktree 生命周期。
 - `network`：结构化 HTTP 工作。
 - `background`：可持久追踪的非阻塞命令执行。
+- `scheduler`：持久提醒与预写本地命令的机器调度 CRUD。
 - `documents`：分页读取 DOCX 与带文字层 PDF，并以原子写和二进制变更记录创建 Word DOCX。
 - `skills`：运行时 skill 发现与显式加载。
 
@@ -210,7 +214,7 @@ Extension 只在配置启用时进入同一工具注册表。它们不是另一�
 
 ### 职责
 
-- `src/control/`：session、turn、tool call、context epoch、task lifecycle、execution、remote message、service lease、wake 和 runtime event 的 SQLite schema 与账本。
+- `src/control/`：session、turn、tool call、context epoch、task lifecycle、execution、scheduled task/trigger、remote message、service lease、wake 和 runtime event 的 SQLite schema 与账本。
 - `src/execution/`：前台与后台 execution 的启动、identity、watchdog、heartbeat、reconcile、取消和进程树终止。
 - `src/remote/`：Telegram 与微信共用的 service lifecycle、per-peer command queue、turn state、process lock 和 durable delivery queue。
 
@@ -246,6 +250,14 @@ Extension 只在配置启用时进入同一工具注册表。它们不是另一�
 `background_wait` 是非并行的 read effect，返回 `progress`、`settled`、`steer` 或 `quiet_timeout` 以及最新 execution snapshot。Running output 的密集变化先合并再返回，避免逐 chunk 请求模型。`background_run`、stop 和 terminate 是 process effect；check、read 和 wait 是 read effect。CLI `background wait` 复用同一个 change wait owner，但保持“等待终态或总 timeout”命令语义。
 
 进程内 signal 只负责降低同进程唤醒延迟，不保存业务状态。每次唤醒都重新读取 SQLite；跨进程变化、遗漏通知和宿主重启依靠有界 SQLite fallback，因此进程内 observer 消失不会丢失 execution 事实。本产品不为该能力新增 continuation scheduler、daemon 或宿主退出后继续运行的独立服务。
+
+### Scheduled task 语义
+
+`scheduled_tasks` 是定义与 next deadline 的唯一 owner，`scheduled_triggers` 是每次触发的唯一 owner。Agent 通过 `schedule_create`、`schedule_list`、`schedule_update`、`schedule_delete` 使用同一领域 service；Web 不提供调度管理入口。计划支持一次性 ISO 时间、分钟级固定间隔和带 IANA timezone 的每日时间，最小间隔一分钟。
+
+Scheduler 只有取得项目内唯一 service lease 后才能运行，并只为最近 deadline 设置一个本机 timer。等待、唤醒和 trigger claim 不创建 Agent turn、不请求 provider、Token 消耗为零。Trigger 只执行创建时已经确认的 reminder 文本或预写本地命令；不支持“到点再调用 Agent 判断”。提醒结果直接在 trigger transaction 中持久化；命令复用 foreground execution ledger、process identity、watchdog、heartbeat 和进程树终止边界。
+
+同一 `(task_id, scheduled_for)` 只有一个 trigger。Claim transaction 同时持久化 trigger 并推进或关闭 task；禁用/删除与 claim 竞争时以该 transaction 为准，正在执行的 task 不能删除。进程强杀或断电后，过期 claim 可被新 scheduler 取得：action 尚未开始时可以继续；已有 execution 时只对账终态，跨越未知副作用边界的命令进入 `uncertain`，不得盲目重放。Kitty 未运行或主机断电期间不承诺准点；重启后一次性过期任务执行一次，重复任务跳过停机期间的密集补跑并计算下一个未来时间。
 
 ### 取消与恢复
 
@@ -290,16 +302,23 @@ Terminal log 使用 UTF-8，记录可读的用户输入、reasoning、assistant 
 - `src/telegram/`：Telegram polling host。
 - `src/weixin/`：微信 iLink 扫码登录、消息轮询、媒体收发和最终回复投影。
 - `src/remote/`：远程宿主共用的进程所有权、排队、turn 状态与投递生命周期。
+- `src/web/`：loopback HTTP、显式配置、只读 Skill、channel manager、SSE 与静态 Bootstrap 工作流。
 
-`kitty` TUI、`kitty run`、`kitty resume`、Telegram、微信和本地 API 都进入同一条 host/agent turn 主链路。`status` 与 `background` CLI 命令只暴露已存事实，不能创建平行生命周期语义。Evaluation harness 是开发脚本，不属于公共 CLI。
+`kitty` TUI、`kitty run`、`kitty resume`、Telegram、微信和本地 API 都进入同一条 host/agent turn 主链路。Web 是配置与运行管理壳，不创建第二条 Agent loop。`status` 与 `background` CLI 命令只暴露已存事实，不能创建平行生命周期语义。Evaluation harness 是开发脚本，不属于公共 CLI。
 
 Telegram 与微信 service 使用同一套 SQLite service lease、signal shutdown、per-peer queue、turn state、durable inbox 和 durable outbox。每个 host 的 token、generation 与 heartbeat 保证单 owner；lease 丢失立即停止 service。远端消息 ID 按 host 分区进入 `remote_inbox` 并与唯一 turn ID 绑定；`processing` 在崩溃后可重新 claim，`completed` 与 `failed` 是终态。回复和显式文件进入 `remote_outbox`，状态为 queued、sending、sent 或 uncertain；远端调用后无法确认本地提交时不得自动盲重试。发送前缺少微信 context token 时保持 queued，等待后续入站消息补全协议上下文。
 
 Telegram 使用 Bot API 长轮询。微信使用 iLink SDK：`kitty weixin login` 扫码取得项目本地凭证，`kitty weixin serve` 使用 sync buffer 长轮询私聊消息，`kitty weixin logout` 清除凭证、sync buffer 与 context token。微信只接受白名单私聊，不处理群聊；文本、图片、视频、语音和文件进入同一 host turn，入站二进制先持久化为本地附件。微信正常 turn 只投影最后一条 assistant 回复和 `send_file` 显式文件，不投影 reasoning、tool、todo 或中间 assistant 文本。
 
+TUI、Telegram 和微信只从 `localCommandDefinitions.ts` 投影命令元数据。TUI 支持 `/status`、`/export`、`/exit`、`/stop`、`/new`；远程支持 `/help`、`/status`、`/stop`、`/new`。`/stop` 只 abort 接收命令时的 active turn，不武装未来任务；`/new` 在当前 peer 队列内创建并持久化新 session、原子替换 binding，旧 session 保留。TUI `/new` 同时清空当前窗口 transcript、历史和草稿 owner。
+
+Web 启动的 Telegram/微信服务仍取得各自 process lock 和 SQLite lease。`remote/events.ts` 只 tee 已有 Agent callbacks，把入站、reasoning、工具、assistant、final 和 error 事件按 host 实时投影到各自工作流的信息流；它不改变远端回复规则，也不保存第二套 turn 状态。Markdown 由本地打包的 `marked` 解析并在浏览器按允许元素和属性清理。
+
 两个远程 service 在 TTY 启动时复用 TUI 的 Kitty 字标事实，分别显示 `kitty weixin` 与 `kitty telegram` banner；非 TTY 日志降级为单行。启动事实只包含版本、状态目录、白名单数量与连接方式，不输出 token 或用户 ID。
 
 SIGINT、SIGTERM 或 service lease 丢失会 abort active turn，并在固定等待上限后清理该 host 活动 session 的 execution 进程树。进程强杀、终端关闭、断电或主机重启不能依赖 finally：`remote_inbox` 保留已接收消息，`remote_outbox` 的遗留 `sending` 在新 owner 启动时转为 `uncertain`，不会把可能已经送达的回复或文件盲目重发。iLink SDK 的底层长轮询不提供原生 AbortSignal；宿主会立即停止等待，但底层请求最多仍可存活到协议超时。
+
+微信收到普通消息后立即把 turn 放入 per-peer queue，不等待长任务完成就继续下一次轮询，因此后发 `/stop` 可以到达 active turn。iLink sync buffer 先只在当前进程 stage，让后续长轮询前进；对应 batch 的所有 inbox 任务进入终态后再按接收顺序持久 commit。进程在二者之间强杀时，重启仍从旧 durable sync buffer 获取原消息，SQLite inbox 负责去重，不能以提前提交 cursor 换取响应速度。
 
 ### TUI
 
@@ -319,7 +338,7 @@ TUI 规则：
 - Transcript 滚动状态只能是 `follow` 或 `detached`。Detached 状态保存稳定 row anchor 和 unseen row count；流式追加、工具状态更新与 resize 不能把阅读位置拉回底部。
 - Input gateway 使用有状态 UTF-8 decoder 保留跨 chunk 的中文与 IME 提交，并对跨 chunk 的 SGR/X10 mouse press、drag、release 和 wheel 做完整 framing；鼠标序列不得进入 composer 键盘流。stdin EOF、close 或错误必须幂等关闭 controller 输入，让 active turn 进入 recoverable detach，并由 session driver 终止当前 root session tree 的进程。Selection 使用渲染 row ID 与字符列，支持宽字符、跨行选择、边缘自动滚动和字符级高亮。
 - 有 selection 时 `Ctrl+C` 复制，不触发 turn interrupt；无 selection 时才中断。Esc 清除 selection。Clipboard 优先使用平台 native provider，失败后在 TTY 使用 OSC52；复制失败必须保留 selection 并显示错误。Windows native provider 必须通过 PowerShell 显式把 stdin 设为 UTF-8 后写入 Unicode clipboard，不得把 UTF-8 字节交给按本地代码页解码的 `clip.exe`。
-- Session picker、TUI chrome、CLI/status/runtime UI、command/help、interaction、Telegram 与微信提示读取 runtime locale 的 typed catalog。简体中文、英文、日文、韩文四份 catalog 必须拥有完全一致的 key 与占位符集合，运行时不做语言 fallback。Locale 不能进入 prompt、session message、tool evidence 或 control-plane 状态；命令名、路径、provider/model、机器 JSON 和模型回复保持原文。
+- Session picker、TUI chrome、CLI/status/runtime UI、command/help、interaction、Telegram、微信提示与本地 Web 读取 runtime locale 的 typed catalog。简体中文、英文、日文、韩文四份 catalog 必须拥有完全一致的 key 与占位符集合，运行时不做语言 fallback。Web bootstrap 返回当前 locale 和结构化文案投影，浏览器不维护第二套翻译源。Locale 不能进入 prompt、session message、tool evidence 或 control-plane 状态；命令名、路径、provider/model、env key、机器 JSON、Skill 内容和模型回复保持原文。
 - Welcome 品牌版本直接读取发布包版本；标识上方只显示版本，不显示项目地址或额外入口。Kitty 文本标识与一行 `猫咪：尽情地探索并享受吧！` 组成独立品牌身份，正文由 typed locale catalog 提供。版本行不参与标识居中；窄终端可以隐藏签名，但不得挤压 session choice 或 composer。
 - Session picker 从 TUI composition root 显式接收当前 runtime config 的 model，只在底部控制行左侧显示 typed 模型标签与模型名，右侧保留选择/打开/退出控制。Picker 不读取配置、不推断模型，也不把显示事实写回 session 或 runtime。
 

@@ -75,7 +75,7 @@ async function reconcileEnvFile(
   const separator = current.length > 0 && !current.endsWith("\n") ? "\n" : "";
   const addition = [
     "",
-    "# Added by kitty init",
+    "# Added by kitty start",
     ...missingEntries.map(([key, value]) => `${key}=${value}`),
     "",
   ].join("\n");

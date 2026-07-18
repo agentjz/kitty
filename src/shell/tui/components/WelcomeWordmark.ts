@@ -14,7 +14,7 @@ export function createWelcomeWordmarkComponent(kit: Pick<InkRuntime, "React" | "
       React.createElement(Text, { color: TUI_COLORS.muted }, `v${packageJson.version}`),
       props.compact ? null : React.createElement(Box, { height: 1 }),
       props.compact
-        ? React.createElement(Text, { color: TUI_COLORS.brand, bold: true }, "kitty agent")
+        ? React.createElement(Text, { color: TUI_COLORS.brand, bold: true }, "Kitty Agent")
         : React.createElement(
           Box,
           { alignItems: "flex-end", flexDirection: "row", gap: 2 },

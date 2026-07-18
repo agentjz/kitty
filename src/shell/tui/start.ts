@@ -114,6 +114,9 @@ export async function startTuiChat(options: StartTuiChatOptions): Promise<void> 
     onSessionUpdated(session) {
       controller.updateSessionFacts(session);
     },
+    onSessionChanged(session) {
+      controller.switchSession(session);
+    },
   });
 
   try {

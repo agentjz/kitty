@@ -23,7 +23,12 @@ const reportText = execFileSync(
 const report = JSON.parse(reportText)[0];
 
 const files = new Set(report.files.map((file) => file.path));
-for (const required of ["dist/cli.js", "dist/tui.mjs", "package.json", "scripts/postinstall.cjs"]) {
+for (const required of [
+  "dist/cli.js", "dist/tui.mjs", "dist/web/index.html", "dist/web/app.js",
+  "dist/web/channelStream.js", "dist/web/workflowViews.js",
+  "dist/web/vendor/bootstrap.min.css", "dist/web/vendor/bootstrap-icons.css",
+  "dist/web/vendor/marked.esm.js", "package.json", "scripts/postinstall.cjs",
+]) {
   if (!files.has(required)) {
     throw new Error(`Packed Kitty artifact is missing ${required}.`);
   }

@@ -4,6 +4,7 @@ import { createDocumentTools } from "./tools/documents/index.js";
 import { createNetworkTools } from "./tools/network/index.js";
 import { createSkillTools } from "./tools/skills/index.js";
 import { createTodoTools } from "./tools/todo/index.js";
+import { createSchedulerTools } from "./tools/scheduler/index.js";
 import { createWorktreeTools } from "./tools/worktree/index.js";
 
 type ExtensionCapabilityCost = "low" | "medium" | "high";
@@ -33,6 +34,22 @@ export const EXTENSION_DEFINITIONS = [
       bestFor: [
         "maintaining current session checklist state",
         "showing concise progress preview",
+      ],
+      cost: "low",
+    },
+  },
+  {
+    id: "scheduler",
+    envKey: "KITTY_EXTENSION_SCHEDULER",
+    defaultEnabled: true,
+    summary: "Durable machine-driven reminders and prewritten command schedules.",
+    createTools: createSchedulerTools,
+    capability: {
+      description: "Create, list, update, and delete durable scheduled reminders or prewritten commands without model polling.",
+      bestFor: [
+        "one-time reminders",
+        "recurring local commands with explicit intervals or daily times",
+        "managing durable schedules and reading trigger results",
       ],
       cost: "low",
     },

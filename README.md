@@ -55,13 +55,13 @@ Kitty 可以把复杂目标拆成清晰步骤，让耗时命令在后台运行�
 npm install -g @jun133/kitty@latest
 ```
 
-进入希望 Kitty 工作的项目目录，初始化配置：
+进入希望 Kitty 工作的项目目录，启动本地控制台：
 
 ```bash
-kitty init
+kitty start
 ```
 
-打开 `.kitty/.env`，填写 provider API key，然后启动：
+Kitty 会补齐项目文件并打开只监听本机的工作台。Web 使用 CLI 同源 Kitty 字形组成完整 `Kitty Agent` 标识，页面跟随 `KITTY_LOCALE` 使用简体中文、英文、日文或韩文，默认简体中文。打开“基础设置”，确认当前 Provider、模型、Base URL 和 API Key，在同一个表单调整 Extension 与运行参数，然后通过唯一的“保存配置”一次提交；连接测试单独执行。首页同时提供微信控制、Telegram 控制和只读能力包，并通过 GitHub 图标进入当前仓库。浏览器没有自动打开时，手动打开终端输出的本地地址。配置完成后启动 TUI：
 
 ```bash
 kitty
@@ -94,7 +94,7 @@ Kitty 会调查事实、判断边界、调用工具、检查结果，并把已�
 | 命令 | 用途 |
 | --- | --- |
 | `kitty` | 启动 Kitty |
-| `kitty init` | 初始化当前项目 |
+| `kitty start` | 初始化项目并打开本地控制台 |
 | `kitty run <prompt>` | 执行一次明确任务 |
 | `kitty resume [sessionId]` | 恢复最近或指定会话 |
 | `kitty status` | 查看当前运行现场 |
@@ -105,11 +105,13 @@ Kitty 会调查事实、判断边界、调用工具、检查结果，并把已�
 | `kitty weixin logout` | 清除微信 iLink 登录状态 |
 | `kitty --version` | 查看版本 |
 
-在 TUI 输入 `/` 可以查看 `/status`、`/export` 和 `/exit`；空输入时按 `?` 可以查看键位。
+在 TUI 输入 `/` 可以查看 `/status`、`/export`、`/stop`、`/new` 和 `/exit`；空输入时按 `?` 可以查看键位。
 
 支持中文、英文、日文和韩文四种语言。
 
-远程入口只接受白名单私聊。Telegram 需要设置 `KITTY_TELEGRAM_TOKEN` 和 `KITTY_TELEGRAM_ALLOWED_USER_IDS`；微信先运行 `kitty weixin login`，再在 `.kitty/.env` 设置 `KITTY_WEIXIN_ALLOWED_USER_IDS` 并运行 `kitty weixin serve`。两个入口共用同一套持久消息与中断恢复生命周期。
+远程入口只接受白名单私聊。可以在 `kitty start` 页面配置、测试、启动和停止 Telegram/微信，也可以继续使用各自 CLI。两个入口共用 `/help`、`/status`、`/stop`、`/new` 和同一套持久消息、中断恢复生命周期。
+
+定时任务由 Agent 的 scheduler 工具新增、查看、启停、修改和删除。等待与到点判断由 SQLite 和本机计时器完成，不轮询模型；到点只投递预先确认的提醒，或运行预先写好的本地命令，不会在触发时偷偷让 Agent 再判断一次。
 
 ## 继续了解
 

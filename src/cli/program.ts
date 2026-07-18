@@ -55,6 +55,8 @@ export function buildCliProgram(
     locale,
     getCliOverrides,
     resolveRuntime,
+    startLocalConsole: dependencies.startLocalConsole,
+    openBrowser: dependencies.openBrowser,
   });
   registerTelegramCommands(program, {
     locale,

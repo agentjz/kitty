@@ -23,11 +23,14 @@ import { TelegramUpdateCommitQueue } from "./updateCommitQueue.js";
 import type { TelegramPrivateMessage, TelegramUpdate } from "./types.js";
 import { QueuedHostMessageRecorder, resolveHostStateRoot } from "../observability/hostEvents.js";
 import { TelegramTurnState } from "./service/turnState.js";
-import { describeIgnoredTelegramUpdate, isStopCommand } from "./service/updateClassification.js";
+import { describeIgnoredTelegramUpdate } from "./service/updateClassification.js";
 import { translate } from "../i18n/index.js";
 import { ControlPlaneLedger } from "../control/ledger.js";
 import { collectRunningExecutionProcesses, terminateRunningExecutionProcesses } from "../execution/lifecycle.js";
 import { waitAtMost } from "../remote/serviceLifecycle.js";
+import { formatRemoteBlockedCommand, formatRemoteCommandHelp, parseRemoteCommand, type RemoteCommandId } from "../remote/commands.js";
+import { formatRemoteRuntimeStatus } from "../remote/status.js";
+import { createPersistedSession } from "../host/session.js";
 
 export interface TelegramServiceOptions {
   cwd: string;
@@ -209,10 +212,14 @@ export class TelegramService {
       return { task: null };
     }
 
-    if (classified.kind === "private_message" && isStopCommand(classified.text)) {
-      await this.handleStopCommand(classified);
-      markTelegramInbox(rootDir, update.update_id, "completed");
-      return { task: null };
+    if (classified.kind === "private_message") {
+      const command = parseRemoteCommand(classified.text, "telegram");
+      if (command) return this.handleRemoteCommand(command, classified, rootDir);
+      if (classified.text.trim().startsWith("/")) {
+        await this.enqueueReply(classified.chatId, formatRemoteBlockedCommand(this.options.config.locale));
+        markTelegramInbox(rootDir, update.update_id, "completed");
+        return { task: null };
+      }
     }
 
     this.logger.info("received inbound message", {
@@ -248,7 +255,6 @@ export class TelegramService {
         runTurn: this.options.runTurn,
         enqueueReply: (chatId, text) => this.enqueueReply(chatId, text),
         markQueuedTurnStarted: (peerKey) => this.turnState.decrementQueuedTurns(peerKey),
-        consumePendingStop: (peerKey) => this.turnState.consumePendingStop(peerKey),
         onActiveTurnStart: (peerKey, activeTurn) => this.turnState.setActiveTurn(peerKey, activeTurn),
         onActiveTurnEnd: (peerKey) => this.turnState.clearActiveTurn(peerKey),
         });
@@ -271,7 +277,7 @@ export class TelegramService {
     const activeTurn = this.turnState.getActiveTurn(message.peerKey);
     if (activeTurn && !activeTurn.controller.signal.aborted) {
       activeTurn.controller.abort();
-      await this.enqueueReply(message.chatId, translate(this.options.config.locale, "telegram.stopConfirmed"));
+      await this.enqueueReply(message.chatId, translate(this.options.config.locale, "remote.stopConfirmed"));
       await this.options.deliveryQueue.flushDue();
       this.logger.info("stop requested", {
         peerKey: message.peerKey,
@@ -282,25 +288,63 @@ export class TelegramService {
       return;
     }
 
-    if (this.turnState.getQueuedTurnCount(message.peerKey) > 0) {
-      this.turnState.armPendingStop(message.peerKey);
-      await this.enqueueReply(message.chatId, translate(this.options.config.locale, "telegram.stopConfirmed"));
-      await this.options.deliveryQueue.flushDue();
-      this.logger.info("stop armed for queued turn", {
-        peerKey: message.peerKey,
-        userId: message.userId,
-        chatId: message.chatId,
-      });
-      return;
-    }
-
-    await this.enqueueReply(message.chatId, translate(this.options.config.locale, "telegram.noTask"));
+    await this.enqueueReply(message.chatId, translate(this.options.config.locale, "remote.noTask"));
     await this.options.deliveryQueue.flushDue();
     this.logger.info("stop requested with no active turn", {
       peerKey: message.peerKey,
       userId: message.userId,
       chatId: message.chatId,
     });
+  }
+
+  private async handleRemoteCommand(
+    command: RemoteCommandId,
+    message: TelegramPrivateMessage,
+    rootDir: string,
+  ): Promise<{ task: Promise<void> | null }> {
+    if (command === "stop") {
+      await this.handleStopCommand(message);
+      markTelegramInbox(rootDir, message.updateId, "completed");
+      return { task: null };
+    }
+    if (command === "help") {
+      await this.enqueueReply(message.chatId, formatRemoteCommandHelp("telegram", this.options.config.locale));
+      markTelegramInbox(rootDir, message.updateId, "completed");
+      return { task: null };
+    }
+    if (command === "status") {
+      const binding = await this.options.sessionMapStore.get(message.peerKey);
+      const text = binding
+        ? await formatRemoteRuntimeStatus({ rootDir, config: this.options.config, sessionId: binding.sessionId })
+        : translate(this.options.config.locale, "remote.noSession");
+      await this.enqueueReply(message.chatId, text);
+      markTelegramInbox(rootDir, message.updateId, "completed");
+      return { task: null };
+    }
+
+    const activeTurn = this.turnState.getActiveTurn(message.peerKey);
+    if (activeTurn && !activeTurn.controller.signal.aborted) activeTurn.controller.abort("New Telegram session requested.");
+    const task = this.commandQueue.enqueue(message.peerKey, async () => {
+      try {
+        const session = await createPersistedSession(this.options.sessionStore, this.options.cwd);
+        const now = new Date().toISOString();
+        await this.options.sessionMapStore.set({
+          peerKey: message.peerKey,
+          userId: message.userId,
+          chatId: message.chatId,
+          sessionId: session.id,
+          cwd: this.options.cwd,
+          createdAt: now,
+          updatedAt: now,
+        });
+        await this.enqueueReply(message.chatId, translate(this.options.config.locale, "remote.newConfirmed"));
+        markTelegramInbox(rootDir, message.updateId, "completed");
+      } catch (error) {
+        markTelegramInbox(rootDir, message.updateId, "failed", error);
+        throw error;
+      }
+    });
+    return { task: this.trackTask(task, { peerKey: message.peerKey, userId: message.userId, chatId: message.chatId }) };
   }
 
   private async enqueueReply(chatId: number, text: string): Promise<void> {

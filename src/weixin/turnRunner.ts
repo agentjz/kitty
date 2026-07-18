@@ -14,6 +14,7 @@ import { chunkWeixinMessage } from "./messageChunking.js";
 import { WeixinOutputPort } from "./outputPort.js";
 import type { WeixinSessionBinding, WeixinSessionMapStore } from "./state.js";
 import type { WeixinPrivateMessage } from "./types.js";
+import { createRemoteObservationCallbacks, publishRemoteRuntimeEvent, teeAgentCallbacks } from "../remote/events.js";
 
 export interface WeixinActiveTurn { controller: AbortController; sessionId: string; }
 
@@ -22,7 +23,7 @@ export async function runWeixinTurn(options: {
   sessionStore: SessionStoreLike & { load(id: string): Promise<SessionRecord> };
   sessionMap: WeixinSessionMapStore; attachments: WeixinAttachmentStore; delivery: WeixinDeliveryQueue;
   logger: WeixinLogger; message: WeixinPrivateMessage; messageKey: string; runTurn?: HostTurnRunner;
-  markQueuedTurnStarted(): void; shouldAbortOnStart(): boolean;
+  markQueuedTurnStarted(): void;
   onActiveTurnStart(turn: WeixinActiveTurn): void; onActiveTurnEnd(): void;
 }): Promise<void> {
   let { binding, session } = await ensureBinding(options);
@@ -47,11 +48,12 @@ export async function runWeixinTurn(options: {
   try {
     const input = await buildInput(options, session.id);
     const rootDir = resolveHostStateRoot(options.config.weixin.stateDir, options.cwd);
+    publishRemoteRuntimeEvent({ rootDir, host: "weixin", peerKey: options.message.peerKey, sessionId: session.id, kind: "inbound", text: input });
     const ledger = new ControlPlaneLedger(rootDir);
     let turnId: string;
     try { turnId = ledger.remoteMessages.bindTurn({ host: "weixin", messageId: options.messageKey, sessionId: session.id, text: input }); }
     finally { ledger.close(); }
-    const callbacks = {
+    const visibleCallbacks = {
       ...display.callbacks,
       enqueueFile: async (filePath: string, fileName?: string, caption?: string) => {
         const entry = await options.delivery.enqueueFile({ peerKey: options.message.peerKey, userId: options.message.userId, filePath, fileName, caption });
@@ -59,6 +61,13 @@ export async function runWeixinTurn(options: {
         return entry.id;
       },
     };
+    const callbacks = teeAgentCallbacks(visibleCallbacks, createRemoteObservationCallbacks({
+      rootDir,
+      host: "weixin",
+      peerKey: options.message.peerKey,
+      sessionId: session.id,
+      locale: options.config.locale,
+    }));
     session = await runBoundHostTurn<WeixinActiveTurn>({
       host: "weixin",
       buildInput: async () => input,
@@ -71,13 +80,15 @@ export async function runWeixinTurn(options: {
       output,
       display,
       callbacks,
-      shouldAbortOnStart: options.shouldAbortOnStart,
       markQueuedTurnStarted: options.markQueuedTurnStarted,
       createActiveTurn: (controller, sessionId) => ({ controller, sessionId }),
       onActiveTurnStart: options.onActiveTurnStart,
       onActiveTurnEnd: options.onActiveTurnEnd,
       onCompleted: (_result, current) => options.logger.info("turn completed", { peerKey: options.message.peerKey, sessionId: current.id }),
-      onFailed: (error, current) => options.logger.error("turn failed", { peerKey: options.message.peerKey, sessionId: current.id, error }),
+      onFailed: (error, current) => {
+        publishRemoteRuntimeEvent({ rootDir, host: "weixin", peerKey: options.message.peerKey, sessionId: current.id, kind: "error", text: error });
+        options.logger.error("turn failed", { peerKey: options.message.peerKey, sessionId: current.id, error });
+      },
     }, { runTurn: options.runTurn });
   } finally {
     binding = await persistBoundSession({ binding, sessionId: session.id, touchBinding, saveBinding: (value) => options.sessionMap.set(value) });

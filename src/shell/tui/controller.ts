@@ -68,7 +68,7 @@ export class TuiController {
   private queuedInputs: string[] = [];
   private interruptHandler: (() => void) | undefined;
   private disposed = false;
-  private readonly sessionId: string | undefined;
+  private sessionId: string | undefined;
   private readonly composerInteraction: TuiComposerInteraction;
   private selectionAutoScrollTimer: NodeJS.Timeout | undefined;
   private selectionAutoScrollDirection = 0;
@@ -265,6 +265,22 @@ export class TuiController {
     }
     return projectSelectedLineViews(this.renderAllTranscriptRows(), this.state.selection)
       .slice(this.state.scroll.offset, this.state.scroll.offset + viewport.height);
+  }
+
+  switchSession(session: SessionRecord): void {
+    this.sessionId = session.id;
+    const model = this.state.dock.model;
+    this.state = createInitialTuiState(session, this.state.locale);
+    if (model) this.state = updateRuntimeDock(this.state, { model });
+    const restoredDraft = this.options.draftStore?.load(session.id);
+    if (restoredDraft) {
+      this.state = updateComposerState(this.state, {
+        cursor: Math.max(0, Math.min(restoredDraft.cursor, restoredDraft.value.length)),
+        value: restoredDraft.value,
+      });
+    }
+    this.state = applyViewportResize(this.state, this.viewport, this.projectionOptions());
+    this.setState(this.state);
   }
 
   handleMouseEvent(event: TuiMouseEvent): void {

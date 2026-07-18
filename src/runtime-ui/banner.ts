@@ -14,6 +14,13 @@ export function renderKittyProductBanner(
   product: "telegram" | "weixin",
   maxWidth = Number.POSITIVE_INFINITY,
 ): string {
+  return renderKittyWordmarkBanner(product, maxWidth);
+}
+
+function renderKittyWordmarkBanner<T extends "agent" | "telegram" | "weixin">(
+  product: T,
+  maxWidth: number,
+): string {
   const wordmark = renderKittyWordmarkPair(product);
   const left = wordmark.kitty.split("\n");
   const right = wordmark[product].split("\n");

@@ -36,6 +36,7 @@ export interface InteractiveSessionDriverOptions {
   localCommandHandler?: typeof handleLocalCommand;
   turnContextProvider?: (session: SessionRecord, input: string) => Promise<InteractiveTurnContext>;
   onSessionUpdated?: (session: SessionRecord) => void;
+  onSessionChanged?: (session: SessionRecord) => void;
   stateRootDir: string;
 }
 
@@ -100,6 +101,14 @@ export class InteractiveSessionDriver {
 
   private async handleInput(input: string): Promise<LocalCommandResult> {
     const command = normalizeLocalCommand(input);
+    if (command === "stop") {
+      this.handleCommandStop();
+      return "handled";
+    }
+    if (command === "new") {
+      await this.handleCommandNew();
+      return "handled";
+    }
     if (!this.options.localCommandHandler && command === undefined) {
       this.submitAgentInput(input);
       return "continue";
@@ -197,6 +206,30 @@ export class InteractiveSessionDriver {
     this.exitRequested = true;
     await this.closeBounded();
     this.options.shell.output.info(this.t("interaction.sessionSaved"));
+  }
+
+  private handleCommandStop(): void {
+    const active = this.activeTurns.find((turn) => !turn.controller.signal.aborted);
+    if (!active) {
+      this.options.shell.output.info(this.t("remote.noTask"));
+      return;
+    }
+    active.controller.abort();
+    this.showInterruptNotice(this.t("remote.stopConfirmed"));
+  }
+
+  private async handleCommandNew(): Promise<void> {
+    this.abortActiveTurns();
+    await waitAtMost(this.waitForActiveTurns(), TURN_SHUTDOWN_GRACE_MS);
+    if (this.activeTurns.length > 0) {
+      this.options.shell.output.warn(this.t("interaction.interrupting"));
+      return;
+    }
+    const session = await this.options.sessionStore.save(await this.options.sessionStore.create(this.options.cwd));
+    this.session = session;
+    this.options.onSessionChanged?.(session);
+    this.options.onSessionUpdated?.(session);
+    this.options.shell.output.info(this.t("remote.newConfirmed"));
   }
 
   private async terminateOwnedProcesses(): Promise<void> {

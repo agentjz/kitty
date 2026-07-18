@@ -9,7 +9,6 @@ import type { RuntimeConfig, SessionRecord } from "../types.js";
 import type { TelegramAttachmentStoreLike } from "./attachmentStore.js";
 import type { TelegramBotApiClient } from "./botApiClient.js";
 import { buildFileTurnInput, buildTextTurnInput, downloadTelegramAttachment } from "./inboundFiles.js";
-import { handleTelegramLocalCommand } from "./localCommands.js";
 import type { TelegramLogger } from "./logger.js";
 import { TelegramOutputPort } from "./outputPort.js";
 import type { TelegramSessionBinding, TelegramSessionMapStoreLike } from "./sessionMapStore.js";
@@ -17,6 +16,7 @@ import { TelegramTurnDisplay } from "./turnDisplay.js";
 import { createLoggedTelegramCallbacks } from "./turnLogging.js";
 import type { TelegramPrivateFileMessage, TelegramPrivateMessage } from "./types.js";
 import { ControlPlaneLedger } from "../control/ledger.js";
+import { createRemoteObservationCallbacks, publishRemoteRuntimeEvent, teeAgentCallbacks } from "../remote/events.js";
 
 export interface TelegramActiveTurn {
   controller: AbortController;
@@ -44,7 +44,6 @@ export async function runTelegramTurn(options: {
   runTurn?: HostTurnRunner;
   enqueueReply: (chatId: number, text: string) => Promise<void>;
   markQueuedTurnStarted: (peerKey: string) => void;
-  consumePendingStop: (peerKey: string) => boolean;
   onActiveTurnStart: (peerKey: string, activeTurn: TelegramActiveTurn) => void;
   onActiveTurnEnd: (peerKey: string) => void;
 }): Promise<void> {
@@ -63,24 +62,6 @@ export async function runTelegramTurn(options: {
   });
 
   try {
-    if (options.message.kind === "private_message") {
-      const localCommandResult = await handleTelegramLocalCommand(
-        options.message.text,
-        {
-          cwd: options.cwd,
-          session,
-          config: options.config,
-        },
-        output,
-      );
-
-      if (localCommandResult === "handled") {
-        options.markQueuedTurnStarted(options.message.peerKey);
-        return;
-      }
-
-    }
-
     const display = new TelegramTurnDisplay({
       chatId: options.message.chatId,
       sendTyping: async (chatId) => {
@@ -101,7 +82,7 @@ export async function runTelegramTurn(options: {
       });
       return entry.id;
     };
-    const callbacks = createLoggedTelegramCallbacks(
+    const visibleCallbacks = createLoggedTelegramCallbacks(
       display,
       options.logger,
       {
@@ -122,6 +103,17 @@ export async function runTelegramTurn(options: {
     });
     const input = await buildTurnInput(options.message, session.id, options);
     const stateRootDir = resolveHostStateRoot(options.config.telegram.stateDir, options.cwd);
+    publishRemoteRuntimeEvent({
+      rootDir: stateRootDir, host: "telegram", peerKey: options.message.peerKey,
+      sessionId: session.id, kind: "inbound", text: input,
+    });
+    const callbacks = teeAgentCallbacks(visibleCallbacks ?? {}, createRemoteObservationCallbacks({
+      rootDir: stateRootDir,
+      host: "telegram",
+      peerKey: options.message.peerKey,
+      sessionId: session.id,
+      locale: options.config.locale,
+    }));
     const ledger = new ControlPlaneLedger(stateRootDir);
     let admittedTurnId: string;
     try {
@@ -147,7 +139,6 @@ export async function runTelegramTurn(options: {
         output,
         display,
         callbacks,
-        shouldAbortOnStart: () => options.consumePendingStop(options.message.peerKey),
         markQueuedTurnStarted: () => options.markQueuedTurnStarted(options.message.peerKey),
         createActiveTurn: (controller, sessionId) => ({
           controller,
@@ -180,6 +171,7 @@ export async function runTelegramTurn(options: {
           });
         },
         onFailed: (errorMessage, nextSession) => {
+          publishRemoteRuntimeEvent({ rootDir: stateRootDir, host: "telegram", peerKey: options.message.peerKey, sessionId: nextSession.id, kind: "error", text: errorMessage });
           options.logger.error("turn failed", {
             peerKey: options.message.peerKey,
             userId: options.message.userId,

@@ -22,19 +22,29 @@ import { createTestRuntimeConfig, TEST_EXECUTION_OWNER } from "../helpers.js";
 
 test("cli exposes only the current public command surface", () => {
   const commands = buildCliProgram().commands.map((command) => command.name()).sort();
-  assert.deepEqual(commands, ["background", "init", "resume", "run", "status", "telegram", "undo", "weixin"]);
+  assert.deepEqual(commands, ["background", "resume", "run", "start", "status", "telegram", "undo", "weixin"]);
 });
 
-test("init bootstraps project templates without loading runtime config", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "kitty-init-"));
+test("start bootstraps project templates and opens the console without a separate init command", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "kitty-start-"));
   let runtimeLoaded = false;
-  const program = buildCliProgram({ resolveRuntime: async () => {
-    runtimeLoaded = true;
-    throw new Error("init must not resolve runtime config");
-  } });
+  let closed = 0;
+  const program = buildCliProgram({
+    resolveRuntime: async () => {
+      runtimeLoaded = true;
+      throw new Error("start initialization must not require valid provider config");
+    },
+    startLocalConsole: async (cwd) => ({
+      url: "http://127.0.0.1:3000/?token=test",
+      wait: async () => undefined,
+      close: async () => { closed += 1; },
+    }),
+    openBrowser: () => false,
+  });
   program.exitOverride();
-  await program.parseAsync(["-C", root, "init"], { from: "user" });
+  await program.parseAsync(["-C", root, "start"], { from: "user" });
   assert.equal(runtimeLoaded, false);
+  assert.equal(closed, 1);
   assert.equal(fs.existsSync(path.join(root, PROJECT_STATE_DIR_NAME, PROJECT_STATE_ENV_FILE_NAME)), true);
   assert.equal(fs.existsSync(path.join(root, PROJECT_STATE_DIR_NAME, PROJECT_STATE_ENV_EXAMPLE_FILE_NAME)), true);
   assert.equal(fs.existsSync(path.join(root, PROJECT_STATE_DIR_NAME, PROJECT_STATE_IGNORE_FILE_NAME)), true);
@@ -102,7 +112,7 @@ test("setup errors no longer route users to a removed doctor command", () => {
   const root = path.join(os.tmpdir(), "kitty-setup-error");
   const invalid = formatCliSetupError(invalidConfigValue("KITTY_MAX_OUTPUT_TOKENS", "invalid"), root, "en") ?? "";
   const missing = formatCliSetupError(missingConfigValue(KITTY_ENV.apiKey), root, "en") ?? "";
-  assert.match(invalid, /kitty init/);
+  assert.match(invalid, /kitty start/);
   assert.match(missing, /KITTY_API_KEY/);
   assert.doesNotMatch(`${invalid}\n${missing}`, /kitty doctor/);
 });

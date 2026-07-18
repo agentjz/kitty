@@ -39,7 +39,7 @@ test("tui command menu selection wraps and keeps selected rows visible", () => {
   assert.equal(moveTuiCommandSelection(3, 2, 1), 0);
   const commands = filterTuiCommandMenu("");
   const window = windowTuiCommandMenu(commands, 9, 4);
-  assert.equal(window.items.length, commands.length);
+  assert.equal(window.items.length, Math.min(commands.length, 4));
   assert.ok(window.startIndex <= window.selectedIndex);
   assert.ok(window.selectedIndex < window.startIndex + window.items.length);
 });
@@ -117,6 +117,26 @@ test("composer history respects multiline movement and restores the stashed draf
   controller.handleComposerInput("", { upArrow: true });
   assert.notEqual(controller.getState().composer.cursor, cursorAtEnd);
   assert.equal(controller.getState().composer.value, "draft\nnext");
+});
+
+test("switching to a new session clears transcript and changes the durable draft owner", () => {
+  const saved: string[] = [];
+  const first = createSession(["old conversation"]);
+  const controller = new TuiController(first, {
+    draftStore: {
+      load: () => undefined,
+      save: (sessionId) => { saved.push(sessionId); },
+      clear: () => true,
+    },
+  });
+  const second = { ...createSession([]), id: "session-new" };
+
+  controller.switchSession(second);
+  controller.handleComposerInput("new draft", {});
+
+  assert.deepEqual(controller.getState().transcript, []);
+  assert.deepEqual(controller.getState().composer.history, []);
+  assert.equal(saved.at(-1), "session-new");
 });
 
 test("selected commands remain queued while the session driver is not reading", async () => {

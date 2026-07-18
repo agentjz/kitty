@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kitty Agent</title>
+  <link rel="stylesheet" href="/vendor/bootstrap.min.css">
+  <link rel="stylesheet" href="/vendor/bootstrap-icons.css">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="kitty-banner">
+    <div class="workspace banner-layout">
+      <div class="kitty-lockup" aria-label="Kitty Agent"><pre id="kitty-wordmark" class="kitty-wordmark"></pre><span>Agent</span></div>
+      <p class="kitty-welcome" data-message="welcome"></p>
+    </div>
+  </header>
+
+  <main class="workspace main-workspace">
+    <section id="workflow-home">
+      <div class="workspace-guide">
+        <p><i class="bi bi-stars" aria-hidden="true"></i><span data-message="workflow.guide"></span></p>
+        <a class="github-link" href="https://github.com/luckymaomi/kitty" target="_blank" rel="noreferrer" data-message-title="common.github"><i class="bi bi-github" aria-hidden="true"></i></a>
+      </div>
+      <div class="workflow-list" role="list">
+        <button class="workflow-card" type="button" data-open-workflow="config" role="listitem">
+          <span class="workflow-icon"><i class="bi bi-cpu"></i></span>
+          <span class="workflow-copy"><span class="workflow-title"><strong data-message="workflow.config"></strong><small data-message="workflow.configNote"></small></span><small id="model-summary" data-message="workflow.loadingConfig"></small><code id="config-location"></code></span>
+        </button>
+        <button class="workflow-card" type="button" data-open-workflow="weixin" role="listitem">
+          <span class="workflow-icon"><i class="bi bi-wechat"></i></span>
+          <span class="workflow-copy"><span class="workflow-title"><strong data-message="workflow.weixin"></strong><small data-message="workflow.weixinNote"></small></span><small id="weixin-summary" data-message="workflow.loadingService"></small></span>
+        </button>
+        <button class="workflow-card" type="button" data-open-workflow="telegram" role="listitem">
+          <span class="workflow-icon"><i class="bi bi-telegram"></i></span>
+          <span class="workflow-copy"><span class="workflow-title"><strong data-message="workflow.telegram"></strong><small data-message="workflow.telegramNote"></small></span><small id="telegram-summary" data-message="workflow.loadingService"></small></span>
+        </button>
+        <button class="workflow-card" type="button" data-open-workflow="skills" role="listitem">
+          <span class="workflow-icon"><i class="bi bi-puzzle"></i></span>
+          <span class="workflow-copy"><span class="workflow-title"><strong data-message="workflow.skills"></strong><small data-message="workflow.skillsNote"></small></span><small id="skills-summary" data-message="workflow.loadingSkills"></small></span>
+        </button>
+      </div>
+    </section>
+
+    <section id="workflow-detail" class="d-none" aria-live="polite">
+      <button class="back-button" type="button" data-action="back-home"><i class="bi bi-grid-3x3-gap-fill"></i><span data-message="common.back"></span></button>
+
+      <article class="workflow-panel d-none" data-workflow-panel="config">
+        <div class="detail-heading"><h1 data-message="workflow.config"></h1><p data-message="config.description"></p></div>
+        <form id="config-form">
+          <ol class="flow-steps">
+            <li class="flow-step">
+              <div class="step-number">1</div>
+              <div class="step-content"><h2 data-message="config.currentTitle"></h2><div id="current-model-facts" class="fact-strip"></div></div>
+            </li>
+            <li class="flow-step">
+              <div class="step-number">2</div>
+              <div class="step-content">
+                <h2 data-message="config.providerTitle"></h2>
+                <p class="step-hint" data-message="config.providerHint"></p>
+                <div class="form-grid">
+                  <div class="span-2"><label class="form-label" for="provider-preset" data-message="config.preset"></label><select class="form-select" id="provider-preset"></select></div>
+                  <div><label class="form-label" for="model-provider" data-message="config.provider"></label><input class="form-control" id="model-provider" required></div>
+                  <div><label class="form-label" for="model-name" data-message="config.model"></label><input class="form-control" id="model-name" required></div>
+                  <div class="span-2"><label class="form-label" for="model-url" data-message="config.baseUrl"></label><input class="form-control" id="model-url" type="url" required></div>
+                  <div class="span-2"><label class="form-label" for="model-key" data-message="config.apiKey"></label><input class="form-control font-monospace" id="model-key" type="text" autocomplete="off"><div class="form-text" data-message="config.apiKeyHint"></div></div>
+                </div>
+              </div>
+            </li>
+            <li class="flow-step">
+              <div class="step-number">3</div>
+              <div class="step-content"><h2 data-message="config.validationTitle"></h2><p class="step-hint" data-message="config.validationHint"></p><button class="btn btn-outline-kitty" type="button" data-action="probe-provider"><i class="bi bi-send"></i><span data-message="common.sendTest"></span></button><div id="provider-result" class="inline-result d-none" role="status"></div></div>
+            </li>
+            <li class="flow-step">
+              <div class="step-number">4</div>
+              <div class="step-content">
+                <h2 data-message="config.settingsTitle"></h2>
+                <p class="step-hint" data-message="config.settingsHint"></p>
+                <section class="settings-section"><h2 data-message="config.extensionsTitle"></h2><div id="extension-switches" class="switch-grid"></div></section>
+                <section class="settings-section"><h2 data-message="config.runtimeTitle"></h2><div id="advanced-settings" class="form-grid"></div></section>
+                <div class="sticky-actions"><button class="btn btn-kitty" type="submit"><i class="bi bi-save"></i><span data-message="common.save"></span></button><div id="config-result" class="inline-result d-none" role="status"></div></div>
+              </div>
+            </li>
+          </ol>
+        </form>
+      </article>
+
+      <article class="workflow-panel d-none" data-workflow-panel="weixin">
+        <div class="detail-heading"><h1 data-message="workflow.weixin"></h1><p data-message="weixin.description"></p></div>
+        <ol class="flow-steps">
+          <li class="flow-step"><div class="step-number">1</div><div class="step-content"><h2 data-message="weixin.allowedTitle"></h2><form id="weixin-form" class="compact-form"><div><label class="form-label" for="weixin-users" data-message="weixin.userId"></label><input class="form-control" id="weixin-users" data-message-placeholder="weixin.usersPlaceholder" required></div><button class="btn btn-kitty" type="submit"><i class="bi bi-save"></i><span data-message="common.save"></span></button></form><div id="weixin-config-result" class="inline-result d-none" role="status"></div></div></li>
+          <li class="flow-step"><div class="step-number">2</div><div class="step-content"><h2 data-message="weixin.loginTitle"></h2><p class="step-hint" data-message="weixin.loginHint"></p><div class="action-row"><button class="btn btn-outline-kitty" type="button" data-action="weixin-login"><i class="bi bi-qr-code"></i><span data-message="weixin.generateQr"></span></button><button class="btn btn-quiet-danger" type="button" data-action="weixin-logout"><i class="bi bi-door-closed"></i><span data-message="weixin.logout"></span></button></div><div id="weixin-qr" class="qr-stage"></div></div></li>
+          <li class="flow-step"><div class="step-number">3</div><div class="step-content"><div class="step-title-row"><div><h2 data-message="weixin.startTitle"></h2><p class="step-hint" data-message="weixin.startHint"></p></div><span id="weixin-status" class="status-pill"></span></div><div class="action-row"><button class="btn btn-run" type="button" data-channel="weixin" data-action="start-channel"><i class="bi bi-play-fill"></i><span data-message="common.start"></span></button><button class="btn btn-outline-secondary" type="button" data-channel="weixin" data-action="stop-channel"><i class="bi bi-stop-fill"></i><span data-message="common.stop"></span></button></div><div class="stream-shell"><div id="weixin-stream" class="channel-stream" aria-live="polite"><div class="stream-empty" data-message="weixin.streamEmpty"></div></div></div></div></li>
+        </ol>
+      </article>
+
+      <article class="workflow-panel d-none" data-workflow-panel="telegram">
+        <div class="detail-heading"><h1 data-message="workflow.telegram"></h1><p data-message="telegram.description"></p></div>
+        <ol class="flow-steps">
+          <li class="flow-step"><div class="step-number">1</div><div class="step-content"><h2 data-message="telegram.botTitle"></h2><form id="telegram-form" class="form-grid"><div class="span-2"><label class="form-label" for="telegram-token" data-message="telegram.token"></label><input class="form-control font-monospace" id="telegram-token" type="text" autocomplete="off"><div class="form-text" data-message="telegram.tokenHint"></div></div><div class="span-2"><label class="form-label" for="telegram-users" data-message="telegram.users"></label><input class="form-control" id="telegram-users" data-message-placeholder="telegram.usersPlaceholder" required></div><div class="span-2 action-row"><button class="btn btn-kitty" type="submit"><i class="bi bi-save"></i><span data-message="common.save"></span></button></div></form><div id="telegram-config-result" class="inline-result d-none" role="status"></div></div></li>
+          <li class="flow-step"><div class="step-number">2</div><div class="step-content"><h2 data-message="telegram.verifyTitle"></h2><p class="step-hint" data-message="telegram.verifyHint"></p><button class="btn btn-outline-kitty" type="button" data-action="probe-telegram"><i class="bi bi-send"></i><span data-message="common.sendTest"></span></button><div id="telegram-probe-result" class="inline-result d-none" role="status"></div></div></li>
+          <li class="flow-step"><div class="step-number">3</div><div class="step-content"><div class="step-title-row"><div><h2 data-message="telegram.startTitle"></h2><p class="step-hint" data-message="telegram.startHint"></p></div><span id="telegram-status" class="status-pill"></span></div><div class="action-row"><button class="btn btn-run" type="button" data-channel="telegram" data-action="start-channel"><i class="bi bi-play-fill"></i><span data-message="common.start"></span></button><button class="btn btn-outline-secondary" type="button" data-channel="telegram" data-action="stop-channel"><i class="bi bi-stop-fill"></i><span data-message="common.stop"></span></button></div><div class="stream-shell"><div id="telegram-stream" class="channel-stream" aria-live="polite"><div class="stream-empty" data-message="telegram.streamEmpty"></div></div></div></div></li>
+        </ol>
+      </article>
+
+      <article class="workflow-panel d-none" data-workflow-panel="skills">
+        <div class="detail-heading"><h1 data-message="workflow.skills"></h1><p data-message="skills.description"></p></div>
+        <div id="skill-list" class="skill-list"></div>
+        <section id="skill-reader" class="skill-reader d-none"><div class="skill-reader-heading"><div><p class="eyebrow" data-message="skills.source"></p><h2 id="skill-reader-title"></h2></div></div><pre id="skill-source"></pre></section>
+      </article>
+    </section>
+  </main>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

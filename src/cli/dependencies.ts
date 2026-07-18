@@ -4,6 +4,12 @@ import type { OneShotPromptRunResult } from "./oneShot.js";
 import type { RuntimeConfig, SessionRecord } from "../types.js";
 
 export interface CliProgramDependencies {
+  startLocalConsole?: (cwd: string) => Promise<{
+    url: string;
+    close(): Promise<void>;
+    wait(): Promise<void>;
+  }>;
+  openBrowser?: (url: string) => boolean | Promise<boolean>;
   startInteractive?: (options: {
     cwd: string;
     config: RuntimeConfig;

@@ -21,6 +21,8 @@ test("interactive slash commands expose only the current TUI product surface", (
     "/status",
     "/export",
     "/exit",
+    "/stop",
+    "/new",
   ]);
   assert.equal(normalizeLocalCommand("/resume", "tui"), undefined);
   assert.equal(normalizeLocalCommand("/copy", "tui"), undefined);

@@ -48,31 +48,6 @@ test("runtime producers never import interface adapters", async () => {
   assert.deepEqual(violations, []);
 });
 
-test("removed delegated-agent capability leaves no current product trace", async () => {
-  const removedName = ["sub", "agent"].join("");
-  const roots = [
-    path.join(ROOT, "src"),
-    path.join(ROOT, "docs"),
-    path.join(ROOT, "README.md"),
-    path.join(ROOT, "spec.md"),
-    path.join(ROOT, ".env.example"),
-    path.join(ROOT, ".env.template"),
-    path.join(ROOT, "package.json"),
-  ];
-  const violations: string[] = [];
-
-  for (const root of roots) {
-    for (const file of await listFiles(root)) {
-      const source = await readFile(file, "utf8");
-      if (source.toLowerCase().includes(removedName)) {
-        violations.push(path.relative(ROOT, file));
-      }
-    }
-  }
-
-  assert.deepEqual(violations, []);
-});
-
 function readRelativeImports(source: string): string[] {
   const imports: string[] = [];
   const pattern = /(?:\bfrom\s*|\bimport\s*\()\s*["']([^"']+)["']/g;

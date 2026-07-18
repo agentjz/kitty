@@ -5,14 +5,11 @@ export interface RemoteActiveTurn {
 
 export class RemoteTurnState<TActive extends RemoteActiveTurn> {
   private readonly activeTurns = new Map<string, TActive>();
-  private readonly pendingStopRequests = new Set<string>();
   private readonly queuedTurnCounts = new Map<string, number>();
 
   getActiveTurn(peerKey: string): TActive | undefined { return this.activeTurns.get(peerKey); }
   setActiveTurn(peerKey: string, turn: TActive): void { this.activeTurns.set(peerKey, turn); }
   clearActiveTurn(peerKey: string): void { this.activeTurns.delete(peerKey); }
-  consumePendingStop(peerKey: string): boolean { return this.pendingStopRequests.delete(peerKey); }
-  armPendingStop(peerKey: string): void { this.pendingStopRequests.add(peerKey); }
   getQueuedTurnCount(peerKey: string): number { return this.queuedTurnCounts.get(peerKey) ?? 0; }
   incrementQueuedTurns(peerKey: string): void { this.queuedTurnCounts.set(peerKey, this.getQueuedTurnCount(peerKey) + 1); }
   decrementQueuedTurns(peerKey: string): void {

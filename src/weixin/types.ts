@@ -2,7 +2,11 @@ import type { CDNMedia, VoiceItem, WeixinMessage } from "@openilink/openilink-sd
 
 export type WeixinRawMessage = WeixinMessage;
 export interface WeixinPollingBatch { messages: WeixinRawMessage[]; syncBuf: string | null; longPollingTimeoutMs?: number; }
-export interface WeixinPollingSourceLike { poll(signal?: AbortSignal): Promise<WeixinPollingBatch>; commit(syncBuf: string | null): Promise<void>; }
+export interface WeixinPollingSourceLike {
+  poll(signal?: AbortSignal): Promise<WeixinPollingBatch>;
+  stage?(syncBuf: string | null): void;
+  commit(syncBuf: string | null): Promise<void>;
+}
 
 interface WeixinPrivateMessageBase {
   peerKey: string; userId: string; messageId: number; seq: number; contextToken: string; text: string; raw: WeixinRawMessage;
