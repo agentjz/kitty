@@ -404,18 +404,6 @@ function collectSessionInputHistory(session: SessionRecord | undefined): string[
     .map((message) => message.content!.trim());
 }
 
-export function parseSubmittedInputEcho(text: string): string | undefined {
-  const lines = text.split(/\r?\n/);
-  if (lines.length === 0 || !lines[0]?.startsWith("> ")) {
-    return undefined;
-  }
-  const parsed = lines.map((line, index) => {
-    const prefix = index === 0 ? "> " : "… ";
-    return line.startsWith(prefix) ? line.slice(prefix.length) : line;
-  }).join("\n");
-  return parsed.trim() ? parsed : undefined;
-}
-
 function createEntryId(index: number): string {
   return `entry-${index + 1}`;
 }

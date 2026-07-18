@@ -12,11 +12,12 @@ import type { RegisteredTool, ToolFilter } from "../tools/core/types.js";
 import type { RuntimeConfig, SessionRecord } from "../types.js";
 import { defaultInteractiveExitGuard, type InteractiveExitGuard } from "./exitGuard.js";
 import { handleLocalCommand, type LocalCommandResult } from "./localCommands.js";
-import { normalizeLocalCommand } from "./localCommandDefinitions.js";
+import { normalizeLocalCommand, type LocalCommandSurface } from "./localCommandDefinitions.js";
 import { notifyBackgroundWaitersForConsumer } from "../execution/backgroundSignals.js";
 import type { InteractionShell } from "./shell.js";
 import { ControlPlaneLedger } from "../control/ledger.js";
 import { translate, type MessageKey } from "../i18n/index.js";
+import { formatSubmittedInput } from "./submittedInput.js";
 
 export interface InteractiveTurnContext {
   cwd?: string;
@@ -38,6 +39,7 @@ export interface InteractiveSessionDriverOptions {
   onSessionUpdated?: (session: SessionRecord) => void;
   onSessionChanged?: (session: SessionRecord) => void;
   stateRootDir: string;
+  surface?: LocalCommandSurface;
 }
 
 interface ActiveTurnOperation {
@@ -61,6 +63,21 @@ export class InteractiveSessionDriver {
 
   constructor(private readonly options: InteractiveSessionDriverOptions) {
     this.session = options.session;
+  }
+
+  async selectSession(session: SessionRecord): Promise<boolean> {
+    this.abortActiveTurns();
+    await waitAtMost(this.waitForActiveTurns(), TURN_SHUTDOWN_GRACE_MS);
+    if (this.activeTurns.length > 0) {
+      this.options.shell.output.warn(this.t("interaction.interrupting"));
+      return false;
+    }
+    this.clearRecoveryTimers();
+    this.session = session;
+    this.options.onSessionChanged?.(session);
+    this.options.onSessionUpdated?.(session);
+    this.resumePendingTurns();
+    return true;
   }
 
   async run(): Promise<SessionRecord> {
@@ -100,7 +117,7 @@ export class InteractiveSessionDriver {
   }
 
   private async handleInput(input: string): Promise<LocalCommandResult> {
-    const command = normalizeLocalCommand(input);
+    const command = normalizeLocalCommand(input, this.options.surface ?? "tui");
     if (command === "stop") {
       this.handleCommandStop();
       return "handled";
@@ -126,6 +143,7 @@ export class InteractiveSessionDriver {
           sessionStore: this.options.sessionStore,
         },
         this.options.shell.output,
+        this.options.surface ?? "tui",
       );
     } catch (error) {
       this.options.shell.output.error(getErrorMessage(error));
@@ -219,17 +237,8 @@ export class InteractiveSessionDriver {
   }
 
   private async handleCommandNew(): Promise<void> {
-    this.abortActiveTurns();
-    await waitAtMost(this.waitForActiveTurns(), TURN_SHUTDOWN_GRACE_MS);
-    if (this.activeTurns.length > 0) {
-      this.options.shell.output.warn(this.t("interaction.interrupting"));
-      return;
-    }
     const session = await this.options.sessionStore.save(await this.options.sessionStore.create(this.options.cwd));
-    this.session = session;
-    this.options.onSessionChanged?.(session);
-    this.options.onSessionUpdated?.(session);
-    this.options.shell.output.info(this.t("remote.newConfirmed"));
+    if (await this.selectSession(session)) this.options.shell.output.info(this.t("remote.newConfirmed"));
   }
 
   private async terminateOwnedProcesses(): Promise<void> {
@@ -466,13 +475,6 @@ export class InteractiveSessionDriver {
 function isYes(value: string): boolean {
   const normalized = value.trim().toLowerCase();
   return normalized === "y" || normalized === "yes";
-}
-
-function formatSubmittedInput(input: string): string {
-  return input
-    .split("\n")
-    .map((line, index) => `${index === 0 ? "> " : "… "}${line}`)
-    .join("\n");
 }
 
 async function waitAtMost(promise: Promise<unknown>, timeoutMs: number): Promise<void> {

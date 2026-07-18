@@ -2,6 +2,7 @@ import { KITTY_BASE_ENV } from "../config/envKeys.js";
 import { listAgentProfiles } from "../agent/profiles/registry.js";
 import type { ExtensionId } from "../extensions/definitions.js";
 import { SUPPORTED_LOCALES, translate, type KittyLocale, type MessageKey } from "../i18n/index.js";
+import { listSlashCommands } from "../interaction/localCommandDefinitions.js";
 
 type RuntimeControl = "text" | "number" | "url" | "select";
 
@@ -81,7 +82,7 @@ export function buildWebMessages(locale: KittyLocale) {
       weixin: t("web.workflow.weixin"), telegram: t("web.workflow.telegram"), skills: t("web.workflow.skills"), web: t("web.workflow.web"),
       loadingConfig: t("web.workflow.loadingConfig"), loadingService: t("web.workflow.loadingService"), loadingSkills: t("web.workflow.loadingSkills"),
       basicNote: t("web.workflow.basicNote"), configNote: t("web.workflow.configNote"), pluginsNote: t("web.workflow.pluginsNote"), otherNote: t("web.workflow.otherNote"), otherSummary: t("web.workflow.otherSummary"),
-      weixinNote: t("web.workflow.weixinNote"), telegramNote: t("web.workflow.telegramNote"), skillsNote: t("web.workflow.skillsNote"), webNote: t("web.workflow.webNote"),
+      weixinNote: t("web.workflow.weixinNote"), telegramNote: t("web.workflow.telegramNote"), skillsNote: t("web.workflow.skillsNote"), webNote: t("web.workflow.webNote"), webSummary: t("web.workflow.webSummary"),
       guide: t("web.workflow.guide"),
     },
     config: {
@@ -119,6 +120,10 @@ export function buildWebMessages(locale: KittyLocale) {
       toolProgress: t("web.stream.toolProgress"), toolResult: t("web.stream.toolResult"), toolError: t("web.stream.toolError"), error: t("web.stream.error"),
     },
     shell: {
+      back: t("web.common.back"),
+      history: t("tui.history"),
+      newSession: t("tui.newSession"),
+      commands: listSlashCommands("web", locale),
       connected: t("web.shell.connected"), disconnected: t("web.shell.disconnected"), thinking: t("web.shell.thinking"), stopped: t("web.shell.stopped"),
       inputPlaceholder: t("web.shell.inputPlaceholder"), send: t("web.shell.send"), stop: t("web.shell.stop"), empty: t("web.shell.empty"),
       reasoning: t("web.shell.reasoning"), user: t("web.shell.user"), assistant: t("web.shell.assistant"),

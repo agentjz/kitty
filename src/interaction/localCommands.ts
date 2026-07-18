@@ -3,7 +3,7 @@ import { formatRuntimeStatusText } from "../runtime-ui/statusPresenter.js";
 import type { SessionStoreLike } from "../session/index.js";
 import { exportSessionConversation } from "../session/transcriptExport.js";
 import type { RuntimeConfig, SessionRecord } from "../types.js";
-import { normalizeLocalCommand, type LocalCommandSurface } from "./localCommandDefinitions.js";
+import { formatLocalCommandHelp, normalizeLocalCommand, type LocalCommandSurface } from "./localCommandDefinitions.js";
 import type { ShellOutputPort } from "./shell.js";
 import { translate } from "../i18n/index.js";
 
@@ -53,5 +53,9 @@ export async function handleLocalCommand(
     return "handled";
   }
 
-  return command === "help" ? "handled" : "continue";
+  if (command === "help") {
+    output.plain(formatLocalCommandHelp(surface, context.config.locale));
+    return "handled";
+  }
+  return "continue";
 }

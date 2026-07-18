@@ -8,7 +8,6 @@ import {
   getVisibleTranscriptRows,
   hasTuiConversation,
   measureTranscriptRows,
-  parseSubmittedInputEcho,
   projectRuntimeStatusToDock,
   renderTranscriptLineViews,
   formatContextBudget,
@@ -16,6 +15,7 @@ import {
   scrollTuiTranscriptToBottom,
   type TuiViewport,
 } from "../../src/shell/tui/store.js";
+import { parseSubmittedInputEcho } from "../../src/interaction/submittedInput.js";
 import { projectTuiExecutionDockFacts, readTuiLiveExecutionDock } from "../../src/shell/tui/executionDock.js";
 import { ExecutionStore } from "../../src/execution/store.js";
 import type { RuntimeStatus } from "../../src/runtime/status.js";

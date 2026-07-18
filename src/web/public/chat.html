@@ -4,111 +4,208 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Kitty Web</title>
+  <link rel="stylesheet" href="/vendor/bootstrap.min.css">
   <link rel="stylesheet" href="/vendor/bootstrap-icons.css">
   <style>
-    :root { color-scheme: dark; --page:#090a0b; --surface:#121518; --surface-soft:#0d0f11; --ink:#edf0f2; --muted:#8f999f; --line:#30383d; --gold:#d6bd86; --blue:#8da9bd; --green:#82bd95; --red:#d98282; }
-    * { box-sizing: border-box; }
-    html, body { height: 100%; }
-    body { display:flex; flex-direction:column; margin:0; overflow:hidden; background:var(--page); color:var(--ink); font-family:Inter,"Noto Sans SC","Microsoft YaHei",system-ui,sans-serif; }
-    button, textarea { font:inherit; }
-    .web-main { width:min(100%, 960px); flex:1; min-height:0; margin:0 auto; padding:1.25rem 1rem 0; }
-    .web-status-line { min-height:1.25rem; color:var(--muted); text-align:right; font-size:.78rem; }
-    .web-transcript { height:100%; overflow-y:auto; padding:0 .25rem 1rem; }
-    .web-empty { display:grid; min-height:100%; place-items:center; color:var(--muted); text-align:center; }
-    .message { display:flex; margin:0 0 1rem; }
-    .message.user { justify-content:flex-end; }
-    .message.assistant { justify-content:flex-start; }
-    .message-card { max-width:min(90%, 760px); padding:.85rem 1rem; border:1px solid var(--line); border-radius:10px; background:var(--surface); line-height:1.7; overflow-wrap:anywhere; }
-    .user .message-card { border-color:#5f543b; background:#211d15; }
-    .message-label { display:block; margin-bottom:.3rem; color:var(--muted); font-size:.72rem; font-weight:700; }
-    .message-body > :first-child { margin-top:0; }
-    .message-body > :last-child { margin-bottom:0; }
-    .message-body pre { max-width:100%; overflow:auto; padding:.75rem; border-radius:6px; background:var(--surface-soft); white-space:pre-wrap; }
-    .message-body code { color:#c9d4dc; }
-    .message-body img { max-width:100%; height:auto; }
-    .reasoning { display:flex; margin:0 0 .9rem; }
-    .reasoning-card { max-width:min(88%, 720px); padding:.35rem 0 .35rem .8rem; border-left:2px solid #8d7950; color:#cfc29c; line-height:1.6; }
-    .reasoning-label { display:block; margin-bottom:.2rem; color:var(--gold); font-size:.75rem; font-weight:700; }
-    .tool-event { display:flex; margin:0 0 .75rem; }
-    .tool-card { width:min(100%, 760px); padding:.65rem .8rem; border:1px solid var(--line); border-radius:7px; background:var(--surface-soft); color:var(--blue); font-family:"Cascadia Mono","SFMono-Regular",Consolas,monospace; font-size:.82rem; }
-    .tool-card.done { color:var(--green); }
-    .tool-card.failed { color:var(--red); }
-    .tool-title { display:flex; align-items:center; gap:.55rem; }
-    .tool-emoji { flex:0 0 auto; font-family:"Segoe UI Emoji","Apple Color Emoji",sans-serif; }
-    .tool-summary { overflow-wrap:anywhere; }
-    .web-activity { min-height:1.4rem; padding:.15rem 0 .45rem; color:var(--muted); font-size:.78rem; }
-    .web-composer { padding:1rem; border-top:1px solid var(--line); background:var(--surface-soft); }
-    .web-form { display:flex; align-items:flex-end; gap:.65rem; width:min(100%, 960px); margin:0 auto; }
-    .web-input { min-height:3.1rem; max-height:12rem; flex:1; resize:none; padding:.8rem .9rem; border:1px solid var(--line); border-radius:7px; outline:0; background:var(--surface); color:var(--ink); }
-    .web-input:focus { border-color:var(--blue); }
-    .web-button { display:inline-flex; width:3rem; height:3rem; flex:0 0 auto; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:7px; background:var(--surface); color:var(--ink); cursor:pointer; }
-    .web-button.send { border-color:var(--gold); background:var(--gold); color:#111311; }
-    .web-button.stop { color:var(--red); }
-    .web-button:disabled { cursor:default; opacity:.45; }
-    @media (max-width:575px) { .web-main { padding:1rem .7rem 0; } .message-card, .reasoning-card { max-width:96%; } .web-composer { padding:.7rem; } .web-form { gap:.45rem; } }
+    :root {
+      color-scheme: dark;
+      --chat-bg: #000;
+      --chat-panel: #151515;
+      --chat-panel-soft: #1d1d1d;
+      --chat-border: #343434;
+      --chat-text: #f5f5f5;
+      --chat-muted: #999;
+      --chat-accent: #f5f5f5;
+      --chat-accent-soft: #1b1b1b;
+      --chat-link: #d6d6d6;
+      --chat-success: #d8d8d8;
+      --chat-danger: #f0f0f0;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; min-width: 320px; margin: 0; overflow: hidden; background: var(--chat-bg); }
+    body { color: var(--chat-text); font-family: Inter, "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif; }
+    button, textarea { font: inherit; }
+
+    .chat-page { width: 100%; height: 100dvh; background: var(--chat-bg); }
+    .chat-header { flex: 0 0 auto; border-bottom: 1px solid #202020; background: var(--chat-bg); }
+    .chat-header-inner { width: min(100%, 960px); min-height: 58px; margin: 0 auto; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .chat-back { display: inline-flex; align-items: center; gap: 7px; min-height: 34px; padding: 6px 10px; border: 1px solid var(--chat-border); border-radius: 6px; color: var(--chat-muted); background: transparent; font-size: .78rem; text-decoration: none; }
+    .chat-back:hover, .chat-back:focus-visible { border-color: #777; color: var(--chat-text); outline: 0; }
+    .chat-header-start { display: flex; align-items: center; gap: 14px; min-width: 0; }
+    .chat-actions { display: flex; align-items: center; gap: 7px; min-width: 0; }
+    .chat-select { max-width: 190px; min-width: 0; min-height: 34px; padding: 5px 28px 5px 9px; border: 1px solid var(--chat-border); border-radius: 6px; background-color: var(--chat-panel); color: var(--chat-muted); font-size: .76rem; }
+    .chat-select:focus { border-color: #777; outline: 0; box-shadow: 0 0 0 3px rgb(255 255 255 / 8%); }
+    .chat-action { width: 34px; height: 34px; display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; border: 1px solid var(--chat-border); border-radius: 6px; background: transparent; color: var(--chat-muted); }
+    .chat-action:hover, .chat-action:focus-visible { border-color: #777; color: var(--chat-text); outline: 0; }
+    .chat-connection { display: flex; align-items: center; gap: 7px; color: var(--chat-muted); font-size: .76rem; white-space: nowrap; }
+    .chat-connection::before { width: 7px; height: 7px; content: ""; border-radius: 50%; background: currentColor; }
+
+    .chat-main { min-height: 0; overflow: hidden; }
+    .chat-transcript { width: min(100%, 920px); min-width: 0; height: 100%; margin: 0 auto; padding: 26px 20px 34px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: #3e3e3e transparent; scrollbar-width: thin; }
+    .chat-transcript::-webkit-scrollbar { width: 7px; }
+    .chat-transcript::-webkit-scrollbar-track { background: transparent; }
+    .chat-transcript::-webkit-scrollbar-thumb { border-radius: 8px; background: #3e3e3e; }
+    .web-empty { min-height: 100%; display: grid; place-items: center; padding: 12vh 20px; color: var(--chat-muted); text-align: center; }
+    .empty-content { max-width: 420px; }
+    .empty-title { margin: 0 0 7px; color: var(--chat-text); font-size: 1.08rem; font-weight: 650; }
+    .empty-copy { margin: 0; font-size: .88rem; line-height: 1.6; }
+
+    .message, .reasoning, .tool-event { width: 100%; display: flex; margin: 0 0 22px; }
+    .message.user { justify-content: flex-end; }
+    .message-card { min-width: 0; max-width: 78%; padding: 12px 16px; border: 1px solid var(--chat-border); border-radius: 14px; background: var(--chat-panel); line-height: 1.7; overflow-wrap: anywhere; }
+    .user .message-card { min-width: 0; border-color: #3d3d3d; border-bottom-right-radius: 5px; background: #1b1b1b; }
+    .assistant .message-card { width: min(100%, 820px); max-width: 100%; padding: 0 4px; border: 0; border-radius: 0; background: transparent; }
+    .message-label, .reasoning-label { display: flex; align-items: center; gap: 7px; margin: 0 0 6px; color: var(--chat-muted); font-size: .75rem; font-weight: 650; }
+    .message-label i { color: var(--chat-accent); }
+    .message-body { min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
+    .message-body > :first-child { margin-top: 0; }
+    .message-body > :last-child { margin-bottom: 0; }
+    .message-body pre { max-width: 100%; overflow: auto; padding: 12px 14px; border: 1px solid var(--chat-border); border-radius: 9px; background: var(--chat-panel-soft); white-space: pre-wrap; }
+    .message-body code { color: #c9d7e0; }
+    .message-body img { max-width: 100%; height: auto; }
+    .message-body blockquote { margin: 12px 0; padding-left: 14px; border-left: 2px solid var(--chat-border); color: var(--chat-muted); }
+    .message-body a { color: var(--chat-link); }
+
+    .reasoning { margin-bottom: 18px; }
+    .reasoning-card { width: min(100%, 820px); padding: 4px 0 4px 16px; border-left: 2px solid #555; color: #b8b8b8; line-height: 1.65; overflow-wrap: anywhere; }
+    .reasoning-label { color: var(--chat-accent); }
+    .thinking-indicator { display: inline-flex; align-items: center; gap: 3px; flex: 0 0 auto; }
+    .thinking-indicator span { width: 4px; height: 4px; border-radius: 50%; background: currentColor; opacity: .38; }
+    .is-streaming .thinking-indicator span, .is-thinking .thinking-indicator span { animation: thinking-breathe 1.2s ease-in-out infinite; }
+    .thinking-indicator span:nth-child(2) { animation-delay: .16s; }
+    .thinking-indicator span:nth-child(3) { animation-delay: .32s; }
+
+    .tool-event { margin-bottom: 14px; }
+    .tool-card { width: min(100%, 820px); border: 1px solid var(--chat-border); border-radius: 10px; background: var(--chat-panel); color: var(--chat-link); overflow: hidden; }
+    .tool-card.done { color: var(--chat-success); }
+    .tool-card.failed { color: var(--chat-danger); }
+    .tool-title { min-height: 43px; display: flex; align-items: center; gap: 10px; padding: 10px 13px; }
+    .tool-title i { flex: 0 0 auto; font-size: .9rem; }
+    .tool-summary { min-width: 0; overflow-wrap: anywhere; font-size: .84rem; }
+    .tool-state { margin-left: auto; color: var(--chat-muted); font-size: .72rem; white-space: nowrap; }
+
+    .chat-composer { flex: 0 0 auto; border-top: 1px solid #202020; background: var(--chat-bg); }
+    .chat-composer-inner { width: min(100%, 920px); margin: 0 auto; padding: 12px 20px 16px; }
+    .web-activity { min-height: 19px; padding: 0 2px 7px; color: var(--chat-muted); font-size: .76rem; }
+    .web-activity.is-thinking { display: flex; align-items: center; gap: 7px; }
+    .web-form { display: flex; align-items: flex-end; gap: 9px; }
+    .web-input { min-width: 0; min-height: 48px; max-height: 170px; flex: 1 1 auto; resize: none; overflow-y: auto; padding: 12px 15px; border: 1px solid var(--chat-border); border-radius: 8px; outline: 0; background: var(--chat-panel); color: var(--chat-text); line-height: 1.5; scrollbar-width: none; }
+    .web-input::-webkit-scrollbar { display: none; }
+    .web-input:focus { border-color: #777; box-shadow: 0 0 0 3px rgb(255 255 255 / 8%); }
+    .web-input::placeholder { color: #6e7b84; }
+    .web-button { width: 48px; height: 48px; display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; border: 1px solid var(--chat-border); border-radius: 8px; background: var(--chat-panel); color: var(--chat-text); cursor: pointer; transition: background-color .15s ease, border-color .15s ease, opacity .15s ease; }
+    .web-button:hover:not(:disabled), .web-button:focus-visible:not(:disabled) { border-color: #777; background: var(--chat-panel-soft); outline: 0; }
+    .web-button.send { border-color: #ededed; background: #ededed; color: #000; }
+    .web-button.send:hover:not(:disabled), .web-button.send:focus-visible:not(:disabled) { border-color: #fff; background: #fff; }
+    .web-button.stop { color: var(--chat-danger); }
+    .web-button:disabled { cursor: default; opacity: .42; }
+    @keyframes thinking-breathe { 0%, 70%, 100% { opacity: .28; transform: translateY(0); } 35% { opacity: 1; transform: translateY(-2px); } }
+    @media (max-width: 575px) { .chat-header-inner { flex-wrap: wrap; padding: 9px 13px; } .chat-header-start { flex: 1 1 auto; } .chat-actions { width: 100%; } .chat-select { max-width: none; flex: 1 1 0; } .chat-connection { display: none; } .chat-composer-inner { padding-inline: 13px; } .chat-transcript { padding-inline: 13px; } .message-card { max-width: 88%; } .web-form { gap: 7px; } .web-button { width: 44px; height: 44px; border-radius: 8px; } .web-input { min-height: 44px; border-radius: 8px; } }
   </style>
 </head>
-<body>
-  <main class="web-main"><div class="web-status-line" id="web-status" aria-live="polite"></div><section class="web-transcript" id="web-transcript" aria-live="polite"><div class="web-empty" id="web-empty"></div></section><div class="web-activity" id="web-activity" aria-live="polite"></div></main>
-  <footer class="web-composer"><form class="web-form" id="web-form"><textarea class="web-input" id="web-input" rows="1" disabled></textarea><button class="web-button stop" id="web-stop" type="button" disabled><i class="bi bi-stop-fill" aria-hidden="true"></i></button><button class="web-button send" id="web-send" type="submit" disabled><i class="bi bi-send-fill" aria-hidden="true"></i></button></form></footer>
+<body class="chat-page d-flex flex-column">
+  <header class="chat-header">
+    <div class="chat-header-inner">
+      <div class="chat-header-start"><a class="chat-back" id="chat-back" href="/" aria-label="返回工作台"><i class="bi bi-grid-3x3-gap" aria-hidden="true"></i><span></span></a></div>
+      <div class="chat-actions"><select class="chat-select" id="chat-sessions" aria-label="Session history"></select><select class="chat-select" id="chat-commands" aria-label="Commands"></select><button class="chat-action" id="chat-new" type="button" aria-label="New session"><i class="bi bi-plus-lg" aria-hidden="true"></i></button><div class="chat-connection" id="web-status" aria-live="polite"></div></div>
+    </div>
+  </header>
+  <main class="chat-main flex-grow-1">
+    <section class="chat-transcript" id="web-transcript" aria-live="polite">
+      <div class="web-empty" id="web-empty"><div class="empty-content"><p class="empty-title">Kitty</p><p class="empty-copy"></p></div></div>
+    </section>
+  </main>
+  <footer class="chat-composer">
+    <div class="chat-composer-inner">
+      <div class="web-activity" id="web-activity" aria-live="polite"></div>
+      <form class="web-form" id="web-form">
+        <textarea class="web-input" id="web-input" rows="1" disabled></textarea>
+        <button class="web-button stop" id="web-stop" type="button" disabled aria-label="Stop"><i class="bi bi-stop-fill" aria-hidden="true"></i></button>
+        <button class="web-button send" id="web-send" type="submit" disabled aria-label="Send"><i class="bi bi-send-fill" aria-hidden="true"></i></button>
+      </form>
+    </div>
+  </footer>
   <script type="module">
     import { marked } from "/vendor/marked.esm.js";
 
     const params = new URLSearchParams(location.search);
     const token = params.get("token") || "";
     const transcript = document.querySelector("#web-transcript");
-    const empty = document.querySelector("#web-empty");
+    let empty = document.querySelector("#web-empty");
     const input = document.querySelector("#web-input");
     const send = document.querySelector("#web-send");
     const stop = document.querySelector("#web-stop");
+    const back = document.querySelector("#chat-back");
+    const sessionsSelect = document.querySelector("#chat-sessions");
+    const commandsSelect = document.querySelector("#chat-commands");
+    const newSession = document.querySelector("#chat-new");
     const status = document.querySelector("#web-status");
     const activity = document.querySelector("#web-activity");
     let labels = {};
     let socket;
     let activeAssistant;
+    let activeAssistantText = "";
     let activeReasoning;
+    let activeReasoningLabel;
     const tools = new Map();
+    let activeSessionId = "";
 
     function scrollToBottom() { transcript.scrollTop = transcript.scrollHeight; }
     function showContent() { empty?.remove(); }
+    function resetTranscript() { transcript.replaceChildren(); const next = document.createElement("div"); next.className = "web-empty"; next.id = "web-empty"; next.innerHTML = `<div class="empty-content"><p class="empty-title">Kitty</p><p class="empty-copy">${labels.empty || ""}</p></div>`; transcript.append(next); empty = next; activeAssistant = undefined; activeAssistantText = ""; activeReasoning = undefined; activeReasoningLabel = undefined; tools.clear(); }
     function markdown(target, text) { target.innerHTML = marked.parse(text || "", { breaks: true }); }
     function addMessage(kind, text, label) {
       showContent();
       const row = document.createElement("article"); row.className = `message ${kind}`;
       const card = document.createElement("div"); card.className = "message-card";
-      if (label) { const heading = document.createElement("span"); heading.className = "message-label"; heading.textContent = label; card.append(heading); }
+      if (label) { const heading = document.createElement("span"); heading.className = "message-label"; heading.innerHTML = kind === "assistant" ? '<i class="bi bi-stars" aria-hidden="true"></i>' : ""; const textNode = document.createElement("span"); textNode.textContent = label; heading.append(textNode); card.append(heading); }
       const body = document.createElement("div"); body.className = "message-body"; markdown(body, text); card.append(body); row.append(card); transcript.append(row); scrollToBottom();
       return body;
     }
+    function createThinkingIndicator() { const indicator = document.createElement("span"); indicator.className = "thinking-indicator"; indicator.setAttribute("aria-hidden", "true"); indicator.append(document.createElement("span"), document.createElement("span"), document.createElement("span")); return indicator; }
+    function renderActivity(text) { const thinking = Boolean(text) && text === labels.thinking; activity.replaceChildren(); activity.classList.toggle("is-thinking", thinking); if (thinking) activity.append(createThinkingIndicator()); if (text) activity.append(document.createTextNode(text)); }
     function appendReasoning(text) {
       showContent();
-      if (!activeReasoning) { const row = document.createElement("article"); row.className = "reasoning"; const card = document.createElement("div"); card.className = "reasoning-card"; const label = document.createElement("span"); label.className = "reasoning-label"; label.textContent = `🐶 ${labels.reasoning || ""}`; const body = document.createElement("div"); card.append(label, body); row.append(card); transcript.append(row); activeReasoning = body; }
+      if (!activeReasoning) { const row = document.createElement("article"); row.className = "reasoning"; const card = document.createElement("div"); card.className = "reasoning-card"; const label = document.createElement("span"); label.className = "reasoning-label is-streaming"; const labelText = document.createElement("span"); labelText.textContent = labels.reasoning || ""; label.append(createThinkingIndicator(), labelText); const body = document.createElement("div"); card.append(label, body); row.append(card); transcript.append(row); activeReasoning = body; activeReasoningLabel = label; }
       activeReasoning.textContent += text || ""; scrollToBottom();
     }
     function addTool(id, summary) {
       showContent();
       const row = document.createElement("article"); row.className = "tool-event"; row.dataset.toolId = String(id || "");
-      const card = document.createElement("div"); card.className = "tool-card"; const title = document.createElement("div"); title.className = "tool-title"; const icon = document.createElement("span"); icon.className = "tool-emoji"; icon.textContent = "🔧"; const text = document.createElement("span"); text.className = "tool-summary"; text.textContent = summary || labels.toolCalling || ""; title.append(icon, text); card.append(title); row.append(card); transcript.append(row); tools.set(id, { card, text }); scrollToBottom();
+      const card = document.createElement("div"); card.className = "tool-card";
+      const title = document.createElement("div"); title.className = "tool-title";
+      const icon = document.createElement("i"); icon.className = "bi bi-tools"; icon.setAttribute("aria-hidden", "true");
+      const text = document.createElement("span"); text.className = "tool-summary"; text.textContent = summary || labels.toolCalling || "";
+      const state = document.createElement("span"); state.className = "tool-state"; state.textContent = labels.toolCalling || "";
+      title.append(icon, text, state); card.append(title); row.append(card); transcript.append(row); tools.set(id, { card, text, state }); scrollToBottom();
     }
-    function updateTool(id, summary, failed) { const tool = tools.get(id); if (!tool) return addTool(id, summary); tool.text.textContent = summary || "工具已完成"; tool.card.classList.add(failed ? "failed" : "done"); scrollToBottom(); }
+    function updateTool(id, summary, failed) { const tool = tools.get(id); if (!tool) return addTool(id, summary); tool.text.textContent = summary || labels.toolDone || ""; tool.state.textContent = failed ? (labels.toolFailed || "") : (labels.toolDone || ""); tool.card.classList.add(failed ? "failed" : "done"); scrollToBottom(); }
+    function finishReasoning() { activeReasoningLabel?.classList.remove("is-streaming"); activeReasoningLabel = undefined; activeReasoning = undefined; }
+    function resetActive() { activeAssistant = undefined; activeAssistantText = ""; finishReasoning(); }
     function handle(message) {
-      if (message.type === "presentation") { labels = message.labels || {}; document.querySelector("#web-empty").textContent = labels.empty || ""; input.placeholder = labels.inputPlaceholder || ""; send.title = labels.send || ""; stop.title = labels.stop || ""; }
-      else if (message.type === "user") { addMessage("user", message.text, ""); activeAssistant = undefined; activeReasoning = undefined; }
+      if (message.type === "presentation") { labels = message.labels || {}; const emptyCopy = document.querySelector("#web-empty .empty-copy"); if (emptyCopy) emptyCopy.textContent = labels.empty || ""; if (back) { back.querySelector("span").textContent = labels.back || ""; back.title = labels.back || ""; } if (sessionsSelect) sessionsSelect.title = labels.history || ""; if (newSession) newSession.title = labels.newSession || ""; if (commandsSelect) { commandsSelect.innerHTML = ""; for (const command of labels.commands || []) { const option = document.createElement("option"); option.value = command.name; option.textContent = `${command.name} · ${command.description}`; commandsSelect.append(option); } commandsSelect.selectedIndex = -1; } input.placeholder = labels.inputPlaceholder || ""; send.title = labels.send || ""; stop.title = labels.stop || ""; }
+      else if (message.type === "session_catalog") { if (message.activeSessionId && message.activeSessionId !== activeSessionId) resetTranscript(); activeSessionId = message.activeSessionId || ""; if (sessionsSelect) { sessionsSelect.innerHTML = ""; for (const session of message.sessions || []) { const option = document.createElement("option"); option.value = session.id; option.textContent = session.title || session.id; sessionsSelect.append(option); } sessionsSelect.value = activeSessionId; } }
+      else if (message.type === "user") { addMessage("user", message.text, ""); resetActive(); }
       else if (message.type === "reasoning" || message.type === "reasoning_delta") appendReasoning(message.text);
-      else if (message.type === "delta") { if (!activeAssistant) activeAssistant = addMessage("assistant", "", `🐱 ${labels.assistant || ""}`); activeAssistant.innerHTML += marked.parseInline(message.text || ""); scrollToBottom(); }
-      else if (message.type === "message") { if (!activeAssistant) activeAssistant = addMessage("assistant", message.text, `🐱 ${labels.assistant || ""}`); else markdown(activeAssistant, message.text); }
-      else if (message.type === "tool_call") { addTool(message.id, message.summary); activeAssistant = undefined; activeReasoning = undefined; }
-      else if (message.type === "tool_result") { updateTool(message.id, message.summary, false); }
-      else if (message.type === "tool_error") { updateTool(message.id, message.summary, true); }
-      else if (message.type === "status") activity.textContent = message.text || "";
-      else if (message.type === "done" || message.type === "interrupt") { activeAssistant = undefined; activeReasoning = undefined; stop.disabled = true; activity.textContent = message.type === "interrupt" ? (message.text || labels.stopped || "") : ""; }
+      else if (message.type === "delta") { finishReasoning(); if (!activeAssistant) activeAssistant = addMessage("assistant", "", ""); activeAssistantText += message.text || ""; markdown(activeAssistant, activeAssistantText); scrollToBottom(); }
+      else if (message.type === "message") { finishReasoning(); if (!activeAssistant) activeAssistant = addMessage("assistant", message.text, ""); else { activeAssistantText = message.text || ""; markdown(activeAssistant, activeAssistantText); } scrollToBottom(); }
+      else if (message.type === "tool_call") { addTool(message.id, message.summary); resetActive(); }
+      else if (message.type === "tool_result") updateTool(message.id, message.summary, false);
+      else if (message.type === "tool_error") updateTool(message.id, message.summary, true);
+      else if (message.type === "status") { renderActivity(message.text || ""); status.textContent = message.text || labels.connected || ""; }
+      else if (message.type === "done" || message.type === "interrupt") { resetActive(); stop.disabled = true; renderActivity(message.type === "interrupt" ? (message.text || labels.stopped || "") : ""); }
     }
     function sendMessage(text) { if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "input", text })); }
     function connect() { socket = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/web?token=${encodeURIComponent(token)}`); socket.addEventListener("open", () => { status.textContent = labels.connected || ""; input.disabled = false; send.disabled = false; input.focus(); }); socket.addEventListener("message", (event) => { try { handle(JSON.parse(event.data)); } catch {} }); socket.addEventListener("close", () => { status.textContent = labels.disconnected || ""; input.disabled = true; send.disabled = true; stop.disabled = true; }); }
     document.querySelector("#web-form").addEventListener("submit", (event) => { event.preventDefault(); const text = input.value.trim(); if (!text) return; input.value = ""; input.style.height = "auto"; stop.disabled = false; sendMessage(text); });
     stop.addEventListener("click", () => { if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "interrupt" })); });
+    sessionsSelect?.addEventListener("change", () => { if (sessionsSelect.value && socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "session_select", sessionId: sessionsSelect.value })); });
+    commandsSelect?.addEventListener("change", () => { const command = commandsSelect.value; if (command) sendMessage(command); commandsSelect.selectedIndex = -1; });
+    newSession?.addEventListener("click", () => sendMessage("/new"));
     input.addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); document.querySelector("#web-form").requestSubmit(); } });
-    input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = `${Math.min(input.scrollHeight, 192)}px`; });
+    input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = `${Math.min(input.scrollHeight, 170)}px`; });
+    if (back) back.href = `/?token=${encodeURIComponent(token)}`;
     connect();
   </script>
 </body>

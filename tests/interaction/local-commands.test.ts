@@ -31,6 +31,21 @@ test("interactive slash commands expose only the current TUI product surface", (
   assert.equal(isExplicitExitCommand("quit"), false);
 });
 
+test("web slash commands are projected from the shared command definitions", async () => {
+  assert.deepEqual(listSlashCommands("web").map((command) => command.name), [
+    "/status",
+    "/help",
+    "/stop",
+    "/new",
+  ]);
+  assert.equal(normalizeLocalCommand("/export", "web"), undefined);
+  const context = createLocalCommandContext(process.cwd());
+  const output = createRecordingOutput();
+  assert.equal(await handleLocalCommand("/help", context, output, "web"), "handled");
+  assert.match(output.plainText.join("\n"), /\/new/);
+  assert.doesNotMatch(output.plainText.join("\n"), /\/export/);
+});
+
 test("status aggregates configuration, background, events, and every discovered skill", async (t) => {
   const root = await createTempWorkspace("local-status", t);
   await fs.mkdir(path.join(root, "skills", "demo"), { recursive: true });

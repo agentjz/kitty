@@ -58,6 +58,19 @@ export async function startLocalConsole(cwd: string): Promise<LocalConsoleHandle
   }
   const webShell = new WebChatShell(presentation.shell);
   const webSockets = new WebSocketServer({ noServer: true });
+  let catalogPublish = Promise.resolve();
+  const publishSessionCatalog = (): Promise<void> => {
+    catalogPublish = catalogPublish.then(async () => {
+      const sessions = await sessionStore.list(20);
+      webShell.broadcastSessionCatalog(webSession?.id, sessions.map((session) => ({
+        id: session.id,
+        title: session.title,
+        updatedAt: session.updatedAt,
+        messageCount: session.messageCount,
+      })));
+    });
+    return catalogPublish;
+  };
   const webDriver = new InteractiveSessionDriver({
     cwd,
     config: runtime,
@@ -65,8 +78,9 @@ export async function startLocalConsole(cwd: string): Promise<LocalConsoleHandle
     sessionStore,
     shell: webShell,
     stateRootDir,
-    onSessionChanged: (session) => { webSession = session; void sessionBinding.save(session.id); },
-    onSessionUpdated: (session) => { webSession = session; void sessionBinding.save(session.id); },
+    surface: "web",
+    onSessionChanged: (session) => { webSession = session; void sessionBinding.save(session.id); void publishSessionCatalog(); },
+    onSessionUpdated: (session) => { webSession = session; void sessionBinding.save(session.id); void publishSessionCatalog(); },
   });
   const webDriverTask = webDriver.run().catch(() => undefined);
   const unsubscribeRemote = subscribeRemoteRuntimeEvents((event) => {
@@ -92,7 +106,26 @@ export async function startLocalConsole(cwd: string): Promise<LocalConsoleHandle
   });
   webShell.attach(webSockets, async (send) => {
     const current = webSession ? await sessionStore.load(webSession.id).catch(() => webSession) : null;
+    const sessions = await sessionStore.list(20);
+    send({
+      type: "session_catalog",
+      activeSessionId: current?.id,
+      sessions: sessions.map((session) => ({
+        id: session.id,
+        title: session.title,
+        updatedAt: session.updatedAt,
+        messageCount: session.messageCount,
+      })),
+    });
     if (current) webShell.replaySession(current, send);
+  }, (message) => {
+    void (async () => {
+      const selected = await sessionStore.load(message.sessionId).catch(() => null);
+      if (selected && await webDriver.selectSession(selected)) {
+        await publishSessionCatalog();
+        webShell.broadcastSessionReplay(selected);
+      }
+    })();
   });
 
   async function route(request: IncomingMessage, response: ServerResponse): Promise<void> {

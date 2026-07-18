@@ -5,7 +5,6 @@ import {
   appendTranscriptEntry,
   appendTranscriptText,
   applyViewportResize,
-  parseSubmittedInputEcho,
   scrollTuiTranscript,
   scrollTuiTranscriptToBottom,
   scrollTuiTranscriptToTop,
@@ -22,6 +21,7 @@ import {
   type TuiTranscriptRole,
   type TuiViewport,
 } from "./store.js";
+import { parseSubmittedInputEcho } from "../../interaction/submittedInput.js";
 import { TuiTranscriptProjection } from "./transcriptProjection.js";
 import type { TuiMouseEvent } from "./input/scroll.js";
 import {
