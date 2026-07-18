@@ -13,6 +13,13 @@ const ENV = {
   model: "KITTY_MODEL",
   baseUrl: "KITTY_BASE_URL",
   apiKey: "KITTY_API_KEY",
+  mediaProvider: "KITTY_MEDIA_PROVIDER",
+  mediaBaseUrl: "KITTY_MEDIA_BASE_URL",
+  mediaApiKey: "KITTY_MEDIA_API_KEY",
+  mediaImageModel: "KITTY_MEDIA_IMAGE_MODEL",
+  mediaVideoModel: "KITTY_MEDIA_VIDEO_MODEL",
+  mediaTimeout: "KITTY_MEDIA_REQUEST_TIMEOUT_MS",
+  mediaPollInterval: "KITTY_MEDIA_POLL_INTERVAL_MS",
   telegramToken: "KITTY_TELEGRAM_TOKEN",
   telegramUsers: "KITTY_TELEGRAM_ALLOWED_USER_IDS",
   weixinUsers: "KITTY_WEIXIN_ALLOWED_USER_IDS",
@@ -24,6 +31,10 @@ let eventConnectionFailed = false;
 const observedChannelStatus = new Map();
 const loadedChannelHistory = new Set();
 const loadingChannelHistory = new Map();
+let mediaVideoPollTimer;
+let mediaVideoRestored = false;
+let mediaPreviewUrl;
+const MEDIA_VIDEO_STORAGE_KEY = "kitty-media-video-task";
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -50,25 +61,47 @@ function render() {
   text("#kitty-wordmark-agent", state.brand.wordmark.agent);
   text("#config-location", state.configuration.file);
   text("#model-summary", `${values[ENV.provider] || message("common.notConfigured")} · ${values[ENV.model] || message("common.notConfigured")}`);
+  text("#media-summary", `${values[ENV.mediaImageModel] || message("common.notConfigured")} · ${values[ENV.mediaVideoModel] || message("common.notConfigured")}`);
   text("#plugins-summary", `${state.extensions.filter((extension) => values[extension.envKey] === "true").length} / ${state.extensions.length}`);
   text("#weixin-summary", describeChannel(state.channels.weixin, state.channels.weixinLogin?.status));
   text("#telegram-summary", describeChannel(state.channels.telegram));
   document.querySelector("#open-web-shell").href = `/web?token=${encodeURIComponent(token)}`;
 
   document.querySelector("#provider-preset").innerHTML = `<option value="">${escapeHtml(message("common.custom"))}</option>` + state.providers
-    .map((item) => `<option value="${escapeAttribute(item.provider)}">${escapeHtml(item.label)}</option>`).join("");
+    .map((item) => `<option value="${escapeAttribute(item.id)}">${escapeHtml(item.label)}</option>`).join("");
   const preset = state.providers.find((item) => item.provider === values[ENV.provider]
     && item.model === values[ENV.model] && item.baseUrl === values[ENV.baseUrl]);
-  value("#provider-preset", preset?.provider ?? "");
+  value("#provider-preset", preset?.id ?? "");
   value("#model-provider", values[ENV.provider]);
   value("#model-name", values[ENV.model]);
   value("#model-url", values[ENV.baseUrl]);
   value("#model-key", values[ENV.apiKey]);
+  document.querySelector("#model-key").required = values[ENV.provider] !== "llama.cpp";
   document.querySelector("#current-model-facts").innerHTML = [
     [message("config.provider"), values[ENV.provider] || message("common.notConfigured")],
     [message("config.model"), values[ENV.model] || message("common.notConfigured")],
     [message("config.baseUrl"), values[ENV.baseUrl] || message("common.notConfigured")],
     [message("config.apiKey"), values[ENV.apiKey] ? message("config.currentLoaded") : message("common.notConfigured")],
+  ].map(([label, current]) => `<span><small>${escapeHtml(label)}</small><strong>${escapeHtml(current)}</strong></span>`).join("");
+
+  document.querySelector("#media-preset").innerHTML = state.mediaProviders
+    .map((item) => `<option value="${escapeAttribute(item.id)}">${escapeHtml(item.label)}</option>`).join("");
+  const mediaPreset = state.mediaProviders.find((item) => item.provider === values[ENV.mediaProvider]
+    && item.imageModel === values[ENV.mediaImageModel] && item.videoModel === values[ENV.mediaVideoModel]
+    && item.baseUrl === values[ENV.mediaBaseUrl]);
+  value("#media-preset", mediaPreset?.id ?? state.mediaProviders[0]?.id ?? "");
+  value("#media-provider", values[ENV.mediaProvider]);
+  value("#media-image-model", values[ENV.mediaImageModel]);
+  value("#media-video-model", values[ENV.mediaVideoModel]);
+  value("#media-url", values[ENV.mediaBaseUrl]);
+  value("#media-key", values[ENV.mediaApiKey] || (values[ENV.provider] === "agnes" ? values[ENV.apiKey] : ""));
+  value("#media-timeout", values[ENV.mediaTimeout]);
+  value("#media-poll-interval", values[ENV.mediaPollInterval]);
+  document.querySelector("#current-media-facts").innerHTML = [
+    [message("media.provider"), values[ENV.mediaProvider] || message("common.notConfigured")],
+    [message("media.imageModel"), values[ENV.mediaImageModel] || message("common.notConfigured")],
+    [message("media.videoModel"), values[ENV.mediaVideoModel] || message("common.notConfigured")],
+    [message("media.apiKey"), (values[ENV.mediaApiKey] || values[ENV.apiKey]) ? message("config.currentLoaded") : message("common.notConfigured")],
   ].map(([label, current]) => `<span><small>${escapeHtml(label)}</small><strong>${escapeHtml(current)}</strong></span>`).join("");
 
   value("#weixin-users", values[ENV.weixinUsers]);
@@ -178,6 +211,8 @@ document.addEventListener("click", async (event) => {
   try {
     if (action === "back-home") backHome();
     if (action === "probe-provider") await probeProvider(button);
+    if (action === "probe-media") await probeMedia(button);
+    if (action === "stop-media-video") stopMediaVideoPolling();
     if (action === "probe-telegram") await probeTelegram(button);
     if (action === "weixin-login") await runButton(button, async () => {
       await api("/api/weixin/login", { method: "POST", body: "{}" });
@@ -196,8 +231,23 @@ document.addEventListener("click", async (event) => {
   }
 });
 
+document.addEventListener("click", (event) => {
+  const tab = event.target.closest("[data-media-mode]");
+  if (!tab) return;
+  const mode = tab.dataset.mediaMode;
+  if (mode !== "image" && mode !== "video") return;
+  for (const button of document.querySelectorAll("[data-media-mode]")) {
+    const selected = button.dataset.mediaMode === mode;
+    button.classList.toggle("is-active", selected);
+    button.setAttribute("aria-selected", String(selected));
+  }
+  for (const panel of document.querySelectorAll("[data-media-mode-panel]")) {
+    panel.classList.toggle("d-none", panel.dataset.mediaModePanel !== mode);
+  }
+});
+
 document.querySelector("#provider-preset").addEventListener("change", (event) => {
-  const preset = state.providers.find((item) => item.provider === event.target.value);
+  const preset = state.providers.find((item) => item.id === event.target.value);
   if (!preset) return;
   value("#model-provider", preset.provider);
   value("#model-name", preset.model);
@@ -205,6 +255,16 @@ document.querySelector("#provider-preset").addEventListener("change", (event) =>
   value("#model-key", preset.provider === state.configuration.values[ENV.provider]
     ? state.configuration.values[ENV.apiKey]
     : "");
+  document.querySelector("#model-key").required = preset.provider !== "llama.cpp";
+});
+
+document.querySelector("#media-preset").addEventListener("change", (event) => {
+  const preset = state.mediaProviders.find((item) => item.id === event.target.value);
+  if (!preset) return;
+  value("#media-provider", preset.provider);
+  value("#media-image-model", preset.imageModel);
+  value("#media-video-model", preset.videoModel);
+  value("#media-url", preset.baseUrl);
 });
 
 document.querySelector("#model-form").addEventListener("submit", async (event) => {
@@ -226,6 +286,68 @@ document.querySelector("#plugins-form").addEventListener("submit", async (event)
   const values = Object.fromEntries([...document.querySelectorAll("#extension-switches [data-env]")]
     .map((input) => [input.dataset.env, String(input.checked)]));
   await submitConfig(values, "#plugins-result", "plugins.saved");
+});
+
+document.querySelector("#media-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await submitConfig({
+    [ENV.mediaProvider]: field("#media-provider"),
+    [ENV.mediaImageModel]: field("#media-image-model"),
+    [ENV.mediaVideoModel]: field("#media-video-model"),
+    [ENV.mediaBaseUrl]: field("#media-url"),
+    [ENV.mediaApiKey]: field("#media-key"),
+    [ENV.mediaTimeout]: field("#media-timeout"),
+    [ENV.mediaPollInterval]: field("#media-poll-interval"),
+  }, "#media-config-result", "media.saved");
+});
+
+document.querySelector("#media-image-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const button = event.submitter || event.currentTarget.querySelector("button[type=submit]");
+  await runButton(button, async () => {
+    showResult("#media-image-status", message("media.generating"), true);
+    try {
+      const result = await api("/api/media/images", {
+        method: "POST",
+        body: JSON.stringify({ prompt: field("#media-image-prompt"), size: field("#media-image-size"), ratio: field("#media-image-ratio") }),
+      });
+      await showMediaArtifact(result.path, "image");
+      showResult("#media-image-status", message("media.imageCompleted"), true);
+    } catch (error) {
+      showResult("#media-image-status", error.message, false);
+    }
+  });
+});
+
+document.querySelector("#media-video-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const button = event.submitter || event.currentTarget.querySelector("button[type=submit]");
+  await runButton(button, async () => {
+    stopMediaVideoPolling(false);
+    const [width, height] = field("#media-video-size").split("x").map(Number);
+    try {
+      showResult("#media-video-status", message("media.videoCreating"), true);
+      const result = await api("/api/media/videos", {
+        method: "POST",
+        body: JSON.stringify({
+          prompt: field("#media-video-prompt"),
+          width,
+          height,
+          numFrames: Number(field("#media-video-duration")),
+          frameRate: 24,
+          negativePrompt: field("#media-video-negative"),
+        }),
+      });
+      value("#media-video-id", result.videoId);
+      value("#media-video-next-poll", result.nextPollAt);
+      sessionStorage.setItem(MEDIA_VIDEO_STORAGE_KEY, JSON.stringify({ videoId: result.videoId, nextPollAt: result.nextPollAt }));
+      document.querySelector("#media-video-stop").classList.remove("d-none");
+      updateVideoStatus(result);
+      scheduleMediaVideoPoll(result.videoId, result.nextPollAt);
+    } catch (error) {
+      showResult("#media-video-status", error.message, false);
+    }
+  });
 });
 
 document.querySelector("#other-form").addEventListener("submit", async (event) => {
@@ -266,6 +388,17 @@ async function probeProvider(button) {
       showResult("#provider-result", parts.join(" · "), true);
     } catch (error) {
       showResult("#provider-result", error.message, false);
+    }
+  });
+}
+
+async function probeMedia(button) {
+  await runButton(button, async () => {
+    try {
+      const result = await api("/api/media/probe", { method: "POST", body: "{}" });
+      showResult("#media-probe-result", [message("common.connectionSuccess"), result.provider, message("common.models", { count: result.models }), result.baseUrl].join(" · "), true);
+    } catch (error) {
+      showResult("#media-probe-result", error.message, false);
     }
   });
 }
@@ -332,6 +465,82 @@ function showResult(selector, content, success) {
   element.innerHTML = `<i class="bi ${success ? "bi-check-circle" : "bi-exclamation-circle"}"></i><span>${escapeHtml(content)}</span>`;
 }
 
+function scheduleMediaVideoPoll(videoId, nextPollAt) {
+  if (mediaVideoPollTimer) clearTimeout(mediaVideoPollTimer);
+  const delay = Math.max(500, Math.min(60_000, Date.parse(nextPollAt || "") - Date.now() || 500));
+  value("#media-video-next-poll", nextPollAt || "");
+  mediaVideoPollTimer = setTimeout(async () => {
+    try {
+      const result = await api(`/api/media/videos/${encodeURIComponent(videoId)}/poll`, { method: "POST", body: "{}" });
+      updateVideoStatus(result);
+      if (result.status === "completed") {
+        sessionStorage.removeItem(MEDIA_VIDEO_STORAGE_KEY);
+        document.querySelector("#media-video-stop").classList.add("d-none");
+        if (result.path) await showMediaArtifact(result.path, "video");
+        return;
+      }
+      scheduleMediaVideoPoll(videoId, result.nextPollAt || new Date(Date.now() + 15_000).toISOString());
+    } catch (error) {
+      showResult("#media-video-status", error.message, false);
+      document.querySelector("#media-video-stop").classList.add("d-none");
+    }
+  }, delay);
+}
+
+function updateVideoStatus(result) {
+  const status = result.status === "waiting" ? message("media.videoWaiting") : result.status === "queued" ? message("media.videoQueued") : result.status === "in_progress" ? message("media.videoInProgress") : message("media.videoCompleted");
+  const progress = typeof result.progress === "number" ? ` · ${Math.round(result.progress)}%` : "";
+  showResult("#media-video-status", `${status}${progress}`, result.status !== "failed");
+  if (result.nextPollAt) value("#media-video-next-poll", result.nextPollAt);
+}
+
+function stopMediaVideoPolling(clearTask = false) {
+  if (mediaVideoPollTimer) clearTimeout(mediaVideoPollTimer);
+  mediaVideoPollTimer = undefined;
+  if (clearTask) sessionStorage.removeItem(MEDIA_VIDEO_STORAGE_KEY);
+  const stop = document.querySelector("#media-video-stop");
+  if (stop) stop.classList.add("d-none");
+}
+
+function restoreMediaVideoTask() {
+  if (mediaVideoRestored) return;
+  mediaVideoRestored = true;
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(MEDIA_VIDEO_STORAGE_KEY) || "null");
+    if (!saved?.videoId) return;
+    value("#media-video-id", saved.videoId);
+    value("#media-video-next-poll", saved.nextPollAt || "");
+    document.querySelector("#media-video-stop").classList.remove("d-none");
+    scheduleMediaVideoPoll(saved.videoId, saved.nextPollAt || new Date().toISOString());
+  } catch {
+    sessionStorage.removeItem(MEDIA_VIDEO_STORAGE_KEY);
+  }
+}
+
+async function showMediaArtifact(relativePath, kind) {
+  const response = await fetch(`/api/media/artifacts?path=${encodeURIComponent(relativePath)}`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error || message("common.requestFailed", { status: response.status }));
+  }
+  const blob = await response.blob();
+  if (mediaPreviewUrl) URL.revokeObjectURL(mediaPreviewUrl);
+  mediaPreviewUrl = URL.createObjectURL(blob);
+  if (kind === "image") {
+    document.querySelector("#media-image-output").src = mediaPreviewUrl;
+    text("#media-image-path", relativePath);
+    document.querySelector("#media-image-download").href = mediaPreviewUrl;
+    document.querySelector("#media-image-preview").classList.remove("d-none");
+  } else {
+    document.querySelector("#media-video-output").src = mediaPreviewUrl;
+    text("#media-video-path", relativePath);
+    document.querySelector("#media-video-download").href = mediaPreviewUrl;
+    document.querySelector("#media-video-preview").classList.remove("d-none");
+  }
+}
+
 function message(path, values = {}) {
   return resolveMessage(state.messages, path, values);
 }
@@ -343,6 +552,6 @@ function readSettings(selector) {
 function field(selector) { return document.querySelector(selector).value.trim(); }
 function value(selector, next) { document.querySelector(selector).value = next ?? ""; }
 function text(selector, next) { document.querySelector(selector).textContent = next ?? ""; }
-refresh().then(startEventStream).catch((error) => {
+refresh().then(() => { restoreMediaVideoTask(); startEventStream(); }).catch((error) => {
   document.querySelector("#workflow-home").innerHTML = `<div class="fatal-error"><p>${escapeHtml(error.message)}</p></div>`;
 });

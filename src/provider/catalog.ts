@@ -3,12 +3,14 @@ import type { ModelReasoningEffort, ModelThinkingMode } from "../types.js";
 export type ProviderWireApi = "responses" | "chat.completions";
 export type ProviderApiKind = "openai-sdk" | "openai-compatible" | "deepseek-openai-compatible";
 export type ProviderTransport = "standard" | "relay";
+export type ProviderAuthentication = "bearer" | "none";
 export type ReasoningContentReplayPolicy = "never" | "tool-call-required";
 export type ModelCacheMode = "prompt-cache-key" | "provider-automatic" | "none";
 export type ChatReasoningRequestMode =
   | "none"
   | "deepseek-thinking"
   | "agnes-thinking"
+  | "chat-template-thinking"
   | "nvidia-reasoning-effort"
   | "reasoning-effort";
 
@@ -17,6 +19,7 @@ export interface ProviderInfo {
   label: string;
   apiKind: ProviderApiKind;
   transport: ProviderTransport;
+  authentication?: ProviderAuthentication;
   defaultBaseUrl: string;
   requestTimeoutMs: number;
   doctorProbeTimeoutMs: number;
@@ -160,6 +163,16 @@ export const PROVIDER_CATALOG: readonly ProviderInfo[] = [
     requestTimeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
     doctorProbeTimeoutMs: DEFAULT_DOCTOR_PROBE_TIMEOUT_MS,
   },
+  {
+    id: "llama.cpp",
+    label: "llama.cpp (本机)",
+    apiKind: "openai-compatible",
+    transport: "standard",
+    authentication: "none",
+    defaultBaseUrl: "http://127.0.0.1:8080/v1",
+    requestTimeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
+    doctorProbeTimeoutMs: DEFAULT_DOCTOR_PROBE_TIMEOUT_MS,
+  },
 ] as const;
 
 const DEEPSEEK_MODEL_BASE = {
@@ -249,6 +262,22 @@ const AGNES_MODEL_BASE = {
   limit: {
     context: 512_000,
     output: 65_500,
+  },
+};
+
+const LLAMA_CPP_MODEL_BASE = {
+  ...OPENAI_COMPATIBLE_CHAT_MODEL_BASE,
+  request: {
+    ...OPENAI_COMPATIBLE_CHAT_MODEL_BASE.request,
+    chat: {
+      reasoning: "chat-template-thinking" as const,
+      toolChoice: "auto" as const,
+      streamUsage: "include_usage" as const,
+    },
+  },
+  limit: {
+    context: 32_768,
+    output: 8_192,
   },
 };
 
@@ -358,6 +387,12 @@ export const MODEL_CATALOG: readonly ModelInfo[] = [
     providerId: "agnes",
     label: "Agnes 2.0 Flash",
     ...AGNES_MODEL_BASE,
+  },
+  {
+    id: "gemma-3-12b-it-q4_0.gguf",
+    providerId: "llama.cpp",
+    label: "Google Gemma 3 12B (本机)",
+    ...LLAMA_CPP_MODEL_BASE,
   },
   {
     id: "openai/gpt-oss-120b",

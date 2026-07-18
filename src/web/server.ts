@@ -9,6 +9,8 @@ import { EXTENSION_DEFINITIONS } from "../extensions/definitions.js";
 import { getProviderPresetBaseUrl, PROVIDER_PRESETS } from "../config/providerPresets.js";
 import { resolveRuntimeConfig } from "../config/runtime.js";
 import { probeProviderConnection } from "../provider/connection.js";
+import { MEDIA_PROVIDER_CATALOG } from "../media/catalog.js";
+import { probeMediaConnection } from "../media/connection.js";
 import { resolveProjectRoots } from "../context/repoRoots.js";
 import { ensureScheduledTaskRuntime } from "../scheduler/runtime.js";
 import { InteractiveSessionDriver } from "../interaction/sessionDriver.js";
@@ -26,6 +28,7 @@ import { loadChannelHistory, type WebChannelName } from "./channelHistory.js";
 import { WebChatShell } from "./chatShell.js";
 import { WebSessionBindingStore } from "./sessionBinding.js";
 import { WebSkillService } from "./skillService.js";
+import { WebMediaService } from "./mediaService.js";
 
 const MAX_BODY_BYTES = 1_000_000;
 
@@ -43,6 +46,7 @@ export async function startLocalConsole(cwd: string): Promise<LocalConsoleHandle
   const token = crypto.randomBytes(24).toString("base64url");
   const events = new WebEventHub();
   const config = new WebConfigService(cwd);
+  const mediaService = new WebMediaService(cwd, stateRootDir);
   const skills = new WebSkillService(cwd);
   const scheduler = ensureScheduledTaskRuntime(stateRootDir);
   const channels = new WebChannelManager(cwd, events);
@@ -157,6 +161,14 @@ export async function startLocalConsole(cwd: string): Promise<LocalConsoleHandle
         configuration,
         preflight,
         providers: PROVIDER_PRESETS.map((preset) => ({ ...preset, baseUrl: getProviderPresetBaseUrl(preset) })),
+        mediaProviders: MEDIA_PROVIDER_CATALOG.map((provider) => ({
+          id: provider.id,
+          label: provider.label,
+          provider: provider.id,
+          baseUrl: provider.defaultBaseUrl,
+          imageModel: provider.imageModels.at(-1),
+          videoModel: provider.videoModels.at(-1),
+        })),
         extensions: EXTENSION_DEFINITIONS.map(({ id, envKey, defaultEnabled }) => ({
           id,
           envKey,
@@ -184,6 +196,52 @@ export async function startLocalConsole(cwd: string): Promise<LocalConsoleHandle
       const runtime = await resolveRuntimeConfig({ cwd });
       const result = await probeProviderConnection(runtime);
       return sendJson(response, result.kind === "ok" ? 200 : 422, result);
+    }
+    if (request.method === "POST" && url.pathname === "/api/media/probe") {
+      const runtime = await resolveRuntimeConfig({ cwd });
+      return sendJson(response, 200, await probeMediaConnection(runtime.media));
+    }
+    if (request.method === "POST" && url.pathname === "/api/media/images") {
+      const runtime = await resolveRuntimeConfig({ cwd });
+      const body = await readJsonBody(request);
+      const controller = requestAbortController(request);
+      try {
+        return sendJson(response, 200, await mediaService.generateImage(runtime.media, body, controller.signal));
+      } finally {
+        controller.cleanup();
+      }
+    }
+    if (request.method === "POST" && url.pathname === "/api/media/videos") {
+      const runtime = await resolveRuntimeConfig({ cwd });
+      const body = await readJsonBody(request);
+      const controller = requestAbortController(request);
+      try {
+        return sendJson(response, 202, await mediaService.createVideo(runtime.media, body, controller.signal));
+      } finally {
+        controller.cleanup();
+      }
+    }
+    const pollVideoMatch = url.pathname.match(/^\/api\/media\/videos\/([^/]+)\/poll$/u);
+    if (request.method === "POST" && pollVideoMatch) {
+      const runtime = await resolveRuntimeConfig({ cwd });
+      const body = await readJsonBody(request);
+      const controller = requestAbortController(request);
+      try {
+        return sendJson(response, 200, await mediaService.pollVideo(runtime.media, decodeURIComponent(pollVideoMatch[1]!), body, controller.signal));
+      } finally {
+        controller.cleanup();
+      }
+    }
+    if (request.method === "GET" && url.pathname === "/api/media/artifacts") {
+      const artifact = await mediaService.readArtifact(url.searchParams.get("path") ?? "");
+      response.writeHead(200, {
+        "content-type": artifact.mimeType,
+        "content-disposition": `inline; filename*=UTF-8''${encodeURIComponent(artifact.fileName)}`,
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
+      });
+      response.end(artifact.bytes);
+      return;
     }
     if (request.method === "POST" && url.pathname === "/api/telegram/probe") {
       return sendJson(response, 200, await channels.probeTelegram());
@@ -312,9 +370,19 @@ function sendJson(response: ServerResponse, status: number, value: unknown): voi
   response.end(`${JSON.stringify(value)}\n`);
 }
 
+function requestAbortController(request: IncomingMessage): { signal: AbortSignal; cleanup: () => void } {
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  request.once("aborted", abort);
+  return {
+    signal: controller.signal,
+    cleanup: () => request.removeListener("aborted", abort),
+  };
+}
+
 function statusForRequestError(request: IncomingMessage): number {
   const pathname = new URL(request.url ?? "/", "http://127.0.0.1").pathname;
   if (pathname.startsWith("/api/config") || pathname.startsWith("/api/skills")) return 400;
-  if (pathname.startsWith("/api/provider") || pathname.startsWith("/api/telegram") || pathname.startsWith("/api/weixin") || pathname.startsWith("/api/channels")) return 422;
+  if (pathname.startsWith("/api/provider") || pathname.startsWith("/api/media") || pathname.startsWith("/api/telegram") || pathname.startsWith("/api/weixin") || pathname.startsWith("/api/channels")) return 422;
   return 500;
 }

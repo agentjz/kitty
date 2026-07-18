@@ -15,6 +15,7 @@ const KNOWN_KEYS: ReadonlySet<string> = new Set<string>([
 ]);
 const SECRET_KEYS: ReadonlySet<string> = new Set<string>([
   KITTY_ENV.apiKey,
+  KITTY_ENV.mediaApiKey,
   KITTY_ENV.telegramToken,
 ]);
 

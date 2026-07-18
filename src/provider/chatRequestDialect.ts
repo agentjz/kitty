@@ -33,6 +33,7 @@ export function applyChatRequestDialect(
       });
       break;
     case "agnes-thinking":
+    case "chat-template-thinking":
       body.chat_template_kwargs = {
         enable_thinking: resolveAgnesThinking({
           thinking: input.thinking,

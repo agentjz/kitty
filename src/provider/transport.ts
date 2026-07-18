@@ -29,12 +29,13 @@ export function buildProviderProbeRequest(input: {
   apiKey: string;
   model: string;
   probe: ProviderProbeKind;
+  authentication?: "bearer" | "none";
 }): ProviderProbeRequest {
   return {
     endpoint: buildProviderProbeEndpoint(input.baseUrl, input.probe),
     method: input.probe === "models" ? "GET" : "POST",
     headers: {
-      Authorization: `Bearer ${input.apiKey}`,
+      ...(input.authentication === "none" ? {} : { Authorization: `Bearer ${input.apiKey}` }),
       ...(input.probe === "models" ? {} : { "Content-Type": "application/json" }),
     },
     body: buildProviderProbeBody(input.probe, input.model),

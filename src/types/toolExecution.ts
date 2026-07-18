@@ -3,6 +3,12 @@ import type { ToolDiagnosticsReport } from "./diagnostics.js";
 import type { ToolOutputGovernance } from "../tools/outputGovernance/index.js";
 
 export interface ToolExecutionMetadata {
+  artifacts?: Array<{
+    kind: "file";
+    path: string;
+    bytes?: number;
+    mimeType?: string;
+  }>;
   changedPaths?: string[];
   changeId?: string;
   runtime?: {

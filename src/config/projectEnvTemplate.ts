@@ -90,6 +90,15 @@ function formatCommonEnvSections(input: {
     `${KITTY_ENV.commandStallTimeoutMs}=${input.initialConfig.commandStallTimeoutMs}`,
     `${KITTY_ENV.showReasoning}=${String(input.initialConfig.showReasoning)}`,
     "",
+    "# Image and video generation",
+    `${KITTY_ENV.mediaProvider}=${input.initialConfig.media.provider}`,
+    `${KITTY_ENV.mediaBaseUrl}=${input.initialConfig.media.baseUrl}`,
+    `${KITTY_ENV.mediaApiKey}=${input.example ? "replace-with-your-agnes-key" : ""}`,
+    `${KITTY_ENV.mediaImageModel}=${input.initialConfig.media.imageModel}`,
+    `${KITTY_ENV.mediaVideoModel}=${input.initialConfig.media.videoModel}`,
+    `${KITTY_ENV.mediaRequestTimeoutMs}=${input.initialConfig.media.requestTimeoutMs}`,
+    `${KITTY_ENV.mediaPollIntervalMs}=${input.initialConfig.media.pollIntervalMs}`,
+    "",
   ];
 }
 

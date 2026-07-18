@@ -5,6 +5,19 @@ import type { KittyLocale } from "../i18n/index.js";
 export type ModelThinkingMode = "enabled" | "disabled";
 export type ModelReasoningEffort = "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
+export interface MediaConfig {
+  provider: string;
+  baseUrl: string;
+  imageModel: string;
+  videoModel: string;
+  requestTimeoutMs: number;
+  pollIntervalMs: number;
+}
+
+export interface MediaRuntimeConfig extends MediaConfig {
+  apiKey: string;
+}
+
 export interface AppPaths {
   configDir: string;
   dataDir: string;
@@ -30,6 +43,7 @@ export interface AppConfig {
   projectDocMaxBytes: number;
   commandStallTimeoutMs: number;
   showReasoning: boolean;
+  media: MediaConfig;
   telegram: TelegramConfig;
   weixin: WeixinConfig;
   extensions: ExtensionToggleConfig;
@@ -37,6 +51,7 @@ export interface AppConfig {
 
 export interface RuntimeConfig extends AppConfig {
   apiKey: string;
+  media: MediaRuntimeConfig;
   paths: AppPaths;
   telegram: TelegramRuntimeConfig;
   weixin: WeixinRuntimeConfig;

@@ -91,6 +91,7 @@ test("CLI, preflight, and Telegram presenters use the selected locale", () => {
       modelProfile: "GPT-5.5",
       wireApi: "responses",
       apiKeyPresent: true,
+      apiKeyRequired: true,
     },
     ready: true,
     nextSteps: [],

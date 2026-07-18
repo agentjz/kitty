@@ -5,6 +5,7 @@ import { normalizeExtensions } from "./extensions.js";
 import { invalidConfigValue, missingConfigValue } from "./errors.js";
 import type { AppConfig } from "../types.js";
 import { DEFAULT_LOCALE, parseKittyLocale, SUPPORTED_LOCALES } from "../i18n/index.js";
+import { normalizeMediaConfig } from "./media.js";
 
 export function normalizeRuntimeConfig(
   config: Omit<AppConfig, "locale"> & { locale: unknown },
@@ -35,6 +36,7 @@ export function normalizeRuntimeConfig(
     projectDocMaxBytes: clampNumber(config.projectDocMaxBytes, 1_000, 500_000, "projectDocMaxBytes"),
     commandStallTimeoutMs: clampNumber(config.commandStallTimeoutMs, 2_000, 300_000, "commandStallTimeoutMs"),
     showReasoning: requireBooleanConfig(config.showReasoning, "showReasoning"),
+    media: normalizeMediaConfig(config.media),
     telegram: normalizeTelegramConfig(config.telegram),
     weixin: normalizeWeixinConfig(config.weixin),
     extensions: normalizeExtensions(config.extensions),

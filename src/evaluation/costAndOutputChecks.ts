@@ -104,6 +104,7 @@ export async function runCacheEconomyCheck(id: EvaluationCheckId): Promise<Evalu
   const config = {
     ...getInitialRuntimeConfig(),
     apiKey: "eval-key",
+    media: { ...getInitialRuntimeConfig().media, apiKey: "eval-key" },
     model: "gpt-5.5",
     telegram: resolveTelegramRuntimeConfig(getInitialRuntimeConfig().telegram, process.cwd()),
     weixin: resolveWeixinRuntimeConfig(getInitialRuntimeConfig().weixin, process.cwd()),

@@ -26,6 +26,14 @@ export function buildToolResultEnvelope(input: {
   const provenance = buildProvenance(input.cwd, payload, args);
   const facts = buildFacts(input.result, payload, input.cwd);
   const artifacts = buildArtifacts(payload, governance, input.cwd);
+  const metadataArtifacts = input.result.metadata?.artifacts ?? [];
+  for (const artifact of metadataArtifacts) {
+    artifacts.push({
+      kind: "file",
+      path: normalizePathForModel(artifact.path, input.cwd),
+      bytes: artifact.bytes,
+    });
+  }
   const error = input.result.ok
     ? undefined
     : buildErrorEvidence(payload, input.result.output, governance?.recoveryHint);

@@ -17,6 +17,7 @@ test("public type barrel exposes runtime, session, transition, and tool result c
     ...initialConfig,
     provider: "openai",
     apiKey: "test",
+    media: { ...initialConfig.media, apiKey: "test" },
     baseUrl: "https://api.openai.com/v1",
     model: "gpt-5.5",
     thinking: "enabled",

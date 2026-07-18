@@ -45,6 +45,14 @@ export async function resolveRuntimeConfig(overrides: CliOverrides = {}): Promis
     projectDocMaxBytes: readIntegerEnv("projectDocMaxBytes", env.projectDocMaxBytes),
     commandStallTimeoutMs: readIntegerEnv("commandStallTimeoutMs", env.commandStallTimeoutMs),
     showReasoning: readBooleanEnv("showReasoning", env.showReasoning),
+    media: {
+      provider: env.mediaProvider,
+      baseUrl: env.mediaBaseUrl,
+      imageModel: env.mediaImageModel,
+      videoModel: env.mediaVideoModel,
+      requestTimeoutMs: readIntegerEnv("mediaRequestTimeoutMs", env.mediaRequestTimeoutMs),
+      pollIntervalMs: readIntegerEnv("mediaPollIntervalMs", env.mediaPollIntervalMs),
+    },
     telegram: {
       token: env.telegramToken,
       apiBaseUrl: env.telegramApiBaseUrl,
@@ -88,6 +96,10 @@ export async function resolveRuntimeConfig(overrides: CliOverrides = {}): Promis
   return {
     ...merged,
     apiKey: env.apiKey,
+    media: {
+      ...merged.media,
+      apiKey: env.mediaApiKey || env.apiKey,
+    },
     paths,
     telegram: resolveTelegramRuntimeConfig(merged.telegram, projectRoots.stateRootDir),
     weixin: resolveWeixinRuntimeConfig(merged.weixin, projectRoots.stateRootDir),

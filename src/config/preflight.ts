@@ -24,6 +24,7 @@ export interface ConfigPreflightReport {
     providerProfile?: string;
     modelProfile?: string;
     wireApi?: string;
+    apiKeyRequired: boolean;
     catalogError?: string;
     provider: string;
     model: string;
@@ -83,12 +84,14 @@ export async function inspectConfigPreflight(rootDir: string): Promise<ConfigPre
       model,
       baseUrl,
       apiKeyPresent: Boolean(parsedEnv[KITTY_ENV.apiKey]?.trim()),
+      apiKeyRequired: catalog.apiKeyRequired,
     },
     ready,
     nextSteps: buildPreflightNextSteps({
       filesReady: files.every((file) => file.exists),
       missingKeys,
       apiKeyPresent: Boolean(parsedEnv[KITTY_ENV.apiKey]?.trim()),
+      apiKeyRequired: catalog.apiKeyRequired,
       ready,
     }),
   };
@@ -123,6 +126,7 @@ function buildPreflightNextSteps(input: {
   filesReady: boolean;
   missingKeys: readonly string[];
   apiKeyPresent: boolean;
+  apiKeyRequired: boolean;
   ready: boolean;
 }): ConfigPreflightNextStep[] {
   if (!input.filesReady) {
@@ -131,7 +135,7 @@ function buildPreflightNextSteps(input: {
   if (input.missingKeys.length > 0) {
     return ["fill_missing", "start_kitty"];
   }
-  if (!input.apiKeyPresent) {
+  if (input.apiKeyRequired && !input.apiKeyPresent) {
     return ["set_api_key", "start_kitty"];
   }
   if (input.ready) {
@@ -184,10 +188,11 @@ function readCatalogProfile(input: {
   providerProfile?: string;
   modelProfile?: string;
   wireApi?: string;
+  apiKeyRequired: boolean;
   error?: string;
 } {
   if (!input.provider || !input.model) {
-    return {};
+    return { apiKeyRequired: true };
   }
 
   try {
@@ -196,10 +201,12 @@ function readCatalogProfile(input: {
       providerProfile: profile.provider.label,
       modelProfile: profile.model.label,
       wireApi: profile.model.wireApi,
+      apiKeyRequired: profile.provider.authentication !== "none",
     };
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : String(error),
+      apiKeyRequired: true,
     };
   }
 }

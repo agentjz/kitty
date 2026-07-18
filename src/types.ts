@@ -8,6 +8,8 @@ export type {
   CliOverrides,
   ModelReasoningEffort,
   ModelThinkingMode,
+  MediaConfig,
+  MediaRuntimeConfig,
   RuntimeConfig,
 } from "./types/config.js";
 export type {

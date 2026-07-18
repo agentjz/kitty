@@ -74,6 +74,7 @@ export function createTestRuntimeConfig(root: string): RuntimeConfig {
     ...initialConfig,
     provider: "openai",
     apiKey: "test-key",
+    media: { ...initialConfig.media, apiKey: "test-key" },
     baseUrl: "https://api.openai.com/v1",
     model: "gpt-5.5",
     thinking: "enabled",

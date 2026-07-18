@@ -1,0 +1,5 @@
+interface:
+  display_name: "Agnes Media"
+  short_description: "Generate Agnes images and videos safely"
+  default_prompt: "Use $agnes-media to generate an image or complete an Agnes video task with durable video_id polling."
+  brand_color: "#111827"

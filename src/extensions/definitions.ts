@@ -2,6 +2,7 @@ import type { RegisteredTool } from "../tools/core/types.js";
 import { createBackgroundTools } from "./tools/background/index.js";
 import { createDocumentTools } from "./tools/documents/index.js";
 import { createNetworkTools } from "./tools/network/index.js";
+import { createMediaTools } from "./tools/media/index.js";
 import { createSkillTools } from "./tools/skills/index.js";
 import { createTodoTools } from "./tools/todo/index.js";
 import { createSchedulerTools } from "./tools/scheduler/index.js";
@@ -114,6 +115,22 @@ export const EXTENSION_DEFINITIONS = [
         "creating Word documents from plain text or simple Markdown",
       ],
       cost: "medium",
+    },
+  },
+  {
+    id: "media",
+    envKey: "KITTY_EXTENSION_MEDIA",
+    defaultEnabled: true,
+    summary: "Configured image generation and durable asynchronous video workflows.",
+    createTools: createMediaTools,
+    capability: {
+      description: "Generate local image artifacts and create or poll durable Agnes video tasks.",
+      bestFor: [
+        "text-to-image and image editing",
+        "asynchronous text-to-video and image-to-video generation",
+        "saving generated media as project files",
+      ],
+      cost: "high",
     },
   },
   {

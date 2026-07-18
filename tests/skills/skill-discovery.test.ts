@@ -29,13 +29,18 @@ test("project runtime skills do not load development skills from .agents", async
   assert.equal(context.skills[0]?.health.resourceGroups.references, 1);
 });
 
-test("repository runtime skills expose one development workflow", async () => {
+test("repository runtime skills expose development and Agnes media workflows", async () => {
   const context = await loadProjectContext(process.cwd(), { projectDocMaxBytes: 24_576 });
   const runtimeSkillNames = context.skills.map((skill) => skill.name);
 
-  assert.deepEqual(runtimeSkillNames, ["dev"]);
+  assert.deepEqual(runtimeSkillNames, ["agnes-media", "dev"]);
   assert.equal(runtimeSkillNames.includes("development"), false);
-  const dev = context.skills[0];
+  const media = context.skills.find((skill) => skill.name === "agnes-media");
+  assert.ok(media);
+  assert.match(media.body, /generate_image/);
+  assert.match(media.body, /generate_video/);
+  assert.match(media.body, /video_id/);
+  const dev = context.skills.find((skill) => skill.name === "dev");
   assert.ok(dev);
   assert.match(dev.description, /完整开发工作流/);
   assert.match(dev.body, /## 一、调研/);

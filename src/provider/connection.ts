@@ -43,6 +43,7 @@ export async function probeProviderConnection(
       apiKey: input.apiKey,
       model: profile.model.id,
       probe,
+      authentication: profile.provider.authentication,
     });
     let response: Response;
 

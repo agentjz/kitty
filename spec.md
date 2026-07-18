@@ -76,13 +76,18 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 - `KITTY_MODEL`
 - `KITTY_BASE_URL`
 - `KITTY_API_KEY`
+- `KITTY_MEDIA_PROVIDER`、`KITTY_MEDIA_BASE_URL`、`KITTY_MEDIA_API_KEY`
+- `KITTY_MEDIA_IMAGE_MODEL`、`KITTY_MEDIA_VIDEO_MODEL`
+- `KITTY_MEDIA_REQUEST_TIMEOUT_MS`、`KITTY_MEDIA_POLL_INTERVAL_MS`
 - thinking、reasoning effort、输出和上下文限制
 - extension 开关
 - Telegram 与微信 iLink 配置
 
 未知 provider、不支持的 provider/model 组合、缺失必填项和非法值必须在配置 schema 显式失败。运行时不能静默猜测 model 或 provider。
 
-默认 provider profile 是 Agnes AI。当前具名 provider profile 还包括 NVIDIA NIM、Groq、Cerebras、Gemini、DeepSeek、OpenAI、YLS 和 TTAPI。`openai-compatible` 仅用于用户明确配置的高级兼容 endpoint；它不是任何具名 provider 的别名。
+默认 provider profile 是 Agnes AI。当前具名 provider profile 还包括 NVIDIA NIM、Groq、Cerebras、Gemini、DeepSeek、OpenAI、YLS、TTAPI 和 `llama.cpp`。`llama.cpp` 是无鉴权、仅 loopback 的 OpenAI-compatible Chat Completions Provider，默认 `http://127.0.0.1:8080/v1`；当前仅提供 Google Gemma 3 12B 一个本地 GGUF preset。`openai-compatible` 仅用于用户明确配置的高级兼容 endpoint；它不是任何具名 provider 的别名。
+
+图片/视频配置独立于语言模型配置。当前媒体 Provider 是 Agnes AI：图片模型 `agnes-image-2.1-flash`，视频模型 `agnes-video-v2.0`。媒体密钥优先使用 `KITTY_MEDIA_API_KEY`，为空时运行时回退到 `KITTY_API_KEY`，但 Web 保存和展示仍按独立媒体字段处理。
 
 `kitty start` 是唯一初始化与本地控制台入口。它创建或补齐 `.kitty/.env`、`.env.example` 与 `.kittyignore`，再监听 `127.0.0.1` 随机端口并尝试打开浏览器；浏览器失败只保留可手动打开的 URL，不停止服务。文件已存在时只向两个 env 文件补充当前模板缺失的配置键，不覆盖已有值、自定义内容或 ignore 规则。独立 `kitty init` 不存在。
 
@@ -203,12 +208,13 @@ Provider request 边界把 adapter、transport 和 SDK 失败归一为 `Provider
 - `background`：可持久追踪的非阻塞命令执行。
 - `scheduler`：持久提醒与预写本地命令的机器调度 CRUD。
 - `documents`：分页读取 DOCX 与带文字层 PDF，并以原子写和二进制变更记录创建 Word DOCX。
+- `media`：通过 Agnes Provider 生成图片、编辑图片，以及创建/查询异步视频任务；图片和完成视频进入项目内 typed file artifact，视频任务的不透明 `video_id` 持久在 `.kitty/extensions/media/video-tasks/`。
 - `skills`：运行时 skill 发现与显式加载。
 
 Extension 只在配置启用时进入同一工具注册表。它们不是另一条 agent loop，也不是 core 工具。
 
 运行时 skill 是项目能力包。Context 只暴露 skill 清单；模型在相关时显式加载 skill 或资源。Skill 不自动路由模型行为。
-仓库当前只提供一个运行时 `dev` skill，将 research、按需计划、实现和验证收束为一条开发工作流。
+仓库当前提供 `dev` 与 `agnes-media` 运行时 skill。`agnes-media` 只约束图片工具、视频 create/poll 顺序、`video_id`、低频轮询和产物恢复；协议事实仍由媒体 Provider/工具 owner 维护。
 
 ## 8. Control Plane 与 Execution
 
