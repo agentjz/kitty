@@ -17,6 +17,8 @@
 </p>
 </div>
 
+![kitty TUI 运行界面](site/kitty-tui-demo.gif)
+
 ## 一个模型，如何成为真正的智能体？
 
 模型很会思考，也很会表达，但仅仅拥有一个聊天框，它仍然只能给出答案。
@@ -68,8 +70,6 @@ kitty
 ```
 
 Kitty 会打开会话界面。你可以新建任务，也可以回到之前保存的现场。
-
-![kitty TUI 运行界面](site/kitty-tui-demo.gif)
 
 第一次使用 Windows 命令行、不熟悉项目目录或不知道如何填写配置，可以按 [小白快速启动](docs/quickstart.md) 一步一步操作。
 
