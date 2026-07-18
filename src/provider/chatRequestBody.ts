@@ -33,11 +33,11 @@ export function buildProviderRequestBody(
     stream: input.stream,
   };
 
-  if (input.tools?.length) {
+  if (input.tools?.length && capabilities.supportsTools) {
     body.tools = input.tools;
   }
 
-  if (input.tools?.length && capabilities.chat.toolChoice === "auto") {
+  if (input.tools?.length && capabilities.supportsTools && capabilities.chat.toolChoice === "auto") {
     body.tool_choice = "auto";
   }
 

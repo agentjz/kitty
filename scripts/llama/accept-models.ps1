@@ -7,7 +7,7 @@ $ReportPath = Join-Path $Root "logs\local-model-acceptance.json"
 $results = @()
 
 foreach ($model in $Manifest) {
-  $context = 32768
+  $context = if ($model.context) { [int]$model.context } else { 32768 }
   & (Join-Path $PSScriptRoot "stop-local.ps1") | Out-Null
   $startedAt = Get-Date
   & (Join-Path $PSScriptRoot "start-local.ps1") -Model $model.file -Context $context | Out-Host
@@ -53,20 +53,23 @@ foreach ($model in $Manifest) {
     $stream = Invoke-WebRequest -UseBasicParsing -Method Post -Uri "http://127.0.0.1:8080/v1/chat/completions" -ContentType "application/json" -Body $streamBody -TimeoutSec 900
     if ($stream.Content -notmatch "data:" -or $stream.Content -notmatch "\[DONE\]") { throw "Streaming SSE response was incomplete for $($model.file)." }
 
-    $toolBody = @{
-      model = $model.file
-      messages = @(@{ role = "user"; content = "Call sum_numbers exactly once with a=17 and b=25. Do not calculate it yourself." })
-      tools = @(@{ type = "function"; function = @{ name = "sum_numbers"; description = "Add two integers."; parameters = @{ type = "object"; properties = @{ a = @{ type = "integer" }; b = @{ type = "integer" } }; required = @("a", "b"); additionalProperties = $false } } })
-      tool_choice = @{ type = "function"; function = @{ name = "sum_numbers" } }
-      max_tokens = 128
-      temperature = 0
-      stream = $false
-    } | ConvertTo-Json -Depth 12
-    $tool = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8080/v1/chat/completions" -ContentType "application/json" -Body $toolBody -TimeoutSec 900
-    $toolCalls = @($tool.choices[0].message.tool_calls)
-    if ($toolCalls.Count -ne 1 -or $toolCalls[0].function.name -ne "sum_numbers") { throw "Tool-call response was invalid for $($model.file)." }
-    $toolArguments = $toolCalls[0].function.arguments | ConvertFrom-Json
-    if ($toolArguments.a -ne 17 -or $toolArguments.b -ne 25) { throw "Tool-call arguments were invalid for $($model.file)." }
+    $toolCall = if ($model.tools -eq $false) { "unsupported" } else {
+      $toolBody = @{
+        model = $model.file
+        messages = @(@{ role = "user"; content = "Call sum_numbers exactly once with a=17 and b=25. Do not calculate it yourself." })
+        tools = @(@{ type = "function"; function = @{ name = "sum_numbers"; description = "Add two integers."; parameters = @{ type = "object"; properties = @{ a = @{ type = "integer" }; b = @{ type = "integer" } }; required = @("a", "b"); additionalProperties = $false } } })
+        tool_choice = @{ type = "function"; function = @{ name = "sum_numbers" } }
+        max_tokens = 128
+        temperature = 0
+        stream = $false
+      } | ConvertTo-Json -Depth 12
+      $tool = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8080/v1/chat/completions" -ContentType "application/json" -Body $toolBody -TimeoutSec 900
+      $toolCalls = @($tool.choices[0].message.tool_calls)
+      if ($toolCalls.Count -ne 1 -or $toolCalls[0].function.name -ne "sum_numbers") { throw "Tool-call response was invalid for $($model.file)." }
+      $toolArguments = $toolCalls[0].function.arguments | ConvertFrom-Json
+      if ($toolArguments.a -ne 17 -or $toolArguments.b -ne 25) { throw "Tool-call arguments were invalid for $($model.file)." }
+      "sum_numbers"
+    }
 
     $gpu = & nvidia-smi --query-gpu=memory.used,memory.total --format=csv,noheader,nounits 2>$null
     $results += [pscustomobject]@{
@@ -80,7 +83,7 @@ foreach ($model in $Manifest) {
       modelIds = $ids
       chineseResponse = $content
       streaming = $true
-      toolCall = $toolCalls[0].function.name
+      toolCall = $toolCall
       gpuMemory = [string]$gpu
     }
   } finally {
@@ -88,9 +91,13 @@ foreach ($model in $Manifest) {
   }
 }
 
+$previousErrorPreference = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+$llamaVersion = [string](& (Join-Path $Root "bin\llama-server.exe") --version 2>&1 | Select-Object -First 1)
+$ErrorActionPreference = $previousErrorPreference
 $report = [pscustomobject]@{
   acceptedAt = (Get-Date).ToUniversalTime().ToString("o")
-  llamaVersion = (& (Join-Path $Root "bin\llama-server.exe") --version 2>&1 | Select-Object -First 1)
+  llamaVersion = $llamaVersion
   models = $results
 }
 New-Item -ItemType Directory -Force -Path (Split-Path $ReportPath -Parent) | Out-Null

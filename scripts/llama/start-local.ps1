@@ -1,7 +1,7 @@
 param(
   [string]$Model = "gemma-3-12b-it-q4_0.gguf",
   [int]$Port = 8080,
-  [int]$Context = 32768,
+  [int]$Context = 0,
   [switch]$Foreground
 )
 
@@ -17,6 +17,7 @@ $Manifest = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot "models.json"
 if (-not (Test-Path -LiteralPath $Server)) { throw "llama-server is not installed at $Server" }
 $modelSpec = $Manifest | Where-Object { $_.file -eq $Model } | Select-Object -First 1
 if (-not $modelSpec) { throw "Model is not declared in scripts/llama/models.json: $Model" }
+$Context = if ($Context -gt 0) { $Context } elseif ($modelSpec.context) { [int]$modelSpec.context } else { 32768 }
 $modelPath = Join-Path $Models $Model
 if (-not (Test-Path -LiteralPath $modelPath)) { throw "Model is not installed at $modelPath" }
 if ((Get-Item -LiteralPath $modelPath).Length -ne [int64]$modelSpec.bytes) { throw "Model is incomplete: $modelPath" }

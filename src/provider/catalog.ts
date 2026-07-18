@@ -281,6 +281,14 @@ const LLAMA_CPP_MODEL_BASE = {
   },
 };
 
+const LLAMA_CPP_GEMMA_MODEL_BASE = {
+  ...LLAMA_CPP_MODEL_BASE,
+  capabilities: {
+    ...LLAMA_CPP_MODEL_BASE.capabilities,
+    tools: false,
+  },
+};
+
 const REASONING_EFFORT_CHAT_MODEL_BASE = {
   ...OPENAI_COMPATIBLE_CHAT_MODEL_BASE,
   capabilities: {
@@ -392,7 +400,27 @@ export const MODEL_CATALOG: readonly ModelInfo[] = [
     id: "gemma-3-12b-it-q4_0.gguf",
     providerId: "llama.cpp",
     label: "Google Gemma 3 12B (本机)",
+    ...LLAMA_CPP_GEMMA_MODEL_BASE,
+  },
+  {
+    id: "Qwen3-8B-Q4_K_M.gguf",
+    providerId: "llama.cpp",
+    label: "Qwen3 8B Q4_K_M (本机)",
     ...LLAMA_CPP_MODEL_BASE,
+    limit: {
+      context: 16_384,
+      output: 4_096,
+    },
+  },
+  {
+    id: "Qwen3-4B-Q4_K_M.gguf",
+    providerId: "llama.cpp",
+    label: "Qwen3 4B Q4_K_M (本机)",
+    ...LLAMA_CPP_MODEL_BASE,
+    limit: {
+      context: 16_384,
+      output: 4_096,
+    },
   },
   {
     id: "openai/gpt-oss-120b",

@@ -4,6 +4,7 @@ export interface ProviderCapabilities {
   provider: string;
   model: string;
   wireApi: "responses" | "chat.completions";
+  supportsTools: boolean;
   supportsReasoningContent: boolean;
   defaultReasoningEnabled: boolean;
   defaultReasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
@@ -29,6 +30,7 @@ export function resolveProviderCapabilities(input: ProviderProfileInput): Provid
     provider: profile.provider.id,
     model: profile.model.id,
     wireApi: profile.model.wireApi,
+    supportsTools: profile.model.capabilities.tools,
     supportsReasoningContent: profile.model.capabilities.reasoningContentReplay !== "never",
     defaultReasoningEnabled: profile.model.capabilities.reasoning,
     defaultReasoningEffort: profile.model.request.reasoningEffortDefault,

@@ -50,9 +50,11 @@ test("llama.cpp SDK requests remove the placeholder Authorization header", async
   assert.equal(authorization, null);
 });
 
-test("llama.cpp exposes only the selected Gemma local model", () => {
+test("llama.cpp exposes the manifest local models", () => {
   assert.equal(findModelInfo("llama.cpp", "gemma-3-12b-it-q4_0.gguf")?.providerId, "llama.cpp");
-  assert.equal(PROVIDER_PRESETS.filter((preset) => preset.provider === "llama.cpp").length, 1);
+  assert.equal(findModelInfo("llama.cpp", "Qwen3-8B-Q4_K_M.gguf")?.capabilities.tools, true);
+  assert.equal(findModelInfo("llama.cpp", "Qwen3-4B-Q4_K_M.gguf")?.capabilities.tools, true);
+  assert.equal(PROVIDER_PRESETS.filter((preset) => preset.provider === "llama.cpp").length, 3);
 });
 
 test("llama.cpp deployment manifest matches catalog and preset model ids", () => {
@@ -77,11 +79,19 @@ test("llama.cpp uses its shared chat-template thinking dialect", () => {
     provider: "llama.cpp",
     model: "gemma-3-12b-it-q4_0.gguf",
     messages: [{ role: "user", content: "hello" }],
-    tools: [],
+    tools: [{
+      type: "function",
+      function: {
+        name: "noop",
+        description: "No-op test function.",
+        parameters: { type: "object", properties: {}, additionalProperties: false },
+      },
+    }],
     stream: true,
     forceReasoning: false,
     thinking: "enabled",
   });
+  assert.equal("tools" in body, false);
   assert.deepEqual(body.chat_template_kwargs, { enable_thinking: true });
   assert.deepEqual(body.stream_options, { include_usage: true });
 });

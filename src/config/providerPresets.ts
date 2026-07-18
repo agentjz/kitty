@@ -74,6 +74,22 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     thinking: "disabled",
     activeByDefault: false,
   },
+  {
+    id: "llama-qwen3-8b",
+    label: "本机 + Qwen3 8B 工具调用",
+    provider: "llama.cpp",
+    model: "Qwen3-8B-Q4_K_M.gguf",
+    thinking: "enabled",
+    activeByDefault: false,
+  },
+  {
+    id: "llama-qwen3-4b",
+    label: "本机 + Qwen3 4B 工具调用",
+    provider: "llama.cpp",
+    model: "Qwen3-4B-Q4_K_M.gguf",
+    thinking: "enabled",
+    activeByDefault: false,
+  },
 ] as const;
 
 export function getDefaultProviderPreset(): ProviderPreset {

@@ -19,7 +19,47 @@ function Get-ExpectedPart([int64]$start, [int64]$end) {
   return $end - $start + 1
 }
 
+$progressStartedAt = @{}
+$lastProgressAt = Get-Date
+
+function Get-ModelDownloadedBytes($model) {
+  $target = Join-Path $Models $model.file
+  $total = if (Test-Path -LiteralPath $target) { [int64](Get-Item -LiteralPath $target).Length } else { 0L }
+  $parts = Get-ChildItem -LiteralPath $Models -Filter "$($model.file).part-*" -File -ErrorAction SilentlyContinue
+  foreach ($part in $parts) { $total += [int64]$part.Length }
+  return [Math]::Min($total, [int64]$model.bytes)
+}
+
+function Write-ProgressSnapshot([object[]]$models) {
+  $now = Get-Date
+  foreach ($model in $models) {
+    if (-not $progressStartedAt.ContainsKey($model.file)) { $progressStartedAt[$model.file] = $now }
+    $downloaded = Get-ModelDownloadedBytes $model
+    $expected = [int64]$model.bytes
+    $elapsed = [Math]::Max(0.001, ($now - $progressStartedAt[$model.file]).TotalSeconds)
+    $rate = $downloaded / $elapsed
+    $remaining = [Math]::Max(0L, $expected - $downloaded)
+    $eta = if ($rate -gt 0 -and $remaining -gt 0) { [TimeSpan]::FromSeconds($remaining / $rate).ToString('hh\:mm\:ss') } elseif ($remaining -eq 0) { '00:00:00' } else { '--:--:--' }
+    $percent = if ($expected -gt 0) { [Math]::Round(($downloaded / $expected) * 100, 2) } else { 0 }
+    Write-Output ("Progress {0}: {1}/{2} bytes ({3}%), {4:N2} MB/s, ETA {5}" -f $model.file,$downloaded,$expected,$percent,($rate / 1MB),$eta)
+  }
+}
+
+function Wait-DownloadJobs([object[]]$jobs, [object[]]$models) {
+  while ($true) {
+    $running = @($jobs | Where-Object { $_.Process.Refresh(); -not $_.Process.HasExited })
+    if ($running.Count -eq 0) { break }
+    $now = Get-Date
+    if (($now - $script:lastProgressAt).TotalSeconds -ge 10) {
+      Write-ProgressSnapshot $models
+      $script:lastProgressAt = $now
+    }
+    Start-Sleep -Seconds 1
+  }
+}
+
 foreach ($model in $Manifest) {
+  if (-not $progressStartedAt.ContainsKey($model.file)) { $progressStartedAt[$model.file] = Get-Date }
   $target = Join-Path $Models $model.file
   $prefix = if (Test-Path -LiteralPath $target) { (Get-Item -LiteralPath $target).Length } else { 0 }
   if ($prefix -gt [int64]$model.bytes) { throw "Model is larger than its manifest size: $target" }
@@ -61,8 +101,8 @@ foreach ($model in $Manifest) {
       $jobs += [pscustomobject]@{ Part = $part; Process = $process; Stderr = $stderr }
       Write-Output ("Started {0} segment {1} ({2}-{3})" -f $model.file,$part.Index,$part.Start,$part.End)
     }
+    Wait-DownloadJobs $jobs @($model)
     foreach ($job in $jobs) {
-      $job.Process | Wait-Process
       $job.Process.Refresh()
       $actual = if (Test-Path -LiteralPath $job.Part.Part) { (Get-Item -LiteralPath $job.Part.Part).Length } else { 0 }
       if ($job.Process.ExitCode -ne 0 -or $actual -ne $job.Part.Expected) {
