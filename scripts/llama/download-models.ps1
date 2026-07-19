@@ -31,10 +31,46 @@ function Get-ModelDownloadedBytes($model) {
   return [Math]::Min($total, [int64]$model.bytes)
 }
 
-function Write-ProgressSnapshot([object[]]$modelsToReport) {
+function Convert-CurlSizeToBytes([string]$value) {
+  if ([string]::IsNullOrWhiteSpace($value)) { return 0L }
+  $match = [regex]::Match($value.Trim(), '^(?<number>\d+(?:\.\d+)?)(?<unit>[kKmMgGtT]?)$')
+  if (-not $match.Success) { return 0L }
+  $number = [double]$match.Groups['number'].Value
+  $multiplier = switch ($match.Groups['unit'].Value.ToUpperInvariant()) {
+    'K' { 1KB }
+    'M' { 1MB }
+    'G' { 1GB }
+    'T' { 1TB }
+    default { 1 }
+  }
+  return [int64]($number * $multiplier)
+}
+
+function Get-CurlDownloadedBytes([string]$stderrPath) {
+  if (-not (Test-Path -LiteralPath $stderrPath)) { return 0L }
+  $line = Get-Content -Tail 12 -LiteralPath $stderrPath -ErrorAction SilentlyContinue |
+    Where-Object { $_ -match '^\s*\d+\s+\S+\s+\d+\s+\S+' } |
+    Select-Object -Last 1
+  if (-not $line) { return 0L }
+  $fields = @($line.Trim() -split '\s+')
+  if ($fields.Count -lt 4) { return 0L }
+  return Convert-CurlSizeToBytes $fields[3]
+}
+
+function Get-VisibleDownloadedBytes($model, [object[]]$jobs) {
+  $downloaded = Get-ModelDownloadedBytes $model
+  foreach ($job in @($jobs | Where-Object { $_.Part.Model -eq $model.file })) {
+    $fileBytes = if (Test-Path -LiteralPath $job.Part.Part) { [int64](Get-Item -LiteralPath $job.Part.Part).Length } else { 0L }
+    $curlBytes = Get-CurlDownloadedBytes $job.Stderr
+    if ($curlBytes -gt $fileBytes) { $downloaded += $curlBytes - $fileBytes }
+  }
+  return [Math]::Min($downloaded, [int64]$model.bytes)
+}
+
+function Write-ProgressSnapshot([object[]]$modelsToReport, [object[]]$jobs = @()) {
   $now = Get-Date
   foreach ($model in $modelsToReport) {
-    $downloaded = Get-ModelDownloadedBytes $model
+    $downloaded = Get-VisibleDownloadedBytes $model $jobs
     if (-not $progressStartedAt.ContainsKey($model.file)) {
       $progressStartedAt[$model.file] = $now
       $progressStartedBytes[$model.file] = $downloaded
@@ -56,7 +92,7 @@ function Wait-DownloadJobs([object[]]$jobs, [object[]]$modelsToReport) {
     if ($running.Count -eq 0) { break }
     $now = Get-Date
     if (($now - $script:lastProgressAt).TotalSeconds -ge 10) {
-      Write-ProgressSnapshot $modelsToReport
+      Write-ProgressSnapshot $modelsToReport $jobs
       $script:lastProgressAt = $now
     }
     Start-Sleep -Seconds 1
@@ -114,7 +150,7 @@ foreach ($model in $Manifest) {
       $job.Process.Refresh()
       $actual = if (Test-Path -LiteralPath $job.Part.Part) { (Get-Item -LiteralPath $job.Part.Part).Length } else { 0 }
       if ($job.Process.ExitCode -ne 0 -or $actual -ne $job.Part.Expected) {
-        $errorText = if (Test-Path -LiteralPath $job.Stderr) { (Get-Content -Raw -LiteralPath $job.Stderr).Trim() } else { "no curl stderr" }
+        $errorText = if (Test-Path -LiteralPath $job.Stderr) { (Get-Content -Tail 20 -LiteralPath $job.Stderr) -join [Environment]::NewLine } else { "no curl stderr" }
         throw "Range failed for $($model.file) segment $($job.Part.Index): exit=$($job.Process.ExitCode), bytes=$actual/$($job.Part.Expected). $errorText"
       }
       Write-Output ("Completed {0} segment {1}: {2} bytes" -f $model.file,$job.Part.Index,$actual)
