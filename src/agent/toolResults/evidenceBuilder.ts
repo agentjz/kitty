@@ -192,15 +192,34 @@ function buildCompactView(input: {
 }
 
 function normalizePathForModel(value: string, cwd: string): string {
-  const resolved = path.resolve(cwd, value);
-  const relative = path.relative(cwd, resolved);
-  if (relative && !relative.startsWith("..") && !path.isAbsolute(relative)) {
+  const cwdPathApi = absolutePathApi(cwd);
+  const valuePathApi = absolutePathApi(value);
+  if (cwdPathApi && valuePathApi && cwdPathApi !== valuePathApi) {
+    return valuePathApi.normalize(value).replace(/\\/g, "/");
+  }
+
+  const pathApi = cwdPathApi ?? valuePathApi ?? path;
+  const resolvedCwd = pathApi.resolve(cwd);
+  const resolved = pathApi.resolve(resolvedCwd, value);
+  const relative = pathApi.relative(resolvedCwd, resolved);
+  const outsideWorkspace = relative === ".." || relative.startsWith(`..${pathApi.sep}`);
+  if (relative && !outsideWorkspace && !pathApi.isAbsolute(relative)) {
     return relative.replace(/\\/g, "/");
   }
   if (!relative) {
     return ".";
   }
   return resolved.replace(/\\/g, "/");
+}
+
+function absolutePathApi(value: string): typeof path.win32 | undefined {
+  if (path.win32.isAbsolute(value)) {
+    return path.win32;
+  }
+  if (path.posix.isAbsolute(value)) {
+    return path.posix;
+  }
+  return undefined;
 }
 
 function parseObject(raw: string): Record<string, unknown> | null {
