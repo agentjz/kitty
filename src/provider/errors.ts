@@ -1,3 +1,6 @@
+import type { ProviderErrorPolicy } from "./catalog.js";
+import { resolveRateLimitRetryability } from "./errorDialect.js";
+
 export type ProviderErrorKind =
   | "auth"
   | "contract"
@@ -13,6 +16,7 @@ export interface ProviderErrorFacts {
   status?: number;
   code?: string;
   retryAfterMs?: number;
+  retryable?: boolean;
 }
 
 export class ProviderError extends Error {
@@ -26,7 +30,10 @@ export class ProviderError extends Error {
   }
 }
 
-export function classifyProviderError(error: unknown): ProviderErrorFacts {
+export function classifyProviderError(
+  error: unknown,
+  policy: ProviderErrorPolicy = "generic",
+): ProviderErrorFacts {
   if (error instanceof ProviderError) {
     return error.facts;
   }
@@ -34,6 +41,7 @@ export function classifyProviderError(error: unknown): ProviderErrorFacts {
   const status = readStatus(error);
   const code = readCode(error);
   const message = readMessage(error).toLowerCase();
+  const rateLimitRetryable = resolveRateLimitRetryability(policy, code);
 
   if (status === 401 || status === 403 || includesAny(message, ["authentication failed", "invalid api key", "api key is invalid"])) {
     return { kind: "auth", status, code };
@@ -45,7 +53,13 @@ export function classifyProviderError(error: unknown): ProviderErrorFacts {
     return { kind: "not_found", status, code };
   }
   if (status === 429 || includesAny(message, ["rate limit", "rate limited"])) {
-    return { kind: "rate_limit", status, code, retryAfterMs: readRetryAfterMs(error) };
+    return {
+      kind: "rate_limit",
+      status,
+      code,
+      retryAfterMs: readRetryAfterMs(error),
+      retryable: rateLimitRetryable,
+    };
   }
   if (status === 408 || status === 409) {
     return { kind: "temporary", status, code, retryAfterMs: readRetryAfterMs(error) };
@@ -80,18 +94,25 @@ export function classifyProviderError(error: unknown): ProviderErrorFacts {
   return { kind: "unknown", status, code };
 }
 
-export function normalizeProviderError(error: unknown): ProviderError {
+export function normalizeProviderError(
+  error: unknown,
+  policy: ProviderErrorPolicy = "generic",
+): ProviderError {
   if (error instanceof ProviderError) {
     return error;
   }
 
-  return new ProviderError(readMessage(error), classifyProviderError(error), {
+  return new ProviderError(readMessage(error), classifyProviderError(error, policy), {
     cause: error,
   });
 }
 
 export function isRetryableProviderError(error: unknown): boolean {
-  const kind = classifyProviderError(error).kind;
+  const facts = classifyProviderError(error);
+  if (typeof facts.retryable === "boolean") {
+    return facts.retryable;
+  }
+  const kind = facts.kind;
   return kind === "temporary" || kind === "rate_limit" || kind === "server";
 }
 
@@ -113,7 +134,9 @@ export function formatProviderError(error: unknown): string | undefined {
     case "temporary":
       return "Environment error: network connection failed; the current provider/base URL is unreachable. Check network, proxy settings, or `KITTY_BASE_URL`.";
     case "rate_limit":
-      return "Provider rate limit reached. Wait briefly, then retry.";
+      return facts.retryable === false
+        ? `Provider usage or access limit reached${facts.code ? ` (${facts.code})` : ""}. This condition is not retried automatically; check quota, plan, and model access.`
+        : "Provider rate limit reached. Wait briefly, then retry.";
     case "server":
       return `Provider error: service returned ${facts.status ?? "a server error"}. Retry later or confirm the provider service is healthy.`;
     case "contract":
@@ -135,8 +158,15 @@ function readStatus(error: unknown): number | undefined {
 }
 
 function readCode(error: unknown): string | undefined {
-  const code = (error as { code?: unknown }).code;
-  return typeof code === "string" && code ? code : undefined;
+  const record = error as { code?: unknown; error?: { code?: unknown } };
+  return normalizeCode(record.code) ?? normalizeCode(record.error?.code);
+}
+
+function normalizeCode(value: unknown): string | undefined {
+  if (typeof value === "string" && value) {
+    return value;
+  }
+  return typeof value === "number" && Number.isFinite(value) ? String(value) : undefined;
 }
 
 function readMessage(error: unknown): string {
@@ -166,6 +196,17 @@ function readRetryAfterMs(error: unknown): number | undefined {
       [key: string]: unknown;
     };
   }).headers;
+  const millisecondHeader = headers?.get?.("retry-after-ms") ??
+    headers?.get?.("Retry-After-Ms") ??
+    readHeaderRecordValue(headers, "retry-after-ms") ??
+    readHeaderRecordValue(headers, "Retry-After-Ms");
+  if (typeof millisecondHeader === "string" && millisecondHeader.trim()) {
+    const milliseconds = Number(millisecondHeader);
+    if (Number.isFinite(milliseconds) && milliseconds >= 0) {
+      return Math.trunc(milliseconds);
+    }
+  }
+
   const header = headers?.get?.("retry-after") ??
     headers?.get?.("Retry-After") ??
     readHeaderRecordValue(headers, "retry-after") ??

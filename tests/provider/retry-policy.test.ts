@@ -20,8 +20,36 @@ test("provider retry policy recognizes transient provider failures", () => {
 test("provider retry delay honors retry-after before bounded backoff", () => {
   assert.equal(computeApiRetryDelayMs({ headers: { "retry-after": "2" } }, 1), 2_000);
   assert.equal(computeApiRetryDelayMs({ headers: { get: (name: string) => name === "retry-after" ? "3" : null } }, 1), 3_000);
+  assert.equal(computeApiRetryDelayMs({ headers: { "retry-after-ms": "2500" } }, 1), 2_500);
+  assert.equal(computeApiRetryDelayMs({ headers: { "retry-after": "120" } }, 1), 120_000);
   assert.equal(computeApiRetryDelayMs(new Error("timeout"), 1), 1_137);
   assert.equal(computeApiRetryDelayMs(new Error("timeout"), 20), 30_000);
+});
+
+test("provider retry never shortens a server delay beyond the total wait budget", async () => {
+  let attempts = 0;
+  let sleeps = 0;
+
+  await assert.rejects(
+    () => withApiRetries(
+      async () => {
+        attempts += 1;
+        throw Object.assign(new Error("rate limited"), {
+          status: 429,
+          headers: { "retry-after": "120" },
+        });
+      },
+      {
+        sleep: async () => {
+          sleeps += 1;
+        },
+      },
+    ),
+    /rate limited/,
+  );
+
+  assert.equal(attempts, 1);
+  assert.equal(sleeps, 0);
 });
 
 test("provider retry has one bounded logical request budget", async () => {

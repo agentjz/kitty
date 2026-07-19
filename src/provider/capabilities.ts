@@ -1,9 +1,14 @@
-import { resolveModelProfile, type ChatReasoningRequestMode } from "./catalog.js";
+import {
+  resolveModelProfile,
+  type ChatReasoningRequestMode,
+  type ProviderErrorPolicy,
+} from "./catalog.js";
 
 export interface ProviderCapabilities {
   provider: string;
   model: string;
   wireApi: "chat.completions";
+  errorPolicy: ProviderErrorPolicy;
   supportsTools: boolean;
   supportsReasoningContent: boolean;
   defaultReasoningEnabled: boolean;
@@ -30,6 +35,7 @@ export function resolveProviderCapabilities(input: ProviderProfileInput): Provid
     provider: profile.provider.id,
     model: profile.model.id,
     wireApi: profile.model.wireApi,
+    errorPolicy: profile.provider.errorPolicy,
     supportsTools: profile.model.capabilities.tools,
     supportsReasoningContent: profile.model.capabilities.reasoningContentReplay !== "never",
     defaultReasoningEnabled: profile.model.capabilities.reasoning,

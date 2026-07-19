@@ -2,17 +2,20 @@ import type { ModelReasoningEffort, ModelThinkingMode } from "../types.js";
 
 export type ProviderWireApi = "chat.completions";
 export type ProviderApiKind = "openai-compatible" | "deepseek-openai-compatible";
+export type ProviderErrorPolicy = "generic" | "zhipu";
 export type ReasoningContentReplayPolicy = "never" | "tool-call-required";
 export type ModelCacheMode = "provider-automatic" | "none";
 export type ChatReasoningRequestMode =
   | "none"
   | "deepseek-thinking"
-  | "agnes-thinking";
+  | "agnes-thinking"
+  | "zhipu-thinking";
 
 export interface ProviderInfo {
   id: string;
   label: string;
   apiKind: ProviderApiKind;
+  errorPolicy: ProviderErrorPolicy;
   defaultBaseUrl: string;
   requestTimeoutMs: number;
   doctorProbeTimeoutMs: number;
@@ -68,6 +71,7 @@ export const PROVIDER_CATALOG: readonly ProviderInfo[] = [
     id: "deepseek",
     label: "DeepSeek official",
     apiKind: "deepseek-openai-compatible",
+    errorPolicy: "generic",
     defaultBaseUrl: "https://api.deepseek.com",
     requestTimeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
     doctorProbeTimeoutMs: DEFAULT_DOCTOR_PROBE_TIMEOUT_MS,
@@ -76,7 +80,17 @@ export const PROVIDER_CATALOG: readonly ProviderInfo[] = [
     id: "agnes",
     label: "Agnes AI",
     apiKind: "openai-compatible",
+    errorPolicy: "generic",
     defaultBaseUrl: "https://apihub.agnes-ai.com/v1",
+    requestTimeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
+    doctorProbeTimeoutMs: DEFAULT_DOCTOR_PROBE_TIMEOUT_MS,
+  },
+  {
+    id: "zhipu",
+    label: "Zhipu AI",
+    apiKind: "openai-compatible",
+    errorPolicy: "zhipu",
+    defaultBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
     requestTimeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
     doctorProbeTimeoutMs: DEFAULT_DOCTOR_PROBE_TIMEOUT_MS,
   },
@@ -84,6 +98,7 @@ export const PROVIDER_CATALOG: readonly ProviderInfo[] = [
     id: "openai-compatible",
     label: "OpenAI-compatible",
     apiKind: "openai-compatible",
+    errorPolicy: "generic",
     defaultBaseUrl: "",
     requestTimeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
     doctorProbeTimeoutMs: DEFAULT_DOCTOR_PROBE_TIMEOUT_MS,
@@ -162,6 +177,29 @@ const AGNES_MODEL_BASE = {
   },
 };
 
+const ZHIPU_MODEL_BASE = {
+  ...OPENAI_COMPATIBLE_CHAT_MODEL_BASE,
+  capabilities: {
+    ...OPENAI_COMPATIBLE_CHAT_MODEL_BASE.capabilities,
+    reasoning: true,
+    reasoningContentReplay: "tool-call-required" as const,
+    cache: "provider-automatic" as const,
+  },
+  request: {
+    thinkingDefault: "enabled" as const,
+    maxOutputTokensParam: "max_tokens" as const,
+    chat: {
+      reasoning: "zhipu-thinking" as const,
+      toolChoice: "auto" as const,
+      streamUsage: "include_usage" as const,
+    },
+  },
+  limit: {
+    context: 200_000,
+    output: 131_072,
+  },
+};
+
 export const MODEL_CATALOG: readonly ModelInfo[] = [
   {
     id: "deepseek-v4-flash",
@@ -180,6 +218,12 @@ export const MODEL_CATALOG: readonly ModelInfo[] = [
     providerId: "agnes",
     label: "Agnes 2.0 Flash",
     ...AGNES_MODEL_BASE,
+  },
+  {
+    id: "glm-4.7-flash",
+    providerId: "zhipu",
+    label: "GLM-4.7 Flash",
+    ...ZHIPU_MODEL_BASE,
   },
 ] as const;
 

@@ -12,8 +12,8 @@ export function buildProjectEnvTemplate(example: boolean): string {
   const defaultPreset = getDefaultProviderPreset();
 
   return [
-    "# Kitty environment",
-    "# Local credentials, provider presets, Telegram, and runtime configuration for this project.",
+    "# Kitty 环境配置",
+    "# 当前项目的本地凭证、Provider 预设、远程渠道与运行参数。",
     "",
     ...formatCommonEnvSections({ initialConfig, defaultPreset, providerKey, example }),
   ].join("\n");
@@ -29,19 +29,19 @@ function formatCommonEnvSections(input: {
   const activeTelegramToken = "";
   const activeTelegramAllowedUsers = "";
   return [
-    "# Agent profile",
-    "# Locale: zh-CN, en, ja, ko",
+    "# 智能体配置",
+    "# 界面语言：zh-CN、en、ja、ko",
     `${KITTY_ENV.locale}=${input.initialConfig.locale}`,
     `${KITTY_ENV.profile}=${input.initialConfig.profile}`,
     "",
-    "# Active provider",
-    "# Switching providers requires replacing KITTY_API_KEY before saving.",
+    "# 当前语言模型 Provider",
+    "# 切换 Provider 时，需要同时替换对应的 KITTY_API_KEY。",
     ...formatProviderPreset(input.defaultPreset, {
       apiKey: input.providerKey,
       commented: false,
     }),
     "",
-    "# Alternative provider presets",
+    "# 其他 Provider 预设",
     ...PROVIDER_PRESETS
       .filter((preset) => preset !== input.defaultPreset)
       .flatMap((preset) => [
@@ -51,7 +51,7 @@ function formatCommonEnvSections(input: {
         }),
         "",
       ]),
-    "# Weixin iLink private chat",
+    "# 微信 iLink 私聊",
     `${KITTY_ENV.weixinBaseUrl}=${INITIAL_WEIXIN_CONFIG.baseUrl}`,
     `${KITTY_ENV.weixinCdnBaseUrl}=${INITIAL_WEIXIN_CONFIG.cdnBaseUrl}`,
     `${KITTY_ENV.weixinAllowedUserIds}=`,
@@ -62,7 +62,7 @@ function formatCommonEnvSections(input: {
     `${KITTY_ENV.weixinQrTimeoutMs}=${INITIAL_WEIXIN_CONFIG.qrTimeoutMs}`,
     `${KITTY_ENV.weixinRouteTag}=${INITIAL_WEIXIN_CONFIG.routeTag}`,
     "",
-    "# Telegram private chat",
+    "# Telegram 私聊",
     `${KITTY_ENV.telegramToken}=${activeTelegramToken}`,
     `${KITTY_ENV.telegramAllowedUserIds}=${activeTelegramAllowedUsers}`,
     `${KITTY_ENV.telegramApiBaseUrl}=${INITIAL_TELEGRAM_CONFIG.apiBaseUrl}`,
@@ -76,11 +76,11 @@ function formatCommonEnvSections(input: {
     `${KITTY_ENV.telegramDeliveryBaseDelayMs}=${INITIAL_TELEGRAM_CONFIG.delivery.baseDelayMs}`,
     `${KITTY_ENV.telegramDeliveryMaxDelayMs}=${INITIAL_TELEGRAM_CONFIG.delivery.maxDelayMs}`,
     "",
-    "# Extension switches",
+    "# Extension 开关",
     ...EXTENSION_DEFINITIONS.map((definition) =>
       `${definition.envKey}=${String(input.initialConfig.extensions[definition.id])}`),
     "",
-    "# Runtime configuration",
+    "# 运行参数",
     `${KITTY_ENV.maxOutputTokens}=${input.initialConfig.maxOutputTokens}`,
     `${KITTY_ENV.contextWindowMessages}=${input.initialConfig.contextWindowMessages}`,
     `${KITTY_ENV.maxContextChars}=${input.initialConfig.maxContextChars}`,
@@ -90,7 +90,7 @@ function formatCommonEnvSections(input: {
     `${KITTY_ENV.commandStallTimeoutMs}=${input.initialConfig.commandStallTimeoutMs}`,
     `${KITTY_ENV.showReasoning}=${String(input.initialConfig.showReasoning)}`,
     "",
-    "# Image and video generation",
+    "# 图片与视频生成",
     `${KITTY_ENV.mediaProvider}=${input.initialConfig.media.provider}`,
     `${KITTY_ENV.mediaBaseUrl}=${input.initialConfig.media.baseUrl}`,
     `${KITTY_ENV.mediaApiKey}=${input.example ? "replace-with-your-agnes-key" : ""}`,
@@ -111,7 +111,10 @@ function formatProviderPreset(
 ): string[] {
   const prefix = options.commented ? "# " : "";
   return [
-    `# Provider preset: ${preset.label}`,
+    `# Provider 预设：${preset.label}`,
+    preset.reasoningEffort
+      ? "# 思考：enabled/disabled；推理强度：high 常规，max 更充分但通常更慢。"
+      : "# 思考：enabled/disabled；此模型不使用推理强度，留空即可。",
     `${prefix}${KITTY_ENV.provider}=${preset.provider}`,
     `${prefix}${KITTY_ENV.apiKey}=${options.apiKey}`,
     `${prefix}${KITTY_ENV.baseUrl}=${getProviderPresetBaseUrl(preset)}`,

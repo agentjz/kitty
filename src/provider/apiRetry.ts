@@ -80,7 +80,7 @@ export async function withApiRetries<T>(
 export function computeApiRetryDelayMs(error: unknown, attempt: number): number {
   const retryAfterMs = readProviderRetryAfterMs(error);
   if (typeof retryAfterMs === "number") {
-    return Math.min(retryAfterMs, API_RETRY_MAX_DELAY_MS);
+    return retryAfterMs;
   }
 
   const exponent = Math.max(0, attempt - 1);

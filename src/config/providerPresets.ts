@@ -18,7 +18,6 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     provider: "agnes",
     model: "agnes-2.0-flash",
     thinking: "enabled",
-    reasoningEffort: "high",
     activeByDefault: true,
   },
   {
@@ -28,6 +27,14 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     model: "deepseek-v4-flash",
     thinking: "enabled",
     reasoningEffort: "high",
+    activeByDefault: false,
+  },
+  {
+    id: "glm-4.7-flash",
+    label: "Zhipu AI + GLM-4.7 Flash (Free)",
+    provider: "zhipu",
+    model: "glm-4.7-flash",
+    thinking: "enabled",
     activeByDefault: false,
   },
 ] as const;

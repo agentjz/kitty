@@ -56,6 +56,33 @@ test("rate limiting stays inside the streaming retry budget without non-streamin
   assert.deepEqual(streams, [true, true, true, true]);
 });
 
+test("Zhipu terminal account limits stop before another provider request", async () => {
+  let calls = 0;
+  const client = createClient(async () => {
+    calls += 1;
+    throw Object.assign(new Error("weekly limit reached"), {
+      status: 429,
+      code: 1310,
+    });
+  });
+
+  await assert.rejects(
+    () => fetchAssistantResponse(
+      client,
+      [{ role: "user", content: "hello" }],
+      {
+        provider: "zhipu",
+        model: "glm-4.7-flash",
+      },
+      undefined,
+      undefined,
+    ),
+    /weekly limit reached/,
+  );
+
+  assert.equal(calls, 1);
+});
+
 test("stream framing failure may use one non-streaming fallback", async () => {
   const streams: boolean[] = [];
   const client = createClient(async (body) => {

@@ -33,6 +33,14 @@ export function applyChatRequestDialect(
         }),
       };
       break;
+    case "zhipu-thinking": {
+      const thinking = input.thinking ?? (capabilities.defaultReasoningEnabled ? "enabled" : "disabled");
+      assertReasoningReplayAvailable(input.messages, thinking, "Zhipu");
+      body.thinking = thinking === "enabled"
+        ? { type: "enabled", clear_thinking: false }
+        : { type: "disabled" };
+      break;
+    }
     case "none":
       break;
   }
@@ -46,11 +54,19 @@ function resolveDeepSeekThinking(
     return "disabled";
   }
 
-  if (hasUnreplayableAssistantReasoning(messages)) {
-    throw new Error("DeepSeek thinking tool-call replay requires stored reasoning_content. Start a new turn or disable KITTY_THINKING.");
-  }
+  assertReasoningReplayAvailable(messages, requested, "DeepSeek");
 
   return "enabled";
+}
+
+function assertReasoningReplayAvailable(
+  messages: ProviderMessage[],
+  thinking: "enabled" | "disabled",
+  provider: string,
+): void {
+  if (thinking === "enabled" && hasUnreplayableAssistantReasoning(messages)) {
+    throw new Error(`${provider} thinking tool-call replay requires stored reasoning_content. Start a new turn or disable KITTY_THINKING.`);
+  }
 }
 
 function hasUnreplayableAssistantReasoning(messages: ProviderMessage[]): boolean {

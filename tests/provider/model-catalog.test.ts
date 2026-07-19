@@ -30,6 +30,20 @@ test("Agnes model owns its chat-template thinking contract", () => {
   assert.equal(profile.model.limit.output, 65_500);
 });
 
+test("Zhipu GLM-4.7 Flash owns its preserved-thinking and free-model limits", () => {
+  const profile = resolveModelProfile({
+    provider: "zhipu",
+    model: "glm-4.7-flash",
+  });
+
+  assert.equal(profile.provider.defaultBaseUrl, "https://open.bigmodel.cn/api/paas/v4");
+  assert.equal(profile.model.request.chat?.reasoning, "zhipu-thinking");
+  assert.equal(profile.model.capabilities.reasoningContentReplay, "tool-call-required");
+  assert.equal(profile.model.capabilities.cache, "provider-automatic");
+  assert.equal(profile.model.limit.context, 200_000);
+  assert.equal(profile.model.limit.output, 131_072);
+});
+
 test("generic OpenAI-compatible endpoints accept an explicitly configured model", () => {
   const profile = resolveModelProfile({
     provider: "openai-compatible",

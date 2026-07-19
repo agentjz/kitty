@@ -85,7 +85,9 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 
 未知 provider、不支持的 provider/model 组合、缺失必填项和非法值必须在配置 schema 显式失败。运行时不能静默猜测 model 或 provider。
 
-默认 provider profile 是 Agnes AI，另一个具名 profile 是 DeepSeek official。`openai-compatible` 是用户后续接入兼容 Chat Completions 免费模型的通用协议入口，不携带厂商模型 preset 或厂商 wire 特判。Kitty 不维护本地模型部署或本地模型 preset。
+默认 provider profile 是 Agnes AI，另有 DeepSeek official 与 Zhipu AI 具名 profile。Zhipu AI 默认模型是免费的 `glm-4.7-flash`，使用标准 BigModel API 端点，支持工具调用、自动上下文缓存与 preserved thinking。`openai-compatible` 是用户后续接入兼容 Chat Completions 免费模型的通用协议入口，不携带厂商模型 preset 或厂商 wire 特判。Kitty 不维护本地模型部署或本地模型 preset。
+
+项目 env 模板使用中文短注释说明 Provider 参数。Agnes 与 Zhipu GLM-4.7 Flash 使用 `KITTY_THINKING=enabled|disabled`，不发送 `KITTY_REASONING_EFFORT`；DeepSeek 使用相同思考开关，并将推理强度收敛为 `high` 或 `max`。
 
 图片/视频配置独立于语言模型配置。当前媒体 Provider 是 Agnes AI：图片模型 `agnes-image-2.1-flash`，视频模型 `agnes-video-v2.0`。媒体密钥优先使用 `KITTY_MEDIA_API_KEY`，为空时运行时回退到 `KITTY_API_KEY`，但 Web 保存和展示仍按独立媒体字段处理。
 
@@ -172,9 +174,11 @@ Context budget 记录当前有效 limit、estimate、remaining、compression mod
 - `src/provider/chatRequestDialect.ts`：Chat Completions provider/model 请求方言投影。
 - `src/provider/chatCompletionsAdapter.ts`：统一 Chat Completions wire adapter。
 
-Provider 与 model 是独立事实。Provider 决定默认 endpoint 和 probe 行为；model 决定限制、工具、usage、cache、reasoning replay 和 Chat Completions 请求方言。当前语言请求统一使用 Bearer 与 Chat Completions；通用 `openai-compatible` 使用标准方言和用户显式填写的 model/base URL，Agnes 与 DeepSeek 的 wire 差异由 catalog model profile 投影，request body 不按 provider 名称散落判断。
+Provider 与 model 是独立事实。Provider 决定默认 endpoint 和 probe 行为；model 决定限制、工具、usage、cache、reasoning replay 和 Chat Completions 请求方言。当前语言请求统一使用 Bearer 与 Chat Completions；通用 `openai-compatible` 使用标准方言和用户显式填写的 model/base URL，Agnes、DeepSeek 与 Zhipu 的 wire 差异由 catalog model profile 投影，request body 不按 provider 名称散落判断。Zhipu 标准 API 的 Agent 请求使用 `thinking.type` 并设置 `clear_thinking: false`，工具调用后的 assistant 消息必须原样回放 `reasoning_content`。
 
 Chat Completions 的 HTTP abort signal 必须作为 SDK request options 传递，不能进入 JSON body。只有明确的无状态 stream framing 故障可以降级为一次非流式请求；认证、参数校验、限流和 HTTP provider error 不得被非流式 fallback 重放。
+
+语言模型请求对 429、临时网络故障和 5xx 使用同一个最多四次、总等待不超过 90 秒的逻辑请求预算；等待可被用户中断并通过 host status 暴露。服务端 `Retry-After` / `retry-after-ms` 是等待事实，不能被本地退避上限缩短；超过总等待预算时直接停止自动重试。Zhipu 错误方言只重试 1302、1303、1305、1312；每日/周期额度、套餐、模型权限与公平使用限制 1304、1308、1309、1310、1311、1313 不自动重试。智谱并发权益按账号、模型和时段动态变化，Kitty 不硬编码虚假的 RPM 或并发数。
 
 Provider request 边界把 adapter、transport 和 SDK 失败归一为 `ProviderError`。错误 kind 驱动 retry、stream fallback 和 alternate base URL；CLI 只展示结构化错误事实。没有可用工具时，Chat Completions request 必须省略 `tools` 字段，不能发送空工具数组。Provider 层不增加任务策略。
 

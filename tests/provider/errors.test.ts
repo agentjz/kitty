@@ -6,6 +6,7 @@ import {
   classifyProviderError,
   isRetryableProviderError,
   isStreamingFallbackEligible,
+  formatProviderError,
   normalizeProviderError,
 } from "../../src/provider/errors.js";
 
@@ -24,6 +25,25 @@ test("provider error classification drives retry, fallback, and alternate endpoi
   assert.equal(isStreamingFallbackEligible({ status: 503 }), false);
   assert.equal(canRetryWithAlternateBaseUrl({ status: 404 }), true);
   assert.equal(canRetryWithAlternateBaseUrl({ status: 401 }), false);
+});
+
+test("Zhipu error policy retries transient limits but stops on quota and access limits", () => {
+  const transient = normalizeProviderError({
+    status: 429,
+    code: 1302,
+    message: "concurrency limit",
+  }, "zhipu");
+  const terminal = normalizeProviderError({
+    status: 429,
+    error: { code: 1310 },
+    message: "weekly limit reached",
+  }, "zhipu");
+
+  assert.equal(transient.facts.code, "1302");
+  assert.equal(isRetryableProviderError(transient), true);
+  assert.equal(terminal.facts.code, "1310");
+  assert.equal(isRetryableProviderError(terminal), false);
+  assert.match(formatProviderError(terminal) ?? "", /not retried automatically/u);
 });
 
 test("provider request boundaries normalize transport errors once", () => {

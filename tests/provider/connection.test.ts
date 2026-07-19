@@ -47,6 +47,20 @@ test("Agnes probes its Chat Completions contract", () => {
   assert.match(request.body ?? "", /"messages":/u);
 });
 
+test("Zhipu probes its named Chat Completions endpoint", () => {
+  const profile = resolveModelProfile({ provider: "zhipu", model: "glm-4.7-flash" });
+  assert.equal(resolveProviderProbeKind(profile), "chat.completions");
+
+  const request = buildProviderProbeRequest({
+    baseUrl: profile.provider.defaultBaseUrl,
+    apiKey: "test-key",
+    model: profile.model.id,
+    probe: "chat.completions",
+  });
+  assert.equal(request.endpoint, "https://open.bigmodel.cn/api/paas/v4/chat/completions");
+  assert.equal(request.method, "POST");
+});
+
 test("base URL candidates add v1 only at a host root", () => {
   assert.deepEqual(
     buildProviderBaseUrlCandidates("https://api.example.com"),

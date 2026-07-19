@@ -5,6 +5,7 @@ import type { ModelRequestMetric } from "./metrics.js";
 import { isAbortError } from "../utils/abort.js";
 import type { AssistantResponse, AgentCallbacks } from "../agent/types.js";
 import { resolveProviderCapabilities } from "./capabilities.js";
+import type { ProviderErrorPolicy } from "./catalog.js";
 import type { ProviderMessage, ProviderWireAdapter } from "./contract.js";
 import { chatCompletionsAdapter } from "./chatCompletionsAdapter.js";
 import { isProviderClientPool, type ProviderClientPool } from "./client.js";
@@ -48,6 +49,7 @@ export async function fetchAssistantResponse(
     tools,
     callbacks,
     false,
+    capabilities.errorPolicy,
     abortSignal,
     onRequestMetric,
     observability,
@@ -68,6 +70,7 @@ async function tryFetch(
   tools: FunctionToolDefinition[] | undefined,
   callbacks: AgentCallbacks | undefined,
   forceReasoning: boolean,
+  errorPolicy: ProviderErrorPolicy,
   abortSignal?: AbortSignal,
   onRequestMetric?: (metric: ModelRequestMetric) => void,
   observability?: ProviderRequestObservability,
@@ -122,7 +125,7 @@ async function tryFetch(
       async () => {
         await recordAttempt("started");
         try {
-          const result = await invokeWithProviderClients(client, async (providerClient, baseUrl) => {
+          const result = await invokeWithProviderClients(client, errorPolicy, async (providerClient, baseUrl) => {
             resolvedBaseUrl = baseUrl;
             return adapter.fetchStreaming(providerClient, {
               provider: request.provider,
@@ -191,7 +194,7 @@ async function tryFetch(
         async () => {
           await recordAttempt("started");
           try {
-            const result = await invokeWithProviderClients(client, async (providerClient, baseUrl) => {
+            const result = await invokeWithProviderClients(client, errorPolicy, async (providerClient, baseUrl) => {
               resolvedBaseUrl = baseUrl;
               return adapter.fetchNonStreaming(providerClient, {
                 provider: request.provider,
@@ -256,6 +259,7 @@ function formatRetryDelay(ms: number): string {
 
 async function invokeWithProviderClients<T>(
   client: OpenAI | ProviderClientPool,
+  errorPolicy: ProviderErrorPolicy,
   operation: (client: OpenAI, baseUrl: string | undefined) => Promise<T>,
 ): Promise<T> {
   if (!isProviderClientPool(client)) {
@@ -265,7 +269,7 @@ async function invokeWithProviderClients<T>(
       if (isAbortError(error)) {
         throw error;
       }
-      throw normalizeProviderError(error);
+      throw normalizeProviderError(error, errorPolicy);
     }
   }
 
@@ -281,7 +285,7 @@ async function invokeWithProviderClients<T>(
       if (isAbortError(error)) {
         throw error;
       }
-      const providerError = normalizeProviderError(error);
+      const providerError = normalizeProviderError(error, errorPolicy);
       lastError = providerError;
 
       const hasMoreCandidates = index < candidates.length - 1;
