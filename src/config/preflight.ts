@@ -201,7 +201,7 @@ function readCatalogProfile(input: {
       providerProfile: profile.provider.label,
       modelProfile: profile.model.label,
       wireApi: profile.model.wireApi,
-      apiKeyRequired: profile.provider.authentication !== "none",
+      apiKeyRequired: true,
     };
   } catch (error) {
     return {

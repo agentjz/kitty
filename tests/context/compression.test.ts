@@ -9,7 +9,7 @@ import type { StoredMessage } from "../../src/types.js";
 
 const config = {
   contextWindowMessages: 120,
-  model: "gpt-5.5",
+  model: "community/free-model",
   maxContextChars: 900_000,
   contextSummaryChars: 120_000,
 };

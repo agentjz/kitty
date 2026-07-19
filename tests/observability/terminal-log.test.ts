@@ -63,12 +63,12 @@ test("terminal log does not duplicate streamed assistant text when status closes
   });
 
   display.callbacks.onAssistantDelta?.("我是 ");
-  display.callbacks.onAssistantDelta?.("GPT-5.5。");
+  display.callbacks.onAssistantDelta?.("通用模型。");
   display.callbacks.onStatus?.("总结中");
-  display.callbacks.onAssistantDone?.("我是 GPT-5.5。");
+  display.callbacks.onAssistantDone?.("我是通用模型。");
 
   const log = chunks.join("");
-  assert.equal(countOccurrences(log, "我是 GPT-5.5。"), 1);
+  assert.equal(countOccurrences(log, "我是通用模型。"), 1);
 });
 
 test("terminal log records submitted input once and skips shell echo", async () => {

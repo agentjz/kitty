@@ -76,7 +76,6 @@ export async function runToolOutputGovernanceCheck(id: EvaluationCheckId): Promi
 
 export async function runCacheEconomyCheck(id: EvaluationCheckId): Promise<EvaluationCheckResult> {
   const { normalizeProviderUsage } = await import("../provider/usageNormalizer.js");
-  const { resolveProviderCachePolicy } = await import("../provider/cachePolicy.js");
   const { buildCompressedContextRequest } = await import("../context/runtime/compression/builder.js");
   const { buildContextRuntimePromptLayers } = await import("../context/runtime/prompt.js");
   const { renderPromptLayers } = await import("../agent/prompt/format.js");
@@ -90,22 +89,17 @@ export async function runCacheEconomyCheck(id: EvaluationCheckId): Promise<Evalu
     prompt_cache_miss_tokens: 200,
     completion_tokens: 40,
   });
-  const openai = normalizeProviderUsage({
+  const compatible = normalizeProviderUsage({
     prompt_tokens: 1200,
     prompt_tokens_details: {
       cached_tokens: 960,
     },
   });
-  const policy = resolveProviderCachePolicy({
-    provider: "openai",
-    model: "gpt-5.5",
-    sessionId: "eval-session",
-  });
   const config = {
     ...getInitialRuntimeConfig(),
     apiKey: "eval-key",
     media: { ...getInitialRuntimeConfig().media, apiKey: "eval-key" },
-    model: "gpt-5.5",
+    model: "agnes-2.0-flash",
     telegram: resolveTelegramRuntimeConfig(getInitialRuntimeConfig().telegram, process.cwd()),
     weixin: resolveWeixinRuntimeConfig(getInitialRuntimeConfig().weixin, process.cwd()),
     paths: getAppPaths(process.cwd()),
@@ -168,7 +162,7 @@ export async function runCacheEconomyCheck(id: EvaluationCheckId): Promise<Evalu
   });
   const requestConfig = {
     contextWindowMessages: 120,
-    model: "gpt-5.5",
+    model: "agnes-2.0-flash",
     maxContextChars: 900_000,
     contextSummaryChars: 120_000,
   };
@@ -198,7 +192,7 @@ export async function runCacheEconomyCheck(id: EvaluationCheckId): Promise<Evalu
     ],
     {
       contextWindowMessages: 3,
-      model: "gpt-5.5",
+      model: "agnes-2.0-flash",
       maxContextChars: 8_000,
       contextSummaryChars: 600,
     },
@@ -207,8 +201,7 @@ export async function runCacheEconomyCheck(id: EvaluationCheckId): Promise<Evalu
 
   if (
     deepSeek?.cacheHitRate !== 0.8 ||
-    openai?.cacheReadTokens !== 960 ||
-    !policy.promptCacheKey ||
+    compatible?.cacheReadTokens !== 960 ||
     first.cacheLayout?.stablePrefixFingerprint !== second.cacheLayout?.stablePrefixFingerprint ||
     first.cacheLayout?.volatileTailFingerprint === second.cacheLayout?.volatileTailFingerprint ||
     renderedPrompt.includes("FULL_SKILL_BODY_MUST_NOT_ENTER_DEFAULT_CONTEXT") ||
@@ -224,7 +217,7 @@ export async function runCacheEconomyCheck(id: EvaluationCheckId): Promise<Evalu
 
   return passed(
     id,
-    `cache economy ready: deepseekHit=${deepSeek?.cacheHitRate}, openaiCached=${openai?.cacheReadTokens}, stablePrefix=${first.cacheLayout?.stablePrefixFingerprint ?? "unknown"}, stableChars=${first.cacheLayout?.stablePrefixChars ?? 0}, compactedTailChars=${compactedLargeOutput.cacheLayout?.volatileTailChars ?? 0}, skillIndex=only`,
+    `cache economy ready: deepseekHit=${deepSeek?.cacheHitRate}, compatibleCached=${compatible?.cacheReadTokens}, stablePrefix=${first.cacheLayout?.stablePrefixFingerprint ?? "unknown"}, stableChars=${first.cacheLayout?.stablePrefixChars ?? 0}, compactedTailChars=${compactedLargeOutput.cacheLayout?.volatileTailChars ?? 0}, skillIndex=only`,
   );
 }
 

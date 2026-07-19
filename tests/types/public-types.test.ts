@@ -15,11 +15,11 @@ test("public type barrel exposes runtime, session, transition, and tool result c
   const initialConfig = getInitialRuntimeConfig();
   const config = {
     ...initialConfig,
-    provider: "openai",
+    provider: "agnes",
     apiKey: "test",
     media: { ...initialConfig.media, apiKey: "test" },
-    baseUrl: "https://api.openai.com/v1",
-    model: "gpt-5.5",
+    baseUrl: "https://apihub.agnes-ai.com/v1",
+    model: "agnes-2.0-flash",
     thinking: "enabled",
     telegram: resolveTelegramRuntimeConfig(initialConfig.telegram, "."),
     weixin: resolveWeixinRuntimeConfig(initialConfig.weixin, "."),
@@ -52,7 +52,7 @@ test("public type barrel exposes runtime, session, transition, and tool result c
   } satisfies ToolExecutionResult;
 
   assert.equal(session.id, "session-public-type");
-  assert.equal(config.model, "gpt-5.5");
+  assert.equal(config.model, "agnes-2.0-flash");
   assert.equal(transition.action, "finalize");
   assert.equal(result.ok, true);
 });

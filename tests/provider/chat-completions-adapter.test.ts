@@ -14,8 +14,8 @@ test("chat completions streaming passes abort signal as SDK options", async () =
   });
 
   const response = await chatCompletionsAdapter.fetchStreaming(client, {
-    provider: "nvidia",
-    model: "deepseek-ai/deepseek-v4-flash",
+    provider: "openai-compatible",
+    model: "community/free-model",
     messages: [{ role: "user", content: "hello" }],
     tools: undefined,
     callbacks: undefined,
@@ -40,8 +40,8 @@ test("chat completions non-streaming passes abort signal as SDK options", async 
   });
 
   const response = await chatCompletionsAdapter.fetchNonStreaming(client, {
-    provider: "nvidia",
-    model: "deepseek-ai/deepseek-v4-flash",
+    provider: "openai-compatible",
+    model: "community/free-model",
     messages: [{ role: "user", content: "hello" }],
     tools: undefined,
     callbacks: undefined,
@@ -64,8 +64,8 @@ test("chat completions normalizes generic reasoning deltas", async () => {
       },
     }],
   }]), {
-    provider: "groq",
-    model: "openai/gpt-oss-120b",
+    provider: "openai-compatible",
+    model: "community/free-model",
     messages: [{ role: "user", content: "hello" }],
     tools: undefined,
     callbacks: {

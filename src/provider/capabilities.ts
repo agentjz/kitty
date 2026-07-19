@@ -3,7 +3,7 @@ import { resolveModelProfile, type ChatReasoningRequestMode } from "./catalog.js
 export interface ProviderCapabilities {
   provider: string;
   model: string;
-  wireApi: "responses" | "chat.completions";
+  wireApi: "chat.completions";
   supportsTools: boolean;
   supportsReasoningContent: boolean;
   defaultReasoningEnabled: boolean;

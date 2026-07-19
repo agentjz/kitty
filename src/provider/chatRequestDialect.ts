@@ -24,16 +24,7 @@ export function applyChatRequestDialect(
       }
       break;
     }
-    case "nvidia-reasoning-effort":
-      body.reasoning_effort = resolveNvidiaReasoningEffort({
-        thinking: input.thinking,
-        forceReasoning: input.forceReasoning,
-        defaultReasoningEnabled: capabilities.defaultReasoningEnabled,
-        effort: input.reasoningEffort ?? capabilities.defaultReasoningEffort,
-      });
-      break;
     case "agnes-thinking":
-    case "chat-template-thinking":
       body.chat_template_kwargs = {
         enable_thinking: resolveAgnesThinking({
           thinking: input.thinking,
@@ -42,18 +33,6 @@ export function applyChatRequestDialect(
         }),
       };
       break;
-    case "reasoning-effort": {
-      const reasoningEffort = resolveReasoningEffort({
-        thinking: input.thinking,
-        forceReasoning: input.forceReasoning,
-        defaultReasoningEnabled: capabilities.defaultReasoningEnabled,
-        effort: input.reasoningEffort ?? capabilities.defaultReasoningEffort,
-      });
-      if (reasoningEffort) {
-        body.reasoning_effort = reasoningEffort;
-      }
-      break;
-    }
     case "none":
       break;
   }
@@ -97,23 +76,6 @@ function normalizeDeepSeekReasoningEffort(
   return "high";
 }
 
-function resolveNvidiaReasoningEffort(input: {
-  thinking?: "enabled" | "disabled";
-  forceReasoning: boolean;
-  defaultReasoningEnabled: boolean;
-  effort?: "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
-}): "none" | "high" | "max" {
-  if (input.thinking === "disabled") {
-    return "none";
-  }
-
-  if (!input.forceReasoning && input.thinking !== "enabled" && !input.defaultReasoningEnabled) {
-    return "none";
-  }
-
-  return input.effort === "xhigh" || input.effort === "max" ? "max" : "high";
-}
-
 function resolveAgnesThinking(input: {
   thinking?: "enabled" | "disabled";
   forceReasoning: boolean;
@@ -124,29 +86,4 @@ function resolveAgnesThinking(input: {
   }
 
   return input.thinking === "enabled" || input.forceReasoning || input.defaultReasoningEnabled;
-}
-
-function resolveReasoningEffort(input: {
-  thinking?: "enabled" | "disabled";
-  forceReasoning: boolean;
-  defaultReasoningEnabled: boolean;
-  effort?: "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
-}): "low" | "medium" | "high" | undefined {
-  if (input.thinking === "disabled") {
-    return undefined;
-  }
-
-  if (!input.forceReasoning && input.thinking !== "enabled" && !input.defaultReasoningEnabled) {
-    return undefined;
-  }
-
-  if (input.effort === "minimal" || input.effort === "low") {
-    return "low";
-  }
-
-  if (input.effort === "high" || input.effort === "xhigh" || input.effort === "max") {
-    return "high";
-  }
-
-  return "medium";
 }

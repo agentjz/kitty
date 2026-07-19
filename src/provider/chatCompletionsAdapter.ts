@@ -35,8 +35,6 @@ export const chatCompletionsAdapter: ProviderWireAdapter = {
           thinking: request.thinking,
           reasoningEffort: request.reasoningEffort,
           maxOutputTokens: request.maxOutputTokens,
-          sessionId: request.sessionId,
-          projectRoot: request.projectRoot,
         }) as never,
         { signal: request.abortSignal },
       );
@@ -167,8 +165,6 @@ export const chatCompletionsAdapter: ProviderWireAdapter = {
           thinking: request.thinking,
           reasoningEffort: request.reasoningEffort,
           maxOutputTokens: request.maxOutputTokens,
-          sessionId: request.sessionId,
-          projectRoot: request.projectRoot,
         }) as never,
         { signal: request.abortSignal },
       );

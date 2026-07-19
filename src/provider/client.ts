@@ -1,7 +1,6 @@
 import OpenAI from "openai";
 
 import { resolveProviderCapabilities } from "./capabilities.js";
-import { resolveModelProfile } from "./catalog.js";
 import { buildProviderBaseUrlCandidates } from "./connection.js";
 import type { RuntimeConfig } from "../types.js";
 
@@ -22,7 +21,6 @@ export function createProviderClientPool(
     provider: config.provider,
     model: config.model,
   });
-  const authentication = resolveModelProfile({ provider: config.provider, model: config.model }).provider.authentication ?? "bearer";
   const baseUrls = buildProviderBaseUrlCandidates(config.baseUrl);
   const clients = new Map<string, OpenAI>();
   let preferredBaseUrl: string | undefined;
@@ -49,11 +47,10 @@ export function createProviderClientPool(
     }
 
     const client = new OpenAI({
-      apiKey: authentication === "none" ? "local" : config.apiKey,
+      apiKey: config.apiKey,
       baseURL: baseUrl,
       timeout: capabilities.requestTimeoutMs,
       maxRetries: 0,
-      defaultHeaders: authentication === "none" ? { Authorization: null } : undefined,
     });
     clients.set(baseUrl, client);
     return client;

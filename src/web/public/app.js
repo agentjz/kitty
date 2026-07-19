@@ -76,7 +76,6 @@ function render() {
   value("#model-name", values[ENV.model]);
   value("#model-url", values[ENV.baseUrl]);
   value("#model-key", values[ENV.apiKey]);
-  document.querySelector("#model-key").required = values[ENV.provider] !== "llama.cpp";
   document.querySelector("#current-model-facts").innerHTML = [
     [message("config.provider"), values[ENV.provider] || message("common.notConfigured")],
     [message("config.model"), values[ENV.model] || message("common.notConfigured")],
@@ -255,7 +254,6 @@ document.querySelector("#provider-preset").addEventListener("change", (event) =>
   value("#model-key", preset.provider === state.configuration.values[ENV.provider]
     ? state.configuration.values[ENV.apiKey]
     : "");
-  document.querySelector("#model-key").required = preset.provider !== "llama.cpp";
 });
 
 document.querySelector("#media-preset").addEventListener("change", (event) => {

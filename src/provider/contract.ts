@@ -24,14 +24,12 @@ export interface ProviderAdapterRequest {
   thinking?: "enabled" | "disabled";
   reasoningEffort?: ModelReasoningEffort;
   maxOutputTokens?: number;
-  sessionId?: string;
-  projectRoot?: string;
   abortSignal?: AbortSignal;
   onRequestMetric?: (metric: ModelRequestMetric) => void;
 }
 
 export interface ProviderWireAdapter {
-  wireApi: "responses" | "chat.completions";
+  wireApi: "chat.completions";
   fetchStreaming(client: OpenAI, request: ProviderAdapterRequest): Promise<AssistantResponse>;
   fetchNonStreaming(client: OpenAI, request: ProviderAdapterRequest): Promise<AssistantResponse>;
 }

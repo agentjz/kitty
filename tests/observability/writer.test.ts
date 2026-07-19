@@ -29,11 +29,11 @@ test("observability persists provider correlation and usage details", async (t) 
   await appendObservabilityEvent(root, {
     event: "model.request",
     status: "completed",
-    model: "gpt-5.5",
+    model: "agnes-2.0-flash",
     requestId: "request-1",
     attemptId: "request-1:1",
     details: {
-      provider: "openai",
+      provider: "agnes",
       usageAvailable: true,
       usage: { inputTokens: 100, cacheReadTokens: 80 },
     },

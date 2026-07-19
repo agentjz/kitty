@@ -72,11 +72,11 @@ export function createTestRuntimeConfig(root: string): RuntimeConfig {
   const initialConfig = getInitialRuntimeConfig();
   return {
     ...initialConfig,
-    provider: "openai",
+    provider: "agnes",
     apiKey: "test-key",
     media: { ...initialConfig.media, apiKey: "test-key" },
-    baseUrl: "https://api.openai.com/v1",
-    model: "gpt-5.5",
+    baseUrl: "https://apihub.agnes-ai.com/v1",
+    model: "agnes-2.0-flash",
     thinking: "enabled",
     telegram: resolveTelegramRuntimeConfig(initialConfig.telegram, root),
     weixin: resolveWeixinRuntimeConfig(initialConfig.weixin, root),

@@ -7,7 +7,6 @@ import type { AssistantResponse, AgentCallbacks } from "../agent/types.js";
 import { resolveProviderCapabilities } from "./capabilities.js";
 import type { ProviderMessage, ProviderWireAdapter } from "./contract.js";
 import { chatCompletionsAdapter } from "./chatCompletionsAdapter.js";
-import { responsesAdapter } from "./responsesAdapter.js";
 import { isProviderClientPool, type ProviderClientPool } from "./client.js";
 import {
   canRetryWithAlternateBaseUrl,
@@ -31,8 +30,6 @@ export async function fetchAssistantResponse(
     thinking?: ModelThinkingMode;
     reasoningEffort?: ModelReasoningEffort;
     maxOutputTokens?: number;
-    sessionId?: string;
-    projectRoot?: string;
   },
   tools: FunctionToolDefinition[] | undefined,
   callbacks: AgentCallbacks | undefined,
@@ -41,7 +38,7 @@ export async function fetchAssistantResponse(
   observability?: ProviderRequestObservability,
 ): Promise<AssistantResponse> {
   const capabilities = resolveProviderCapabilities(request);
-  const adapter = selectProviderWireAdapter(capabilities.wireApi);
+  const adapter = chatCompletionsAdapter;
 
   return tryFetch(
     adapter,
@@ -67,8 +64,6 @@ async function tryFetch(
     thinking?: ModelThinkingMode;
     reasoningEffort?: ModelReasoningEffort;
     maxOutputTokens?: number;
-    sessionId?: string;
-    projectRoot?: string;
   },
   tools: FunctionToolDefinition[] | undefined,
   callbacks: AgentCallbacks | undefined,
@@ -139,8 +134,6 @@ async function tryFetch(
               thinking: request.thinking,
               reasoningEffort: request.reasoningEffort,
               maxOutputTokens: request.maxOutputTokens,
-              sessionId: request.sessionId,
-              projectRoot: request.projectRoot,
               abortSignal,
               onRequestMetric: forwardMetric,
             });
@@ -210,8 +203,6 @@ async function tryFetch(
                 thinking: request.thinking,
                 reasoningEffort: request.reasoningEffort,
                 maxOutputTokens: request.maxOutputTokens,
-                sessionId: request.sessionId,
-                projectRoot: request.projectRoot,
                 abortSignal,
                 onRequestMetric: forwardMetric,
               });
@@ -261,16 +252,6 @@ async function tryFetch(
 
 function formatRetryDelay(ms: number): string {
   return ms % 1_000 === 0 ? `${ms / 1_000}s` : `${ms}ms`;
-}
-
-function selectProviderWireAdapter(
-  wireApi: "responses" | "chat.completions",
-): ProviderWireAdapter {
-  if (wireApi === "responses") {
-    return responsesAdapter;
-  }
-
-  return chatCompletionsAdapter;
 }
 
 async function invokeWithProviderClients<T>(

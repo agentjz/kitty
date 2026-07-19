@@ -57,7 +57,7 @@ test("runtime config schema rejects missing required values instead of hiding de
     /Missing config value: provider/,
   );
   assert.throws(
-    () => normalizeRuntimeConfig({ ...config, provider: "nvidia", model: "not-in-catalog" }),
+    () => normalizeRuntimeConfig({ ...config, provider: "deepseek", model: "not-in-catalog" }),
     (error: unknown) => error instanceof ConfigError
       && error.kind === "invalid"
       && error.key === "KITTY_PROVIDER/KITTY_MODEL",

@@ -43,7 +43,6 @@ export async function probeProviderConnection(
       apiKey: input.apiKey,
       model: profile.model.id,
       probe,
-      authentication: profile.provider.authentication,
     });
     let response: Response;
 
@@ -92,15 +91,6 @@ export async function probeProviderConnection(
       return {
         kind: "provider",
         message: `Provider error: service returned ${response.status}. This is not a local runtime initialization issue; check provider response or configuration.`,
-        probeTimeoutMs,
-      };
-    }
-
-    if (probe === "responses") {
-      return {
-        kind: "ok",
-        probe: "responses",
-        resolvedBaseUrl: candidateBaseUrl,
         probeTimeoutMs,
       };
     }

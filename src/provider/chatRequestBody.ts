@@ -1,5 +1,4 @@
 import type { FunctionToolDefinition } from "../tools/index.js";
-import { resolveProviderCachePolicy } from "./cachePolicy.js";
 import { resolveProviderCapabilities } from "./capabilities.js";
 import type { ProviderMessage } from "./contract.js";
 import { applyChatRequestDialect } from "./chatRequestDialect.js";
@@ -16,8 +15,6 @@ export interface BuildProviderRequestBodyInput {
   thinking?: "enabled" | "disabled";
   reasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
   maxOutputTokens?: number;
-  sessionId?: string;
-  projectRoot?: string;
 }
 
 export function buildProviderRequestBody(
@@ -45,11 +42,6 @@ export function buildProviderRequestBody(
     body.stream_options = {
       include_usage: true,
     };
-  }
-
-  const cachePolicy = resolveProviderCachePolicy(input);
-  if (cachePolicy.promptCacheKey) {
-    body.prompt_cache_key = cachePolicy.promptCacheKey;
   }
 
   if (typeof input.maxOutputTokens === "number" && Number.isFinite(input.maxOutputTokens)) {

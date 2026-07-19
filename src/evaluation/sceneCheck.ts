@@ -55,10 +55,10 @@ export async function runProductionSceneCheck(id: EvaluationCheckId, rootDir: st
   await appendObservabilityEvent(workspace, {
       event: "model.request",
       status: "completed",
-      model: "gpt-5.5",
+      model: "agnes-2.0-flash",
       durationMs: 123,
       details: {
-        provider: "openai",
+        provider: "agnes",
         usageAvailable: true,
         usage: {
           totalTokens: 1000,

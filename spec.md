@@ -85,7 +85,7 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 
 未知 provider、不支持的 provider/model 组合、缺失必填项和非法值必须在配置 schema 显式失败。运行时不能静默猜测 model 或 provider。
 
-默认 provider profile 是 Agnes AI。当前具名 provider profile 还包括 NVIDIA NIM、Groq、Cerebras、Gemini、DeepSeek、OpenAI、YLS、TTAPI 和 `llama.cpp`。`llama.cpp` 是无鉴权、仅 loopback 的 OpenAI-compatible Chat Completions Provider，默认 `http://127.0.0.1:8080/v1`；当前本地 GGUF preset 只保留 Google Gemma 3 12B。当前 GGUF 与 llama.cpp 的真实强制工具请求返回普通代码而非 `tool_calls`，因此 catalog 不向它发送工具合同。`openai-compatible` 仅用于用户明确配置的高级兼容 endpoint；它不是任何具名 provider 的别名。
+默认 provider profile 是 Agnes AI，另一个具名 profile 是 DeepSeek official。`openai-compatible` 是用户后续接入兼容 Chat Completions 免费模型的通用协议入口，不携带厂商模型 preset 或厂商 wire 特判。Kitty 不维护本地模型部署或本地模型 preset。
 
 图片/视频配置独立于语言模型配置。当前媒体 Provider 是 Agnes AI：图片模型 `agnes-image-2.1-flash`，视频模型 `agnes-video-v2.0`。媒体密钥优先使用 `KITTY_MEDIA_API_KEY`，为空时运行时回退到 `KITTY_API_KEY`，但 Web 保存和展示仍按独立媒体字段处理。
 
@@ -170,9 +170,9 @@ Context budget 记录当前有效 limit、estimate、remaining、compression mod
 - `src/provider/request.ts`：请求生命周期、streaming fallback、retry 接入和 observability。
 - `src/provider/chatRequestBody.ts`：Chat Completions 通用 request body 装配。
 - `src/provider/chatRequestDialect.ts`：Chat Completions provider/model 请求方言投影。
-- `src/provider/*Adapter.ts`：Responses 与 Chat Completions wire adapter。
+- `src/provider/chatCompletionsAdapter.ts`：统一 Chat Completions wire adapter。
 
-Provider 与 model 是独立事实。Provider 决定 transport、endpoint 行为、认证形态和 probe 行为；model 决定 wire API、限制、工具、usage、cache、reasoning replay 和 Chat Completions 请求方言。方言包括 reasoning 参数、tool choice、stream usage 和输出 token 参数名；request body 只能投影这些事实，不能按 provider 名称散落特判。
+Provider 与 model 是独立事实。Provider 决定默认 endpoint 和 probe 行为；model 决定限制、工具、usage、cache、reasoning replay 和 Chat Completions 请求方言。当前语言请求统一使用 Bearer 与 Chat Completions；通用 `openai-compatible` 使用标准方言和用户显式填写的 model/base URL，Agnes 与 DeepSeek 的 wire 差异由 catalog model profile 投影，request body 不按 provider 名称散落判断。
 
 Chat Completions 的 HTTP abort signal 必须作为 SDK request options 传递，不能进入 JSON body。只有明确的无状态 stream framing 故障可以降级为一次非流式请求；认证、参数校验、限流和 HTTP provider error 不得被非流式 fallback 重放。
 

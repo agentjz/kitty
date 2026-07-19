@@ -13,15 +13,6 @@ export interface ProviderPreset {
 
 export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
   {
-    id: "nvidia-deepseek-v4-flash",
-    label: "NVIDIA NIM + DeepSeek V4 Flash",
-    provider: "nvidia",
-    model: "deepseek-ai/deepseek-v4-flash",
-    thinking: "enabled",
-    reasoningEffort: "high",
-    activeByDefault: false,
-  },
-  {
     id: "agnes-2.0-flash",
     label: "Agnes AI + 2.0 Flash",
     provider: "agnes",
@@ -31,47 +22,12 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     activeByDefault: true,
   },
   {
-    id: "gemini-2.5-flash",
-    label: "Gemini + 2.5 Flash",
-    provider: "gemini",
-    model: "gemini-2.5-flash",
-    thinking: "disabled",
-    reasoningEffort: "high",
-    activeByDefault: false,
-  },
-  {
-    id: "yls-gpt-5.4",
-    label: "YLS Codex + GPT-5.4",
-    provider: "yls",
-    model: "gpt-5.4",
-    thinking: "enabled",
-    reasoningEffort: "xhigh",
-    activeByDefault: false,
-  },
-  {
-    id: "ttapi-gpt-5.4",
-    label: "TTAPI + GPT-5.4",
-    provider: "ttapi",
-    model: "gpt-5.4",
-    thinking: "disabled",
-    reasoningEffort: "xhigh",
-    activeByDefault: false,
-  },
-  {
     id: "deepseek-v4-flash",
     label: "DeepSeek official V4",
     provider: "deepseek",
     model: "deepseek-v4-flash",
     thinking: "enabled",
     reasoningEffort: "high",
-    activeByDefault: false,
-  },
-  {
-    id: "llama-gemma-3-12b",
-    label: "本机 + Google Gemma 3 12B",
-    provider: "llama.cpp",
-    model: "gemma-3-12b-it-q4_0.gguf",
-    thinking: "disabled",
     activeByDefault: false,
   },
 ] as const;

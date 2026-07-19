@@ -9,7 +9,6 @@ export function normalizeProviderUsage(usage: unknown): ProviderUsageSnapshot | 
   const promptDetails = readObject(record.prompt_tokens_details);
   const completionDetails = readObject(record.completion_tokens_details);
   const outputDetails = readObject(record.output_tokens_details);
-  const cacheCreation = readObject(record.cache_creation);
 
   const inputTokens = readUsageNumber(record.prompt_tokens ?? record.input_tokens);
   const outputTokens = readUsageNumber(record.completion_tokens ?? record.output_tokens);
@@ -19,25 +18,11 @@ export function normalizeProviderUsage(usage: unknown): ProviderUsageSnapshot | 
     outputDetails?.reasoning_tokens,
   );
 
-  const openAiCachedTokens = readUsageNumber(promptDetails?.cached_tokens);
   const deepSeekHitTokens = readUsageNumber(record.prompt_cache_hit_tokens);
   const deepSeekMissTokens = readUsageNumber(record.prompt_cache_miss_tokens);
-  const anthropicCacheReadTokens = readUsageNumber(record.cache_read_input_tokens);
-  const anthropicCacheCreationTokens = readUsageNumber(record.cache_creation_input_tokens) ??
-    sumUsageNumbers([
-      cacheCreation?.ephemeral_1h_input_tokens,
-      cacheCreation?.ephemeral_5m_input_tokens,
-    ]);
-  const geminiCachedTokens = readUsageNumber(record.cachedContentTokenCount ?? record.cached_content_token_count);
-
-  const cacheReadTokens = firstNumber(
-    anthropicCacheReadTokens,
-    openAiCachedTokens,
-    geminiCachedTokens,
-  );
+  const cacheReadTokens = readUsageNumber(promptDetails?.cached_tokens);
   const cacheHitTokens = firstNumber(deepSeekHitTokens, cacheReadTokens);
   const cacheMissTokens = deepSeekMissTokens;
-  const cacheCreationTokens = anthropicCacheCreationTokens;
 
   const snapshot: ProviderUsageSnapshot = {
     inputTokens,
@@ -45,7 +30,6 @@ export function normalizeProviderUsage(usage: unknown): ProviderUsageSnapshot | 
     totalTokens,
     reasoningTokens,
     cacheReadTokens,
-    cacheCreationTokens,
     cacheHitTokens,
     cacheMissTokens,
   };
@@ -96,17 +80,6 @@ function readObject(value: unknown): Record<string, unknown> | undefined {
 
 function firstNumber(...values: Array<number | undefined>): number | undefined {
   return values.find((value) => typeof value === "number");
-}
-
-function sumUsageNumbers(values: unknown[]): number | undefined {
-  const numbers = values
-    .map(readUsageNumber)
-    .filter((value): value is number => typeof value === "number");
-  if (numbers.length === 0) {
-    return undefined;
-  }
-
-  return numbers.reduce((total, value) => total + value, 0);
 }
 
 function readUsageNumber(value: unknown): number | undefined {

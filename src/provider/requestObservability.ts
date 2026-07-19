@@ -16,7 +16,7 @@ export async function recordProviderRequestEvent(input: {
     provider: string;
     model: string;
   };
-  wireApi: "responses" | "chat.completions";
+  wireApi: "chat.completions";
   status: "started" | "completed" | "failed";
   startedAt?: number;
   baseUrl?: string;
