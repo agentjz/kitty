@@ -19,6 +19,88 @@ test("media POST is never retried across an uncertain response boundary", async 
   assert.equal(calls, 1);
 });
 
+test("media POST retries only opted-in provider responses, never network failures", async () => {
+  let responseCalls = 0;
+  const result = await requestMediaJson({
+    endpoint: "https://example.test/images",
+    method: "POST",
+    headers: {},
+    body: "{}",
+  }, {
+    timeoutMs: 1_000,
+    retryResponseStatuses: [429, 503],
+    maxAttempts: 4,
+    fetchImpl: async () => {
+      responseCalls += 1;
+      return responseCalls === 1
+        ? new Response(JSON.stringify({ error: { message: "Service busy (id: req_retry_test)" } }), {
+          status: 503,
+          headers: { "retry-after": "0" },
+        })
+        : Response.json({ status: "completed" });
+    },
+    sleep: async () => undefined,
+  });
+  assert.deepEqual(result, { status: "completed" });
+  assert.equal(responseCalls, 2);
+
+  let networkCalls = 0;
+  await assert.rejects(() => requestMediaJson({
+    endpoint: "https://example.test/images",
+    method: "POST",
+    headers: {},
+    body: "{}",
+  }, {
+    timeoutMs: 1_000,
+    retryResponseStatuses: [429, 503],
+    maxAttempts: 4,
+    fetchImpl: async () => { networkCalls += 1; throw new TypeError("fetch failed"); },
+    sleep: async () => undefined,
+  }), (error: unknown) => error instanceof MediaProviderError && error.kind === "environment");
+  assert.equal(networkCalls, 1);
+});
+
+test("media POST aborts during retry backoff without sending another request", async () => {
+  const controller = new AbortController();
+  let calls = 0;
+  await assert.rejects(() => requestMediaJson({
+    endpoint: "https://example.test/images",
+    method: "POST",
+    headers: {},
+    body: "{}",
+  }, {
+    timeoutMs: 1_000,
+    signal: controller.signal,
+    retryResponseStatuses: [503],
+    maxAttempts: 4,
+    fetchImpl: async () => {
+      calls += 1;
+      return new Response("busy", { status: 503 });
+    },
+    sleep: async () => {
+      controller.abort();
+      throw new DOMException("Aborted", "AbortError");
+    },
+  }), (error: unknown) => error instanceof MediaProviderError && error.kind === "aborted");
+  assert.equal(calls, 1);
+});
+
+test("media 503 errors expose a concise request id instead of nested provider JSON", async () => {
+  await assert.rejects(() => requestMediaJson({
+    endpoint: "https://example.test/images",
+    method: "POST",
+    headers: {},
+    body: "{}",
+  }, {
+    timeoutMs: 1_000,
+    fetchImpl: async () => new Response(JSON.stringify({
+      error: { message: "ServiceUnavailableError: Service busy (id: req_900280a667e947d5)", type: "upstream_error" },
+    }), { status: 503 }),
+  }), (error: unknown) => error instanceof MediaProviderError &&
+    error.message === "Media provider is temporarily unavailable (HTTP 503, request req_900280a667e947d5)." &&
+    !error.message.includes("upstream_error"));
+});
+
 test("media GET retries temporary errors and honors Retry-After", async () => {
   let calls = 0;
   const delays: number[] = [];

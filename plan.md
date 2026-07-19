@@ -40,7 +40,7 @@ Kitty 需要同时具备两类可长期使用的免费能力。
 - 新集成必须从创建响应字段 `video_id` 读取不透明 ID，并用 `GET /agnesapi?video_id=...` 查询；真实 2026-07-19 响应证明该字段的值当前可能以 `task_` 开头，因此不能用值前缀猜测字段语义。`task_id` 请求/响应字段不进入当前产品主干。
 - `num_frames <= 441` 且满足 `8n + 1`，`frame_rate` 为 1 至 60，视频宽高必须是 64 的倍数。最终时长和尺寸以响应 `seconds`、`size` 为准。
 - 视频状态是 `queued`、`in_progress`、`completed`、`failed`。真实 poll 响应使用顶层 `id` 回显任务，不重复 `video_id` 字段；poll normalization 以请求携带的持久 `video_id` 为 owner，并校验回显 `id` 不冲突。完成响应必须有可下载 URL。
-- 400/401/403/404/413/415/422 是用户或合同错误；408/429/5xx 和网络失败可能临时；POST 在响应边界不确定时不能自动重放，GET 查询和下载可以有界重试并尊重 `Retry-After`。
+- 400/401/403/404/409/413/415/422 是用户或合同错误；POST 在响应边界不确定时不能自动重放。图片生成只对 Agnes 官方列出的明确临时 HTTP 响应有界重试，429 尊重 `Retry-After` 或等待一分钟；连续 503 时使用已验证可用的 Agnes Image 2.0 fallback。GET 查询和下载继续有界重试。
 
 ### Kitty 代码与状态
 
@@ -129,7 +129,7 @@ Kitty 需要同时具备两类可长期使用的免费能力。
 
 - `src/media/catalog.ts`：媒体 Provider、模型、能力和固有限制唯一 owner。
 - `src/media/errors.ts`：结构化用户/合同/临时/provider/abort 错误；控制流不依赖展示字符串。
-- `src/media/http.ts`：Bearer、timeout、abort、响应大小、JSON、Retry-After 和仅 GET 的有界 retry。
+- `src/media/http.ts`：Bearer、timeout、abort、响应大小、JSON、Retry-After、GET 有界 retry，以及图片生成明确临时响应的有界 retry。
 - `src/media/providers/agnes.ts`：图片 body、视频 create、`video_id` poll 和 Agnes response normalization。
 - `src/media/artifacts.ts`：限制协议、content-type、最大字节、原子文件写入和扩展名选择。
 - `src/extensions/tools/media/`：两个薄工具，读取 `RuntimeConfig.media`，校验 tool args，调用媒体核心并返回 changed path/artifact。
@@ -138,7 +138,7 @@ Kitty 需要同时具备两类可长期使用的免费能力。
 ### 6.3 图片执行
 
 1. 工具校验 prompt、size/ratio、输入图片数量和 output path。
-2. adapter 发送一次 POST；不做隐式 retry。
+2. adapter 按官方合同发送 POST；只重试明确临时 HTTP 响应，网络失败、超时和 abort 不重放，连续 503 后回退到 Agnes Image 2.0，总请求数不超过四次。
 3. URL 响应走有界 GET 下载；Base64 响应在大小上限内解码。
 4. 文件先写同目录临时文件，再原子 rename；失败清理临时文件。
 5. 成功 result 记录模型、标准化尺寸、path、bytes、content type 和 typed file artifact，不记录 secret 或完整 Base64。
@@ -165,7 +165,7 @@ Kitty 需要同时具备两类可长期使用的免费能力。
 - bootstrap 投影 language presets 和 media presets，不由浏览器复制 catalog。
 - 媒体配置和人类生成共享一个首页入口和 panel；保存仍走 `/api/config` 的 known-key/secret 规则。
 - `/api/media/probe` 只验证鉴权与模型服务可达，不生成收费/耗时产物。
-- `POST /api/media/images`、`POST /api/media/videos` 和 `POST /api/media/videos/:videoId/poll` 复用同一共享媒体服务；图片和视频 create POST 不自动重放，poll 与下载才允许有界重试。
+- `POST /api/media/images`、`POST /api/media/videos` 和 `POST /api/media/videos/:videoId/poll` 复用同一共享媒体服务；图片只重试 Provider 已明确返回的临时状态，视频 create POST 不自动重放，poll 与下载允许有界重试。
 - 生成产物只写入项目 `generated/kitty/`，API 只返回相对路径；`GET /api/media/artifacts?path=...` 必须验证 token、项目边界、生成目录和媒体 magic，再以真实 MIME 返回。浏览器通过带 Authorization 的 fetch 读取 Blob，不把启动 token 放进媒体 URL。
 - 前端以图片/视频 tab 分隔模式；提交期间禁用重复动作。视频创建成功后把 `video_id` 保存在 sessionStorage，按服务端 `nextPollAt` 调度查询，刷新后可恢复；停止按钮只停止本地查询，不声称取消 Provider 任务。
 - zh-CN、en、ja、ko catalog 同步新增完全一致的 key 和 placeholder；provider/model/env key 保持原文。

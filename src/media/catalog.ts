@@ -3,6 +3,7 @@ export interface MediaProviderInfo {
   label: string;
   defaultBaseUrl: string;
   imageModels: readonly string[];
+  imageFallbackModel?: string;
   videoModels: readonly string[];
 }
 
@@ -12,6 +13,7 @@ export const MEDIA_PROVIDER_CATALOG: readonly MediaProviderInfo[] = [
     label: "Agnes AI",
     defaultBaseUrl: "https://apihub.agnes-ai.com/v1",
     imageModels: ["agnes-image-2.0-flash", "agnes-image-2.1-flash"],
+    imageFallbackModel: "agnes-image-2.0-flash",
     videoModels: ["agnes-video-v2.0"],
   },
 ] as const;

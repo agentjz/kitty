@@ -54,6 +54,24 @@ test("web replay preserves visible messages and tool event order", () => {
   assert.equal(events[2]?.summary, "已读取 README.md");
 });
 
+test("web live tool failures preserve their actionable error fact", () => {
+  const shell = new WebChatShell(buildWebMessages("zh-CN").shell);
+  const events: Array<{ type?: string; summary?: string }> = [];
+  (shell as unknown as { broadcast: (event: { type?: string; summary?: string }) => void }).broadcast = (event) => events.push(event);
+  const display = shell.createTurnDisplay({
+    cwd: ".",
+    config: createTestRuntimeConfig("."),
+    abortSignal: new AbortController().signal,
+  });
+  display.callbacks.onToolCall?.("generate_image", "{}");
+  display.callbacks.onToolError?.("generate_image", JSON.stringify({
+    ok: false,
+    error: "Media provider is temporarily unavailable (HTTP 503, request req_test).",
+  }));
+  assert.equal(events.at(-1)?.type, "tool_error");
+  assert.match(events.at(-1)?.summary ?? "", /HTTP 503.*req_test/u);
+});
+
 test("interactive driver can switch the bound session without creating a second host", async (t) => {
   const root = await createTempWorkspace("web-session-switch", t);
   const config = createTestRuntimeConfig(root);

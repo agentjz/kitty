@@ -176,6 +176,13 @@ function projectResultPresentation(name: string, payload: string, rootDir: strin
         format: "preformatted",
         state: "success",
       };
+    case "error":
+      return {
+        title: translate(locale, "web.event.toolFailed", { name }),
+        detail: presentation.message,
+        format: "text",
+        state: "error",
+      };
     case "none":
       return { title: translate(locale, "web.event.toolComplete", { name }), state: "success" };
   }

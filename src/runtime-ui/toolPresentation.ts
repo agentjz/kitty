@@ -76,6 +76,7 @@ export type ToolResultPresentation =
     readonly items: readonly ToolPlanItem[];
     readonly completed: number;
   }
+  | { readonly kind: "error"; readonly name: string; readonly message: string }
   | { readonly kind: "none"; readonly name: string };
 
 export function projectToolCallPresentation(name: string, rawArgs: string): ToolCallPresentation {
@@ -211,6 +212,11 @@ export function projectToolResultPresentation(name: string, rawOutput: string): 
     } catch {
       return { kind: "none", name };
     }
+  }
+
+  if (output.ok === false) {
+    const message = readString(output.error)?.replace(/\s+/gu, " ").trim();
+    if (message) return { kind: "error", name, message: message.slice(0, 500) };
   }
 
   return { kind: "none", name };

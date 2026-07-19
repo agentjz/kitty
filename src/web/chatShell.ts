@@ -132,7 +132,12 @@ export class WebChatShell implements InteractionShell {
       },
       onToolError: (name, error) => {
         const id = this.takeToolId(name);
-        this.broadcast({ type: "tool_error", id, name, summary: this.labels.toolFailed });
+        this.broadcast({
+          type: "tool_error",
+          id,
+          name,
+          summary: formatToolResult(this.labels, projectToolResultPresentation(name, error)),
+        });
       },
       onStatus: (text) => this.broadcast({ type: "status", text }),
     };
@@ -250,6 +255,7 @@ function formatToolResult(labels: WebShellLabels, presentation: ToolResultPresen
     case "read": return interpolate(labels.toolRead, { target: presentation.path });
     case "command": return presentation.status === "failed" ? labels.commandFailed : labels.commandDone;
     case "plan": return interpolate(labels.toolPlan, { completed: presentation.completed, total: presentation.items.length });
+    case "error": return `${labels.toolFailed}: ${presentation.message}`;
     default: return labels.toolDone;
   }
 }

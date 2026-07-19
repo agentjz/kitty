@@ -6,7 +6,7 @@ import { ensureProjectStateDirectories } from "../project/statePaths.js";
 import { atomicWriteFile } from "../utils/fs.js";
 import { inspectMediaArtifact, resolveMediaOutputPath } from "./artifacts.js";
 import { resolveMediaProvider } from "./catalog.js";
-import { downloadMedia, requestMediaJson } from "./http.js";
+import { downloadMedia, MediaProviderError, requestMediaJson } from "./http.js";
 import {
   buildAgnesImageRequest,
   buildAgnesVideoCreateRequest,
@@ -82,20 +82,40 @@ export async function generateMediaImage(input: {
   if (!provider.imageModels.includes(input.config.imageModel)) {
     throw new Error(`Unsupported image model for ${provider.id}: ${input.config.imageModel}.`);
   }
-  const request = buildAgnesImageRequest({
-    baseUrl: input.config.baseUrl,
-    apiKey: input.config.apiKey,
-    model: input.config.imageModel,
-    prompt: input.prompt,
-    size: input.size ?? "1K",
-    ratio: input.ratio ?? "1:1",
-    images: input.images,
-    responseFormat: input.responseFormat ?? "url",
-  });
-  const result = normalizeAgnesImageResponse(await requestMediaJson(request, {
-    timeoutMs: input.config.requestTimeoutMs,
-    signal: input.signal,
-  }));
+  const models = [input.config.imageModel];
+  if (provider.imageFallbackModel && provider.imageFallbackModel !== input.config.imageModel) {
+    models.push(provider.imageFallbackModel);
+  }
+  let response: { model: string; payload: unknown } | undefined;
+  for (const [index, model] of models.entries()) {
+    const request = buildAgnesImageRequest({
+      baseUrl: input.config.baseUrl,
+      apiKey: input.config.apiKey,
+      model,
+      prompt: input.prompt,
+      size: input.size ?? "1K",
+      ratio: input.ratio ?? "1:1",
+      images: input.images,
+      responseFormat: input.responseFormat ?? "url",
+    });
+    try {
+      response = {
+        model,
+        payload: await requestMediaJson(request, {
+          timeoutMs: input.config.requestTimeoutMs,
+          signal: input.signal,
+          retryResponseStatuses: [408, 429, 502, 503, 504, 520, 522, 524],
+          maxAttempts: 2,
+        }),
+      };
+      break;
+    } catch (error) {
+      const canFallback = error instanceof MediaProviderError && error.status === 503 && index + 1 < models.length;
+      if (!canFallback) throw error;
+    }
+  }
+  if (!response) throw new Error("Agnes image generation failed without a provider response.");
+  const result = normalizeAgnesImageResponse(response.payload);
   const downloaded = result.kind === "url"
     ? await downloadMedia({ endpoint: result.url!, method: "GET", headers: {} }, {
       timeoutMs: input.config.requestTimeoutMs,
@@ -111,7 +131,7 @@ export async function generateMediaImage(input: {
     mediaType: "image",
     status: "completed",
     provider: provider.id,
-    model: input.config.imageModel,
+    model: response.model,
     path: outputPath,
     bytes: artifact.bytes,
     contentType: artifact.mimeType,

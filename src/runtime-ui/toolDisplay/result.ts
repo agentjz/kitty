@@ -90,6 +90,8 @@ function buildSharedToolResultDisplay(
           return `${marker} #${item.id}: ${item.text}`;
         }), `- Progress: ${presentation.completed}/${presentation.items.length} completed`].join("\n"),
       };
+    case "error":
+      return { summary: `${presentation.name} failed`, preview: presentation.message };
     case "none":
       return undefined;
   }

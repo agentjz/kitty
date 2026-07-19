@@ -17,6 +17,8 @@ export interface MediaHttpOptions {
   timeoutMs: number;
   signal?: AbortSignal;
   retryGet?: boolean;
+  retryResponseStatuses?: readonly number[];
+  maxAttempts?: number;
   fetchImpl?: typeof fetch;
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
   maxBytes?: number;
@@ -25,15 +27,18 @@ export interface MediaHttpOptions {
 export async function requestMediaJson(request: MediaHttpRequest, options: MediaHttpOptions): Promise<unknown> {
   const fetchImpl = options.fetchImpl ?? fetch;
   const sleep = options.sleep ?? abortableSleep;
-  const attempts = request.method === "GET" && options.retryGet ? 3 : 1;
+  const retryGet = request.method === "GET" && options.retryGet;
+  const retryResponseStatuses = request.method === "POST" ? new Set(options.retryResponseStatuses ?? []) : undefined;
+  const retriesEnabled = retryGet || Boolean(retryResponseStatuses?.size);
+  const attempts = retriesEnabled ? Math.max(1, Math.min(4, options.maxAttempts ?? 3)) : 1;
   let lastError: unknown;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
       const response = await fetchMedia(request, options.timeoutMs, options.signal, fetchImpl);
       if (!response.ok) {
         const error = await providerError(response);
-        if (attempt + 1 < attempts && isRetryableStatus(response.status)) {
-          await sleep(error.retryAfterMs ?? retryDelay(attempt), options.signal);
+        if (attempt + 1 < attempts && (retryGet ? isRetryableStatus(response.status) : retryResponseStatuses?.has(response.status))) {
+          await sleep(error.retryAfterMs ?? retryDelay(attempt, response.status), options.signal);
           continue;
         }
         throw error;
@@ -47,7 +52,7 @@ export async function requestMediaJson(request: MediaHttpRequest, options: Media
     } catch (error) {
       if (isAbortError(error)) throw new MediaProviderError("Media request was aborted.", "aborted");
       lastError = error;
-      if (attempt + 1 < attempts && isTransientError(error)) {
+      if (attempt + 1 < attempts && retryGet && isTransientError(error)) {
         await sleep(retryDelay(attempt), options.signal);
         continue;
       }
@@ -124,14 +129,43 @@ async function fetchMedia(
 
 async function providerError(response: Response): Promise<MediaProviderError> {
   const body = await response.text().catch(() => "");
-  const message = body.trim().slice(0, 500) || `Media provider returned HTTP ${response.status}.`;
+  const retryAfterMs = parseRetryAfter(response.headers.get("retry-after"));
+  const requestId = body.match(/\breq_[a-zA-Z0-9]+\b/u)?.[0];
+  const providerMessage = extractProviderMessage(body);
+  const retryHint = retryAfterMs !== undefined ? ` Retry after ${Math.ceil(retryAfterMs / 1_000)} seconds.` : "";
+  const message = response.status === 503
+    ? `Media provider is temporarily unavailable (HTTP 503${requestId ? `, request ${requestId}` : ""}).${retryHint}`
+    : response.status === 429
+      ? `Media provider rate limit reached (HTTP 429).${retryHint}`
+      : providerMessage || `Media provider returned HTTP ${response.status}.`;
   const kind = response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429 ? "user" : response.status >= 500 || response.status === 408 || response.status === 429 ? "temporary" : "provider";
-  return new MediaProviderError(message, kind, response.status, parseRetryAfter(response.headers.get("retry-after")));
+  return new MediaProviderError(message, kind, response.status, retryAfterMs);
+}
+
+function extractProviderMessage(body: string): string {
+  const fallback = body.trim().slice(0, 500);
+  if (!fallback) return "";
+  try {
+    const parsed = JSON.parse(body) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return fallback;
+    const root = parsed as Record<string, unknown>;
+    const error = root.error && typeof root.error === "object" && !Array.isArray(root.error)
+      ? root.error as Record<string, unknown>
+      : undefined;
+    const value = error?.message ?? error?.detail ?? root.detail ?? root.message;
+    return typeof value === "string" && value.trim() ? value.trim().slice(0, 500) : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 function isRetryableStatus(status: number): boolean { return status === 408 || status === 429 || status >= 500; }
 function isTransientError(error: unknown): boolean { return error instanceof MediaProviderError && (error.kind === "temporary" || error.kind === "environment"); }
-function retryDelay(attempt: number): number { return Math.min(10_000, 500 * 2 ** attempt); }
+function retryDelay(attempt: number, status?: number): number {
+  if (status === 429) return 60_000;
+  if (status !== undefined) return Math.min(30_000, 2_000 * 2 ** attempt);
+  return Math.min(10_000, 500 * 2 ** attempt);
+}
 
 function parseRetryAfter(value: string | null): number | undefined {
   if (!value) return undefined;

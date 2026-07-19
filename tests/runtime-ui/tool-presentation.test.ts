@@ -97,3 +97,15 @@ test("shared tool result presentation keeps structured plan and source evidence"
     assert.equal(read.truncated, true);
   }
 });
+
+test("shared tool result presentation keeps a bounded generic error fact", () => {
+  const presentation = projectToolResultPresentation("generate_image", JSON.stringify({
+    ok: false,
+    error: "Media provider is temporarily unavailable (HTTP 503, request req_test).",
+  }));
+  assert.deepEqual(presentation, {
+    kind: "error",
+    name: "generate_image",
+    message: "Media provider is temporarily unavailable (HTTP 503, request req_test).",
+  });
+});

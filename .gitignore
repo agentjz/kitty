@@ -12,6 +12,7 @@ __pycache__/
 !.kitty/.env.example
 !.kitty/.kittyignore
 validation/
+generated/
 *.tgz
 *.log
 *.tsbuildinfo

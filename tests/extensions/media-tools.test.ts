@@ -46,6 +46,39 @@ test("generate_image writes Base64 media, records binary history, and supports u
   await assert.rejects(() => fs.access(absolute), { code: "ENOENT" });
 });
 
+test("generate_image retries documented 503 responses and falls back to Agnes Image 2.0", async (t) => {
+  const root = await createTempWorkspace("media-image-fallback", t);
+  const context = createToolContext(root);
+  const requestedModels: string[] = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, init) => {
+    const body = JSON.parse(String(init?.body)) as { model: string };
+    requestedModels.push(body.model);
+    if (body.model === "agnes-image-2.1-flash") {
+      return new Response(JSON.stringify({ error: { message: "Service busy (id: req_fallback_test)" } }), {
+        status: 503,
+        headers: { "retry-after": "0" },
+      });
+    }
+    return Response.json({ data: [{ b64_json: PNG.toString("base64") }] });
+  };
+  t.after(() => { globalThis.fetch = originalFetch; });
+
+  const result = await createMediaTools()[0]!.execute(JSON.stringify({
+    prompt: "a fallback test image",
+    response_format: "b64_json",
+    output_path: "generated/fallback.png",
+  }), context);
+  const payload = parseToolJson(result.output);
+  assert.equal(payload.model, "agnes-image-2.0-flash");
+  assert.deepEqual(requestedModels, [
+    "agnes-image-2.1-flash",
+    "agnes-image-2.1-flash",
+    "agnes-image-2.0-flash",
+  ]);
+  assert.deepEqual(await fs.readFile(path.join(root, "generated", "fallback.png")), PNG);
+});
+
 test("generate_video persists video_id, rate-limits early polls, then saves completion", async (t) => {
   const root = await createTempWorkspace("media-video-tool", t);
   const context = createToolContext(root);

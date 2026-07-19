@@ -141,6 +141,8 @@ function projectToolTranscript(
         text: `${translate(locale, "tui.tool.updatedPlan")} · ${presentation.completed}/${presentation.items.length}`,
         planItems: presentation.items,
       };
+    case "error":
+      return { role: "tool", text: presentation.message };
     case "none":
       return undefined;
   }
