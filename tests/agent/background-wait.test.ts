@@ -15,9 +15,15 @@ import { createTempWorkspace, createTestRuntimeConfig } from "../helpers.js";
 test("one agent turn observes background progress and settlement before finalizing", async (t) => {
   const root = await createTempWorkspace("agent-background-wait", t);
   await fs.writeFile(path.join(root, "background-task.cjs"), [
-    'setTimeout(() => console.log(`${"x".repeat(4_200)}:PROGRESS_SENTINEL`), 1_000);',
-    'setTimeout(() => console.log(`${"y".repeat(300)}:LATE_PROGRESS_SENTINEL`), 3_000);',
-    'setTimeout(() => console.log("BACKGROUND_FINAL_SENTINEL"), 6_000);',
+    'const fs = require("node:fs");',
+    'const waitBuffer = new Int32Array(new SharedArrayBuffer(4));',
+    'const waitFor = (file) => { while (!fs.existsSync(file)) Atomics.wait(waitBuffer, 0, 0, 10); };',
+    'waitFor("release-progress");',
+    'process.stdout.write(`${"x".repeat(4_200)}:PROGRESS_SENTINEL\\n`);',
+    'waitFor("release-late-progress");',
+    'process.stdout.write(`${"y".repeat(300)}:LATE_PROGRESS_SENTINEL\\n`);',
+    'waitFor("release-settlement");',
+    'process.stdout.write("BACKGROUND_FINAL_SENTINEL\\n");',
   ].join("\n"), "utf8");
 
   const config = createTestRuntimeConfig(root);
@@ -62,7 +68,7 @@ test("one agent turn observes background progress and settlement before finalizi
         return toolResponse("run-call", "background_run", {
           command: "node background-task.cjs",
           cwd: root,
-          timeout_ms: 10_000,
+          timeout_ms: 30_000,
         });
       }
 
@@ -75,9 +81,10 @@ test("one agent turn observes background progress and settlement before finalizi
       assert.ok(executionId);
 
       if (requestCount === 2) {
+        await releaseStage(root, "release-progress");
         return toolResponse("progress-wait-call", "background_wait", {
           id: executionId,
-          timeout_ms: 10_000,
+          timeout_ms: 20_000,
         });
       }
 
@@ -85,18 +92,20 @@ test("one agent turn observes background progress and settlement before finalizi
       if (requestCount === 3) {
         assert.match(latest, /wait: progress/);
         assert.match(latest, /PROGRESS_SENTINEL/);
+        await releaseStage(root, "release-late-progress");
         return toolResponse("late-progress-wait-call", "background_wait", {
           id: executionId,
-          timeout_ms: 10_000,
+          timeout_ms: 20_000,
         });
       }
 
       if (requestCount === 4) {
         assert.match(latest, /wait: progress/);
         assert.match(latest, /LATE_PROGRESS_SENTINEL/);
+        await releaseStage(root, "release-settlement");
         return toolResponse("settled-wait-call", "background_wait", {
           id: executionId,
-          timeout_ms: 10_000,
+          timeout_ms: 20_000,
         });
       }
 
@@ -130,6 +139,10 @@ test("one agent turn observes background progress and settlement before finalizi
     facts.close();
   }
 });
+
+async function releaseStage(root: string, name: string): Promise<void> {
+  await fs.writeFile(path.join(root, name), "released\n", "utf8");
+}
 
 function toolResponse(
   id: string,
