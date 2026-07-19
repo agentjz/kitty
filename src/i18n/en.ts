@@ -379,6 +379,7 @@ export const enMessages = {
   "web.common.back": "Back to workspace",
   "web.common.save": "Save configuration",
   "web.common.sendTest": "Send test request",
+  "web.common.testingConnection": "Connecting to the provider and reading model capabilities. Please wait…",
   "web.common.start": "Start",
   "web.common.stop": "Stop",
   "web.common.github": "Open Kitty on GitHub",

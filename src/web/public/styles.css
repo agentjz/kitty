@@ -105,7 +105,8 @@ button, input, select, textarea { font: inherit; }
 .status-starting, .status-stopping { border-color: rgb(214 189 134 / 50%); color: var(--kitty-gold); }
 .status-failed { border-color: rgb(217 130 130 / 50%); color: var(--kitty-error); }
 
-.media-studio { margin-top: 38px; padding-top: 30px; border-top: 1px solid var(--kitty-border); }
+.media-generation-flow { margin-top: 0; }
+.media-studio { min-width: 0; }
 .media-mode-tabs { display: inline-flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
 .media-mode-tab.is-active { border-color: var(--kitty-gold); background: rgb(214 189 134 / 12%); color: var(--kitty-gold); }
 .media-generation-form { max-width: 760px; }

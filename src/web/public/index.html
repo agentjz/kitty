@@ -97,37 +97,6 @@
             </li>
           </ol>
         </form>
-        <section class="media-studio" aria-labelledby="media-studio-title">
-          <div class="section-heading"><h2 id="media-studio-title" data-message="media.studioTitle"></h2><p data-message="media.studioHint"></p></div>
-          <div class="media-mode-tabs" role="tablist" aria-labelledby="media-studio-title">
-            <button class="btn btn-outline-secondary media-mode-tab is-active" type="button" role="tab" aria-selected="true" data-media-mode="image"><i class="bi bi-image"></i><span data-message="media.imageTab"></span></button>
-            <button class="btn btn-outline-secondary media-mode-tab" type="button" role="tab" aria-selected="false" data-media-mode="video"><i class="bi bi-film"></i><span data-message="media.videoTab"></span></button>
-          </div>
-          <section class="media-mode-panel" data-media-mode-panel="image" role="tabpanel">
-            <form id="media-image-form" class="media-generation-form">
-              <div class="form-grid">
-                <div class="span-2"><label class="form-label" for="media-image-prompt" data-message="media.prompt"></label><textarea class="form-control" id="media-image-prompt" rows="4" maxlength="8000" required></textarea></div>
-                <div><label class="form-label" for="media-image-size" data-message="media.size"></label><select class="form-select" id="media-image-size"><option value="1K">1K</option><option value="2K">2K</option><option value="3K">3K</option><option value="4K">4K</option></select></div>
-                <div><label class="form-label" for="media-image-ratio" data-message="media.ratio"></label><select class="form-select" id="media-image-ratio"><option value="1:1">1:1</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="4:3">4:3</option><option value="3:4">3:4</option><option value="3:2">3:2</option><option value="2:3">2:3</option><option value="21:9">21:9</option></select></div>
-              </div>
-              <div class="action-row media-generation-actions"><button class="btn btn-run" type="submit"><i class="bi bi-stars"></i><span data-message="media.generateImage"></span></button><div id="media-image-status" class="inline-result d-none" role="status" aria-live="polite"></div></div>
-            </form>
-            <figure id="media-image-preview" class="media-preview d-none"><img id="media-image-output" alt="" loading="lazy"><figcaption><code id="media-image-path"></code><a id="media-image-download" class="btn btn-outline-secondary" download><i class="bi bi-download"></i><span data-message="media.download"></span></a></figcaption></figure>
-          </section>
-          <section class="media-mode-panel d-none" data-media-mode-panel="video" role="tabpanel">
-            <form id="media-video-form" class="media-generation-form">
-              <div class="form-grid">
-                <div class="span-2"><label class="form-label" for="media-video-prompt" data-message="media.prompt"></label><textarea class="form-control" id="media-video-prompt" rows="4" maxlength="8000" required></textarea></div>
-                <div><label class="form-label" for="media-video-size" data-message="media.videoSize"></label><select class="form-select" id="media-video-size"><option value="1152x768">1152 x 768</option><option value="768x1152">768 x 1152</option><option value="1024x1024">1024 x 1024</option></select></div>
-                <div><label class="form-label" for="media-video-duration" data-message="media.duration"></label><select class="form-select" id="media-video-duration"><option value="81">3.4 s</option><option value="121">5.0 s</option><option value="161">6.7 s</option></select></div>
-                <div class="span-2"><label class="form-label" for="media-video-negative" data-message="media.negativePrompt"></label><input class="form-control" id="media-video-negative" maxlength="4000"></div>
-              </div>
-              <div class="action-row media-generation-actions"><button class="btn btn-run" type="submit"><i class="bi bi-film"></i><span data-message="media.generateVideo"></span></button><button class="btn btn-quiet-danger d-none" id="media-video-stop" type="button" data-action="stop-media-video"><i class="bi bi-stop-circle"></i><span data-message="media.stopPolling"></span></button><div id="media-video-status" class="inline-result d-none" role="status" aria-live="polite"></div></div>
-              <div class="form-grid media-video-facts"><div><label class="form-label" for="media-video-id" data-message="media.videoId"></label><input class="form-control font-monospace" id="media-video-id" readonly></div><div><label class="form-label" for="media-video-next-poll" data-message="media.nextPoll"></label><input class="form-control font-monospace" id="media-video-next-poll" readonly></div></div>
-            </form>
-            <figure id="media-video-preview" class="media-preview d-none"><video id="media-video-output" controls preload="metadata"></video><figcaption><code id="media-video-path"></code><a id="media-video-download" class="btn btn-outline-secondary" download><i class="bi bi-download"></i><span data-message="media.download"></span></a></figcaption></figure>
-          </section>
-        </section>
       </article>
 
       <article class="workflow-panel d-none" data-workflow-panel="media">
@@ -163,6 +132,39 @@
             <li class="flow-step"><div class="step-number">4</div><div class="step-content"><h2 data-message="media.validationTitle"></h2><p class="step-hint" data-message="media.validationHint"></p><button class="btn btn-outline-kitty" type="button" data-action="probe-media"><i class="bi bi-send"></i><span data-message="common.sendTest"></span></button><div id="media-probe-result" class="inline-result d-none" role="status"></div></div></li>
           </ol>
         </form>
+        <ol class="flow-steps media-generation-flow">
+          <li class="flow-step"><div class="step-number">5</div><div class="step-content media-studio" aria-labelledby="media-studio-title">
+          <div><h2 id="media-studio-title" data-message="media.studioTitle"></h2><p class="step-hint" data-message="media.studioHint"></p></div>
+          <div class="media-mode-tabs" role="tablist" aria-labelledby="media-studio-title">
+            <button class="btn btn-outline-secondary media-mode-tab is-active" type="button" role="tab" aria-selected="true" data-media-mode="image"><i class="bi bi-image"></i><span data-message="media.imageTab"></span></button>
+            <button class="btn btn-outline-secondary media-mode-tab" type="button" role="tab" aria-selected="false" data-media-mode="video"><i class="bi bi-film"></i><span data-message="media.videoTab"></span></button>
+          </div>
+          <section class="media-mode-panel" data-media-mode-panel="image" role="tabpanel">
+            <form id="media-image-form" class="media-generation-form">
+              <div class="form-grid">
+                <div class="span-2"><label class="form-label" for="media-image-prompt" data-message="media.prompt"></label><textarea class="form-control" id="media-image-prompt" rows="4" maxlength="8000" required></textarea></div>
+                <div><label class="form-label" for="media-image-size" data-message="media.size"></label><select class="form-select" id="media-image-size"><option value="1K">1K</option><option value="2K">2K</option><option value="3K">3K</option><option value="4K">4K</option></select></div>
+                <div><label class="form-label" for="media-image-ratio" data-message="media.ratio"></label><select class="form-select" id="media-image-ratio"><option value="1:1">1:1</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="4:3">4:3</option><option value="3:4">3:4</option><option value="3:2">3:2</option><option value="2:3">2:3</option><option value="21:9">21:9</option></select></div>
+              </div>
+              <div class="action-row media-generation-actions"><button class="btn btn-run" type="submit"><i class="bi bi-stars"></i><span data-message="media.generateImage"></span></button><div id="media-image-status" class="inline-result d-none" role="status" aria-live="polite"></div></div>
+            </form>
+            <figure id="media-image-preview" class="media-preview d-none"><img id="media-image-output" alt="" loading="lazy"><figcaption><code id="media-image-path"></code><a id="media-image-download" class="btn btn-outline-secondary" download><i class="bi bi-download"></i><span data-message="media.download"></span></a></figcaption></figure>
+          </section>
+          <section class="media-mode-panel d-none" data-media-mode-panel="video" role="tabpanel">
+            <form id="media-video-form" class="media-generation-form">
+              <div class="form-grid">
+                <div class="span-2"><label class="form-label" for="media-video-prompt" data-message="media.prompt"></label><textarea class="form-control" id="media-video-prompt" rows="4" maxlength="8000" required></textarea></div>
+                <div><label class="form-label" for="media-video-size" data-message="media.videoSize"></label><select class="form-select" id="media-video-size"><option value="1152x768">1152 x 768</option><option value="768x1152">768 x 1152</option><option value="1024x1024">1024 x 1024</option></select></div>
+                <div><label class="form-label" for="media-video-duration" data-message="media.duration"></label><select class="form-select" id="media-video-duration"><option value="81">3.4 s</option><option value="121">5.0 s</option><option value="161">6.7 s</option></select></div>
+                <div class="span-2"><label class="form-label" for="media-video-negative" data-message="media.negativePrompt"></label><input class="form-control" id="media-video-negative" maxlength="4000"></div>
+              </div>
+              <div class="action-row media-generation-actions"><button class="btn btn-run" type="submit"><i class="bi bi-film"></i><span data-message="media.generateVideo"></span></button><button class="btn btn-quiet-danger d-none" id="media-video-stop" type="button" data-action="stop-media-video"><i class="bi bi-stop-circle"></i><span data-message="media.stopPolling"></span></button><div id="media-video-status" class="inline-result d-none" role="status" aria-live="polite"></div></div>
+              <div class="form-grid media-video-facts"><div><label class="form-label" for="media-video-id" data-message="media.videoId"></label><input class="form-control font-monospace" id="media-video-id" readonly></div><div><label class="form-label" for="media-video-next-poll" data-message="media.nextPoll"></label><input class="form-control font-monospace" id="media-video-next-poll" readonly></div></div>
+            </form>
+            <figure id="media-video-preview" class="media-preview d-none"><video id="media-video-output" controls preload="metadata"></video><figcaption><code id="media-video-path"></code><a id="media-video-download" class="btn btn-outline-secondary" download><i class="bi bi-download"></i><span data-message="media.download"></span></a></figcaption></figure>
+          </section>
+          </div></li>
+        </ol>
       </article>
 
       <article class="workflow-panel d-none" data-workflow-panel="plugins">

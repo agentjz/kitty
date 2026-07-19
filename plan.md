@@ -6,9 +6,9 @@ Kitty 需要同时具备两类可长期使用的免费能力。
 
 第一类是 Agnes AI 的图片和视频生成。用户应能在 Agent 对话中要求生成或编辑图片、创建或续查视频任务，最终拿到项目内的本地文件；也应能在 Web 工作台中独立配置和验证多模态 Provider，并直接输入提示词生成图片或视频。Web 必须展示生成状态、产物预览和本地文件路径，视频创建后自动按持久 `video_id` 低频查询，刷新页面后仍能继续当前浏览器会话中的查询。浏览器不能直接持有或调用 Agnes 密钥。视频排队期间不能用错误 ID 查询、不能高频空转，也不能因进程恢复而丢掉已经确认的任务事实。
 
-第二类是本机 llama.cpp 文本推理。用户应能在现有“语言模型设置”中选择本地 Provider 和已安装模型，复用 Kitty 的同一 Agent、session、tool、streaming、context 和恢复链路。部署应匹配当前电脑的 8 GB RTX 5070 Laptop GPU、32 GB 内存和 D 盘空间；当前部署清单包含 Google Gemma 3 与两个适配显存的 Qwen3 GGUF 模型。Google Gemini 没有可下载的开放权重；本地 Google 模型使用官方开放权重 Gemma 3。
+第二类是本机 llama.cpp 文本推理。用户应能在现有“语言模型设置”中选择本地 Provider 和已安装模型，复用 Kitty 的同一 Agent、session、streaming、context 和恢复链路。部署应匹配当前电脑的 8 GB RTX 5070 Laptop GPU、32 GB 内存和 D 盘空间；当前只保留已安装并验证的 Google Gemma 3 GGUF。Google Gemini 没有可下载的开放权重；本地 Google 模型使用官方开放权重 Gemma 3。
 
-本次交付包含：Agnes 图片/视频 Provider 适配、两个 Agent 工具、运行时 Agnes 多模态 skill、Web 配置与人类生成工作台、llama.cpp Provider 适配、D 盘二进制与 Gemma/Qwen GGUF 模型部署、真实图片/视频/本地推理验收、边界测试和 `spec.md` 同步。commit/push 不在未明确授权的范围内。
+本次交付包含：Agnes 图片/视频 Provider 适配、两个 Agent 工具、运行时 Agnes 多模态 skill、Web 配置与人类生成工作台、llama.cpp Provider 适配、D 盘二进制与 Gemma GGUF 模型部署、真实图片/视频/本地推理验收、边界测试和 `spec.md` 同步。commit/push 不在未明确授权的范围内。
 
 业务完成标准：
 
@@ -28,8 +28,7 @@ Kitty 需要同时具备两类可长期使用的免费能力。
 - D 盘约 512.7 GiB 可用，适合保存二进制和模型；部署目标为 `D:\AI\llama.cpp`。
 - `llama-server` 与 `llama-cli` b10068 CUDA 12.4 已安装到 `D:\AI\llama.cpp\bin`，两个官方 ZIP 的 SHA-256 均通过；CMake、uv 与 ffmpeg 不属于当前运行依赖，未安装。
 - llama.cpp 官方 Windows CUDA 12.4 发布包可在当前 NVIDIA 驱动上运行。当前官方 release 是 `b10068`；主程序包与 CUDA runtime 包均提供发布 SHA-256。
-- Hugging Face 主站 API 可访问但大文件吞吐受限；当前 Gemma 从 ModelScope 官方镜像分段断点下载，并按固定 SHA-256 校验。
-- 当前本地模型集合为 Google `gemma-3-12b-it-q4_0`、Qwen3 8B Q4_K_M 和 Qwen3 4B Q4_K_M；Gemma 已完整合并并通过 SHA-256 marker，Qwen 两个模型已加入 manifest，等待用户下载。Gemma 的 SHA-256 为 `dd53172ff3a7b1b16c8fb3d944b87f42a6228ff2de3825b8813ae90d988434cd`。Kimi、MiniMax、GLM、DeepSeek 和 Phi 不在当前本地部署清单中。
+- 当前本地模型集合只保留 Google `gemma-3-12b-it-q4_0`；文件已完整合并并通过 SHA-256 marker，SHA-256 为 `dd53172ff3a7b1b16c8fb3d944b87f42a6228ff2de3825b8813ae90d988434cd`。
 - 当前 `.kitty/.env` 已有非空 `KITTY_API_KEY`。值不进入日志、源码、plan、测试、截图或 Git；本机多模态配置会从该值初始化独立媒体密钥。
 
 ### Agnes 官方合同
@@ -65,7 +64,7 @@ Kitty 需要同时具备两类可长期使用的免费能力。
 - 媒体配置、catalog/adapter、两个工具、typed artifact evidence、Web 独立配置、媒体 probe 和 Agnes 运行时 skill 已实现；typecheck、skill validator 与 31 个定向测试已通过。
 - 当前 key 已完成真实 Agnes 1K URL 图片生成、图片编辑和 81 帧视频 create/poll/download。两个 PNG 与 `generated/kitty/agnes-video-acceptance.mp4` 均通过 magic/非零大小校验；视频任务和二进制 change history 已持久化。
 - 媒体边界测试仍缺 Base64、原子写失败清理、坏媒体、下载超限/中断、视频任务持久化、提前轮询、失败状态、完成无 URL 和等待中断。
-- llama.cpp Provider/model preset、本机 CUDA binaries、Gemma/Qwen 模型下载清单和 router 启停状态脚本已完成；Gemma GGUF 已达到 manifest 精确字节数并通过 SHA-256 marker 校验。router 已真实加载并从 `/v1/models` 返回 `gemma-3-12b-it-q4_0.gguf`；中文非流式和流式通过，tool-call 探测返回 Python 代码而非 `tool_calls`，因此 Gemma capability 明确为 `tools: false`。Qwen 两个模型待下载后进行真实 tool-call 验收。
+- llama.cpp Provider/model preset、本机 CUDA binaries、Gemma 校验清单和 router 启停状态脚本已完成；下载入口已移除。Gemma GGUF 已达到 manifest 精确字节数并通过 SHA-256 marker 校验。router 已真实加载并从 `/v1/models` 返回 `gemma-3-12b-it-q4_0.gguf`；中文非流式和流式通过，tool-call 探测返回 Python 代码而非 `tool_calls`，因此 Gemma capability 明确为 `tools: false`。
 - llama.cpp router 对本地 GGUF 暴露的准确模型 ID，需要安装后从 `/v1/models` 读取并回写 catalog/preset，不能猜测。
 
 ## 3. 失败测试
@@ -90,15 +89,15 @@ Kitty 需要同时具备两类可长期使用的免费能力。
 
 ## 4. 目标
 
-- 语言模型主链路新增一个明确的 `llama.cpp` Provider，认证模式为 `none`，暴露 Gemma 与两个 Qwen3 本地 preset；Gemma 不发送工具合同，Qwen3 preset 复用 Chat Completions streaming、tool call、tool result replay 和 session 恢复。
+- 语言模型主链路新增一个明确的 `llama.cpp` Provider，认证模式为 `none`，只暴露 Gemma 本地 preset；Gemma 不发送工具合同，复用 Chat Completions streaming 和 session 恢复。
 - 把 `chat_template_kwargs.enable_thinking` 提炼为共享请求方言，Agnes 文本与 llama.cpp 只声明能力，不复制请求逻辑。
 - 新增独立 media 配置 owner 和 provider catalog。通用媒体执行层负责校验、HTTP、错误分类、abort、GET retry、下载与 artifact；Agnes adapter 只负责 Agnes wire 差异。
 - `generate_image` 同步生成或编辑并保存本地图片；`generate_video` 以 `create` 和 `poll` 两个操作表达异步协议。create 一次提交并持久返回 `video_id`，poll 只用 `video_id`、遵守最小间隔、完成后下载本地视频。
 - 媒体工具通过现有 extension registry、tool ledger、evidence builder、session 和宿主壳运行。生成文件进入通用 metadata artifact，不由 presenter 猜测。
-- Web 的“图像与视频”工作流同时承担配置与人类生成：图片表单支持提示词、清晰度和比例；视频表单支持提示词、画幅、时长和负面提示词，创建后自动低频查询并展示 `video_id`、状态、进度、预览和项目内路径。语言模型页显示 Gemma 与两个 Qwen3 本地 preset。
+- Web 的“图像与视频”工作流同时承担配置与人类生成：图片表单支持提示词、清晰度和比例；视频表单支持提示词、画幅、时长和负面提示词，创建后自动低频查询并展示 `video_id`、状态、进度、预览和项目内路径。语言模型页只显示 Gemma 本地 preset。
 - 新增简短 `skills/agnes-media/SKILL.md`，只保留两工具正确使用顺序和高风险合同，详细 API 事实由代码/schema 负责。
 - 在 `D:\AI\llama.cpp` 安装官方 CUDA 12.4 binaries 和 Gemma 3 12B QAT Q4_0；router 最多加载一个模型，默认 32,768 context，Q8 KV cache，自动 GPU fit，绑定 `127.0.0.1:8080`。
-- 所有确定性测试、真实 Agnes 验收、本机 llama.cpp 验收、完整 `npm.cmd run verify` 通过；`spec.md` 与当前事实一致；最终 commit 并 push `origin/master`。
+- 所有确定性测试、真实 Agnes 验收、本机 llama.cpp 验收、完整 `npm.cmd run verify` 通过；`spec.md` 与当前事实一致。本次已获用户明确授权 commit/push。
 
 ## 5. 不做范围
 

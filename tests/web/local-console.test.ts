@@ -304,6 +304,13 @@ test("local console lets humans generate and retrieve image and video artifacts"
   assert.equal(traversal.response.status, 422);
   const page = await fetch(handle.url);
   const html = await page.text();
+  const mediaPanelStart = html.indexOf('data-workflow-panel="media"');
+  const nextPanelStart = html.indexOf('data-workflow-panel="plugins"', mediaPanelStart);
+  const imagePrompt = html.indexOf('id="media-image-prompt"');
+  const videoPrompt = html.indexOf('id="media-video-prompt"');
+  assert.equal(mediaPanelStart >= 0 && nextPanelStart > mediaPanelStart, true);
+  assert.equal(imagePrompt > mediaPanelStart && imagePrompt < nextPanelStart, true);
+  assert.equal(videoPrompt > mediaPanelStart && videoPrompt < nextPanelStart, true);
   assert.match(html, /id="media-image-prompt"/u);
   assert.match(html, /id="media-video-prompt"/u);
   assert.match(html, /id="media-image-preview"/u);

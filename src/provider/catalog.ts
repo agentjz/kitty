@@ -403,26 +403,6 @@ export const MODEL_CATALOG: readonly ModelInfo[] = [
     ...LLAMA_CPP_GEMMA_MODEL_BASE,
   },
   {
-    id: "Qwen3-8B-Q4_K_M.gguf",
-    providerId: "llama.cpp",
-    label: "Qwen3 8B Q4_K_M (本机)",
-    ...LLAMA_CPP_MODEL_BASE,
-    limit: {
-      context: 16_384,
-      output: 4_096,
-    },
-  },
-  {
-    id: "Qwen3-4B-Q4_K_M.gguf",
-    providerId: "llama.cpp",
-    label: "Qwen3 4B Q4_K_M (本机)",
-    ...LLAMA_CPP_MODEL_BASE,
-    limit: {
-      context: 16_384,
-      output: 4_096,
-    },
-  },
-  {
     id: "openai/gpt-oss-120b",
     providerId: "groq",
     label: "GPT-OSS 120B via Groq",

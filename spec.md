@@ -85,7 +85,7 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 
 未知 provider、不支持的 provider/model 组合、缺失必填项和非法值必须在配置 schema 显式失败。运行时不能静默猜测 model 或 provider。
 
-默认 provider profile 是 Agnes AI。当前具名 provider profile 还包括 NVIDIA NIM、Groq、Cerebras、Gemini、DeepSeek、OpenAI、YLS、TTAPI 和 `llama.cpp`。`llama.cpp` 是无鉴权、仅 loopback 的 OpenAI-compatible Chat Completions Provider，默认 `http://127.0.0.1:8080/v1`；当前本地 GGUF preset 为 Google Gemma 3 12B、Qwen3 8B 和 Qwen3 4B。Gemma 实测不提供原生 tool-call，因此 catalog 不向 Gemma 发送工具合同；Qwen3 两个 preset 声明工具调用能力。`openai-compatible` 仅用于用户明确配置的高级兼容 endpoint；它不是任何具名 provider 的别名。
+默认 provider profile 是 Agnes AI。当前具名 provider profile 还包括 NVIDIA NIM、Groq、Cerebras、Gemini、DeepSeek、OpenAI、YLS、TTAPI 和 `llama.cpp`。`llama.cpp` 是无鉴权、仅 loopback 的 OpenAI-compatible Chat Completions Provider，默认 `http://127.0.0.1:8080/v1`；当前本地 GGUF preset 只保留 Google Gemma 3 12B。当前 GGUF 与 llama.cpp 的真实强制工具请求返回普通代码而非 `tool_calls`，因此 catalog 不向它发送工具合同。`openai-compatible` 仅用于用户明确配置的高级兼容 endpoint；它不是任何具名 provider 的别名。
 
 图片/视频配置独立于语言模型配置。当前媒体 Provider 是 Agnes AI：图片模型 `agnes-image-2.1-flash`，视频模型 `agnes-video-v2.0`。媒体密钥优先使用 `KITTY_MEDIA_API_KEY`，为空时运行时回退到 `KITTY_API_KEY`，但 Web 保存和展示仍按独立媒体字段处理。
 

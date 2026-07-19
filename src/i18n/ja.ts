@@ -381,6 +381,7 @@ export const jaMessages = {
   "web.common.back": "ワークスペースに戻る",
   "web.common.save": "設定を保存",
   "web.common.sendTest": "テストリクエストを送信",
+  "web.common.testingConnection": "Provider に接続してモデル機能を確認しています。しばらくお待ちください…",
   "web.common.start": "開始",
   "web.common.stop": "停止",
   "web.common.github": "GitHub で Kitty を開く",

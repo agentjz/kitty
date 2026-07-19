@@ -381,6 +381,7 @@ export const koMessages = {
   "web.common.back": "작업 공간으로 돌아가기",
   "web.common.save": "설정 저장",
   "web.common.sendTest": "테스트 요청 보내기",
+  "web.common.testingConnection": "Provider에 연결하고 모델 기능을 확인하는 중입니다. 잠시 기다려 주세요…",
   "web.common.start": "시작",
   "web.common.stop": "중지",
   "web.common.github": "GitHub에서 Kitty 열기",

@@ -380,6 +380,7 @@ async function submitConfig(values, resultSelector, successMessagePath, clear = 
 
 async function probeProvider(button) {
   await runButton(button, async () => {
+    showResult("#provider-result", message("common.testingConnection"), true);
     try {
       const result = await api("/api/provider/probe", { method: "POST", body: "{}" });
       const parts = [message("common.connectionSuccess"), result.probe];
@@ -394,6 +395,7 @@ async function probeProvider(button) {
 
 async function probeMedia(button) {
   await runButton(button, async () => {
+    showResult("#media-probe-result", message("common.testingConnection"), true);
     try {
       const result = await api("/api/media/probe", { method: "POST", body: "{}" });
       showResult("#media-probe-result", [message("common.connectionSuccess"), result.provider, message("common.models", { count: result.models }), result.baseUrl].join(" · "), true);

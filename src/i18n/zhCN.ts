@@ -381,6 +381,7 @@ export const zhCNMessages = {
   "web.common.back": "返回工作台",
   "web.common.save": "保存配置",
   "web.common.sendTest": "发送测试请求",
+  "web.common.testingConnection": "正在连接 Provider 并读取模型能力，请稍候…",
   "web.common.start": "启动",
   "web.common.stop": "停止",
   "web.common.github": "在 GitHub 打开 Kitty",

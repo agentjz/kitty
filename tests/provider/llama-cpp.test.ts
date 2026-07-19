@@ -52,9 +52,7 @@ test("llama.cpp SDK requests remove the placeholder Authorization header", async
 
 test("llama.cpp exposes the manifest local models", () => {
   assert.equal(findModelInfo("llama.cpp", "gemma-3-12b-it-q4_0.gguf")?.providerId, "llama.cpp");
-  assert.equal(findModelInfo("llama.cpp", "Qwen3-8B-Q4_K_M.gguf")?.capabilities.tools, true);
-  assert.equal(findModelInfo("llama.cpp", "Qwen3-4B-Q4_K_M.gguf")?.capabilities.tools, true);
-  assert.equal(PROVIDER_PRESETS.filter((preset) => preset.provider === "llama.cpp").length, 3);
+  assert.equal(PROVIDER_PRESETS.filter((preset) => preset.provider === "llama.cpp").length, 1);
 });
 
 test("llama.cpp deployment manifest matches catalog and preset model ids", () => {

@@ -64,7 +64,7 @@ export function buildWebMessages(locale: KittyLocale) {
     pageTitle: t("web.pageTitle"),
     welcome: t("tui.authorTip"),
     common: {
-      back: t("web.common.back"), save: t("web.common.save"), sendTest: t("web.common.sendTest"),
+      back: t("web.common.back"), save: t("web.common.save"), sendTest: t("web.common.sendTest"), testingConnection: t("web.common.testingConnection"),
       start: t("web.common.start"), stop: t("web.common.stop"),
       github: t("web.common.github"),
       notConfigured: t("web.common.notConfigured"), custom: t("web.common.custom"), requestFailed: t("web.common.requestFailed"),
