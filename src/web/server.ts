@@ -9,6 +9,7 @@ import { EXTENSION_DEFINITIONS } from "../extensions/definitions.js";
 import { getProviderPresetBaseUrl, PROVIDER_PRESETS } from "../config/providerPresets.js";
 import { resolveRuntimeConfig } from "../config/runtime.js";
 import { probeProviderConnection } from "../provider/connection.js";
+import { findProviderOfficialLinks } from "../provider/officialLinks.js";
 import { MEDIA_PROVIDER_CATALOG } from "../media/catalog.js";
 import { probeMediaConnection } from "../media/connection.js";
 import { resolveProjectRoots } from "../context/repoRoots.js";
@@ -160,7 +161,11 @@ export async function startLocalConsole(cwd: string): Promise<LocalConsoleHandle
         brand: { version: packageJson.version, wordmark: renderKittyAgentWordmark() },
         configuration,
         preflight,
-        providers: PROVIDER_PRESETS.map((preset) => ({ ...preset, baseUrl: getProviderPresetBaseUrl(preset) })),
+        providers: PROVIDER_PRESETS.map((preset) => ({
+          ...preset,
+          baseUrl: getProviderPresetBaseUrl(preset),
+          officialLinks: findProviderOfficialLinks(preset.provider),
+        })),
         mediaProviders: MEDIA_PROVIDER_CATALOG.map((provider) => ({
           id: provider.id,
           label: provider.label,
@@ -168,6 +173,7 @@ export async function startLocalConsole(cwd: string): Promise<LocalConsoleHandle
           baseUrl: provider.defaultBaseUrl,
           imageModel: provider.imageModels.at(-1),
           videoModel: provider.videoModels.at(-1),
+          officialLinks: findProviderOfficialLinks(provider.id),
         })),
         extensions: EXTENSION_DEFINITIONS.map(({ id, envKey, defaultEnabled }) => ({
           id,

@@ -8,7 +8,6 @@ import {
 } from "../../src/provider/connection.js";
 import {
   buildProviderProbeRequest,
-  resolveProviderProbeKind,
 } from "../../src/provider/transport.js";
 import { resolveModelProfile } from "../../src/provider/catalog.js";
 
@@ -31,34 +30,26 @@ test("DeepSeek probes the provider model endpoint", async () => {
   assert.equal(requests[0]?.method, "GET");
 });
 
-test("Agnes probes its Chat Completions contract", () => {
-  assert.equal(
-    resolveProviderProbeKind(resolveModelProfile({ provider: "agnes", model: "agnes-2.0-flash" })),
-    "chat.completions",
-  );
-  const request = buildProviderProbeRequest({
-    baseUrl: "https://apihub.agnes-ai.com/v1",
-    apiKey: "test-key",
-    model: "agnes-2.0-flash",
-    probe: "chat.completions",
-  });
-  assert.equal(request.endpoint, "https://apihub.agnes-ai.com/v1/chat/completions");
-  assert.equal(request.method, "POST");
-  assert.match(request.body ?? "", /"messages":/u);
-});
-
-test("Zhipu probes its named Chat Completions endpoint", () => {
-  const profile = resolveModelProfile({ provider: "zhipu", model: "glm-4.7-flash" });
-  assert.equal(resolveProviderProbeKind(profile), "chat.completions");
-
+test("Agnes connection test reads model metadata without generating tokens", () => {
+  const profile = resolveModelProfile({ provider: "agnes", model: "agnes-2.0-flash" });
   const request = buildProviderProbeRequest({
     baseUrl: profile.provider.defaultBaseUrl,
     apiKey: "test-key",
-    model: profile.model.id,
-    probe: "chat.completions",
   });
-  assert.equal(request.endpoint, "https://open.bigmodel.cn/api/paas/v4/chat/completions");
-  assert.equal(request.method, "POST");
+  assert.equal(request.endpoint, "https://apihub.agnes-ai.com/v1/models");
+  assert.equal(request.method, "GET");
+  assert.deepEqual(request.headers, { Authorization: "Bearer test-key" });
+});
+
+test("Zhipu connection test reads model metadata without generating tokens", () => {
+  const profile = resolveModelProfile({ provider: "zhipu", model: "glm-4.7-flash" });
+  const request = buildProviderProbeRequest({
+    baseUrl: profile.provider.defaultBaseUrl,
+    apiKey: "test-key",
+  });
+  assert.equal(request.endpoint, "https://open.bigmodel.cn/api/paas/v4/models");
+  assert.equal(request.method, "GET");
+  assert.deepEqual(request.headers, { Authorization: "Bearer test-key" });
 });
 
 test("base URL candidates add v1 only at a host root", () => {

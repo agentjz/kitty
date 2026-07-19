@@ -1,66 +1,24 @@
-import type { ResolvedModelProfile } from "./catalog.js";
-
-export type ProviderProbeKind = "models" | "chat.completions";
-
 export interface ProviderProbeRequest {
   endpoint: string;
-  method: "GET" | "POST";
+  method: "GET";
   headers: Record<string, string>;
-  body?: string;
-}
-
-export function resolveProviderProbeKind(profile: ResolvedModelProfile): ProviderProbeKind {
-  if (
-    profile.provider.apiKind === "openai-compatible" &&
-    profile.provider.id !== "openai-compatible"
-  ) {
-    return profile.model.wireApi;
-  }
-
-  return "models";
 }
 
 export function buildProviderProbeRequest(input: {
   baseUrl: string;
   apiKey: string;
-  model: string;
-  probe: ProviderProbeKind;
 }): ProviderProbeRequest {
   return {
-    endpoint: buildProviderProbeEndpoint(input.baseUrl, input.probe),
-    method: input.probe === "models" ? "GET" : "POST",
+    endpoint: buildProviderProbeEndpoint(input.baseUrl),
+    method: "GET",
     headers: {
       Authorization: `Bearer ${input.apiKey}`,
-      ...(input.probe === "models" ? {} : { "Content-Type": "application/json" }),
     },
-    body: buildProviderProbeBody(input.probe, input.model),
   };
 }
 
-export function buildProviderProbeEndpoint(baseUrl: string, probe: ProviderProbeKind): string {
-  if (probe === "chat.completions") {
-    return buildEndpoint(baseUrl, "chat/completions");
-  }
-
+export function buildProviderProbeEndpoint(baseUrl: string): string {
   return buildEndpoint(baseUrl, "models");
-}
-
-function buildProviderProbeBody(probe: ProviderProbeKind, model: string): string | undefined {
-  if (probe === "models") {
-    return undefined;
-  }
-
-  return JSON.stringify({
-    model,
-    messages: [
-      {
-        role: "user",
-        content: "Return ok.",
-      },
-    ],
-    max_tokens: 8,
-    stream: false,
-  });
 }
 
 function buildEndpoint(baseUrl: string, path: string): string {

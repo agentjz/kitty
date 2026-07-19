@@ -67,6 +67,7 @@ export function buildWebMessages(locale: KittyLocale) {
       back: t("web.common.back"), save: t("web.common.save"), sendTest: t("web.common.sendTest"), testingConnection: t("web.common.testingConnection"),
       start: t("web.common.start"), stop: t("web.common.stop"),
       github: t("web.common.github"),
+      officialSite: t("web.common.officialSite"), apiKeyPortal: t("web.common.apiKeyPortal"),
       notConfigured: t("web.common.notConfigured"), custom: t("web.common.custom"), requestFailed: t("web.common.requestFailed"),
       connectionSuccess: t("web.common.connectionSuccess"), serviceState: t("web.common.serviceState"), models: t("web.common.models"),
       skills: t("web.common.skills"), eventUpdated: t("web.common.eventUpdated"), eventDisconnected: t("web.common.eventDisconnected"),

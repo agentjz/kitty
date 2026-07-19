@@ -91,6 +91,10 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 
 图片/视频配置独立于语言模型配置。当前媒体 Provider 是 Agnes AI：图片模型 `agnes-image-2.1-flash`，视频模型 `agnes-video-v2.0`。媒体密钥优先使用 `KITTY_MEDIA_API_KEY`，为空时运行时回退到 `KITTY_API_KEY`，但 Web 保存和展示仍按独立媒体字段处理。
 
+具名语言与媒体 Provider 在本地控制台投影其官方网站和 API Key 获取入口；链接事实由共享 Provider 目录持有。通用 `openai-compatible` 不绑定任何厂商入口。
+
+语言与媒体连接测试只使用带当前密钥的只读 `GET /models` 请求；它验证端点、鉴权与模型元数据，不创建 completion，不消耗模型 Token。Provider 不提供该只读端点时，测试明确失败，不回退到生成请求。
+
 图片生成遵循 Agnes 官方合同：`POST /v1/images/generations`，URL 输出位于 `extra_body.response_format`。只对 Provider 已明确返回的 408、429、502、503、504、520、522、524 做有界重试；429 无 `Retry-After` 时等待一分钟，网络中断、客户端超时和用户取消不自动重放。`agnes-image-2.1-flash` 连续 503 后回退到当前账户可用的 `agnes-image-2.0-flash`，两模型合计最多四次请求。Abort 会中断请求或退避并阻止 fallback；未知外部副作用边界继续由 tool journal 结算为 interrupted/uncertain。Web 实时错误与 session replay 复用 typed tool presentation，展示精简 HTTP 状态和 Agnes request ID，不暴露嵌套上游错误体。
 
 `kitty start` 是唯一初始化与本地控制台入口。它创建或补齐 `.kitty/.env`、`.env.example` 与 `.kittyignore`，再监听 `127.0.0.1` 随机端口并尝试打开浏览器；浏览器失败只保留可手动打开的 URL，不停止服务。文件已存在时只向两个 env 文件补充当前模板缺失的配置键，不覆盖已有值、自定义内容或 ignore 规则。独立 `kitty init` 不存在。

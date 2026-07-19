@@ -1,5 +1,5 @@
 import { resolveModelProfile } from "./catalog.js";
-import { buildProviderProbeRequest, resolveProviderProbeKind, type ProviderProbeKind } from "./transport.js";
+import { buildProviderProbeRequest } from "./transport.js";
 
 export interface ProviderConnectionProbeInput {
   provider?: string;
@@ -12,8 +12,8 @@ export interface ProviderConnectionProbeInput {
 export type ProviderConnectionProbeResult =
   | {
       kind: "ok";
-      probe: ProviderProbeKind;
-      models?: number;
+      probe: "models";
+      models: number;
       resolvedBaseUrl: string;
       probeTimeoutMs: number;
     }
@@ -30,7 +30,6 @@ export async function probeProviderConnection(
     provider: input.provider,
     model: input.model,
   });
-  const probe = resolveProviderProbeKind(profile);
   const fetchImpl = input.fetchImpl ?? fetch;
   const probeTimeoutMs = profile.provider.doctorProbeTimeoutMs;
   let lastFailure:
@@ -41,8 +40,6 @@ export async function probeProviderConnection(
     const request = buildProviderProbeRequest({
       baseUrl: candidateBaseUrl,
       apiKey: input.apiKey,
-      model: profile.model.id,
-      probe,
     });
     let response: Response;
 
@@ -50,7 +47,6 @@ export async function probeProviderConnection(
       response = await fetchImpl(request.endpoint, {
         method: request.method,
         headers: request.headers,
-        body: request.body,
         signal: AbortSignal.timeout(probeTimeoutMs),
       });
     } catch (error) {
@@ -65,7 +61,7 @@ export async function probeProviderConnection(
     if (response.status === 404) {
       lastFailure = {
         kind: "user",
-        message: `User-fixable error: provider endpoint returned 404 at ${request.endpoint}. Check \`KITTY_PROVIDER\`, \`KITTY_MODEL\`, and \`KITTY_BASE_URL\` together; this provider uses ${profile.model.wireApi}.`,
+        message: `User-fixable error: provider endpoint returned 404 at ${request.endpoint}. Check \`KITTY_PROVIDER\` and \`KITTY_BASE_URL\`; connection testing requires a read-only \`GET /models\` endpoint.`,
         probeTimeoutMs,
       };
       continue;
@@ -91,15 +87,6 @@ export async function probeProviderConnection(
       return {
         kind: "provider",
         message: `Provider error: service returned ${response.status}. This is not a local runtime initialization issue; check provider response or configuration.`,
-        probeTimeoutMs,
-      };
-    }
-
-    if (probe === "chat.completions") {
-      return {
-        kind: "ok",
-        probe: "chat.completions",
-        resolvedBaseUrl: candidateBaseUrl,
         probeTimeoutMs,
       };
     }

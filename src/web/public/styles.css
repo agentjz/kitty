@@ -82,6 +82,10 @@ button, input, select, textarea { font: inherit; }
 .form-control:focus, .form-select:focus { border-color: var(--kitty-blue); background-color: var(--kitty-panel); color: var(--kitty-text); box-shadow: 0 0 0 3px rgb(141 169 189 / 14%); }
 .form-control::placeholder { color: #676f76; }
 .form-text { color: var(--kitty-muted); font-size: .78rem; }
+.provider-resource-links { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-top: -4px; }
+.provider-resource-links.d-none { display: none; }
+.provider-resource-link { display: inline-flex; align-items: center; gap: 7px; color: var(--kitty-blue); font-size: .82rem; text-decoration: none; }
+.provider-resource-link:hover, .provider-resource-link:focus-visible { color: var(--kitty-text); outline: 0; text-decoration: underline; }
 .compact-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px; }
 .action-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .btn { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 6px; }

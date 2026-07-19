@@ -76,6 +76,7 @@ function render() {
   value("#model-name", values[ENV.model]);
   value("#model-url", values[ENV.baseUrl]);
   value("#model-key", values[ENV.apiKey]);
+  renderProviderLinks("#model-provider-links", findProviderLinks(state.providers, values[ENV.provider]));
   document.querySelector("#current-model-facts").innerHTML = [
     [message("config.provider"), values[ENV.provider] || message("common.notConfigured")],
     [message("config.model"), values[ENV.model] || message("common.notConfigured")],
@@ -96,6 +97,7 @@ function render() {
   value("#media-key", values[ENV.mediaApiKey] || (values[ENV.provider] === "agnes" ? values[ENV.apiKey] : ""));
   value("#media-timeout", values[ENV.mediaTimeout]);
   value("#media-poll-interval", values[ENV.mediaPollInterval]);
+  renderProviderLinks("#media-provider-links", findProviderLinks(state.mediaProviders, values[ENV.mediaProvider]));
   document.querySelector("#current-media-facts").innerHTML = [
     [message("media.provider"), values[ENV.mediaProvider] || message("common.notConfigured")],
     [message("media.imageModel"), values[ENV.mediaImageModel] || message("common.notConfigured")],
@@ -247,13 +249,17 @@ document.addEventListener("click", (event) => {
 
 document.querySelector("#provider-preset").addEventListener("change", (event) => {
   const preset = state.providers.find((item) => item.id === event.target.value);
-  if (!preset) return;
+  if (!preset) {
+    refreshModelProviderLinks();
+    return;
+  }
   value("#model-provider", preset.provider);
   value("#model-name", preset.model);
   value("#model-url", preset.baseUrl);
   value("#model-key", preset.provider === state.configuration.values[ENV.provider]
     ? state.configuration.values[ENV.apiKey]
     : "");
+  refreshModelProviderLinks();
 });
 
 document.querySelector("#media-preset").addEventListener("change", (event) => {
@@ -263,7 +269,11 @@ document.querySelector("#media-preset").addEventListener("change", (event) => {
   value("#media-image-model", preset.imageModel);
   value("#media-video-model", preset.videoModel);
   value("#media-url", preset.baseUrl);
+  refreshMediaProviderLinks();
 });
+
+document.querySelector("#model-provider").addEventListener("input", refreshModelProviderLinks);
+document.querySelector("#media-provider").addEventListener("input", refreshMediaProviderLinks);
 
 document.querySelector("#model-form").addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -463,6 +473,46 @@ function showResult(selector, content, success) {
   const element = document.querySelector(selector);
   element.className = `inline-result ${success ? "result-success" : "result-error"}`;
   element.innerHTML = `<i class="bi ${success ? "bi-check-circle" : "bi-exclamation-circle"}"></i><span>${escapeHtml(content)}</span>`;
+}
+
+function findProviderLinks(providers, providerId) {
+  const normalized = String(providerId || "").trim().toLowerCase();
+  return providers.find((provider) => provider.provider === normalized)?.officialLinks;
+}
+
+function refreshModelProviderLinks() {
+  renderProviderLinks("#model-provider-links", findProviderLinks(state.providers, field("#model-provider")));
+}
+
+function refreshMediaProviderLinks() {
+  renderProviderLinks("#media-provider-links", findProviderLinks(state.mediaProviders, field("#media-provider")));
+}
+
+function renderProviderLinks(selector, links) {
+  const container = document.querySelector(selector);
+  container.replaceChildren();
+  const resources = [
+    [links?.websiteUrl, message("common.officialSite")],
+    [links?.apiKeyUrl, message("common.apiKeyPortal")],
+  ];
+  for (const [href, label] of resources) {
+    if (!href) continue;
+    const url = new URL(href);
+    if (url.protocol !== "https:") continue;
+    const anchor = document.createElement("a");
+    anchor.className = "provider-resource-link";
+    anchor.href = url.href;
+    anchor.target = "_blank";
+    anchor.rel = "noopener noreferrer";
+    const icon = document.createElement("i");
+    icon.className = "bi bi-box-arrow-up-right";
+    icon.setAttribute("aria-hidden", "true");
+    const copy = document.createElement("span");
+    copy.textContent = label;
+    anchor.append(icon, copy);
+    container.append(anchor);
+  }
+  container.classList.toggle("d-none", container.childElementCount === 0);
 }
 
 function scheduleMediaVideoPoll(videoId, nextPollAt) {
