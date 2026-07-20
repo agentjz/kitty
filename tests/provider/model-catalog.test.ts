@@ -30,6 +30,17 @@ test("Agnes model owns its chat-template thinking contract", () => {
   assert.equal(profile.model.limit.output, 65_500);
 });
 
+test("Agnes 2.5 Flash shares the current Agnes language-model contract", () => {
+  const profile = resolveModelProfile({
+    provider: "agnes",
+    model: "agnes-2.5-flash",
+  });
+
+  assert.equal(profile.model.request.chat?.reasoning, "agnes-thinking");
+  assert.equal(profile.model.limit.context, 512_000);
+  assert.equal(profile.model.limit.output, 65_500);
+});
+
 test("Zhipu GLM-4.7 Flash owns its preserved-thinking and free-model limits", () => {
   const profile = resolveModelProfile({
     provider: "zhipu",
@@ -42,6 +53,19 @@ test("Zhipu GLM-4.7 Flash owns its preserved-thinking and free-model limits", ()
   assert.equal(profile.model.capabilities.cache, "provider-automatic");
   assert.equal(profile.model.limit.context, 200_000);
   assert.equal(profile.model.limit.output, 131_072);
+});
+
+test("current Zhipu language models resolve with their published context limits", () => {
+  for (const model of ["glm-4.6", "glm-4.7", "glm-5", "glm-5-turbo", "glm-5.1"]) {
+    const profile = resolveModelProfile({ provider: "zhipu", model });
+    assert.equal(profile.model.limit.context, 200_000, model);
+    assert.equal(profile.model.limit.output, 131_072, model);
+  }
+
+  const glm52 = resolveModelProfile({ provider: "zhipu", model: "glm-5.2" });
+  assert.equal(glm52.model.limit.context, 1_000_000);
+  assert.equal(glm52.model.limit.output, 131_072);
+  assert.equal(glm52.model.request.reasoningEffortDefault, "max");
 });
 
 test("generic OpenAI-compatible endpoints accept an explicitly configured model", () => {

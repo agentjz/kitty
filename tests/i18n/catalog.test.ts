@@ -57,6 +57,7 @@ test("the Web presentation projects every supported runtime locale", () => {
   for (const locale of SUPPORTED_LOCALES) {
     const messages = buildWebMessages(locale);
     assert.equal(messages.welcome, translate(locale, "tui.authorTip"));
+    assert.equal(messages.authorNote.title, translate(locale, "web.authorNote.title"));
     const runtimeFields = [...messages.runtime.modelFields, ...messages.runtime.otherFields];
     assert.equal(runtimeFields.some((field) => field.envKey === "KITTY_LOCALE" && field.label.length > 0), true);
     const profileField = messages.runtime.otherFields.find((field) => field.envKey === "KITTY_PROFILE");

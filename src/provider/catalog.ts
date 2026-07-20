@@ -200,6 +200,28 @@ const ZHIPU_MODEL_BASE = {
   },
 };
 
+function createZhipuModel(input: {
+  id: string;
+  label: string;
+  context: number;
+  reasoningEffortDefault?: ModelReasoningEffort;
+}): ModelInfo {
+  return {
+    id: input.id,
+    providerId: "zhipu",
+    label: input.label,
+    ...ZHIPU_MODEL_BASE,
+    request: {
+      ...ZHIPU_MODEL_BASE.request,
+      reasoningEffortDefault: input.reasoningEffortDefault,
+    },
+    limit: {
+      context: input.context,
+      output: 131_072,
+    },
+  };
+}
+
 export const MODEL_CATALOG: readonly ModelInfo[] = [
   {
     id: "deepseek-v4-flash",
@@ -220,11 +242,23 @@ export const MODEL_CATALOG: readonly ModelInfo[] = [
     ...AGNES_MODEL_BASE,
   },
   {
-    id: "glm-4.7-flash",
-    providerId: "zhipu",
-    label: "GLM-4.7 Flash",
-    ...ZHIPU_MODEL_BASE,
+    id: "agnes-2.5-flash",
+    providerId: "agnes",
+    label: "Agnes 2.5 Flash",
+    ...AGNES_MODEL_BASE,
   },
+  createZhipuModel({ id: "glm-4.7-flash", label: "GLM-4.7 Flash", context: 200_000 }),
+  createZhipuModel({ id: "glm-4.6", label: "GLM-4.6", context: 200_000 }),
+  createZhipuModel({ id: "glm-4.7", label: "GLM-4.7", context: 200_000 }),
+  createZhipuModel({ id: "glm-5", label: "GLM-5", context: 200_000 }),
+  createZhipuModel({ id: "glm-5-turbo", label: "GLM-5 Turbo", context: 200_000 }),
+  createZhipuModel({ id: "glm-5.1", label: "GLM-5.1", context: 200_000 }),
+  createZhipuModel({
+    id: "glm-5.2",
+    label: "GLM-5.2",
+    context: 1_000_000,
+    reasoningEffortDefault: "max",
+  }),
 ] as const;
 
 export function listProviderInfos(): ProviderInfo[] {

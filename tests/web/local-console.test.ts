@@ -11,7 +11,6 @@ import { resolveRuntimeConfig } from "../../src/config/runtime.js";
 import { createMessage } from "../../src/session/messages.js";
 import { SessionStore } from "../../src/session/store.js";
 import { startLocalConsole } from "../../src/web/server.js";
-import { renderKittyAgentWordmark } from "../../src/runtime-ui/banner.js";
 import { WeixinSessionMapStore } from "../../src/weixin/state.js";
 import packageJson from "../../package.json";
 import { createTempWorkspace } from "../helpers.js";
@@ -32,15 +31,35 @@ test("local console binds loopback, authenticates API, and rejects foreign write
   assert.equal((bootstrap.body.messages as { welcome: string }).welcome, "尽情地探索并享受吧！");
   assert.deepEqual(bootstrap.body.brand, {
     version: packageJson.version,
-    wordmark: renderKittyAgentWordmark(),
   });
   assert.equal((bootstrap.body.configuration as { file: string }).file, ".kitty/.env");
+  const providers = bootstrap.body.providers as Array<{ id: string; label: string; model: string }>;
+  assert.deepEqual(
+    providers.filter(({ id }) => id.startsWith("agnes-") || id.startsWith("glm-")).map(({ id }) => id),
+    [
+      "agnes-2.0-flash",
+      "agnes-2.5-flash",
+      "glm-4.7-flash",
+      "glm-4.6",
+      "glm-4.7",
+      "glm-5",
+      "glm-5-turbo",
+      "glm-5.1",
+      "glm-5.2",
+    ],
+  );
+  assert.equal(providers.every(({ label }) => label.includes("｜") || label.startsWith("DeepSeek")), true);
   const webPage = await fetch(handle.webUrl);
   assert.equal(webPage.status, 200);
   const webSource = await webPage.text();
   assert.match(webSource, /marked\.esm\.js/u);
   assert.match(webSource, /presentation/u);
   assert.equal(webSource.includes("message.payload"), false);
+  const consolePage = await fetch(handle.url);
+  const consoleSource = await consolePage.text();
+  assert.match(consoleSource, /<h1 class="kitty-hero-title">Kitty Agent<\/h1>/u);
+  assert.match(consoleSource, /id="author-note"/u);
+  assert.match(consoleSource, /data-action="close-author-note"/u);
 
   const foreign = await fetch(new URL("/api/config", url), {
     method: "PUT",

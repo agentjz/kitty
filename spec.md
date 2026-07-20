@@ -85,7 +85,7 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 
 未知 provider、不支持的 provider/model 组合、缺失必填项和非法值必须在配置 schema 显式失败。运行时不能静默猜测 model 或 provider。
 
-默认 provider profile 是 Agnes AI，另有 DeepSeek official 与 Zhipu AI 具名 profile。Zhipu AI 默认模型是免费的 `glm-4.7-flash`，使用标准 BigModel API 端点，支持工具调用、自动上下文缓存与 preserved thinking。`openai-compatible` 是用户后续接入兼容 Chat Completions 免费模型的通用协议入口，不携带厂商模型 preset 或厂商 wire 特判。Kitty 不维护本地模型部署或本地模型 preset。
+默认 provider profile 是 Agnes AI，另有 DeepSeek official 与 Zhipu AI 具名 profile。语言模型预设提供 Agnes AI 的 `agnes-2.0-flash`、`agnes-2.5-flash`，以及智谱 AI 的 `glm-4.7-flash`、`glm-4.6`、`glm-4.7`、`glm-5`、`glm-5-turbo`、`glm-5.1`、`glm-5.2`；其中 `glm-4.7-flash` 是免费模型。智谱模型使用标准 BigModel API 端点，支持工具调用、自动上下文缓存与 preserved thinking；`glm-5.2` 额外使用 reasoning effort。`openai-compatible` 是用户后续接入兼容 Chat Completions 免费模型的通用协议入口，不携带厂商模型 preset 或厂商 wire 特判。Kitty 不维护本地模型部署或本地模型 preset。
 
 项目 env 模板使用中文短注释说明 Provider 参数。Agnes 与 Zhipu GLM-4.7 Flash 使用 `KITTY_THINKING=enabled|disabled`，不发送 `KITTY_REASONING_EFFORT`；DeepSeek 使用相同思考开关，并将推理强度收敛为 `high` 或 `max`。
 
@@ -100,6 +100,8 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 `kitty start` 是唯一初始化与本地控制台入口。它创建或补齐 `.kitty/.env`、`.env.example` 与 `.kittyignore`，再监听 `127.0.0.1` 随机端口并尝试打开浏览器；浏览器失败只保留可手动打开的 URL，不停止服务。文件已存在时只向两个 env 文件补充当前模板缺失的配置键，不覆盖已有值、自定义内容或 ignore 规则。独立 `kitty init` 不存在。
 
 本地控制台是引导式工作流壳：首页按任务展示 Kitty 网页端控制、语言模型设置、插件与 Skill 开关、微信远程控制、Telegram 远程控制及其他设置，不使用后台管理侧栏。语言模型设置只负责 Provider、模型、密钥、连接测试和模型行为；插件与 Skill 开关在同一工作流中管理 Extension 开关并只读查看项目 Skill；其他设置承载语言、人格、上下文、文件和渠道参数。人格选项从当前 agent profile registry 投影，当前内置 `INTP` 与 `毒舌`，后者用于证据优先、直接且不攻击人的需求分析和代码审查。点击模块后进入单任务的配置、验证与运行详情，通过工作台按钮返回。渠道信息流在用户位于底部时继续跟随，离开底部后保持阅读位置，用户通过原生滚动回到底部。Web 从 `KITTY_LOCALE` 读取 `zh-CN`、`en`、`ja` 或 `ko`，由现有 typed catalog 投影页面、运行参数、人格选项、Extension 说明、状态和事件 presentation；外部 Web 壳在 WebSocket 首包接收同一套 locale 文案，Markdown assistant 内容由 `marked` 渲染，工具只显示已经投影的名称、目标、进度和结果摘要，不把原始 JSON 参数或返回暴露给用户。默认简体中文，provider/model、env key、Skill 内容与模型输出保持原文。后端拥有配置、Provider 探测、微信登录、channel lifecycle 和只读 Skill API；定时任务只通过 Agent scheduler 工具管理，不进入 Web。写请求必须携带启动期随机 token 且 Origin 必须等于当前 loopback origin；配置只接受已知 env key。`KITTY_API_KEY` 是运行时和持久配置唯一使用的 Provider 密钥；选择其他 Provider 时，页面清空密钥输入并要求在保存前填入对应密钥，不保存 Provider 专属副本。注释中的替代 Provider 预设只用于人工参考，不进入运行或展示判断。loopback 页面读取并显示 `.kitty/.env` 的当前值，包括 API Key 和 Bot Token；空 secret 更新保留原值，显式 clear 才删除。除远程渠道的 SSE 信息流外，`kitty start` 还提供带启动 token 的 `/web` WebSocket 工作壳；它复用同一 session、InteractiveSessionDriver 和 typed runtime events，不复制 Agent 核心。所有写入只在用户点击保存后发生，不自动保存或切换模型。
+
+`kitty start` 页面加载后显示作者便签；用户可以使用关闭图标、Esc 或点击遮罩关闭。
 
 ## 4. Agent 与 Host Turn
 
@@ -158,7 +160,7 @@ Session 保存 append-only 可见消息、revision、context budget、task state
 
 ### Context budget
 
-Context 优先保留可见的近场对话。超过配置预算后，它摘要较早消息，并压缩早期 tool/user/assistant 内容，同时保留安全的近期 tail 和工具边界。
+Context 优先保留可见的近场对话。超过配置预算后，它摘要较早消息，并压缩早期 tool/user/assistant 内容，同时保留安全的近期 tail 和工具边界。近期窗口不能从 assistant 或 tool 开始：跨 turn 裁剪从下一条 user 开始；单个超长 turn 超过窗口时保留当前 user 作为语义锚点，把被裁掉的旧工具批次写入摘要，并只重放完整的近期 assistant/tool 批次。
 
 近期 canonical tool evidence 使用 model view；较旧 tool evidence 在 normal/aggressive/hard compression 中直接切换为自身 compact view。compact view 已有严格边界，context 不再对它进行第二次无语义字符串截断。状态与上下文压缩读取 compact evidence，而不是再次解析 model-facing 文本。
 
@@ -224,7 +226,7 @@ Provider request 边界把 adapter、transport 和 SDK 失败归一为 `Provider
 Extension 只在配置启用时进入同一工具注册表。它们不是另一条 agent loop，也不是 core 工具。
 
 运行时 skill 是项目能力包。Context 只暴露 skill 清单；模型在相关时显式加载 skill 或资源。Skill 不自动路由模型行为。
-仓库当前提供 `dev` 与 `agnes-media` 运行时 skill。`agnes-media` 只约束图片工具、视频 create/poll 顺序、`video_id`、低频轮询和产物恢复；协议事实仍由媒体 Provider/工具 owner 维护。
+仓库当前提供 `dev`、`read-only` 与 `agnes-media` 运行时 skill。`read-only` 用于不改变项目或外部状态的通用项目研究、进度审计、生命周期阶段判断、同类成果对标、架构调查、风险与缺口报告；它禁止编辑、安装、构建、测试和启动服务，只使用可证明无副作用的证据采集。`agnes-media` 只约束图片工具、视频 create/poll 顺序、`video_id`、低频轮询和产物恢复；协议事实仍由媒体 Provider/工具 owner 维护。
 
 ## 8. Control Plane 与 Execution
 

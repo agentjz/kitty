@@ -1,4 +1,4 @@
-import { expandStartToToolBoundary } from "../../../session/messages.js";
+import { expandStartToToolBoundary, findLatestUserIndex } from "../../../session/messages.js";
 import { joinBlocks, renderPromptLayers } from "../../../agent/prompt/format.js";
 import { measurePromptLayers } from "../../../agent/prompt/metrics.js";
 import { isInternalMessage } from "../../../session/turnFrame.js";
@@ -67,8 +67,9 @@ export function buildCompressedContextRequest(
   let tailCount = Math.max(1, Math.min(conversationMessages.length, config.contextWindowMessages));
 
   while (true) {
-    const tailMessages = sliceTailMessages(conversationMessages, tailCount);
-    const compressedFrameHead = conversationMessages.slice(0, Math.max(0, conversationMessages.length - tailMessages.length));
+    const frame = selectTailFrame(conversationMessages, tailCount);
+    const tailMessages = frame.tail;
+    const compressedFrameHead = frame.head;
     const summary =
       compressedFrameHead.length > 0
         ? summarizeConversation(compressedFrameHead, config.contextSummaryChars)
@@ -140,7 +141,10 @@ export function buildCompressedContextRequest(
     const hardPrompt = appendSummary(systemPrompt, hardSummary);
 
     for (const hardTailCount of HARD_TAIL_COUNTS) {
-      const hardTail = sliceTailMessages(conversationMessages, Math.min(hardTailCount, conversationMessages.length));
+      const hardTail = selectTailFrame(
+        conversationMessages,
+        Math.min(hardTailCount, conversationMessages.length),
+      ).tail;
       const compactedHardTail = compactTailMessages(hardTail, "hard");
       const hardMessages = composeChatMessages(
         hardPrompt,
@@ -195,14 +199,53 @@ function buildContextEpoch(messages: StoredMessage[], summary: string): NonNulla
   };
 }
 
-function sliceTailMessages(messages: StoredMessage[], tailCount: number): StoredMessage[] {
+function selectTailFrame(
+  messages: StoredMessage[],
+  tailCount: number,
+): { head: StoredMessage[]; tail: StoredMessage[] } {
   if (messages.length === 0) {
-    return [];
+    return { head: [], tail: [] };
   }
 
-  const startIndex = Math.max(0, messages.length - tailCount);
-  const safeStartIndex = expandStartToToolBoundary(messages, startIndex);
-  return messages.slice(safeStartIndex);
+  const boundedTailCount = Math.max(1, Math.min(messages.length, tailCount));
+  const desiredStartIndex = Math.max(0, messages.length - boundedTailCount);
+  const nextUserIndex = messages.findIndex((message, index) =>
+    index >= desiredStartIndex && message.role === "user");
+
+  if (nextUserIndex >= 0) {
+    return {
+      head: messages.slice(0, nextUserIndex),
+      tail: messages.slice(nextUserIndex),
+    };
+  }
+
+  const currentUserIndex = findLatestUserIndex(messages);
+  if (currentUserIndex < 0 || currentUserIndex >= desiredStartIndex) {
+    const safeStartIndex = expandStartToToolBoundary(messages, desiredStartIndex);
+    return {
+      head: messages.slice(0, safeStartIndex),
+      tail: messages.slice(safeStartIndex),
+    };
+  }
+
+  let recentBudget = Math.max(0, boundedTailCount - 1);
+  while (recentBudget > 0) {
+    const recentStartIndex = Math.max(currentUserIndex + 1, messages.length - recentBudget);
+    const safeStartIndex = expandStartToToolBoundary(messages, recentStartIndex);
+    const tail = [messages[currentUserIndex]!, ...messages.slice(safeStartIndex)];
+    if (tail.length <= boundedTailCount) {
+      return {
+        head: messages.slice(0, safeStartIndex),
+        tail,
+      };
+    }
+    recentBudget -= 1;
+  }
+
+  return {
+    head: messages.slice(0, messages.length),
+    tail: [messages[currentUserIndex]!],
+  };
 }
 
 function composeChatMessages(

@@ -25,12 +25,24 @@ body { min-width: 320px; min-height: 100vh; margin: 0; background: var(--kitty-b
 button, input, select, textarea { font: inherit; }
 .workspace { width: min(100% - 40px, 1040px); margin-inline: auto; }
 
+.author-note { width: min(calc(100% - 32px), 620px); max-height: min(82vh, 680px); margin: auto; overflow: auto; padding: 42px 38px 34px; border: 1px solid #d9c878; border-radius: 4px; background: #fff4bd; color: #2f2b21; box-shadow: 6px 8px 0 #c9a95f, 0 26px 80px rgb(0 0 0 / 55%); transform: rotate(-.25deg); }
+.author-note::backdrop { background: rgb(9 10 11 / 78%); }
+.author-note::after { content: ""; position: absolute; right: 0; bottom: 0; width: 0; height: 0; border-style: solid; border-width: 0 0 24px 24px; border-color: transparent transparent #e0c96f transparent; }
+.author-note-tape { position: absolute; top: 0; left: 50%; width: 116px; height: 24px; background: rgb(240 224 181 / 88%); border-inline: 1px dashed #c8af70; transform: translate(-50%, -9px) rotate(1.5deg); }
+.author-note-close { position: absolute; top: 13px; right: 14px; width: 32px; height: 32px; display: grid; place-items: center; padding: 0; border: 0; background: transparent; color: #766b4c; font-size: 1rem; }
+.author-note-close:hover, .author-note-close:focus-visible { color: #211e17; outline: 1px dashed #897748; outline-offset: 2px; }
+.author-note h1 { margin: 0 36px 20px 0; color: #211e17; font-size: 1.55rem; line-height: 1.3; }
+.author-note > p { margin: 0; color: #4d4633; line-height: 1.85; }
+.author-note > p + p { margin-top: 15px; }
+.author-note .author-note-question { color: #332e21; font-weight: 700; }
+.author-note .author-note-answer { width: fit-content; padding: 2px 8px; background: #f2dda0; color: #332e21; font-weight: 700; transform: rotate(.35deg); }
+.author-note .author-note-ending { margin-top: 22px; padding-top: 18px; border-top: 1px dashed #c4ae61; color: #29251b; font-weight: 700; }
+
 .kitty-banner { border-bottom: 1px solid var(--kitty-border); background: #0d0f11; }
 .banner-layout { min-height: 240px; display: flex; align-items: center; justify-content: center; }
 .kitty-identity { max-width: 100%; display: flex; align-items: flex-start; flex-direction: column; gap: 16px; }
 .kitty-version { color: var(--kitty-blue); font: .84rem/1 "Cascadia Mono", "SFMono-Regular", Consolas, monospace; }
-.kitty-lockup { max-width: 100%; display: flex; align-items: flex-end; gap: 2ch; color: var(--kitty-brand); }
-.kitty-wordmark { margin: 0; overflow: hidden; color: var(--kitty-brand); font: 700 14px/1 "Cascadia Mono", "SFMono-Regular", Consolas, monospace; white-space: pre; }
+.kitty-hero-title { margin: 0; color: var(--kitty-brand); font-size: 5.4rem; font-weight: 900; line-height: 1; }
 .kitty-welcome { align-self: center; margin: 0; color: var(--kitty-muted); font-size: .9rem; }
 .kitty-welcome strong { color: var(--kitty-gold); }
 
@@ -162,11 +174,15 @@ button, input, select, textarea { font: inherit; }
 .skill-reader pre { max-height: 600px; margin: 8px 0 0; overflow: auto; padding: 18px; border: 1px solid var(--kitty-border); border-radius: 8px; background: #0d0f11; color: #cbd2d7; font: .82rem/1.6 "Cascadia Mono", Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 .empty-state, .fatal-error { padding: 28px; border: 1px solid var(--kitty-border); border-radius: 8px; color: var(--kitty-muted); }
 
+@media (max-width: 767.98px) {
+  .kitty-hero-title { font-size: 3.75rem; }
+}
+
 @media (max-width: 720px) {
+  .author-note { padding: 38px 24px 28px; box-shadow: 4px 6px 0 #c9a95f, 0 20px 60px rgb(0 0 0 / 55%); transform: none; }
   .workspace { width: min(100% - 28px, 1040px); }
   .banner-layout { min-height: 190px; }
   .kitty-identity { gap: 12px; }
-  .kitty-wordmark { font-size: 10px; }
   .main-workspace { padding-block: 32px 56px; }
   .detail-heading h1 { font-size: 1.6rem; }
   .workflow-card { grid-template-columns: 44px minmax(0, 1fr); gap: 14px; padding: 14px; }
@@ -181,7 +197,14 @@ button, input, select, textarea { font: inherit; }
   .channel-stream { height: 320px; }
 }
 
+@media (max-width: 575.98px) {
+  .kitty-hero-title { font-size: 3rem; }
+}
+
 @media (max-width: 380px) {
-  .kitty-wordmark { font-size: 7px; }
   .kitty-version, .kitty-welcome { font-size: .76rem; }
+}
+
+@media (max-width: 359.98px) {
+  .kitty-hero-title { font-size: 2.7rem; }
 }

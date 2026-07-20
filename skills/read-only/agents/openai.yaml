@@ -1,0 +1,4 @@
+interface:
+  display_name: "只读审计"
+  short_description: "只读研究通用项目的现状、进度、成熟阶段、同类位置、风险与证据缺口"
+  default_prompt: "Use $read-only to audit this project's status, maturity stage, peer position, risks, and evidence gaps without changing any state."

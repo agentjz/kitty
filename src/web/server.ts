@@ -20,7 +20,6 @@ import { SessionStore } from "../session/store.js";
 import type { SessionRecord } from "../types.js";
 import { subscribeRemoteRuntimeEvents } from "../remote/events.js";
 import { DEFAULT_LOCALE, parseKittyLocale } from "../i18n/index.js";
-import { renderKittyAgentWordmark } from "../runtime-ui/banner.js";
 import { WebChannelManager } from "./channelManager.js";
 import { WebConfigService } from "./configService.js";
 import { WebEventHub } from "./events.js";
@@ -158,7 +157,7 @@ export async function startLocalConsole(cwd: string): Promise<LocalConsoleHandle
       return sendJson(response, 200, {
         locale,
         messages,
-        brand: { version: packageJson.version, wordmark: renderKittyAgentWordmark() },
+        brand: { version: packageJson.version },
         configuration,
         preflight,
         providers: PROVIDER_PRESETS.map((preset) => ({

@@ -57,8 +57,6 @@ function render() {
   const values = state.configuration.values;
   localizeDocument(state.locale, state.messages);
   text("#kitty-version", `v${state.brand.version}`);
-  text("#kitty-wordmark-kitty", state.brand.wordmark.kitty);
-  text("#kitty-wordmark-agent", state.brand.wordmark.agent);
   text("#config-location", state.configuration.file);
   text("#model-summary", `${values[ENV.provider] || message("common.notConfigured")} · ${values[ENV.model] || message("common.notConfigured")}`);
   text("#media-summary", `${values[ENV.mediaImageModel] || message("common.notConfigured")} · ${values[ENV.mediaVideoModel] || message("common.notConfigured")}`);
@@ -116,6 +114,19 @@ function render() {
   initializeChannelStreams({ ...state.messages.stream, eventUpdated: state.messages.common.eventUpdated });
   syncWorkflowFromLocation();
 }
+
+function openAuthorNote() {
+  const note = document.querySelector("#author-note");
+  if (!note?.showModal || note.open) return;
+  note.showModal();
+}
+
+document.querySelector("[data-action='close-author-note']")?.addEventListener("click", () => {
+  document.querySelector("#author-note")?.close();
+});
+document.querySelector("#author-note")?.addEventListener("click", (event) => {
+  if (event.target === event.currentTarget) event.currentTarget.close();
+});
 
 function describeChannel(channel, loginStatus) {
   const service = state.messages.status[channel?.status] || channel?.status || state.messages.status.unknown;
@@ -602,6 +613,6 @@ function readSettings(selector) {
 function field(selector) { return document.querySelector(selector).value.trim(); }
 function value(selector, next) { document.querySelector(selector).value = next ?? ""; }
 function text(selector, next) { document.querySelector(selector).textContent = next ?? ""; }
-refresh().then(() => { restoreMediaVideoTask(); startEventStream(); }).catch((error) => {
+refresh().then(() => { openAuthorNote(); restoreMediaVideoTask(); startEventStream(); }).catch((error) => {
   document.querySelector("#workflow-home").innerHTML = `<div class="fatal-error"><p>${escapeHtml(error.message)}</p></div>`;
 });

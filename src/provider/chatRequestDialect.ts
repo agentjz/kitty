@@ -39,6 +39,9 @@ export function applyChatRequestDialect(
       body.thinking = thinking === "enabled"
         ? { type: "enabled", clear_thinking: false }
         : { type: "disabled" };
+      if (thinking === "enabled" && capabilities.defaultReasoningEffort) {
+        body.reasoning_effort = input.reasoningEffort ?? capabilities.defaultReasoningEffort;
+      }
       break;
     }
     case "none":

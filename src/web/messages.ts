@@ -63,6 +63,11 @@ export function buildWebMessages(locale: KittyLocale) {
   return {
     pageTitle: t("web.pageTitle"),
     welcome: t("tui.authorTip"),
+    authorNote: {
+      title: t("web.authorNote.title"), body: t("web.authorNote.body"),
+      question: t("web.authorNote.question"), answer: t("web.authorNote.answer"), context: t("web.authorNote.context"),
+      ending: t("web.authorNote.ending"), close: t("web.authorNote.close"),
+    },
     common: {
       back: t("web.common.back"), save: t("web.common.save"), sendTest: t("web.common.sendTest"), testingConnection: t("web.common.testingConnection"),
       start: t("web.common.start"), stop: t("web.common.stop"),

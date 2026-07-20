@@ -9,11 +9,23 @@
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
+  <dialog id="author-note" class="author-note" aria-labelledby="author-note-title">
+    <button class="author-note-close" type="button" data-action="close-author-note" data-message-title="authorNote.close">
+      <i class="bi bi-x-lg" aria-hidden="true"></i>
+    </button>
+    <div class="author-note-tape" aria-hidden="true"></div>
+    <h1 id="author-note-title" data-message="authorNote.title"></h1>
+    <p data-message="authorNote.body"></p>
+    <p class="author-note-question" data-message="authorNote.question"></p>
+    <p class="author-note-answer" data-message="authorNote.answer"></p>
+    <p data-message="authorNote.context"></p>
+    <p class="author-note-ending" data-message="authorNote.ending"></p>
+  </dialog>
   <header class="kitty-banner">
     <div class="workspace banner-layout">
       <div class="kitty-identity">
         <span id="kitty-version" class="kitty-version"></span>
-        <div class="kitty-lockup" aria-label="Kitty Agent"><pre id="kitty-wordmark-kitty" class="kitty-wordmark" aria-hidden="true"></pre><pre id="kitty-wordmark-agent" class="kitty-wordmark" aria-hidden="true"></pre></div>
+        <h1 class="kitty-hero-title">Kitty Agent</h1>
         <p class="kitty-welcome"><strong>猫咪：</strong><span data-message="welcome"></span></p>
       </div>
     </div>

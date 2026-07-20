@@ -107,6 +107,32 @@ test("Zhipu chat request can disable thinking without preserved-thinking options
   assert.deepEqual(body.thinking, { type: "disabled" });
 });
 
+test("GLM-5.2 sends its reasoning effort while GLM-4.7 Flash keeps the legacy wire contract", () => {
+  const glm52 = buildProviderRequestBody({
+    provider: "zhipu",
+    model: "glm-5.2",
+    messages: [{ role: "user", content: "hello" }],
+    tools: undefined,
+    stream: true,
+    forceReasoning: false,
+    thinking: "enabled",
+    reasoningEffort: "high",
+  });
+  const glm47Flash = buildProviderRequestBody({
+    provider: "zhipu",
+    model: "glm-4.7-flash",
+    messages: [{ role: "user", content: "hello" }],
+    tools: undefined,
+    stream: true,
+    forceReasoning: false,
+    thinking: "enabled",
+    reasoningEffort: "high",
+  });
+
+  assert.equal(glm52.reasoning_effort, "high");
+  assert.equal("reasoning_effort" in glm47Flash, false);
+});
+
 test("chat request omits an empty tool surface", () => {
   const body = buildProviderRequestBody({
     provider: "agnes",
