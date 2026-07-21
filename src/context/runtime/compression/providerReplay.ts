@@ -2,6 +2,9 @@ import {
   findLatestUserIndex,
   shouldIncludeStoredAssistantReasoning,
 } from "../../../session/messages.js";
+import { resolveProviderCapabilities } from "../../../provider/capabilities.js";
+import type { ToolCallProviderMetadataReplayPolicy } from "../../../provider/catalog.js";
+import { hasRequiredToolCallProviderMetadata } from "../../../provider/toolCallMetadata.js";
 import type { StoredMessage } from "../../../types.js";
 
 export function normalizeProviderReplayMessages(
@@ -9,7 +12,8 @@ export function normalizeProviderReplayMessages(
   model: string,
   provider: string,
 ): StoredMessage[] {
-  if (!providerNeedsReasoningReplay(model, provider)) {
+  const requirements = readReplayRequirements(model, provider);
+  if (!requirements.reasoning && requirements.toolCallProviderMetadataReplay === "never") {
     return messages;
   }
 
@@ -17,7 +21,7 @@ export function normalizeProviderReplayMessages(
   const latestUserIndex = findLatestUserIndex(messages);
   for (let index = 0; index < messages.length; index += 1) {
     const message = messages[index]!;
-    if (index >= latestUserIndex || !isUnreplayableToolCallAssistant(message)) {
+    if (index >= latestUserIndex || !isUnreplayableToolCallAssistant(message, requirements)) {
       normalized.push(message);
       continue;
     }
@@ -55,22 +59,30 @@ export function shouldIncludeProviderReplayReasoning(
   return shouldIncludeStoredAssistantReasoning(messages, index, model, provider);
 }
 
-function providerNeedsReasoningReplay(model: string, provider: string): boolean {
-  return shouldIncludeStoredAssistantReasoning([
-    {
-      role: "assistant",
-      content: "",
-      reasoningContent: "probe",
-      createdAt: "1970-01-01T00:00:00.000Z",
-    },
-  ], 0, model, provider);
+function readReplayRequirements(model: string, provider: string): {
+  reasoning: boolean;
+  toolCallProviderMetadataReplay: ToolCallProviderMetadataReplayPolicy;
+} {
+  const capabilities = resolveProviderCapabilities({ model, provider });
+  return {
+    reasoning: capabilities.supportsReasoningContent,
+    toolCallProviderMetadataReplay: capabilities.toolCallProviderMetadataReplay,
+  };
 }
 
-function isUnreplayableToolCallAssistant(message: StoredMessage): boolean {
+function isUnreplayableToolCallAssistant(
+  message: StoredMessage,
+  requirements: {
+    reasoning: boolean;
+    toolCallProviderMetadataReplay: ToolCallProviderMetadataReplayPolicy;
+  },
+): boolean {
   return message.role === "assistant" &&
     Array.isArray(message.tool_calls) &&
     message.tool_calls.length > 0 &&
-    message.reasoningContent === undefined;
+    ((requirements.reasoning && message.reasoningContent === undefined) ||
+      message.tool_calls.some((toolCall) =>
+        !hasRequiredToolCallProviderMetadata(toolCall, requirements.toolCallProviderMetadataReplay)));
 }
 
 function summarizeUnreplayableToolBatch(

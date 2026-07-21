@@ -85,9 +85,9 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 
 未知 provider、不支持的 provider/model 组合、缺失必填项和非法值必须在配置 schema 显式失败。运行时不能静默猜测 model 或 provider。
 
-默认 provider profile 是 Agnes AI，另有 DeepSeek official 与 Zhipu AI 具名 profile。语言模型预设提供 Agnes AI 的 `agnes-2.0-flash`、`agnes-2.5-flash`，以及智谱 AI 的 `glm-4.7-flash`、`glm-4.6`、`glm-4.7`、`glm-5`、`glm-5-turbo`、`glm-5.1`、`glm-5.2`；其中 `glm-4.7-flash` 是免费模型。智谱模型使用标准 BigModel API 端点，支持工具调用、自动上下文缓存与 preserved thinking；`glm-5.2` 额外使用 reasoning effort。`openai-compatible` 是用户后续接入兼容 Chat Completions 免费模型的通用协议入口，不携带厂商模型 preset 或厂商 wire 特判。Kitty 不维护本地模型部署或本地模型 preset。
+默认 provider profile 是 Agnes AI，另有 Google Gemini、DeepSeek official 与 Zhipu AI 具名 profile。语言模型预设提供 Agnes AI 的 `agnes-2.0-flash`、`agnes-2.5-flash`，Google 的 `gemini-3.5-flash`，以及智谱 AI 的 `glm-4.7-flash`、`glm-4.6`、`glm-4.7`、`glm-5`、`glm-5-turbo`、`glm-5.1`、`glm-5.2`；其中部分 Provider/model 入口有免费层，具体由 Provider 账户和项目配额决定。Google 使用官方 OpenAI-compatible Chat Completions 端点，模型拥有 1,048,576 token 上下文、65,536 token 输出、工具调用、流式 usage、自动缓存和始终开启的 thinking；Kitty 将 `minimal/low/medium/high` reasoning effort 映射到官方参数，保存并回放工具调用里的 Google thought signature，并在发送前把工具 JSON Schema 收敛为 Gemini 接受的形状。智谱模型使用标准 BigModel API 端点，支持工具调用、自动上下文缓存与 preserved thinking；`glm-5.2` 额外使用 reasoning effort。`openai-compatible` 是用户后续接入兼容 Chat Completions 模型的通用协议入口，不携带厂商模型 preset 或厂商 wire 特判。Kitty 不维护本地模型部署或本地模型 preset。
 
-项目 env 模板使用中文短注释说明 Provider 参数。Agnes 与 Zhipu GLM-4.7 Flash 使用 `KITTY_THINKING=enabled|disabled`，不发送 `KITTY_REASONING_EFFORT`；DeepSeek 使用相同思考开关，并将推理强度收敛为 `high` 或 `max`。
+项目 env 模板使用中文短注释说明 Provider 参数。Agnes 与 Zhipu GLM-4.7 Flash 使用 `KITTY_THINKING=enabled|disabled`，不发送 `KITTY_REASONING_EFFORT`；DeepSeek 使用相同思考开关，并将推理强度收敛为 `high` 或 `max`。Gemini 3.5 thinking 不能关闭；`KITTY_THINKING=disabled` 只把推理强度降到官方最低 `minimal`，`xhigh/max` 收敛为 `high`。
 
 图片/视频配置独立于语言模型配置。当前媒体 Provider 是 Agnes AI：图片模型 `agnes-image-2.1-flash`，视频模型 `agnes-video-v2.0`。媒体密钥优先使用 `KITTY_MEDIA_API_KEY`，为空时运行时回退到 `KITTY_API_KEY`，但 Web 保存和展示仍按独立媒体字段处理。
 
@@ -180,11 +180,11 @@ Context budget 记录当前有效 limit、estimate、remaining、compression mod
 - `src/provider/chatRequestDialect.ts`：Chat Completions provider/model 请求方言投影。
 - `src/provider/chatCompletionsAdapter.ts`：统一 Chat Completions wire adapter。
 
-Provider 与 model 是独立事实。Provider 决定默认 endpoint 和 probe 行为；model 决定限制、工具、usage、cache、reasoning replay 和 Chat Completions 请求方言。当前语言请求统一使用 Bearer 与 Chat Completions；通用 `openai-compatible` 使用标准方言和用户显式填写的 model/base URL，Agnes、DeepSeek 与 Zhipu 的 wire 差异由 catalog model profile 投影，request body 不按 provider 名称散落判断。Zhipu 标准 API 的 Agent 请求使用 `thinking.type` 并设置 `clear_thinking: false`，工具调用后的 assistant 消息必须原样回放 `reasoning_content`。
+Provider 与 model 是独立事实。Provider 决定默认 endpoint 和 probe 行为；model 决定限制、工具、usage、cache、reasoning replay、工具调用 metadata replay 和 Chat Completions 请求方言。当前语言请求统一使用 Bearer 与 Chat Completions；通用 `openai-compatible` 使用标准方言和用户显式填写的 model/base URL，Agnes、Google、DeepSeek 与 Zhipu 的 wire 差异由 catalog model profile 投影，request body 不按 provider 名称散落判断。Google 工具调用必须把响应中的 `extra_content.google.thought_signature` 作为 provider metadata 持久化并在后续 assistant tool-call message 原样回放；Zhipu 标准 API 的 Agent 请求使用 `thinking.type` 并设置 `clear_thinking: false`，工具调用后的 assistant 消息必须原样回放 `reasoning_content`。
 
 Chat Completions 的 HTTP abort signal 必须作为 SDK request options 传递，不能进入 JSON body。只有明确的无状态 stream framing 故障可以降级为一次非流式请求；认证、参数校验、限流和 HTTP provider error 不得被非流式 fallback 重放。
 
-语言模型请求对 429、临时网络故障和 5xx 使用同一个最多四次、总等待不超过 90 秒的逻辑请求预算；等待可被用户中断并通过 host status 暴露。服务端 `Retry-After` / `retry-after-ms` 是等待事实，不能被本地退避上限缩短；超过总等待预算时直接停止自动重试。Zhipu 错误方言只重试 1302、1303、1305、1312；每日/周期额度、套餐、模型权限与公平使用限制 1304、1308、1309、1310、1311、1313 不自动重试。智谱并发权益按账号、模型和时段动态变化，Kitty 不硬编码虚假的 RPM 或并发数。
+语言模型请求对 429、临时网络故障和 5xx 使用同一个最多四次、总等待不超过 90 秒的逻辑请求预算；等待可被用户中断并通过 host status 暴露。服务端 `Retry-After` / `retry-after-ms` 是等待事实，不能被本地退避上限缩短；Google `google.rpc.RetryInfo.retryDelay` 进入同一等待事实，结构化 `QuotaFailure.quotaId` 区分可恢复的分钟额度与不应盲重试的日额度；超过总等待预算时直接停止自动重试。Zhipu 错误方言只重试 1302、1303、1305、1312；每日/周期额度、套餐、模型权限与公平使用限制 1304、1308、1309、1310、1311、1313 不自动重试。Provider 免费额度和并发权益按项目、账号、模型和时段动态变化，Kitty 不在 env 或源码硬编码虚假的 RPM、TPM、RPD 或并发数。
 
 Provider request 边界把 adapter、transport 和 SDK 失败归一为 `ProviderError`。错误 kind 驱动 retry、stream fallback 和 alternate base URL；CLI 只展示结构化错误事实。没有可用工具时，Chat Completions request 必须省略 `tools` 字段，不能发送空工具数组。Provider 层不增加任务策略。
 
@@ -200,11 +200,13 @@ Provider request 边界把 adapter、transport 和 SDK 失败归一为 `Provider
 - `bash`
 - `send_file`
 
-工具执行真实操作，返回有界证据，记录 changed path，并在需要时保留可恢复的原始输出。每次 tool call 无论成功或失败都必须持久为下一次模型请求可见的非空 tool result；成功但没有文本输出时，机器明确记录该事实。Tool output projection 限制上下文成本，但不伪造语义结论。
+工具执行真实操作，返回有界证据，记录 changed path，并在需要时保留可恢复的原始输出。每次 tool call 无论成功或失败都必须持久为下一次模型请求可见的非空 tool result；成功但 stdout/stderr 或正文为空时，机器明确说明执行成功且没有缺失结果。Tool output projection 保留工具已经返回的事实，不用摘要、计数或固定短预览提前替代真实结果；整体上下文成本由 context owner 处理。
 
 每个 tool result 同时保存当前唯一的 typed evidence：call id、tool、status、summary、provenance、facts、error、artifact、truncation、model view 和 compact view。Tool intent 以 `(turn_id, call_id)` 写入 `tool_calls`，状态为 `planned -> running -> success/error/interrupted/uncertain`。每个工具紧邻真实调用前校验 turn token、generation、lease 与 abort，再从 planned 激活；恢复时未激活 intent 进入 interrupted，已激活但无法确认的副作用进入 uncertain，副作用工具不自动重放。工具实现拥有原始结果；evidence builder 拥有模型证据合同；session 保存 canonical evidence；context 只选择 full 或 compact view；宿主展示继续读取 display/raw result。
 
-模型证据遵循最小充分原则：必须足以判断本次操作是否成功、作用于哪里、产生了什么关键事实、失败根因是什么、下一步如何恢复。工作区内目标使用相对路径；工作区外目标保留绝对路径。read 返回实际行区间和 continuation；edit/write 返回目标和变更范围；bash 返回 cwd、exit code、duration、头尾输出和 artifact recovery。大输出保留头尾，明确省略规模，并提供可执行的 `read` 恢复参数。
+模型证据遵循充分事实原则：必须足以判断本次操作是否成功、作用于哪里、实际返回了什么、失败根因是什么、下一步如何恢复。工作区内目标使用相对路径；工作区外目标保留绝对路径。`read` 完整返回其已经受 offset、limit 与 `KITTY_MAX_READ_BYTES` 约束的当前窗口；`edit` / `write` 保留全部相关 diff hunk；skill、document 与 extension 工具保留各自工具边界已经约束的结果。`bash` 在 48,000 字符以内完整回放；超过后保存全文，只把等量头尾、明确省略规模和可执行的 `read` 恢复参数送入当前模型请求。工具投影不得在这些 owner 边界之后再次静默裁剪。
+
+Context 压缩与工具结果边界分离。新产生的当前工具结果先按上述合同完整进入下一次模型请求；只有整个请求真实超过 provider budget 时，context 才能压缩较旧历史，并继续保护当前用户输入、当前工具批次的调用/结果配对和最新事实。当前用户输入与最新完整工具批次本身无法容纳时必须在本地明确失败，不能丢弃批次后伪装成压缩成功。不能为了预防超长对话，把每次正常工具结果预先压成短摘要。
 
 `bash` 只有正常零退出才返回成功。非零退出、超时、停滞和中断都是失败 tool result；payload、evidence、callbacks、session blocker、observability 和模型视图必须使用同一状态。
 
@@ -414,6 +416,8 @@ npm.cmd run eval:production
 Production tool acceptance 是真实修复任务，不是固定字符串工具演示。隔离工作区先处于失败状态；真实模型必须检查文件、运行失败验证、从长输出尾部读取根因、修改目标、重新验证通过，并在最终回答中引用成功 sentinel。缺少失败证据、真实变更、复验通过或最终消费中的任一项都判失败。
 
 Production background acceptance 使用真实 provider 和真实渐进输出子进程。真实模型必须在一个 turn 中调用 `background_run`、至少两次 `background_wait`，分别消费 running progress 与 settled sentinel，并在最终回答引用终态 sentinel；SQLite 必须留下一个 completed turn、terminal tool calls、正确 ownership 的 completed background execution 和唯一 wake signal。
+
+Production context pressure acceptance 使用当前真实 provider 在隔离 session 中连续执行有界长对话，直到真实触发压缩；验收 completed turns、最新事实回复、持久 context epoch 和非 `none` compression mode。随后以超大项目指令打满不可压缩静态上下文，要求真实 Host 路径在 provider completion 前明确失败、turn 持久为 failed 且不产生伪造 assistant 回复。该检查固定轮数、输入规模、输出上限与隔离工作区，不用无界 Token 消耗冒充压力。
 
 该真实任务还必须在当前 SQLite 控制平面留下 completed turn、terminal tool calls、带明确 session/turn/tool-call ownership 的 foreground executions 与对应 wake signals。真实 provider 任务证明生产主链路；hard kill、lease 过期、stale generation、PID identity 和进程树终止由确定性 recovery 测试证明，不能用一个平台的结果冒充另一个平台实机验收。
 

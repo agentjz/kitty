@@ -1,9 +1,6 @@
 import type { ProjectionResult } from "./projection.js";
 import type { ToolOutputKind, ToolOutputSource } from "./types.js";
-import { buildDiagnosticProjection } from "./projectors/diagnostic.js";
-import { buildGitDiffProjection } from "./projectors/gitDiff.js";
-import { projectEmptyOutput, projectGenericOutput, projectStructuredOutput } from "./projectors/generic.js";
-import { buildSearchProjection } from "./projectors/search.js";
+import { projectEmptyOutput, projectGenericOutput } from "./projectors/generic.js";
 export { appendRecoveryHint } from "./projectors/recovery.js";
 
 export function projectOutputByKind(kind: ToolOutputKind, source: ToolOutputSource): ProjectionResult {
@@ -11,15 +8,15 @@ export function projectOutputByKind(kind: ToolOutputKind, source: ToolOutputSour
     case "empty":
       return projectEmptyOutput(source);
     case "test":
-      return projectStructuredOutput(source, buildDiagnosticProjection(source, "test"));
+      return projectGenericOutput(source, "verbatim_test_output", "test", "structured");
     case "build":
-      return projectStructuredOutput(source, buildDiagnosticProjection(source, "build"));
+      return projectGenericOutput(source, "verbatim_build_output", "build", "structured");
     case "typecheck":
-      return projectStructuredOutput(source, buildDiagnosticProjection(source, "typecheck"));
+      return projectGenericOutput(source, "verbatim_typecheck_output", "typecheck", "structured");
     case "search":
-      return projectStructuredOutput(source, buildSearchProjection(source));
+      return projectGenericOutput(source, "verbatim_search_output", "search", "structured");
     case "git_diff":
-      return projectStructuredOutput(source, buildGitDiffProjection(source));
+      return projectGenericOutput(source, "verbatim_git_diff_output", "git diff", "structured");
     case "generic":
       return projectGenericOutput(source);
   }

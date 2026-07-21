@@ -7,6 +7,7 @@ import {
   isRetryableApiError,
   withApiRetries,
 } from "../../src/provider/apiRetry.js";
+import { normalizeProviderError } from "../../src/provider/errors.js";
 
 test("provider retry policy recognizes transient provider failures", () => {
   assert.equal(isRetryableApiError({ status: 429 }), true);
@@ -24,6 +25,16 @@ test("provider retry delay honors retry-after before bounded backoff", () => {
   assert.equal(computeApiRetryDelayMs({ headers: { "retry-after": "120" } }, 1), 120_000);
   assert.equal(computeApiRetryDelayMs(new Error("timeout"), 1), 1_137);
   assert.equal(computeApiRetryDelayMs(new Error("timeout"), 20), 30_000);
+  const googleRetry = normalizeProviderError({
+    status: 429,
+    error: {
+      details: [{
+        "@type": "type.googleapis.com/google.rpc.RetryInfo",
+        retryDelay: { seconds: 4, nanos: 250_000_000 },
+      }],
+    },
+  }, "google");
+  assert.equal(computeApiRetryDelayMs(googleRetry, 1), 4_250);
 });
 
 test("provider retry never shortens a server delay beyond the total wait budget", async () => {

@@ -33,12 +33,20 @@ test("local console binds loopback, authenticates API, and rejects foreign write
     version: packageJson.version,
   });
   assert.equal((bootstrap.body.configuration as { file: string }).file, ".kitty/.env");
-  const providers = bootstrap.body.providers as Array<{ id: string; label: string; model: string }>;
+  const providers = bootstrap.body.providers as Array<{
+    id: string;
+    label: string;
+    model: string;
+    officialLinks?: { websiteUrl: string; apiKeyUrl: string };
+  }>;
   assert.deepEqual(
-    providers.filter(({ id }) => id.startsWith("agnes-") || id.startsWith("glm-")).map(({ id }) => id),
+    providers
+      .filter(({ id }) => id.startsWith("agnes-") || id.startsWith("gemini-") || id.startsWith("glm-"))
+      .map(({ id }) => id),
     [
       "agnes-2.0-flash",
       "agnes-2.5-flash",
+      "gemini-3.5-flash",
       "glm-4.7-flash",
       "glm-4.6",
       "glm-4.7",
@@ -49,6 +57,10 @@ test("local console binds loopback, authenticates API, and rejects foreign write
     ],
   );
   assert.equal(providers.every(({ label }) => label.includes("｜") || label.startsWith("DeepSeek")), true);
+  assert.deepEqual(providers.find(({ id }) => id === "gemini-3.5-flash")?.officialLinks, {
+    websiteUrl: "https://ai.google.dev/gemini-api",
+    apiKeyUrl: "https://aistudio.google.com/api-keys",
+  });
   const webPage = await fetch(handle.webUrl);
   assert.equal(webPage.status, 200);
   const webSource = await webPage.text();

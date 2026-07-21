@@ -2,14 +2,17 @@ import type { ModelReasoningEffort, ModelThinkingMode } from "../types.js";
 
 export type ProviderWireApi = "chat.completions";
 export type ProviderApiKind = "openai-compatible" | "deepseek-openai-compatible";
-export type ProviderErrorPolicy = "generic" | "zhipu";
+export type ProviderErrorPolicy = "generic" | "google" | "zhipu";
 export type ReasoningContentReplayPolicy = "never" | "tool-call-required";
+export type ToolCallProviderMetadataReplayPolicy = "never" | "google-thought-signature-required";
 export type ModelCacheMode = "provider-automatic" | "none";
 export type ChatReasoningRequestMode =
   | "none"
   | "deepseek-thinking"
   | "agnes-thinking"
+  | "gemini-thinking"
   | "zhipu-thinking";
+export type ChatToolSchemaDialect = "standard" | "gemini";
 
 export interface ProviderInfo {
   id: string;
@@ -30,6 +33,7 @@ export interface ModelInfo {
     tools: boolean;
     reasoning: boolean;
     reasoningContentReplay: ReasoningContentReplayPolicy;
+    toolCallProviderMetadataReplay: ToolCallProviderMetadataReplayPolicy;
     streaming: boolean;
     usage: boolean;
     cache: ModelCacheMode;
@@ -42,6 +46,7 @@ export interface ModelInfo {
       reasoning: ChatReasoningRequestMode;
       toolChoice: "auto" | "omit";
       streamUsage: "include_usage" | "omit";
+      toolSchema: ChatToolSchemaDialect;
     };
   };
   limit: {
@@ -95,6 +100,15 @@ export const PROVIDER_CATALOG: readonly ProviderInfo[] = [
     doctorProbeTimeoutMs: DEFAULT_DOCTOR_PROBE_TIMEOUT_MS,
   },
   {
+    id: "google",
+    label: "Google Gemini",
+    apiKind: "openai-compatible",
+    errorPolicy: "google",
+    defaultBaseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+    requestTimeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
+    doctorProbeTimeoutMs: DEFAULT_DOCTOR_PROBE_TIMEOUT_MS,
+  },
+  {
     id: "openai-compatible",
     label: "OpenAI-compatible",
     apiKind: "openai-compatible",
@@ -111,6 +125,7 @@ const DEEPSEEK_MODEL_BASE = {
     tools: true,
     reasoning: true,
     reasoningContentReplay: "tool-call-required" as const,
+    toolCallProviderMetadataReplay: "never" as const,
     streaming: true,
     usage: true,
     cache: "provider-automatic" as const,
@@ -123,6 +138,7 @@ const DEEPSEEK_MODEL_BASE = {
       reasoning: "deepseek-thinking" as const,
       toolChoice: "omit" as const,
       streamUsage: "include_usage" as const,
+      toolSchema: "standard" as const,
     },
   },
   limit: {
@@ -137,6 +153,7 @@ const OPENAI_COMPATIBLE_CHAT_MODEL_BASE = {
     tools: true,
     reasoning: false,
     reasoningContentReplay: "never" as const,
+    toolCallProviderMetadataReplay: "never" as const,
     streaming: true,
     usage: true,
     cache: "none" as const,
@@ -148,6 +165,7 @@ const OPENAI_COMPATIBLE_CHAT_MODEL_BASE = {
       reasoning: "none" as const,
       toolChoice: "auto" as const,
       streamUsage: "include_usage" as const,
+      toolSchema: "standard" as const,
     },
   },
   limit: {
@@ -169,6 +187,7 @@ const AGNES_MODEL_BASE = {
       reasoning: "agnes-thinking" as const,
       toolChoice: "auto" as const,
       streamUsage: "include_usage" as const,
+      toolSchema: "standard" as const,
     },
   },
   limit: {
@@ -192,11 +211,37 @@ const ZHIPU_MODEL_BASE = {
       reasoning: "zhipu-thinking" as const,
       toolChoice: "auto" as const,
       streamUsage: "include_usage" as const,
+      toolSchema: "standard" as const,
     },
   },
   limit: {
     context: 200_000,
     output: 131_072,
+  },
+};
+
+const GEMINI_MODEL_BASE = {
+  ...OPENAI_COMPATIBLE_CHAT_MODEL_BASE,
+  capabilities: {
+    ...OPENAI_COMPATIBLE_CHAT_MODEL_BASE.capabilities,
+    reasoning: true,
+    toolCallProviderMetadataReplay: "google-thought-signature-required" as const,
+    cache: "provider-automatic" as const,
+  },
+  request: {
+    thinkingDefault: "enabled" as const,
+    reasoningEffortDefault: "medium" as const,
+    maxOutputTokensParam: "max_tokens" as const,
+    chat: {
+      reasoning: "gemini-thinking" as const,
+      toolChoice: "auto" as const,
+      streamUsage: "include_usage" as const,
+      toolSchema: "gemini" as const,
+    },
+  },
+  limit: {
+    context: 1_048_576,
+    output: 65_536,
   },
 };
 
@@ -246,6 +291,12 @@ export const MODEL_CATALOG: readonly ModelInfo[] = [
     providerId: "agnes",
     label: "Agnes 2.5 Flash",
     ...AGNES_MODEL_BASE,
+  },
+  {
+    id: "gemini-3.5-flash",
+    providerId: "google",
+    label: "Gemini 3.5 Flash",
+    ...GEMINI_MODEL_BASE,
   },
   createZhipuModel({ id: "glm-4.7-flash", label: "GLM-4.7 Flash", context: 200_000 }),
   createZhipuModel({ id: "glm-4.6", label: "GLM-4.6", context: 200_000 }),

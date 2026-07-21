@@ -65,7 +65,7 @@ export function buildToolResultEnvelope(input: {
     truncation: {
       truncated,
       strategy: truncated
-        ? governance?.mode === "structured" ? "structured" : "artifact"
+        ? governance?.truncated ? "head_tail" : "artifact"
         : "none",
       originalChars,
       projectedChars,

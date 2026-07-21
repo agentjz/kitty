@@ -4,6 +4,7 @@ import test from "node:test";
 import { getAppPaths } from "../../src/config/paths.js";
 import { SessionRevisionConflictError } from "../../src/control/sessions.js";
 import { createMessage } from "../../src/session/messages.js";
+import { parseSessionSnapshot, serializeSessionSnapshot } from "../../src/session/snapshot.js";
 import { SessionStore } from "../../src/session/store.js";
 import { createTempWorkspace } from "../helpers.js";
 
@@ -59,6 +60,32 @@ test("session store preserves context cache layout facts", async (t) => {
     volatileTailChars: 2_000,
     stableSources: ["staticPrompt", "profilePersona"],
     volatileSources: ["runtimeFacts", "nearFieldConversation"],
+  });
+});
+
+test("session snapshots preserve provider tool-call metadata", async (t) => {
+  const root = await createTempWorkspace("session-provider-metadata", t);
+  const store = new SessionStore(getAppPaths(root).sessionsDir);
+  const session = await store.create(root);
+  const message = createMessage("assistant", null, {
+    toolCalls: [{
+      id: "call-google",
+      type: "function",
+      providerMetadata: {
+        google: { thought_signature: "durable-signature" },
+      },
+      function: { name: "read", arguments: "{\"path\":\"README.md\"}" },
+    }],
+  });
+
+  const loaded = parseSessionSnapshot(serializeSessionSnapshot({
+    ...session,
+    messages: [message],
+    messageCount: 1,
+  }), "session.json");
+
+  assert.deepEqual(loaded.messages[0]?.tool_calls?.[0]?.providerMetadata, {
+    google: { thought_signature: "durable-signature" },
   });
 });
 

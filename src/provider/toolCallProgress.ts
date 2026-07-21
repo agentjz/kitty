@@ -5,6 +5,7 @@ export interface StreamingToolCallState {
   name: string;
   arguments: string;
   argumentBytesReceived: number;
+  providerMetadata?: Record<string, unknown>;
 }
 
 export function appendToolCallArguments(state: StreamingToolCallState, delta: string): void {

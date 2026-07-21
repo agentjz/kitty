@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import path from "node:path";
 import test from "node:test";
 
+import { createBashOutputCapture, DEFAULT_BASH_OUTPUT_PREVIEW_CHARS } from "../../src/tools/outputCapture.js";
 import { governToolOutput } from "../../src/tools/outputGovernance/index.js";
+import { createTempWorkspace } from "../helpers.js";
 
-test("tool output governance projects test failures into compact evidence", () => {
+test("tool output governance preserves bounded test output verbatim", () => {
   const raw = [
     "npm test",
     "PASS tests/a.test.ts",
@@ -22,23 +26,19 @@ test("tool output governance projects test failures into compact evidence", () =
     exitCode: 1,
     durationMs: 321,
     output: raw,
-    outputPath: ".kitty/observability/command-output/session/output.txt",
-    truncated: true,
   });
 
   assert.equal(governance.kind, "test");
   assert.equal(governance.mode, "structured");
-  assert.equal(governance.truncated, true);
+  assert.equal(governance.truncated, false);
   assert.match(governance.projection, /bash: test/);
   assert.match(governance.projection, /FAIL tests\/b\.test\.ts/);
   assert.match(governance.projection, /Tests: 1 failed/);
-  assert.match(governance.projection, /\[full output:/);
-  assert.ok(governance.projectedChars < governance.rawChars);
-  assert.ok(governance.savedTokens > 0);
-  assert.ok(governance.savingsRatio > 0);
+  assert.match(governance.projection, new RegExp(`x{${8_000}}`));
+  assert.doesNotMatch(governance.projection, /truncated|full output/u);
 });
 
-test("tool output governance projects search output with match counts", () => {
+test("tool output governance preserves every bounded search match", () => {
   const raw = Array.from({ length: 40 }, (_, index) => `src/file${index}.ts:${index + 1}:needle match`).join("\n");
 
   const governance = governToolOutput({
@@ -50,13 +50,12 @@ test("tool output governance projects search output with match counts", () => {
   });
 
   assert.equal(governance.kind, "search");
-  assert.match(governance.projection, /matches shown: 24, omitted: 16/);
   assert.match(governance.projection, /src\/file0\.ts/);
+  assert.match(governance.projection, /src\/file20\.ts/);
   assert.match(governance.projection, /src\/file39\.ts/);
-  assert.doesNotMatch(governance.projection, /src\/file20\.ts/);
 });
 
-test("tool output governance projects git diff files and hunks", () => {
+test("tool output governance preserves bounded git diff content", () => {
   const raw = [
     "diff --git a/src/a.ts b/src/a.ts",
     "--- a/src/a.ts",
@@ -77,12 +76,20 @@ test("tool output governance projects git diff files and hunks", () => {
   });
 
   assert.equal(governance.kind, "git_diff");
-  assert.match(governance.projection, /files: src\/a\.ts -> src\/a\.ts, src\/b\.ts -> src\/b\.ts/);
+  assert.match(governance.projection, /diff --git a\/src\/a\.ts b\/src\/a\.ts/);
   assert.match(governance.projection, /@@ -1 \+1 @@/);
+  assert.match(governance.projection, /-old\n\+new/);
 });
 
-test("tool output governance keeps huge generic output model-facing projection bounded", () => {
+test("bash output capture preserves head and tail and stores oversized full output", async (t) => {
+  const root = await createTempWorkspace("tool-output-head-tail", t);
   const raw = Array.from({ length: 120_000 }, (_, index) => `line ${index}: ${"x".repeat(60)}`).join("\n");
+  const capture = await createBashOutputCapture({
+    stateRootDir: root,
+    sessionId: "session-output",
+  });
+  capture.append(raw);
+  const bounded = await capture.finalize();
 
   const governance = governToolOutput({
     toolName: "bash",
@@ -90,22 +97,25 @@ test("tool output governance keeps huge generic output model-facing projection b
     status: "completed",
     exitCode: 0,
     durationMs: 1000,
-    output: raw,
-    outputPath: ".kitty/observability/command-output/session/huge.txt",
-    truncated: true,
+    output: bounded.outputPreview,
+    outputPath: bounded.outputPath,
+    outputChars: bounded.outputChars,
+    outputBytes: bounded.outputBytes,
+    truncated: bounded.truncated,
   });
 
   assert.equal(governance.kind, "generic");
   assert.equal(governance.truncated, true);
-  assert.equal(governance.outputPath, ".kitty/observability/command-output/session/huge.txt");
-  assert.match(governance.projection, /\[full output:/);
+  assert.equal(governance.outputPath, bounded.outputPath);
+  assert.match(governance.projection, /tool output truncated/);
   assert.ok(governance.rawChars > 8_000_000);
-  assert.ok(governance.projectedChars < 4_000);
-  assert.ok(governance.savedTokens > 1_000_000);
-  assert.ok(governance.savingsRatio > 0.99);
+  assert.ok(governance.projectedChars < DEFAULT_BASH_OUTPUT_PREVIEW_CHARS + 1_000);
+  assert.match(governance.projection, /line 0:/);
   assert.match(governance.projection, /line 119999/);
-  assert.match(governance.projection, /characters omitted/);
-  assert.match(governance.projection, /inspect with read/);
+  assert.match(governance.projection, /head and tail preserved/);
+  assert.ok(bounded.outputPath);
+  const saved = await fs.readFile(path.join(root, bounded.outputPath!), "utf8");
+  assert.equal(saved, raw);
 });
 
 test("tool output governance preserves a failure root cause that appears only at the tail", () => {
@@ -120,11 +130,22 @@ test("tool output governance preserves a failure root cause that appears only at
     status: "failed",
     exitCode: 1,
     output: raw,
-    outputPath: ".kitty/observability/command-output/session/migrate.txt",
-    truncated: true,
   });
 
   assert.match(governance.projection, /ROOT_CAUSE_SENTINEL/);
   assert.match(governance.projection, /exit=1/);
-  assert.match(governance.projection, /inspect with read/);
+});
+
+test("empty successful command output is an explicit complete fact", () => {
+  const governance = governToolOutput({
+    toolName: "bash",
+    command: "git diff --quiet",
+    status: "completed",
+    exitCode: 0,
+    output: "",
+  });
+
+  assert.equal(governance.kind, "empty");
+  assert.match(governance.projection, /completed successfully/);
+  assert.match(governance.projection, /stdout and stderr were empty; no result content is missing/);
 });

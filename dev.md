@@ -103,6 +103,7 @@ Presenter 不能重新计算事实。UI 不能保存第二套生命周期。测�
 - 错误分类：retry、fallback、CLI 展示共用错误 kind，不散落 message 猜测。
 - 配置 contract：init template、env example、doctor/preflight 读取同一个配置事实。
 - 工具输出治理：raw 保存、projection、model view 只走一条链。
+- 工具结果先保护事实完整性：工具 owner 先约束单次输出，投影不得再做固定短摘要；只有 context owner 能在整体请求真实超限时压缩旧历史。
 
 禁止统一：
 
@@ -151,7 +152,27 @@ Presenter 不能重新计算事实。UI 不能保存第二套生命周期。测�
 - 清理是否幂等，失败是否保留可行动证据。
 - 用户连续重复操作时，状态机是否仍只有一条合法路径。
 
-## 9. 发布规则
+## 9. 超长对话、上下文压力与真实验收
+
+长任务连续性是发布门槛，不以短对话绿灯代替。
+
+- 修改 provider、context、session、host turn、tool replay、cache 或压缩逻辑时，必须检查超长对话、持续压力、接近上限、触发压缩、不可压缩超限和恢复后的继续执行。
+- 确定性测试负责边界算法：预算计算、tail 保护、summary、context epoch、tool batch 完整性、不可压缩请求的本地失败和 provider 请求未发生。
+- `eval:production` 负责真实主链路：使用当前真实 Provider 连续完成多轮对话，直到实际触发上下文压缩；必须留下 completed turns、durable session、context epoch 和可审阅 budget。
+- 压缩后必须继续完成真实模型请求，并保留当前用户输入、最新事实和完整工具调用边界；不能只证明 `compressed=true`。
+- 上下文打爆测试使用真实 Host、真实配置、真实 session/control plane 和真实 Provider adapter。对于机器已经能判定不可容纳的请求，正确结果是在发送 completion 前明确失败；禁止为了“真调用”向 Provider 盲发已知超限内容。
+- 压力测试必须有界：固定最大轮数、输入规模、输出上限、总等待和隔离工作区。高 Token 消耗、长时间空转或无限循环不是强度证据。
+- 结果只按行为判定：完成轮数、压缩模式、epoch、session/turn 终态、最终事实连续性、明确 overflow 错误和无伪造 assistant 回复；不固定模型措辞。
+
+生产验收命令：
+
+```powershell
+npm.cmd run eval:production
+```
+
+它必须包含真实 Provider 探测、普通多轮、超长对话与上下文压力、后台等待、修复任务和 runtime status；任一项失败都不能用普通单测绿灯覆盖。
+
+## 10. 发布规则
 
 源码开发入口使用与发布包相同的构建合同：
 
@@ -184,7 +205,7 @@ npm.cmd run eval:production
 
 `eval:production` 使用真实 provider，不进入普通 verify。
 
-## 10. 收口规则
+## 11. 收口规则
 
 每次大改收口只写事实：
 

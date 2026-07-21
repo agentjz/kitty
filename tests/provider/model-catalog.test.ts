@@ -41,6 +41,23 @@ test("Agnes 2.5 Flash shares the current Agnes language-model contract", () => {
   assert.equal(profile.model.limit.output, 65_500);
 });
 
+test("Google Gemini owns its official Chat Completions and tool replay contract", () => {
+  const profile = resolveModelProfile({
+    provider: "google",
+    model: "gemini-3.5-flash",
+  });
+
+  assert.equal(profile.provider.defaultBaseUrl, "https://generativelanguage.googleapis.com/v1beta/openai");
+  assert.equal(profile.provider.apiKind, "openai-compatible");
+  assert.equal(profile.model.request.chat?.reasoning, "gemini-thinking");
+  assert.equal(profile.model.request.chat?.toolSchema, "gemini");
+  assert.equal(profile.model.request.reasoningEffortDefault, "medium");
+  assert.equal(profile.model.capabilities.toolCallProviderMetadataReplay, "google-thought-signature-required");
+  assert.equal(profile.model.capabilities.cache, "provider-automatic");
+  assert.equal(profile.model.limit.context, 1_048_576);
+  assert.equal(profile.model.limit.output, 65_536);
+});
+
 test("Zhipu GLM-4.7 Flash owns its preserved-thinking and free-model limits", () => {
   const profile = resolveModelProfile({
     provider: "zhipu",

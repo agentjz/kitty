@@ -17,7 +17,7 @@ export interface BashOutputCaptureAppender {
   finalize(): Promise<BashOutputCapture>;
 }
 
-const DEFAULT_BASH_OUTPUT_PREVIEW_CHARS = 12_000;
+export const DEFAULT_BASH_OUTPUT_PREVIEW_CHARS = 48_000;
 
 export async function createBashOutputCapture(input: {
   stateRootDir?: string;
@@ -37,8 +37,9 @@ export async function createBashOutputCapture(input: {
       ? path.relative(input.stateRootDir, absoluteOutputPath) || undefined
       : undefined;
 
-  let preview = "";
   let bufferedOutput = "";
+  let previewHead = "";
+  let previewTail = "";
   let totalChars = 0;
   let totalBytes = 0;
   let truncated = false;
@@ -56,24 +57,31 @@ export async function createBashOutputCapture(input: {
       const combined = bufferedOutput + chunk;
       if (combined.length <= maxPreviewChars) {
         bufferedOutput = combined;
-        preview = combined;
         return;
       }
 
       truncated = true;
-      preview = combined.slice(0, maxPreviewChars);
+      const headLimit = Math.ceil(maxPreviewChars / 2);
+      const tailLimit = Math.max(1, maxPreviewChars - headLimit);
+      previewHead = combined.slice(0, headLimit);
+      previewTail = combined.slice(-tailLimit);
       queueWrite(combined);
       bufferedOutput = "";
       return;
     }
 
+    const tailLimit = Math.max(1, maxPreviewChars - Math.ceil(maxPreviewChars / 2));
+    previewTail = (previewTail + chunk).slice(-tailLimit);
     queueWrite(chunk);
   }
 
   async function finalize(): Promise<BashOutputCapture> {
     await pendingWrite;
+    const omittedChars = Math.max(0, totalChars - previewHead.length - previewTail.length);
     return {
-      outputPreview: truncated ? `${preview}\n\n... [truncated ${totalChars - maxPreviewChars} chars]` : preview,
+      outputPreview: truncated
+        ? `${previewHead}\n\n... [truncated ${omittedChars} chars; head and tail preserved] ...\n\n${previewTail}`
+        : bufferedOutput,
       outputPath: truncated ? outputPath : undefined,
       truncated,
       outputChars: totalChars,

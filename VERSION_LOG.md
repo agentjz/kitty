@@ -1,5 +1,27 @@
 # 版本记录
 
+## 2026-07-21 - Provider、工具事实与上下文重放重建
+
+状态：发布版本。
+
+包版本：`@jun133/kitty@4.0.9`。
+
+验证结果：
+
+- `npm.cmd run verify`：432 项，431 通过、0 失败、1 项平台跳过。
+- `npm.cmd run eval:local`：全部通过。
+- `npm.cmd run eval:production`：使用智谱 GLM-4.7 Flash 全部通过。
+- 真实生产验收覆盖两轮对话、上下文压缩与 epoch、不可压缩请求本地失败、后台等待和工具修复任务。
+
+这个版本重要的原因：
+
+- 工具结果先保留事实；工具 owner 约束单次输出，context owner 只在整体请求真实超限时压缩旧历史。
+- bash 在 48,000 字符内完整回放，超限保存全文并保留等量头尾、明确省略规模与恢复路径。
+- 当前用户输入和最新完整工具批次不能被 hard compression 丢弃；无法共同容纳时明确本地失败。
+- Google Gemini 进入具名 Provider，保存并回放 thought signature，收敛工具 schema，并按结构化 quota facts 重试。
+- DeepSeek 与 Zhipu 的 preserved-thinking 工具重放保留 `reasoning_content`；空字符串与字段缺失严格区分。
+- 超长对话与上下文压力进入真实生产评测，不再只靠短对话或合成测试证明。
+
 ## 2026-07-12 - 界面定型与可维护性封顶满意版本
 
 状态：满意版本。

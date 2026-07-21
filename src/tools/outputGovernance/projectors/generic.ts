@@ -1,52 +1,30 @@
 import type { ProjectionResult } from "../projection.js";
 import type { ToolOutputSource } from "../types.js";
-import { buildHeadTailPreview, buildHeader } from "./shared.js";
-
-const GENERIC_MAX_CHARS = 1_500;
+import { buildHeader } from "./shared.js";
 
 export function projectEmptyOutput(source: ToolOutputSource): ProjectionResult {
+  const successful = source.exitCode === 0 || source.status === "completed";
   return {
     mode: "empty",
-    projection: buildHeader(source, "no output"),
+    projection: [
+      buildHeader(source, successful ? "completed successfully" : "completed without output"),
+      successful ? "stdout and stderr were empty; no result content is missing." : "stdout and stderr were empty.",
+    ].join("\n"),
     degraded: false,
     reason: "empty_output",
   };
 }
 
-export function projectGenericOutput(source: ToolOutputSource, reason = "generic_output"): ProjectionResult {
+export function projectGenericOutput(
+  source: ToolOutputSource,
+  reason = "verbatim_output",
+  label = "output",
+  mode: ProjectionResult["mode"] = "generic",
+): ProjectionResult {
   return {
-    mode: "generic",
-    projection: buildGenericPreview(source),
+    mode,
+    projection: [buildHeader(source, label), source.output.trim()].filter(Boolean).join("\n"),
     degraded: false,
     reason,
   };
-}
-
-export function projectStructuredOutput(
-  source: ToolOutputSource,
-  body: string,
-): ProjectionResult {
-  const trimmed = body.trim();
-  if (!trimmed) {
-    return {
-      mode: "generic",
-      projection: buildGenericPreview(source),
-      degraded: true,
-      reason: "structured_projection_empty",
-    };
-  }
-
-  return {
-    mode: "structured",
-    projection: trimmed,
-    degraded: false,
-    reason: "structured_projection",
-  };
-}
-
-function buildGenericPreview(source: ToolOutputSource): string {
-  return [
-    buildHeader(source, "output"),
-    buildHeadTailPreview(source.output, GENERIC_MAX_CHARS),
-  ].filter(Boolean).join("\n");
 }

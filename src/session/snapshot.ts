@@ -304,6 +304,12 @@ function readToolCalls(value: unknown, sessionPath: string, index: number): Tool
     return {
       id: readRequiredString(record, "id", sessionPath, `messages[${index}].tool_calls[${toolIndex}]`),
       type,
+      providerMetadata: readOptionalObject(
+        record.providerMetadata,
+        "providerMetadata",
+        sessionPath,
+        `messages[${index}].tool_calls[${toolIndex}]`,
+      ),
       function: {
         name: readRequiredString(fn, "name", sessionPath, `messages[${index}].tool_calls[${toolIndex}].function`),
         arguments: readRequiredString(fn, "arguments", sessionPath, `messages[${index}].tool_calls[${toolIndex}].function`),

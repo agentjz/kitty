@@ -79,6 +79,66 @@ test("chat completions normalizes generic reasoning deltas", async () => {
   assert.deepEqual(reasoning, ["Inspect the package first."]);
 });
 
+test("Gemini streaming captures tool-call provider metadata for replay", async () => {
+  const response = await chatCompletionsAdapter.fetchStreaming(createClient(async () => [{
+    choices: [{
+      delta: {
+        tool_calls: [{
+          index: 0,
+          id: "call-google",
+          type: "function",
+          extra_content: {
+            google: { thought_signature: "stream-signature" },
+          },
+          function: { name: "read", arguments: "{\"path\":\"README.md\"}" },
+        }],
+      },
+    }],
+  }]), {
+    provider: "google",
+    model: "gemini-3.5-flash",
+    messages: [{ role: "user", content: "read the project" }],
+    tools: undefined,
+    callbacks: undefined,
+    forceReasoning: false,
+    thinking: "enabled",
+  });
+
+  assert.deepEqual(response.toolCalls[0]?.providerMetadata, {
+    google: { thought_signature: "stream-signature" },
+  });
+});
+
+test("Gemini non-streaming captures tool-call provider metadata for replay", async () => {
+  const response = await chatCompletionsAdapter.fetchNonStreaming(createClient(async () => ({
+    choices: [{
+      message: {
+        content: null,
+        tool_calls: [{
+          id: "call-google",
+          type: "function",
+          extra_content: {
+            google: { thought_signature: "response-signature" },
+          },
+          function: { name: "read", arguments: "{\"path\":\"README.md\"}" },
+        }],
+      },
+    }],
+  })), {
+    provider: "google",
+    model: "gemini-3.5-flash",
+    messages: [{ role: "user", content: "read the project" }],
+    tools: undefined,
+    callbacks: undefined,
+    forceReasoning: false,
+    thinking: "enabled",
+  });
+
+  assert.deepEqual(response.toolCalls[0]?.providerMetadata, {
+    google: { thought_signature: "response-signature" },
+  });
+});
+
 function createClient(
   create: (body: Record<string, unknown>, options?: Record<string, unknown>) => Promise<unknown>,
 ) {

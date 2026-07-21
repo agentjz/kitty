@@ -1,5 +1,5 @@
 import type { ProviderErrorPolicy } from "./catalog.js";
-import { resolveRateLimitRetryability } from "./errorDialect.js";
+import { readGoogleRetryDelayMs, resolveRateLimitRetryability } from "./errorDialect.js";
 
 export type ProviderErrorKind =
   | "auth"
@@ -41,7 +41,8 @@ export function classifyProviderError(
   const status = readStatus(error);
   const code = readCode(error);
   const message = readMessage(error).toLowerCase();
-  const rateLimitRetryable = resolveRateLimitRetryability(policy, code);
+  const rateLimitRetryable = resolveRateLimitRetryability(policy, code, error);
+  const retryAfterMs = readRetryAfterMs(error) ?? (policy === "google" ? readGoogleRetryDelayMs(error) : undefined);
 
   if (status === 401 || status === 403 || includesAny(message, ["authentication failed", "invalid api key", "api key is invalid"])) {
     return { kind: "auth", status, code };
@@ -57,7 +58,7 @@ export function classifyProviderError(
       kind: "rate_limit",
       status,
       code,
-      retryAfterMs: readRetryAfterMs(error),
+      retryAfterMs,
       retryable: rateLimitRetryable,
     };
   }

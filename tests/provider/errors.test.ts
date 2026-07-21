@@ -46,6 +46,42 @@ test("Zhipu error policy retries transient limits but stops on quota and access 
   assert.match(formatProviderError(terminal) ?? "", /not retried automatically/u);
 });
 
+test("Google error policy follows structured retry and quota facts", () => {
+  const minuteLimit = normalizeProviderError({
+    status: 429,
+    error: {
+      code: 429,
+      details: [
+        {
+          "@type": "type.googleapis.com/google.rpc.QuotaFailure",
+          violations: [{ quotaId: "GenerateRequestsPerMinutePerProjectPerModel-FreeTier" }],
+        },
+        {
+          "@type": "type.googleapis.com/google.rpc.RetryInfo",
+          retryDelay: "3.5s",
+        },
+      ],
+    },
+  }, "google");
+  const dailyLimit = normalizeProviderError({
+    status: 429,
+    error: {
+      code: 429,
+      details: [{
+        "@type": "type.googleapis.com/google.rpc.QuotaFailure",
+        violations: [{ quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier" }],
+      }],
+    },
+  }, "google");
+
+  assert.equal(minuteLimit.facts.retryable, true);
+  assert.equal(minuteLimit.facts.retryAfterMs, 3_500);
+  assert.equal(isRetryableProviderError(minuteLimit), true);
+  assert.equal(dailyLimit.facts.retryable, false);
+  assert.equal(isRetryableProviderError(dailyLimit), false);
+  assert.match(formatProviderError(dailyLimit) ?? "", /not retried automatically/u);
+});
+
 test("provider request boundaries normalize transport errors once", () => {
   const source = Object.assign(new Error("connection refused"), { code: "ECONNREFUSED" });
   const error = normalizeProviderError(source);

@@ -1,8 +1,12 @@
 import type { LoadedSkill } from "../types.js";
 import { passed, type EvaluationCheckId, type EvaluationCheckResult } from "./types.js";
 
-export async function runToolOutputGovernanceCheck(id: EvaluationCheckId): Promise<EvaluationCheckResult> {
+export async function runToolOutputGovernanceCheck(
+  id: EvaluationCheckId,
+  workspace: string,
+): Promise<EvaluationCheckResult> {
   const { governToolOutput } = await import("../tools/outputGovernance/index.js");
+  const { createBashOutputCapture, DEFAULT_BASH_OUTPUT_PREVIEW_CHARS } = await import("../tools/outputCapture.js");
   const testOutput = governToolOutput({
     toolName: "bash",
     command: "npm test",
@@ -14,8 +18,6 @@ export async function runToolOutputGovernanceCheck(id: EvaluationCheckId): Promi
       "Tests: 1 failed, 24 passed, 25 total",
       "x".repeat(10_000),
     ].join("\n"),
-    outputPath: ".kitty/observability/command-output/eval/test.txt",
-    truncated: true,
   });
   const searchOutput = governToolOutput({
     toolName: "bash",
@@ -24,14 +26,23 @@ export async function runToolOutputGovernanceCheck(id: EvaluationCheckId): Promi
     exitCode: 0,
     output: Array.from({ length: 80 }, (_, index) => `src/provider/file${index}.ts:${index + 1}:provider`).join("\n"),
   });
+  const hugeRaw = Array.from({ length: 40_000 }, (_, index) => `line ${index}: ${"x".repeat(80)}`).join("\n");
+  const capture = await createBashOutputCapture({
+    stateRootDir: workspace,
+    sessionId: "eval-tool-output",
+  });
+  capture.append(hugeRaw);
+  const bounded = await capture.finalize();
   const hugeOutput = governToolOutput({
     toolName: "bash",
     command: "node huge-output.js",
     status: "completed",
     exitCode: 0,
-    output: Array.from({ length: 40_000 }, (_, index) => `line ${index}: ${"x".repeat(80)}`).join("\n"),
-    outputPath: ".kitty/observability/command-output/eval/huge.txt",
-    truncated: true,
+    output: bounded.outputPreview,
+    outputPath: bounded.outputPath,
+    outputChars: bounded.outputChars,
+    outputBytes: bounded.outputBytes,
+    truncated: bounded.truncated,
   });
   const tailFailure = governToolOutput({
     toolName: "bash",
@@ -42,23 +53,32 @@ export async function runToolOutputGovernanceCheck(id: EvaluationCheckId): Promi
       ...Array.from({ length: 500 }, (_, index) => `progress ${index}`),
       "EVIDENCE_ROOT_CAUSE: expected READY but received BROKEN",
     ].join("\n"),
-    outputPath: ".kitty/observability/command-output/eval/tail-failure.txt",
-    truncated: true,
+  });
+  const emptyOutput = governToolOutput({
+    toolName: "bash",
+    command: "git diff --quiet",
+    status: "completed",
+    exitCode: 0,
+    output: "",
   });
 
   const ready =
     testOutput.kind === "test" &&
     testOutput.projection.includes("FAIL tests/provider/deepseek-replay.test.ts") &&
-    testOutput.projection.includes("[full output:") &&
+    testOutput.projection.includes("x".repeat(10_000)) &&
     searchOutput.kind === "search" &&
-    searchOutput.projection.includes("matches shown:") &&
+    searchOutput.projection.includes("src/provider/file40.ts") &&
+    searchOutput.projection.includes("src/provider/file79.ts") &&
     hugeOutput.kind === "generic" &&
-    hugeOutput.projectedChars < 4_000 &&
+    hugeOutput.projectedChars < DEFAULT_BASH_OUTPUT_PREVIEW_CHARS + 1_000 &&
     hugeOutput.savedTokens > 100_000 &&
-    hugeOutput.outputPath === ".kitty/observability/command-output/eval/huge.txt" &&
+    hugeOutput.outputPath === bounded.outputPath &&
+    hugeOutput.projection.includes("line 0:") &&
+    hugeOutput.projection.includes("line 39999:") &&
+    hugeOutput.projection.includes("head and tail preserved") &&
     tailFailure.projection.includes("EVIDENCE_ROOT_CAUSE") &&
-    tailFailure.projection.includes("inspect with read") &&
-    tailFailure.projection.includes("exit=1");
+    tailFailure.projection.includes("exit=1") &&
+    emptyOutput.projection.includes("no result content is missing");
 
   if (!ready) {
     return {

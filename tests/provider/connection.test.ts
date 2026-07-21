@@ -52,6 +52,17 @@ test("Zhipu connection test reads model metadata without generating tokens", () 
   assert.deepEqual(request.headers, { Authorization: "Bearer test-key" });
 });
 
+test("Google connection test uses the official OpenAI-compatible model endpoint", () => {
+  const profile = resolveModelProfile({ provider: "google", model: "gemini-3.5-flash" });
+  const request = buildProviderProbeRequest({
+    baseUrl: profile.provider.defaultBaseUrl,
+    apiKey: "test-key",
+  });
+  assert.equal(request.endpoint, "https://generativelanguage.googleapis.com/v1beta/openai/models");
+  assert.equal(request.method, "GET");
+  assert.deepEqual(request.headers, { Authorization: "Bearer test-key" });
+});
+
 test("base URL candidates add v1 only at a host root", () => {
   assert.deepEqual(
     buildProviderBaseUrlCandidates("https://api.example.com"),

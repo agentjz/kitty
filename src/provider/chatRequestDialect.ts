@@ -1,5 +1,6 @@
 import type { ProviderCapabilities } from "./capabilities.js";
 import type { ProviderMessage } from "./contract.js";
+import { hasGoogleThoughtSignature } from "./toolCallMetadata.js";
 
 export interface ChatRequestDialectInput {
   messages: ProviderMessage[];
@@ -33,6 +34,12 @@ export function applyChatRequestDialect(
         }),
       };
       break;
+    case "gemini-thinking":
+      assertGeminiToolCallMetadata(input.messages);
+      body.reasoning_effort = normalizeGeminiReasoningEffort(
+        input.thinking === "disabled" ? "minimal" : input.reasoningEffort ?? capabilities.defaultReasoningEffort,
+      );
+      break;
     case "zhipu-thinking": {
       const thinking = input.thinking ?? (capabilities.defaultReasoningEnabled ? "enabled" : "disabled");
       assertReasoningReplayAvailable(input.messages, thinking, "Zhipu");
@@ -47,6 +54,25 @@ export function applyChatRequestDialect(
     case "none":
       break;
   }
+}
+
+function assertGeminiToolCallMetadata(messages: ProviderMessage[]): void {
+  const missingMetadata = messages.some((message) =>
+    message.role === "assistant" &&
+    message.toolCalls?.some((toolCall) => !hasGoogleThoughtSignature(toolCall)),
+  );
+  if (missingMetadata) {
+    throw new Error("Google Gemini tool-call replay requires the stored thought signature. Start a new turn.");
+  }
+}
+
+function normalizeGeminiReasoningEffort(
+  effort: "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | undefined,
+): "minimal" | "low" | "medium" | "high" {
+  if (effort === "minimal" || effort === "low" || effort === "medium" || effort === "high") {
+    return effort;
+  }
+  return effort === "xhigh" || effort === "max" ? "high" : "medium";
 }
 
 function resolveDeepSeekThinking(

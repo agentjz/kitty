@@ -29,7 +29,7 @@ test("tool result projection uses output governance as the model-facing evidence
         outputPath: ".kitty/observability/command-output/session/output.txt",
         recoveryHint: "[full output: .kitty/observability/command-output/session/output.txt]",
         degraded: false,
-        reason: "structured_projection",
+        reason: "verbatim_test_output",
       },
     },
   };
@@ -45,6 +45,63 @@ test("tool result projection never returns an empty model message", () => {
     }),
     "network_probe completed without text output.",
   );
+});
+
+test("generic success projection states completion and preserves returned JSON", () => {
+  assert.equal(
+    projectToolResultForModel({
+      toolName: "custom_state",
+      result: { ok: true, output: "{}" },
+    }),
+    "custom_state completed successfully and returned these facts:\n{}",
+  );
+});
+
+test("generic projection preserves nested extension facts", () => {
+  const raw = JSON.stringify({
+    ok: true,
+    skills: [{ name: "dev", path: "skills/dev/SKILL.md" }],
+    total: 1,
+  }, null, 2);
+  const projection = projectToolResultForModel({
+    toolName: "skill_list",
+    result: { ok: true, output: raw },
+  });
+
+  assert.match(projection, /skill_list completed successfully/);
+  assert.match(projection, /"name": "dev"/);
+  assert.match(projection, /"path": "skills\/dev\/SKILL\.md"/);
+});
+
+test("read and write projections do not silently discard tool facts", () => {
+  const readTail = "READ_TAIL_SENTINEL";
+  const readProjection = projectToolResultForModel({
+    toolName: "read",
+    result: {
+      ok: true,
+      output: JSON.stringify({
+        path: "large.txt",
+        startLine: 1,
+        endLine: 2,
+        content: `${"x".repeat(8_000)}${readTail}`,
+      }),
+    },
+  });
+  assert.match(readProjection, new RegExp(`${readTail}$`));
+
+  const diffTail = "DIFF_TAIL_SENTINEL";
+  const writeProjection = projectToolResultForModel({
+    toolName: "write",
+    result: {
+      ok: true,
+      output: JSON.stringify({
+        path: "large.txt",
+        bytes: 9_000,
+        diff: `${"+x\n".repeat(2_000)}+${diffTail}`,
+      }),
+    },
+  });
+  assert.match(writeProjection, new RegExp(`${diffTail}$`));
 });
 
 test("background run projection preserves the execution id needed by follow-up waits", () => {
@@ -126,7 +183,7 @@ test("tool result envelope keeps model, compact, provenance, and recovery eviden
           outputPath: ".kitty/observability/command-output/session/test.txt",
           recoveryHint: "read artifact",
           degraded: false,
-          reason: "structured_projection",
+          reason: "verbatim_test_output",
         },
       },
     },

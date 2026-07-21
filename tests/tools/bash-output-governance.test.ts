@@ -13,7 +13,7 @@ test("bash tool records governed output and recoverable raw output", async (t) =
   const registry = await createDefaultAgentToolRegistry(context.config);
 
   const result = await registry.execute("bash", JSON.stringify({
-    command: "node -e \"for (let i=0;i<900;i++) console.log('FAIL tests/demo.test.ts expected received line '+i)\"",
+    command: "node -e \"for (let i=0;i<1800;i++) console.log('FAIL tests/demo.test.ts expected received line '+i)\"",
     timeout_ms: 30_000,
   }), context);
   const ledger = new ControlPlaneLedger(context.projectContext.stateRootDir);
@@ -31,7 +31,7 @@ test("bash tool records governed output and recoverable raw output", async (t) =
   assert.equal(governance.truncated, true);
   assert.ok(governance.outputPath);
   assert.match(governance.projection, /bash: test/);
-  assert.match(governance.projection, /\[full output:/);
+  assert.match(governance.projection, /Full output:/);
 
   const payload = parseToolJson(result.output);
   assert.ok(payload.outputGovernance);
@@ -40,5 +40,5 @@ test("bash tool records governed output and recoverable raw output", async (t) =
 
   const fullPath = path.join(root, String(governance.outputPath));
   const raw = await fs.readFile(fullPath, "utf8");
-  assert.match(raw, /line 899/);
+  assert.match(raw, /line 1799/);
 });

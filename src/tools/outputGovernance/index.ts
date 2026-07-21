@@ -10,7 +10,7 @@ export function governToolOutput(source: ToolOutputSource): ToolOutputGovernance
   const kind = classifyToolOutput(source);
   const projected = projectOutputByKind(kind, source);
   const artifactRecoveryHint = source.outputPath
-    ? `[full output: ${source.outputPath}; inspect with read {"path":${JSON.stringify(source.outputPath)}}]`
+    ? `[tool output truncated; this preview preserves the head and tail. Full output: ${source.outputPath}. Read a specific range only when the omitted facts are needed: {"path":${JSON.stringify(source.outputPath)}}]`
     : undefined;
   const recoveryHint = [source.recoveryHint, artifactRecoveryHint]
     .filter((hint): hint is string => Boolean(hint))
@@ -22,6 +22,7 @@ export function governToolOutput(source: ToolOutputSource): ToolOutputGovernance
   const metrics = computeSavings({
     raw: source.output,
     projected: projection,
+    rawChars: source.outputChars,
   });
 
   return {

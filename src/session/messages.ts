@@ -1,8 +1,12 @@
 import crypto from "node:crypto";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
-import { listModelInfos } from "../provider/catalog.js";
+import {
+  listModelInfos,
+  type ToolCallProviderMetadataReplayPolicy,
+} from "../provider/catalog.js";
 import { resolveProviderCapabilities } from "../provider/capabilities.js";
+import { toChatCompletionToolCall } from "../provider/toolCallMetadata.js";
 import type { StoredMessage, ToolCallRecord, ToolResultEnvelope } from "../types.js";
 
 export function buildChatMessages(
@@ -13,6 +17,7 @@ export function buildChatMessages(
   provider?: string,
 ): ChatCompletionMessageParam[] {
   const recentMessages = messages.slice(-contextWindowMessages);
+  const capabilities = resolveProviderCapabilities({ provider, model });
 
   return [
     {
@@ -22,7 +27,7 @@ export function buildChatMessages(
     ...recentMessages.map((message, index) =>
       toChatMessage(message, {
         includeReasoning: shouldIncludeStoredAssistantReasoning(recentMessages, index, model, provider),
-        provider,
+        toolCallProviderMetadataReplay: capabilities.toolCallProviderMetadataReplay,
       }),
     ),
   ];
@@ -96,7 +101,10 @@ export function collapseContentParts(content: unknown): string | null {
 
 export function toChatMessage(
   message: StoredMessage,
-  options: { includeReasoning: boolean; provider?: string },
+  options: {
+    includeReasoning: boolean;
+    toolCallProviderMetadataReplay?: ToolCallProviderMetadataReplayPolicy;
+  },
 ): ChatCompletionMessageParam {
   if (message.role === "tool") {
     return {
@@ -110,7 +118,8 @@ export function toChatMessage(
     const assistantMessage: Record<string, unknown> = {
       role: "assistant",
       content: message.content,
-      tool_calls: message.tool_calls,
+      tool_calls: message.tool_calls.map((toolCall) =>
+        toChatCompletionToolCall(toolCall, options.toolCallProviderMetadataReplay ?? "never")),
     };
 
     if (options.includeReasoning && message.reasoningContent !== undefined) {

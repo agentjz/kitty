@@ -16,6 +16,10 @@ import {
   createToolCallProgressReporter,
   type StreamingToolCallState,
 } from "./toolCallProgress.js";
+import {
+  readToolCallProviderMetadata,
+  toChatCompletionToolCall,
+} from "./toolCallMetadata.js";
 
 export const chatCompletionsAdapter: ProviderWireAdapter = {
   wireApi: "chat.completions",
@@ -58,6 +62,7 @@ export const chatCompletionsAdapter: ProviderWireAdapter = {
             tool_calls?: Array<{
               index?: number;
               id?: string;
+              extra_content?: unknown;
               function?: {
                 name?: string;
                 arguments?: string;
@@ -110,6 +115,11 @@ export const chatCompletionsAdapter: ProviderWireAdapter = {
               appendToolCallArguments(existing, toolCall.function.arguments);
             }
 
+            const providerMetadata = readToolCallProviderMetadata(toolCall.extra_content);
+            if (providerMetadata) {
+              existing.providerMetadata = providerMetadata;
+            }
+
             toolCallParts.set(index, existing);
             toolCallProgress.report(index, existing);
           }
@@ -140,6 +150,7 @@ export const chatCompletionsAdapter: ProviderWireAdapter = {
               name: toolCall.name,
               arguments: toolCall.arguments,
             },
+            providerMetadata: toolCall.providerMetadata,
           })),
       };
     } finally {
@@ -192,6 +203,9 @@ export const chatCompletionsAdapter: ProviderWireAdapter = {
           .map((call) => ({
             id: call.id,
             type: "function",
+            providerMetadata: readToolCallProviderMetadata(
+              (call as unknown as { extra_content?: unknown }).extra_content,
+            ),
             function: {
               name: call.function.name,
               arguments: call.function.arguments,
@@ -258,6 +272,7 @@ export function toChatCompletionMessages(
 ): ChatCompletionMessageParam[] {
   const profile = resolveModelProfile(profileInput);
   const replayReasoningContent = profile.model.capabilities.reasoningContentReplay === "tool-call-required";
+  const replayProviderMetadata = profile.model.capabilities.toolCallProviderMetadataReplay;
 
   return messages.map((message) => {
     if (message.role === "tool") {
@@ -272,7 +287,8 @@ export function toChatCompletionMessages(
       const assistantMessage: Record<string, unknown> = {
         role: "assistant",
         content: message.content ?? "",
-        tool_calls: message.toolCalls,
+        tool_calls: message.toolCalls.map((toolCall) =>
+          toChatCompletionToolCall(toolCall, replayProviderMetadata)),
       };
 
       if (replayReasoningContent && message.reasoningContent !== undefined) {

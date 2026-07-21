@@ -147,7 +147,7 @@ test("runtime status surfaces recent tool output governance facts", async (t) =>
         truncated: true,
         outputPath: "observability/command-output/session/output.txt",
         degraded: false,
-        reason: "structured_projection",
+        reason: "verbatim_test_output",
       },
   });
 

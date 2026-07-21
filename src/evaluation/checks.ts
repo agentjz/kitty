@@ -73,7 +73,8 @@ export async function runEvaluationCheck(id: EvaluationCheckId, rootDir: string)
         return await runCacheEconomyCheck(id);
       }
       case "tool-output-governance-ready": {
-        return await runToolOutputGovernanceCheck(id);
+        const workspace = await prepareCheckWorkspace(rootDir, "tool-output-governance");
+        return await runToolOutputGovernanceCheck(id, workspace);
       }
       case "production-scene-ready": {
         return await runProductionSceneCheck(id, rootDir);

@@ -53,6 +53,97 @@ test("Agnes chat request can disable chat template thinking", () => {
   assert.equal("stream_options" in body, false);
 });
 
+test("Google Gemini sends supported reasoning effort, schema, and thought signature", () => {
+  const body = buildProviderRequestBody({
+    provider: "google",
+    model: "gemini-3.5-flash",
+    messages: [
+      { role: "user", content: "hello" },
+      {
+        role: "assistant",
+        content: "",
+        toolCalls: [{
+          id: "call-1",
+          type: "function",
+          providerMetadata: {
+            google: { thought_signature: "signed-thought" },
+          },
+          function: { name: "read_package_name", arguments: "{}" },
+        }],
+      },
+      { role: "tool", content: "kitty", toolCallId: "call-1" },
+    ],
+    tools: [{
+      ...tool,
+      function: {
+        ...tool.function,
+        parameters: {
+          type: "object",
+          properties: {
+            value: { type: ["string", "null"] },
+          },
+          required: ["value"],
+          additionalProperties: false,
+        },
+      },
+    }],
+    stream: true,
+    forceReasoning: false,
+    thinking: "enabled",
+    reasoningEffort: "max",
+    maxOutputTokens: 384_000,
+  });
+
+  assert.equal(body.reasoning_effort, "high");
+  assert.equal(body.max_tokens, 65_536);
+  const assistant = (body.messages as Array<Record<string, unknown>>)[1]!;
+  const replayedCall = (assistant.tool_calls as Array<Record<string, unknown>>)[0]!;
+  assert.deepEqual(replayedCall.extra_content, {
+    google: { thought_signature: "signed-thought" },
+  });
+  const sentTool = (body.tools as Array<{ function: { parameters: Record<string, unknown> } }>)[0]!;
+  assert.deepEqual(
+    (sentTool.function.parameters.properties as Record<string, unknown>).value,
+    { type: "string", nullable: true },
+  );
+});
+
+test("Google Gemini minimizes always-on thinking when the shared toggle is disabled", () => {
+  const body = buildProviderRequestBody({
+    provider: "google",
+    model: "gemini-3.5-flash",
+    messages: [{ role: "user", content: "hello" }],
+    tools: undefined,
+    stream: false,
+    forceReasoning: false,
+    thinking: "disabled",
+    reasoningEffort: "high",
+  });
+
+  assert.equal(body.reasoning_effort, "minimal");
+});
+
+test("Google Gemini rejects tool replay without its thought signature", () => {
+  assert.throws(() => buildProviderRequestBody({
+    provider: "google",
+    model: "gemini-3.5-flash",
+    messages: [{
+      role: "assistant",
+      content: "",
+      toolCalls: [{
+        id: "call-1",
+        type: "function",
+        providerMetadata: { vendor: { opaque: "not-a-google-signature" } },
+        function: { name: "read_package_name", arguments: "{}" },
+      }],
+    }],
+    tools: [tool],
+    stream: true,
+    forceReasoning: false,
+    thinking: "enabled",
+  }), /stored thought signature/u);
+});
+
 test("Zhipu chat request enables preserved thinking and replays reasoning content", () => {
   const body = buildProviderRequestBody({
     provider: "zhipu",

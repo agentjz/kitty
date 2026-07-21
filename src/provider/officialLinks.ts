@@ -16,6 +16,10 @@ const PROVIDER_OFFICIAL_LINKS: Readonly<Record<string, ProviderOfficialLinks>> =
     websiteUrl: "https://bigmodel.cn",
     apiKeyUrl: "https://bigmodel.cn/usercenter/proj-mgmt/apikeys",
   },
+  google: {
+    websiteUrl: "https://ai.google.dev/gemini-api",
+    apiKeyUrl: "https://aistudio.google.com/api-keys",
+  },
 };
 
 export function findProviderOfficialLinks(providerId: string): ProviderOfficialLinks | undefined {

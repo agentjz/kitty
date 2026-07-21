@@ -6,6 +6,7 @@ import type { ToolResultEnvelope } from "./toolEvidence.js";
 export interface ToolCallRecord {
   id: string;
   type: "function";
+  providerMetadata?: Record<string, unknown>;
   function: {
     name: string;
     arguments: string;

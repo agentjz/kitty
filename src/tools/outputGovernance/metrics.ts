@@ -9,6 +9,7 @@ export function estimateTextTokens(value: string): number {
 export function computeSavings(input: {
   raw: string;
   projected: string;
+  rawChars?: number;
 }): {
   rawChars: number;
   projectedChars: number;
@@ -17,9 +18,11 @@ export function computeSavings(input: {
   savedTokens: number;
   savingsRatio: number;
 } {
-  const rawChars = input.raw.length;
+  const rawChars = input.rawChars ?? input.raw.length;
   const projectedChars = input.projected.length;
-  const rawTokens = estimateTextTokens(input.raw);
+  const rawTokens = input.rawChars === undefined
+    ? estimateTextTokens(input.raw)
+    : rawChars > 0 ? Math.max(1, Math.ceil(rawChars / 4)) : 0;
   const projectedTokens = estimateTextTokens(input.projected);
   const savedTokens = Math.max(0, rawTokens - projectedTokens);
   const savingsRatio = rawTokens > 0

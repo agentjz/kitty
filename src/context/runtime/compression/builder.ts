@@ -64,7 +64,11 @@ export function buildCompressedContextRequest(
     };
   }
 
-  let tailCount = Math.max(1, Math.min(conversationMessages.length, config.contextWindowMessages));
+  let tailCount = Math.max(1, Math.min(
+    conversationMessages.length,
+    config.contextWindowMessages,
+    currentFactTailCount(conversationMessages),
+  ));
 
   while (true) {
     const frame = selectTailFrame(conversationMessages, tailCount);
@@ -228,10 +232,17 @@ function selectTailFrame(
     };
   }
 
+  const latestToolBatchStart = findLatestToolBatchStart(messages);
+  const requiredRecentStart = latestToolBatchStart > currentUserIndex
+    ? latestToolBatchStart
+    : messages.length;
   let recentBudget = Math.max(0, boundedTailCount - 1);
   while (recentBudget > 0) {
     const recentStartIndex = Math.max(currentUserIndex + 1, messages.length - recentBudget);
-    const safeStartIndex = expandStartToToolBoundary(messages, recentStartIndex);
+    const safeStartIndex = Math.min(
+      expandStartToToolBoundary(messages, recentStartIndex),
+      requiredRecentStart,
+    );
     const tail = [messages[currentUserIndex]!, ...messages.slice(safeStartIndex)];
     if (tail.length <= boundedTailCount) {
       return {
@@ -243,8 +254,8 @@ function selectTailFrame(
   }
 
   return {
-    head: messages.slice(0, messages.length),
-    tail: [messages[currentUserIndex]!],
+    head: messages.slice(0, requiredRecentStart),
+    tail: [messages[currentUserIndex]!, ...messages.slice(requiredRecentStart)],
   };
 }
 
@@ -276,9 +287,15 @@ function composeChatMessages(
 function compactTailMessages(messages: StoredMessage[], mode: "normal" | "aggressive" | "hard"): StoredMessage[] {
   const protectedRecentCount = mode === "normal" ? DETAILED_RECENT_MESSAGES : mode === "aggressive" ? 4 : 0;
   const protectedStart = Math.max(0, messages.length - protectedRecentCount);
+  const latestUserIndex = findLatestUserIndex(messages);
+  const latestToolBatchStart = findLatestToolBatchStart(messages);
 
   return messages.map((message, index) => {
-    if (index >= protectedStart) {
+    if (
+      index >= protectedStart ||
+      index === latestUserIndex ||
+      (latestToolBatchStart >= 0 && index >= latestToolBatchStart)
+    ) {
       return message;
     }
 
@@ -309,6 +326,25 @@ function compactTailMessages(messages: StoredMessage[], mode: "normal" | "aggres
 
     return message;
   });
+}
+
+function findLatestToolBatchStart(messages: StoredMessage[]): number {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]!;
+    if (message.role === "assistant" && message.tool_calls?.length) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+function currentFactTailCount(messages: StoredMessage[]): number {
+  const latestUserIndex = findLatestUserIndex(messages);
+  const latestToolBatchStart = findLatestToolBatchStart(messages);
+  if (latestToolBatchStart >= 0) {
+    return (messages.length - latestToolBatchStart) + (latestUserIndex >= 0 ? 1 : 0);
+  }
+  return latestUserIndex >= 0 ? messages.length - latestUserIndex : messages.length;
 }
 
 function summarizeConversation(messages: StoredMessage[], maxChars: number): string {

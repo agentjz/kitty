@@ -4,6 +4,7 @@ import type { ProviderMessage } from "./contract.js";
 import { applyChatRequestDialect } from "./chatRequestDialect.js";
 import { toChatCompletionMessages } from "./chatCompletionsAdapter.js";
 import { normalizeProviderMaxOutputTokens } from "./maxOutputTokens.js";
+import { applyToolSchemaDialect } from "./toolSchemaDialect.js";
 
 export interface BuildProviderRequestBodyInput {
   provider?: string;
@@ -31,7 +32,7 @@ export function buildProviderRequestBody(
   };
 
   if (input.tools?.length && capabilities.supportsTools) {
-    body.tools = input.tools;
+    body.tools = applyToolSchemaDialect(input.tools, capabilities.chat.toolSchema);
   }
 
   if (input.tools?.length && capabilities.supportsTools && capabilities.chat.toolChoice === "auto") {

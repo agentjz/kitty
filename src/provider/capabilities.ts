@@ -2,6 +2,7 @@ import {
   resolveModelProfile,
   type ChatReasoningRequestMode,
   type ProviderErrorPolicy,
+  type ToolCallProviderMetadataReplayPolicy,
 } from "./catalog.js";
 
 export interface ProviderCapabilities {
@@ -11,6 +12,7 @@ export interface ProviderCapabilities {
   errorPolicy: ProviderErrorPolicy;
   supportsTools: boolean;
   supportsReasoningContent: boolean;
+  toolCallProviderMetadataReplay: ToolCallProviderMetadataReplayPolicy;
   defaultReasoningEnabled: boolean;
   defaultReasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
   maxOutputTokensParam: "max_tokens" | "max_completion_tokens" | "max_output_tokens";
@@ -19,6 +21,7 @@ export interface ProviderCapabilities {
     reasoning: ChatReasoningRequestMode;
     toolChoice: "auto" | "omit";
     streamUsage: "include_usage" | "omit";
+    toolSchema: "standard" | "gemini";
   };
   requestTimeoutMs: number;
   doctorProbeTimeoutMs: number;
@@ -38,6 +41,7 @@ export function resolveProviderCapabilities(input: ProviderProfileInput): Provid
     errorPolicy: profile.provider.errorPolicy,
     supportsTools: profile.model.capabilities.tools,
     supportsReasoningContent: profile.model.capabilities.reasoningContentReplay !== "never",
+    toolCallProviderMetadataReplay: profile.model.capabilities.toolCallProviderMetadataReplay,
     defaultReasoningEnabled: profile.model.capabilities.reasoning,
     defaultReasoningEffort: profile.model.request.reasoningEffortDefault,
     maxOutputTokensParam: profile.model.request.maxOutputTokensParam,
@@ -46,6 +50,7 @@ export function resolveProviderCapabilities(input: ProviderProfileInput): Provid
       reasoning: "none",
       toolChoice: "auto",
       streamUsage: "include_usage",
+      toolSchema: "standard",
     },
     requestTimeoutMs: profile.provider.requestTimeoutMs,
     doctorProbeTimeoutMs: profile.provider.doctorProbeTimeoutMs,

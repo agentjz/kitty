@@ -1,11 +1,4 @@
-import { truncateText } from "../../utils/fs.js";
 import type { ToolExecutionResult } from "../../types.js";
-
-const DEFAULT_MAX_CHARS = 4_000;
-const DIFF_MAX_CHARS = 3_000;
-const OUTPUT_MAX_CHARS = 1_500;
-const SKILL_BODY_MAX_CHARS = 16_000;
-const DOCUMENT_CONTENT_MAX_CHARS = 16_000;
 export function projectToolResultForModel(input: {
   toolName: string;
   result: ToolExecutionResult;
@@ -33,7 +26,7 @@ function projectRawToolResultForModel(input: {
   }
 
   if (!parsed) {
-    return truncateText(input.result.output.trim(), DEFAULT_MAX_CHARS);
+    return input.result.output.trim();
   }
 
   switch (input.toolName) {
@@ -61,7 +54,7 @@ function projectRawToolResultForModel(input: {
     case "skill_load":
       return projectSkillLoad(parsed);
     default:
-      return projectGenericSuccess(parsed, input.result.output);
+      return projectGenericSuccess(input.toolName, input.result.output);
   }
 }
 
@@ -74,7 +67,7 @@ function projectDocumentRead(payload: Record<string, unknown>): string {
   const warnings = readArray(payload.warnings)?.filter((warning): warning is string => typeof warning === "string");
   return joinLines([
     `${path}${start !== undefined && end !== undefined ? ` (${unit}s ${start}-${end})` : ""}`,
-    readString(payload.content) ? truncateText(readString(payload.content) ?? "", DOCUMENT_CONTENT_MAX_CHARS) : undefined,
+    readString(payload.content),
     warnings && warnings.length > 0 ? `warnings: ${warnings.join("; ")}` : undefined,
     continuationArgs ? `next: document_read ${JSON.stringify(continuationArgs)}` : undefined,
   ]);
@@ -94,7 +87,7 @@ function projectExecutionRead(payload: Record<string, unknown>): string {
     readString(payload.mode) ? `mode: ${readString(payload.mode)}` : undefined,
     readNumber(payload.bytes) !== undefined ? `bytes: ${readNumber(payload.bytes)}` : undefined,
     payload.truncated === true ? "output truncated" : undefined,
-    readString(payload.output) ? truncateText(readString(payload.output) ?? "", OUTPUT_MAX_CHARS) : undefined,
+    readString(payload.output),
   ]);
 }
 
@@ -122,7 +115,6 @@ function projectExecutionCheck(payload: Record<string, unknown>): string {
   const stale = readArray(payload.stale) ?? [];
   const entries = [...active, ...recent]
     .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
-    .slice(0, 8)
     .map((item) => {
       const parts = [
         readString(item.id) ?? "execution",
@@ -160,7 +152,7 @@ function projectRead(payload: Record<string, unknown>): string {
 
   return joinLines([
     `${path}${startLine && endLine ? `:${startLine}-${endLine}` : ""}`,
-    truncateText(content, DEFAULT_MAX_CHARS),
+    content || "The requested file range is empty.",
     continuationArgs ? `next: read ${JSON.stringify(continuationArgs)}` : undefined,
   ]);
 }
@@ -171,7 +163,7 @@ function projectEdit(payload: Record<string, unknown>): string {
   const diff = readString(payload.diff) ?? readString(payload.preview);
   return joinLines([
     `edited ${path}${applied ? ` (${applied} replacement${applied === 1 ? "" : "s"})` : ""}`,
-    diff ? truncateText(diff, DIFF_MAX_CHARS) : undefined,
+    diff,
   ]);
 }
 
@@ -182,7 +174,7 @@ function projectWrite(payload: Record<string, unknown>): string {
   const diff = readString(payload.diff) ?? readString(payload.preview);
   return joinLines([
     `${existed ? "wrote" : "created"} ${path}${bytes !== undefined ? ` (${bytes} bytes)` : ""}`,
-    diff ? truncateText(diff, DIFF_MAX_CHARS) : undefined,
+    diff,
   ]);
 }
 
@@ -201,7 +193,7 @@ function projectBash(payload: Record<string, unknown>): string {
     `exit ${exitCode ?? "?"}${durationMs !== undefined ? ` in ${durationMs}ms` : ""}${status && status !== "completed" ? ` (${status})` : ""}`,
   ];
   if (output?.trim()) {
-    lines.push(truncateText(output.trim(), OUTPUT_MAX_CHARS));
+    lines.push(output.trim());
   }
   if (payload.truncated === true) {
     lines.push("output truncated");
@@ -218,40 +210,17 @@ function projectSkillLoad(payload: Record<string, unknown>): string {
   return joinLines([
     `loaded skill: ${name}${path ? ` (${path})` : ""}`,
     description,
-    truncateText(body, SKILL_BODY_MAX_CHARS),
+    body,
   ]);
 }
 
-function projectGenericSuccess(payload: Record<string, unknown>, rawOutput: string): string {
-  const lines = [
-    readString(payload.summary),
-    readString(payload.preview),
-    readString(payload.output),
-    readString(payload.content),
-  ].filter((line): line is string => Boolean(line));
-
-  if (lines.length > 0) {
-    return truncateText(lines.join("\n"), DEFAULT_MAX_CHARS);
-  }
-
-  const fragments = [
-    formatScalar("path", payload.path),
-    formatScalar("title", payload.title),
-    formatArrayCount("matches", payload.matches),
-    formatScalar("total", payload.total),
-    formatScalar("jobId", payload.jobId),
-    formatScalar("taskId", payload.taskId),
-    formatScalar("status", payload.status ?? payload.jobStatus),
-  ].filter((fragment): fragment is string => Boolean(fragment));
-
-  return fragments.length > 0
-    ? truncateText(fragments.join("; "), DEFAULT_MAX_CHARS)
-    : truncateText(rawOutput.trim(), DEFAULT_MAX_CHARS);
+function projectGenericSuccess(toolName: string, rawOutput: string): string {
+  return `${toolName} completed successfully and returned these facts:\n${rawOutput.trim() || "No additional result fields."}`;
 }
 
 function projectFailure(toolName: string, rawOutput: string, payload: Record<string, unknown> | null): string {
   if (!payload) {
-    return truncateText(rawOutput.trim(), DEFAULT_MAX_CHARS);
+    return rawOutput.trim();
   }
 
   const details = readObject(payload.details);
@@ -262,10 +231,10 @@ function projectFailure(toolName: string, rawOutput: string, payload: Record<str
     readString(payload.code) ? `code: ${readString(payload.code)}` : undefined,
     readString(payload.hint) ? `hint: ${readString(payload.hint)}` : undefined,
     readArgs ? `read: read ${JSON.stringify(readArgs)}` : undefined,
-    suggestions && suggestions.length > 0 ? `suggestions: ${suggestions.slice(0, 5).map((item) => String(item)).join(", ")}` : undefined,
+    suggestions && suggestions.length > 0 ? `suggestions: ${suggestions.map((item) => String(item)).join(", ")}` : undefined,
   ];
 
-  return truncateText(joinLines(lines), DEFAULT_MAX_CHARS);
+  return joinLines(lines);
 }
 
 function joinLines(lines: Array<string | undefined>): string {
@@ -302,15 +271,4 @@ function readString(value: unknown): string | undefined {
 
 function readNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? Math.trunc(value) : undefined;
-}
-
-function formatScalar(key: string, value: unknown): string | undefined {
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-    return `${key}: ${String(value)}`;
-  }
-  return undefined;
-}
-
-function formatArrayCount(key: string, value: unknown): string | undefined {
-  return Array.isArray(value) ? `${key}: ${value.length}` : undefined;
 }

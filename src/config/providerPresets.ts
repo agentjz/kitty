@@ -8,6 +8,7 @@ export interface ProviderPreset {
   model: string;
   thinking?: ModelThinkingMode;
   reasoningEffort?: ModelReasoningEffort;
+  configurationNote?: string;
   activeByDefault: boolean;
 }
 
@@ -26,6 +27,16 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     provider: "agnes",
     model: "agnes-2.5-flash",
     thinking: "enabled",
+    activeByDefault: false,
+  },
+  {
+    id: "gemini-3.5-flash",
+    label: "Google Gemini｜Gemini 3.5 Flash｜免费｜1M 上下文",
+    provider: "google",
+    model: "gemini-3.5-flash",
+    thinking: "enabled",
+    reasoningEffort: "medium",
+    configurationNote: "# Gemini 3.5 思考始终开启；推理强度：minimal/low/medium/high。",
     activeByDefault: false,
   },
   {

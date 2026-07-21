@@ -36,6 +36,7 @@ function formatCommonEnvSections(input: {
     "",
     "# 当前语言模型 Provider",
     "# 切换 Provider 时，需要同时替换对应的 KITTY_API_KEY。",
+    "# RPM、TPM、RPD 由 Provider 项目动态决定；运行时遵守 Retry-After 和 Provider quota facts，不在 env 硬编码。",
     ...formatProviderPreset(input.defaultPreset, {
       apiKey: input.providerKey,
       commented: false,
@@ -112,9 +113,9 @@ function formatProviderPreset(
   const prefix = options.commented ? "# " : "";
   return [
     `# Provider 预设：${preset.label}`,
-    preset.reasoningEffort
+    preset.configurationNote ?? (preset.reasoningEffort
       ? "# 思考：enabled/disabled；推理强度：high 常规，max 更充分但通常更慢。"
-      : "# 思考：enabled/disabled；此模型不使用推理强度，留空即可。",
+      : "# 思考：enabled/disabled；此模型不使用推理强度，留空即可。"),
     `${prefix}${KITTY_ENV.provider}=${preset.provider}`,
     `${prefix}${KITTY_ENV.apiKey}=${options.apiKey}`,
     `${prefix}${KITTY_ENV.baseUrl}=${getProviderPresetBaseUrl(preset)}`,

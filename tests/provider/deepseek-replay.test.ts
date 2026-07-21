@@ -112,6 +112,35 @@ test("deepseek streaming tool call preserves empty reasoning_content for replay"
   assert.equal(assistantMessage.reasoning_content, "");
 });
 
+test("deepseek non-streaming tool call preserves empty reasoning_content for replay", async () => {
+  const response = await chatCompletionsAdapter.fetchNonStreaming(createNonStreamingChatClient({
+    choices: [{
+      message: {
+        content: null,
+        reasoning_content: "",
+        tool_calls: [toolCall],
+      },
+    }],
+    usage: {
+      prompt_tokens: 100,
+      completion_tokens: 1,
+      total_tokens: 101,
+      completion_tokens_details: { reasoning_tokens: 0 },
+    },
+  }), {
+    provider: "deepseek",
+    model: "deepseek-v4-flash",
+    messages: [{ role: "user", content: "read package" }],
+    tools: undefined,
+    callbacks: undefined,
+    forceReasoning: false,
+    thinking: "enabled",
+  });
+
+  assert.equal(response.toolCalls.length, 1);
+  assert.equal(response.reasoningContent, "");
+});
+
 test("deepseek thinking tool-call replay rejects missing reasoning_content", () => {
   assert.throws(
     () => buildProviderRequestBody({
@@ -205,6 +234,8 @@ test("context compression keeps deepseek tool-call reasoning_content under hard 
     "You are Kitty.",
     [
       { role: "user", content: `old ${"x".repeat(20_000)}`, createdAt: "2026-07-01T00:00:00.000Z" },
+      { role: "assistant", content: "Old turn complete.", createdAt: "2026-07-01T00:00:00.500Z" },
+      { role: "user", content: "inspect package", createdAt: "2026-07-01T00:00:00.750Z" },
       {
         role: "assistant",
         content: "",
@@ -216,7 +247,7 @@ test("context compression keeps deepseek tool-call reasoning_content under hard 
         role: "tool",
         name: "read",
         tool_call_id: "call-1",
-        content: `{"name":"kitty","padding":"${"y".repeat(20_000)}"}`,
+        content: "{\"name\":\"kitty\"}",
         createdAt: "2026-07-01T00:00:02.000Z",
       },
     ],
@@ -351,6 +382,16 @@ function createStreamingChatClient(chunks: unknown[]) {
     chat: {
       completions: {
         create: async () => chunks,
+      },
+    },
+  } as never;
+}
+
+function createNonStreamingChatClient(completion: unknown) {
+  return {
+    chat: {
+      completions: {
+        create: async () => completion,
       },
     },
   } as never;
