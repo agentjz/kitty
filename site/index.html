@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kitty Agent</title>
-<meta name="description" content="让模型真正开始做事。认识 Kitty Agent，免费安装，查看源码，理解一个智能体如何运转。">
+<meta name="description" content="上下文就是猫咪的世界。猫咪看见什么，就基于什么理解、判断和行动。">
 <meta property="og:title" content="Kitty Agent">
-<meta property="og:description" content="让模型真正开始做事。开源、免费安装，由你选择模型。">
+<meta property="og:description" content="猫咪知道自己有什么，就会自己行动。">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet">
@@ -25,7 +25,7 @@
       <div class="topbar-links" aria-label="页面导航">
         <a href="#demo">演示</a>
         <a href="#get-started">开始</a>
-        <a href="#how-it-works">原理</a>
+        <a href="#how-it-works">猫咪的话</a>
       </div>
       <a class="github-link" href="https://github.com/luckymaomi/kitty" target="_blank" rel="noopener" aria-label="在 GitHub 打开 Kitty Agent" title="GitHub">
         <i class="bi bi-github" aria-hidden="true"></i>
@@ -39,8 +39,8 @@
     <div class="container hero-inner">
       <h1 class="hero-title">Kitty Agent</h1>
       <div class="hero-message">
-        <p class="hero-statement">让模型真正开始做事。</p>
-        <p class="hero-summary">把目标交给 Kitty。它会理解局面、拆开难题、调动合适的能力，让每一步都有回应，让进展自然发生。</p>
+        <p class="hero-statement">猫咪自己出门。</p>
+        <p class="hero-summary">看见什么，猫咪自己决定下一步。</p>
       </div>
       <div class="hero-actions">
         <a class="button button-primary" href="#get-started"><i class="bi bi-terminal" aria-hidden="true"></i>开始使用</a>
@@ -62,7 +62,7 @@
   <section class="start-band" id="get-started">
     <div class="container section-shell">
       <div class="section-heading start-heading">
-        <h2>三步，Kitty 就位。</h2>
+        <h2>三步，猫咪就位。</h2>
         <p>进入你准备开始的目录，安装、配置，然后打开 Kitty。</p>
       </div>
       <div class="start-steps">
@@ -97,11 +97,15 @@
     </div>
   </section>
 
-  <article class="guide container" aria-label="Kitty Agent 工作原理">
-    <header class="guide-intro" id="how-it-works">
-      <h2>它为什么会做事？</h2>
-      <p>从最小的工具循环开始，把记忆、上下文、计划和后台任务一层层装进来。下面拆开 Kitty，看看一个智能体是怎样运转的。</p>
-    </header>
+  <details class="guide container" id="how-it-works">
+    <summary class="guide-summary">
+      <span class="guide-summary-copy">
+        <span class="guide-summary-title">猫咪看见什么，就基于什么行动。</span>
+        <span class="guide-summary-text">这里放着猫咪一路走来留下的做事方法。打开看看。</span>
+      </span>
+      <span class="guide-summary-action" aria-hidden="true">展开 <i class="bi bi-plus-lg"></i></span>
+    </summary>
+    <div class="guide-content">
     <section class="chapter reveal" id="tool-loop">
       <div class="chapter-body">
         <h2>工具循环</h2>
@@ -187,17 +191,17 @@ skills
 抓根本逻辑。</code></pre>
         <p>skill 像一份经过试错的熟练做法。上下文先给模型可用 skill 的名字和简介；模型判断任务需要某一份经验时，调用 <code>skill_load</code> 加载完整做法。</p>
 
-        <h3>做菜例子</h3>
-        <p>假设有一个 skill 叫“西红柿炒鸡蛋”：</p>
-        <pre><code>skill 名称：西红柿炒鸡蛋
-skill 简介：适合把鸡蛋炒嫩、把西红柿炒出汁。
+        <h3>猫咪的例子</h3>
+        <p>假设有一份 skill 叫“窗边晒太阳”：</p>
+        <pre><code>skill 名称：窗边晒太阳
+skill 简介：给猫咪收拾一块舒服的太阳地。
 skill 细则：
-  先把鸡蛋炒到刚凝固，盛出来。
-  再把西红柿炒出汁。
-  最后把鸡蛋倒回锅里一起收味。</code></pre>
+  先看看太阳落在哪里。
+  再把窗边腾出来，放好靠垫。
+  最后让猫咪自己过去趴着。</code></pre>
         <p>用户输入：</p>
-        <pre><code>帮我做一盘西红柿炒鸡蛋。</code></pre>
-        <p>模型看到这份 skill 可用，判断需要这套做法，于是调用 <code>skill_load("西红柿炒鸡蛋")</code>。系统把 skill 细则放进当前上下文，模型按熟练做法继续回答。</p>
+        <pre><code>猫咪想去窗边晒太阳。</code></pre>
+        <p>猫咪看到这份 skill 可用，于是调用 <code>skill_load("窗边晒太阳")</code>。系统把 skill 细则放进当前上下文，猫咪就去找太阳。</p>
       </div>
     </section>
 
@@ -259,11 +263,11 @@ skill 细则：
 
         <h3>具体例子</h3>
         <p>用户输入：</p>
-        <pre><code>做一盘西红柿炒鸡蛋。</code></pre>
+        <pre><code>猫咪想去窗边晒太阳。</code></pre>
         <p>模型把计划写成 To Do list：</p>
-        <pre><code>[&gt;] 1. 把鸡蛋炒到刚凝固，盛出来。
-[ ] 2. 把西红柿炒出汁。
-[ ] 3. 把鸡蛋倒回锅里，一起收味。</code></pre>
+        <pre><code>[&gt;] 1. 看看太阳落在哪里。
+[ ] 2. 收拾窗边，放好靠垫。
+[ ] 3. 去晒太阳。</code></pre>
         <p><code>[&gt;]</code> 表示正在做，<code>[ ]</code> 表示后面要做。Kitty 的 To Do 只允许一个步骤处于进行中。第一步完成后，它会变成 <code>[x]</code>，第二步才变成新的 <code>[&gt;]</code>。</p>
       </div>
     </section>
@@ -296,7 +300,7 @@ skill 细则：
               <span class="cycle-node-index">02</span>
               <span>判断</span>
             </button>
-            <button class="cycle-node cycle-node-three" type="button" data-cycle-step="2" aria-label="查看读取食材步骤">
+            <button class="cycle-node cycle-node-three" type="button" data-cycle-step="2" aria-label="查看窗边情况步骤">
               <span class="cycle-node-index">03</span>
               <span>读取</span>
             </button>
@@ -336,7 +340,7 @@ skill 细则：
               </div>
             </div>
             <div class="cycle-stream" id="cycle-stream" role="log" aria-live="polite" aria-label="Agent 运行过程">
-              <div class="cycle-slot is-user" data-cycle-slot="user"><span data-cycle-label>用户</span><p data-cycle-content>做一盘西红柿炒鸡蛋。</p></div>
+              <div class="cycle-slot is-user" data-cycle-slot="user"><span data-cycle-label>用户</span><p data-cycle-content>猫咪想去窗边晒太阳。</p></div>
               <div class="cycle-slot is-steer is-empty" data-cycle-slot="steer"><span data-cycle-label>追加要求</span><p data-cycle-content></p></div>
               <div class="cycle-slot is-reasoning is-empty" data-cycle-slot="reasoning"><span data-cycle-label>思考</span><p data-cycle-content></p></div>
               <div class="cycle-slot is-result is-empty" data-cycle-slot="result"><span data-cycle-label>结果</span><p data-cycle-content></p></div>
@@ -349,21 +353,13 @@ skill 细则：
         </div>
       </div>
     </section>
-  </article>
+    <div class="guide-opening">
+      <p>经得起实战的，已经成了猫咪的一部分。概念、表演和自动化炫技里的，已经彻底移除。</p>
+    </div>
+    </div>
+  </details>
 
 </main>
-
-<footer class="site-footer">
-  <div class="container footer-inner">
-    <a class="footer-brand" href="#top"><span>Kitty Agent</span></a>
-    <div class="footer-links">
-      <a href="https://github.com/luckymaomi/kitty" target="_blank" rel="noopener">源码</a>
-      <a href="https://github.com/luckymaomi/kitty/blob/master/docs/quickstart.md" target="_blank" rel="noopener">快速开始</a>
-      <a href="https://github.com/luckymaomi/kitty/blob/master/spec.md" target="_blank" rel="noopener">技术规格</a>
-      <span>MIT License</span>
-    </div>
-  </div>
-</footer>
 
 <script src="script.js"></script>
 </body>

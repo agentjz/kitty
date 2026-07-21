@@ -7,50 +7,50 @@
   var cycleSteps = [
     {
       updates: [
-        { slot: 'user', label: '用户', text: '做一盘西红柿炒鸡蛋。' }
+        { slot: 'user', label: '用户', text: '猫咪想去窗边晒太阳。' }
       ]
     },
     {
       updates: [
-        { slot: 'reasoning', label: '思考', text: '我先确认现在有哪些食材，以及用户喜欢什么口感。', mode: 'append' }
+        { slot: 'reasoning', label: '思考', text: '我先看看太阳落在哪里，窗边有没有空地方。', mode: 'append' }
       ]
     },
     {
       updates: [
-        { slot: 'tool', label: '工具', text: 'read("食材清单.md")' },
-        { slot: 'result', label: '结果', text: '3 个西红柿、4 个鸡蛋；用户喜欢嫩一点的鸡蛋。' }
+        { slot: 'tool', label: '工具', text: 'read("窗边.md")' },
+        { slot: 'result', label: '结果', text: '下午的太阳落在窗边；书堆占着一半，靠垫在椅子上。' }
       ]
     },
     {
       updates: [
-        { slot: 'reasoning', label: '思考', text: '材料已经确认。我再加载一份稳定做法，避免凭感觉下锅。', mode: 'append' },
-        { slot: 'tool', label: '工具', text: 'skill_load("西红柿炒鸡蛋")' },
-        { slot: 'result', label: '结果', text: '鸡蛋先炒嫩，番茄炒出汁后，再把鸡蛋倒回锅里。' }
+        { slot: 'reasoning', label: '思考', text: '太阳找到了。我再拿一份收拾窗边的做法。', mode: 'append' },
+        { slot: 'tool', label: '工具', text: 'skill_load("窗边晒太阳")' },
+        { slot: 'result', label: '结果', text: '先腾出太阳地，再放好靠垫，最后让猫咪自己过去。' }
       ]
     },
     {
       updates: [
-        { slot: 'result', label: '记忆', text: '短期：食材够用，用户喜欢嫩一点的鸡蛋。\n长期：先看事实，再做判断，再行动。' }
+        { slot: 'result', label: '记忆', text: '窗边有太阳，书堆要挪开，靠垫在椅子上。' }
       ]
     },
     {
       updates: [
-        { slot: 'reasoning', label: '思考', text: '计时可以在后台进行，我不用停在原地，可以继续整理后面的步骤。', mode: 'append' },
-        { slot: 'tool', label: '工具', text: 'background_run("计时 3 分钟")' },
-        { slot: 'background', label: '后台', text: '计时任务正在运行。' }
+        { slot: 'reasoning', label: '思考', text: '靠垫晒一晒就会暖起来，我先把窗边收拾好。', mode: 'append' },
+        { slot: 'tool', label: '工具', text: 'background_run("晒靠垫 10 分钟")' },
+        { slot: 'background', label: '后台', text: '靠垫正在晒太阳。' }
       ]
     },
     {
       updates: [
-        { slot: 'steer', label: '追加要求', text: '鸡蛋再嫩一点，少放糖。' },
-        { slot: 'reasoning', label: '思考', text: '新要求已经加入。我把做法整理成三步，再按顺序执行。', mode: 'append' },
-        { slot: 'plan', label: '计划', text: '[>] 炒嫩鸡蛋\n[ ] 炒出番茄汁\n[ ] 合锅收味' }
+        { slot: 'steer', label: '追加要求', text: '猫咪喜欢靠窗左边。' },
+        { slot: 'reasoning', label: '思考', text: '新要求已经进来。左边的太阳地留给猫咪。', mode: 'append' },
+        { slot: 'plan', label: '计划', text: '[>] 挪开书堆\n[ ] 把暖靠垫放到左边\n[ ] 猫咪去晒太阳' }
       ]
     },
     {
       updates: [
-        { slot: 'plan', label: '计划', text: '[x] 鸡蛋刚凝固就盛出\n[x] 西红柿已经炒出汁\n[x] 鸡蛋倒回锅里完成收味' },
-        { slot: 'assistant', label: 'Kitty', text: '西红柿炒鸡蛋已经做好了。' }
+        { slot: 'plan', label: '计划', text: '[x] 书堆已经挪开\n[x] 暖靠垫已经放到左边\n[x] 猫咪正在晒太阳' },
+        { slot: 'assistant', label: 'Kitty', text: '这里很好。猫咪要晒太阳了。' }
       ]
     }
   ];
