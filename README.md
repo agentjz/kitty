@@ -61,6 +61,17 @@ Kitty 优先接入有免费层的模型，同时保留其他具名模型供用�
 - [设计哲学](philosophy.md)
 - [开发规则](AGENTS.md)
 
+## 联系我
+
+QQ：1773384983
+
+Wechat：yes_smile_peace
+
+<div align="center">
+  <p>微信二维码</p>
+  <img src="./site/wechat-qr.png" alt="微信二维码" width="200">
+</div>
+
 ## License
 
 [MIT](LICENSE)
