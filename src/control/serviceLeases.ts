@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 
+import { buildLeaseDeadline, DEFAULT_LEASE_MS, LeaseOwnershipLostError } from "./lease.js";
 import type { ControlDatabase } from "./sqlite.js";
 
 export interface ServiceLeaseRecord {
@@ -17,22 +18,15 @@ export class ServiceLeaseLedgerRepo {
     return this.db.transaction(() => {
       const now = new Date();
       const nowIso = now.toISOString();
-      const current = this.db.prepare("SELECT * FROM service_leases WHERE name=?").get(input.name) as {
-        owner_token: string; generation: number; lease_expires_at: string;
-      } | undefined;
-      if (current?.lease_expires_at && current.lease_expires_at > nowIso) {
-        throw new Error(`Service ${input.name} already has an active owner generation ${current.generation}.`);
-      }
       const ownerToken = crypto.randomUUID();
-      const generation = (current?.generation ?? 0) + 1;
-      const leaseExpiresAt = new Date(now.getTime() + (input.leaseMs ?? 30_000)).toISOString();
+      const leaseExpiresAt = buildLeaseDeadline(now, input.leaseMs ?? DEFAULT_LEASE_MS);
       this.db.prepare(`
         INSERT INTO service_leases (
           name, owner_token, generation, process_id, process_identity_json,
           lease_expires_at, heartbeat_at, updated_at
-        ) VALUES (@name, @ownerToken, @generation, @processId, @processIdentityJson, @leaseExpiresAt, @now, @now)
+        ) VALUES (@name, @ownerToken, 1, @processId, @processIdentityJson, @leaseExpiresAt, @now, @now)
         ON CONFLICT(name) DO UPDATE SET
-          owner_token=excluded.owner_token, generation=excluded.generation,
+          owner_token=excluded.owner_token, generation=service_leases.generation + 1,
           process_id=excluded.process_id, process_identity_json=excluded.process_identity_json,
           lease_expires_at=excluded.lease_expires_at, heartbeat_at=excluded.heartbeat_at,
           updated_at=excluded.updated_at
@@ -41,30 +35,31 @@ export class ServiceLeaseLedgerRepo {
         name: input.name,
         processId: input.processId,
         ownerToken,
-        generation,
         processIdentityJson: input.processIdentity ? JSON.stringify(input.processIdentity) : null,
         leaseExpiresAt,
         now: nowIso,
       });
       const row = this.load(input.name);
-      if (!row || row.ownerToken !== ownerToken) throw new Error(`Service ${input.name} ownership changed during acquire.`);
+      if (!row || row.ownerToken !== ownerToken) {
+        throw new Error(`Service ${input.name} already has an active owner generation ${row?.generation ?? "unknown"}.`);
+      }
       return row;
     })();
   }
 
-  heartbeat(lease: ServiceLeaseRecord, leaseMs = 30_000): ServiceLeaseRecord {
+  heartbeat(lease: ServiceLeaseRecord, leaseMs = DEFAULT_LEASE_MS): ServiceLeaseRecord {
     const now = new Date();
     const result = this.db.prepare(`
       UPDATE service_leases SET heartbeat_at=@now, lease_expires_at=@expires, updated_at=@now
-      WHERE name=@name AND owner_token=@ownerToken AND generation=@generation AND lease_expires_at > @now
+      WHERE name=@name AND owner_token=@ownerToken AND generation=@generation
     `).run({
       name: lease.name,
       ownerToken: lease.ownerToken,
       generation: lease.generation,
       now: now.toISOString(),
-      expires: new Date(now.getTime() + leaseMs).toISOString(),
+      expires: buildLeaseDeadline(now, leaseMs),
     });
-    if (result.changes !== 1) throw new Error(`Service ${lease.name} lost ownership.`);
+    if (result.changes !== 1) throw new LeaseOwnershipLostError("service", lease.name);
     return this.load(lease.name)!;
   }
 

@@ -1,5 +1,26 @@
 # 版本记录
 
+## 2026-07-24 - 租约连续性与 Host 收口修复
+
+状态：发布版本。
+
+包版本：`@jun133/kitty@4.0.10`。
+
+验证结果：
+
+- `npm.cmd run verify`：439 项，438 通过、0 失败、1 项平台跳过。
+- `npm.cmd run dev -- --version`：输出 `4.0.10`。
+- `npm.cmd run dev -- --help`：公共 CLI 入口正常。
+- `npm.cmd publish --dry-run --access public`：21 个文件，public `latest` 包合同通过。
+
+这个版本重要的原因：
+
+- lease deadline 只开启 recovery 接管资格，不再单独误判当前 owner 已失权；token、generation 与 active state 继续严格 fencing 真实 takeover。
+- turn、session、steer、tool、execution 与 service lease 统一支持无人接管时的迟到原子续租，用户在 timer 暂停后的 steer 仍进入原 turn。
+- Host 只有在 session 与 turn 终态原子提交成功后才返回 completed；真实 takeover 转成可恢复中断，不向用户暴露内部 lease/generation 错误。
+- host turn observability 补齐 durable turn ID，恢复、完成与失败可以按同一 turn 关联。
+- README 免费说明完成收敛，站点微信二维码资源同步优化。
+
 ## 2026-07-21 - Provider、工具事实与上下文重放重建
 
 状态：发布版本。

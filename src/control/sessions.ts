@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import type { ControlDatabase } from "./sqlite.js";
+import { renewTurnLease } from "./turnLease.js";
 
 import type { SessionRecord, StoredMessage } from "../types.js";
 
@@ -86,20 +87,12 @@ export class SessionLedgerRepo {
 
   saveOwned(input: { session: SessionRecord; turnId: string; ownerToken: string; ownerGeneration: number }): SessionRecord {
     return this.db.transaction(() => {
-      const now = new Date().toISOString();
-      const owner = this.db.prepare(`
-        SELECT 1 FROM session_turns
-        WHERE id=@turnId AND session_id=@sessionId AND owner_token=@ownerToken
-          AND owner_generation=@ownerGeneration
-          AND status IN ('running', 'closing') AND lease_expires_at > @now
-      `).get({
+      renewTurnLease(this.db, {
         turnId: input.turnId,
         sessionId: input.session.id,
         ownerToken: input.ownerToken,
         ownerGeneration: input.ownerGeneration,
-        now,
-      });
-      if (!owner) throw new Error(`Turn ${input.turnId} no longer owns its session lease.`);
+      }, { allowClosing: true });
       return this.save(input.session);
     })();
   }

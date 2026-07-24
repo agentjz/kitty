@@ -1,6 +1,7 @@
 import { AgentTurnError, getErrorMessage } from "../agent/errors.js";
 import { runAgentTurn } from "../agent/turn.js";
 import { ControlPlaneLedger } from "../control/ledger.js";
+import { isLeaseOwnershipLostError, type LeaseOwnershipLostError } from "../control/lease.js";
 import { resolveProjectRoots } from "../context/repoRoots.js";
 import { enterCrashContext } from "../observability/crashRecorder.js";
 import { recordHostTurnFinished, recordHostTurnStarted } from "../observability/hostEvents.js";
@@ -12,11 +13,16 @@ import type { SessionRecord } from "../types.js";
 import { consumePendingTurnSteers } from "../agent/turn/steering.js";
 import { translate } from "../i18n/index.js";
 import { createTurnScopedSessionStore } from "./turnSessionStore.js";
+import { finalizeOwnedTurn, loadLatestTurnSession } from "./turnFinalization.js";
 
 export const PRESERVE_QUEUED_TURN_ABORT_REASON = "Preserve accepted queued turn for restart.";
 export const PRESERVE_ACTIVE_TURN_ABORT_REASON = "Detach active turn for durable recovery.";
 
 class QueuedTurnDetachedError extends Error {}
+
+interface HostTurnOutcomeCandidate extends HostTurnOutcome {
+  details?: Record<string, unknown>;
+}
 
 export async function runHostTurn(
   options: HostTurnOptions,
@@ -35,14 +41,98 @@ export async function runHostTurn(
   let toolRegistry: Awaited<ReturnType<typeof createToolRegistry>> | null = null;
   let session = options.session;
   let turnRecord: { id: string; input: string; ownerToken?: string; ownerGeneration: number } | undefined;
-  let terminalStatus: "completed" | "failed" | "aborted" | undefined;
-  let detachedForRecovery = false;
   let heartbeatTimer: NodeJS.Timeout | undefined;
   const leaseAbortController = new AbortController();
   const turnAbortSignal = AbortSignal.any([
     leaseAbortController.signal,
     ...(options.abortSignal ? [options.abortSignal] : []),
   ]);
+
+  const settleOutcome = async (
+    candidate: HostTurnOutcomeCandidate,
+    settleOptions: { skipFinalization?: boolean; ownershipLoss?: LeaseOwnershipLostError } = {},
+  ): Promise<HostTurnOutcome> => {
+    let outcome = candidate;
+    let eventError = candidate.error;
+    let ownershipLoss = settleOptions.ownershipLoss;
+
+    if (turnRecord?.ownerToken && !settleOptions.skipFinalization) {
+      try {
+        const committedSession = finalizeOwnedTurn({
+          rootDir: stateRootDir,
+          session: candidate.session,
+          turnId: turnRecord.id,
+          ownerToken: turnRecord.ownerToken,
+          ownerGeneration: turnRecord.ownerGeneration,
+          status: candidate.status,
+          error: candidate.status === "completed" || !candidate.error
+            ? undefined
+            : getErrorMessage(candidate.error),
+        });
+        outcome = {
+          ...candidate,
+          session: committedSession,
+          result: candidate.result ? { ...candidate.result, session: committedSession } : undefined,
+        };
+        session = committedSession;
+      } catch (error) {
+        ownershipLoss = findLeaseOwnershipLoss(error);
+        eventError = error;
+        if (ownershipLoss) {
+          const latestSession = safelyLoadLatestTurnSession(stateRootDir, candidate.session);
+          session = latestSession;
+          outcome = {
+            status: "aborted",
+            session: latestSession,
+            error: ownershipLoss,
+            errorMessage: translate(options.config.locale, "interaction.detachedRecovery"),
+            details: { ownershipLost: true },
+          };
+        } else {
+          outcome = {
+            status: "failed",
+            session: candidate.session,
+            error,
+            errorMessage: translate(options.config.locale, "interaction.requestFailed"),
+            details: { finalizationFailed: true },
+          };
+        }
+      }
+    } else if (ownershipLoss) {
+      const latestSession = safelyLoadLatestTurnSession(stateRootDir, candidate.session);
+      session = latestSession;
+      outcome = {
+        status: "aborted",
+        session: latestSession,
+        error: ownershipLoss,
+        errorMessage: translate(options.config.locale, "interaction.detachedRecovery"),
+        details: { ownershipLost: true },
+      };
+      eventError = ownershipLoss;
+    }
+
+    if (turnRecord) {
+      await recordHostTurnFinished(stateRootDir, {
+        host,
+        sessionId: outcome.session.id,
+        turnId: turnRecord.id,
+        status: outcome.status,
+        durationMs: Date.now() - startedAt,
+        cwd: options.cwd,
+        error: eventError,
+        details: outcome.details,
+      });
+    }
+    await appendTerminalSessionEvent(
+      sessionEvents,
+      outcome,
+      options.cwd,
+      host,
+    ).catch(() => undefined);
+
+    const { details: _details, ...publicOutcome } = outcome;
+    return publicOutcome;
+  };
 
   try {
     turnRecord = await claimTurn({
@@ -59,10 +149,17 @@ export async function runHostTurn(
       try {
         const settled = existing.turns.load(turnRecord.id);
         const settledSession = existing.sessions.load(options.session.id) ?? options.session;
+        const status = settled?.status === "completed"
+          ? "completed"
+          : settled?.status === "aborted" ? "aborted" : "failed";
         return {
-          status: settled?.status === "completed" ? "completed" : settled?.status === "aborted" ? "aborted" : "failed",
+          status,
           session: settledSession,
-          errorMessage: settled?.error,
+          errorMessage: status === "failed"
+            ? translate(options.config.locale, "interaction.requestFailed")
+            : status === "aborted"
+              ? translate(options.config.locale, "interaction.turnInterrupted")
+              : undefined,
         };
       } finally {
         existing.close();
@@ -71,6 +168,7 @@ export async function runHostTurn(
     await recordHostTurnStarted(stateRootDir, {
       host,
       sessionId: options.session.id,
+      turnId: turnRecord.id,
       cwd: options.cwd,
     });
     await sessionEvents.append({
@@ -81,20 +179,11 @@ export async function runHostTurn(
       message: turnRecord.input,
     });
     if (options.abortSignal?.aborted) {
-      terminalStatus = "aborted";
-      await recordHostTurnFinished(stateRootDir, {
-        host,
-        sessionId: options.session.id,
-        status: "aborted",
-        durationMs: Date.now() - startedAt,
-        cwd: options.cwd,
-      });
-      await appendTurnAbortedEvent(sessionEvents, options.session.id, options.cwd, host);
-      return {
+      return settleOutcome({
         status: "aborted",
         session: options.session,
         errorMessage: translate(options.config.locale, "interaction.turnInterrupted"),
-      };
+      });
     }
 
     try {
@@ -121,20 +210,11 @@ export async function runHostTurn(
     });
 
     if (options.abortSignal?.aborted) {
-      terminalStatus = "aborted";
-      await recordHostTurnFinished(stateRootDir, {
-        host,
-        sessionId: options.session.id,
-        status: "aborted",
-        durationMs: Date.now() - startedAt,
-        cwd: options.cwd,
-      });
-      await appendTurnAbortedEvent(sessionEvents, options.session.id, options.cwd, host);
-      return {
+      return settleOutcome({
         status: "aborted",
         session,
         errorMessage: translate(options.config.locale, "interaction.turnInterrupted"),
-      };
+      });
     }
 
     const turnSessionStore = turnRecord?.ownerToken
@@ -195,32 +275,14 @@ export async function runHostTurn(
       }
     }
 
-    await recordHostTurnFinished(stateRootDir, {
-      host,
-      sessionId: result.session.id,
-      status: "completed",
-      durationMs: Date.now() - startedAt,
-      cwd: options.cwd,
-      details: {
-        changedPathCount: result.changedPaths.length,
-      },
-    });
-    await sessionEvents.append({
-      type: "turn.completed",
-      sessionId: result.session.id,
-      cwd: options.cwd,
-      host,
-      details: {
-        changedPathCount: result.changedPaths.length,
-      },
-    });
-
-    terminalStatus = "completed";
-    return {
+    return settleOutcome({
       status: "completed",
       session: result.session,
       result,
-    };
+      details: {
+        changedPathCount: result.changedPaths.length,
+      },
+    });
   } catch (error) {
     const failedSession = error instanceof AgentTurnError ? error.session : session;
     session = failedSession;
@@ -241,93 +303,60 @@ export async function runHostTurn(
           turnRecord.ownerGeneration,
           "Host detached while the turn was active. Resume from durable session and tool facts.",
         );
-        detachedForRecovery = true;
+      } catch (detachError) {
+        const ownershipLoss = findLeaseOwnershipLoss(detachError);
+        if (ownershipLoss) {
+          return settleOutcome({
+            status: "aborted",
+            session: failedSession,
+            error: ownershipLoss,
+            errorMessage: translate(options.config.locale, "interaction.detachedRecovery"),
+          }, { skipFinalization: true, ownershipLoss });
+        }
+        return settleOutcome({
+          status: "failed",
+          session: failedSession,
+          error: detachError,
+          errorMessage: translate(options.config.locale, "interaction.requestFailed"),
+          details: { finalizationFailed: true },
+        });
       } finally {
         recoveryLedger.close();
       }
-      return {
+      return settleOutcome({
         status: "aborted",
         session: failedSession,
         error,
         errorMessage: translate(options.config.locale, "interaction.detachedRecovery"),
-      };
+      }, { skipFinalization: true });
+    }
+    const ownershipLoss = findLeaseOwnershipLoss(error)
+      ?? findLeaseOwnershipLoss(leaseAbortController.signal.reason);
+    if (ownershipLoss) {
+      return settleOutcome({
+        status: "aborted",
+        session: failedSession,
+        error: ownershipLoss,
+        errorMessage: translate(options.config.locale, "interaction.detachedRecovery"),
+      }, { skipFinalization: true, ownershipLoss });
     }
     if (isAbortError(error)) {
-      terminalStatus = "aborted";
-      await recordHostTurnFinished(stateRootDir, {
-        host,
-        sessionId: failedSession.id,
-        status: "aborted",
-        durationMs: Date.now() - startedAt,
-        cwd: options.cwd,
-        error,
-      });
-      await appendTurnAbortedEvent(sessionEvents, failedSession.id, options.cwd, host);
-      return {
+      return settleOutcome({
         status: "aborted",
         session: failedSession,
         error,
         errorMessage: translate(options.config.locale, "interaction.turnInterrupted"),
-      };
+      });
     }
 
-    await recordHostTurnFinished(stateRootDir, {
-      host,
-      sessionId: failedSession.id,
-      status: "failed",
-      durationMs: Date.now() - startedAt,
-      cwd: options.cwd,
-      error,
-    });
-    await sessionEvents.append({
-      type: "turn.failed",
-      sessionId: failedSession.id,
-      cwd: options.cwd,
-      host,
-      message: getErrorMessage(error),
-    });
-    terminalStatus = "failed";
-    return {
+    return settleOutcome({
       status: "failed",
       session: failedSession,
       error,
       errorMessage: getErrorMessage(error),
-    };
+    });
   } finally {
     if (heartbeatTimer) clearInterval(heartbeatTimer);
-    if (turnRecord?.ownerToken && !detachedForRecovery) {
-      const ownedTurn = {
-        id: turnRecord.id,
-        ownerToken: turnRecord.ownerToken,
-        ownerGeneration: turnRecord.ownerGeneration,
-      };
-      const ledger = new ControlPlaneLedger(stateRootDir);
-      try {
-        ledger.transaction(() => {
-          const committedSession = ledger.sessions.saveOwned({
-            session,
-            turnId: ownedTurn.id,
-            ownerToken: ownedTurn.ownerToken,
-            ownerGeneration: ownedTurn.ownerGeneration,
-          });
-          Object.assign(session, committedSession);
-          if (terminalStatus === "aborted" || terminalStatus === "failed") {
-            ledger.turnSteers.rejectPending(
-              ownedTurn.id,
-              terminalStatus === "aborted" ? "The current turn was interrupted." : "The current turn failed.",
-            );
-          }
-          ledger.turns.finish(
-            ownedTurn.id,
-            ownedTurn.ownerToken,
-            ownedTurn.ownerGeneration,
-            terminalStatus ?? "failed",
-          );
-        });
-      } finally {
-        ledger.close();
-      }
-    }
     releaseCrashContext();
     await toolRegistry?.close?.().catch(() => undefined);
   }
@@ -410,4 +439,56 @@ async function appendTurnAbortedEvent(
     host,
     message: "Turn interrupted.",
   });
+}
+
+async function appendTerminalSessionEvent(
+  events: SessionEventStore,
+  outcome: HostTurnOutcomeCandidate,
+  cwd: string,
+  host: string,
+): Promise<void> {
+  if (outcome.status === "aborted") {
+    await appendTurnAbortedEvent(events, outcome.session.id, cwd, host);
+    return;
+  }
+  if (outcome.status === "failed") {
+    await events.append({
+      type: "turn.failed",
+      sessionId: outcome.session.id,
+      cwd,
+      host,
+      message: outcome.error ? getErrorMessage(outcome.error) : outcome.errorMessage,
+    });
+    return;
+  }
+  await events.append({
+    type: "turn.completed",
+    sessionId: outcome.session.id,
+    cwd,
+    host,
+    details: outcome.details,
+  });
+}
+
+function findLeaseOwnershipLoss(error: unknown): LeaseOwnershipLostError | undefined {
+  if (isLeaseOwnershipLostError(error)) return error;
+  if (typeof error !== "object" || error === null) return undefined;
+  if (error instanceof AggregateError) {
+    for (const nested of error.errors) {
+      const ownershipLoss = findLeaseOwnershipLoss(nested);
+      if (ownershipLoss) return ownershipLoss;
+    }
+  }
+  if ("cause" in error) {
+    return findLeaseOwnershipLoss((error as { cause?: unknown }).cause);
+  }
+  return undefined;
+}
+
+function safelyLoadLatestTurnSession(rootDir: string, fallback: SessionRecord): SessionRecord {
+  try {
+    return loadLatestTurnSession(rootDir, fallback.id, fallback);
+  } catch {
+    return fallback;
+  }
 }

@@ -1,4 +1,5 @@
 import type { ControlDatabase } from "./sqlite.js";
+import { renewTurnLease } from "./turnLease.js";
 
 import type { ToolEffect } from "../tools/core/types.js";
 import type { ToolResultEnvelope } from "../types.js";
@@ -71,21 +72,24 @@ export class ToolCallLedgerRepo {
   }
 
   activate(input: { callId: string; turnId: string; ownerToken: string; ownerGeneration: number }): DurableToolCall {
-    const now = new Date().toISOString();
-    const result = this.db.prepare(`
-      UPDATE tool_calls
-      SET status='running', owner_generation=(
-            SELECT owner_generation FROM session_turns WHERE id=@turnId
-          ), started_at=@now, updated_at=@now
-      WHERE turn_id=@turnId AND call_id=@callId AND status='planned'
-        AND EXISTS (
-          SELECT 1 FROM session_turns
-          WHERE id=@turnId AND owner_token=@ownerToken AND status='running' AND lease_expires_at > @now
-            AND owner_generation=@ownerGeneration
-        )
-    `).run({ ...input, now });
-    if (result.changes !== 1) throw new Error(`Tool call ${input.turnId}/${input.callId} cannot start without the active turn lease.`);
-    return this.require(input.turnId, input.callId);
+    return this.db.transaction(() => {
+      renewTurnLease(this.db, input);
+      const now = new Date().toISOString();
+      const result = this.db.prepare(`
+        UPDATE tool_calls
+        SET status='running', owner_generation=@ownerGeneration, started_at=@now, updated_at=@now
+        WHERE turn_id=@turnId AND call_id=@callId AND status='planned'
+      `).run({
+        callId: input.callId,
+        turnId: input.turnId,
+        ownerGeneration: input.ownerGeneration,
+        now,
+      });
+      if (result.changes !== 1) {
+        throw new Error(`Tool call ${input.turnId}/${input.callId} cannot start from its current state.`);
+      }
+      return this.require(input.turnId, input.callId);
+    })();
   }
 
   settle(input: {
@@ -97,38 +101,35 @@ export class ToolCallLedgerRepo {
     beforeHash?: string;
     afterHash?: string;
   }): DurableToolCall {
-    const now = new Date().toISOString();
-    const status = input.result.status;
-    const update = this.db.prepare(`
-      UPDATE tool_calls
-      SET status=@status, result_json=@resultJson, before_hash=COALESCE(@beforeHash, before_hash), after_hash=@afterHash,
-          updated_at=@now, finished_at=@now
-      WHERE turn_id=@turnId AND call_id=@callId AND status='running'
-        AND owner_generation=(SELECT owner_generation FROM session_turns WHERE id=@turnId)
-        AND EXISTS (
-          SELECT 1 FROM session_turns
-          WHERE id=@turnId AND owner_token=@ownerToken AND status IN ('running', 'closing')
-            AND lease_expires_at > @now
-            AND owner_generation=@ownerGeneration
-        )
-    `).run({
-      callId: input.callId,
-      turnId: input.turnId,
-      ownerToken: input.ownerToken,
-      ownerGeneration: input.ownerGeneration,
-      status,
-      resultJson: JSON.stringify(input.result),
-      beforeHash: input.beforeHash ?? null,
-      afterHash: input.afterHash ?? null,
-      now,
-    });
-    if (update.changes !== 1) {
+    return this.db.transaction(() => {
       const current = this.require(input.turnId, input.callId);
-      if (current.status !== status || JSON.stringify(current.result) !== JSON.stringify(input.result)) {
+      const status = input.result.status;
+      if (current.status === status && JSON.stringify(current.result) === JSON.stringify(input.result)) {
+        return current;
+      }
+      renewTurnLease(this.db, input, { allowClosing: true });
+      const now = new Date().toISOString();
+      const update = this.db.prepare(`
+        UPDATE tool_calls
+        SET status=@status, result_json=@resultJson, before_hash=COALESCE(@beforeHash, before_hash), after_hash=@afterHash,
+            updated_at=@now, finished_at=@now
+        WHERE turn_id=@turnId AND call_id=@callId AND status='running'
+          AND owner_generation=@ownerGeneration
+      `).run({
+        callId: input.callId,
+        turnId: input.turnId,
+        ownerGeneration: input.ownerGeneration,
+        status,
+        resultJson: JSON.stringify(input.result),
+        beforeHash: input.beforeHash ?? null,
+        afterHash: input.afterHash ?? null,
+        now,
+      });
+      if (update.changes !== 1) {
         throw new Error(`Tool call ${input.turnId}/${input.callId} cannot be settled from ${current.status}.`);
       }
-    }
-    return this.require(input.turnId, input.callId);
+      return this.require(input.turnId, input.callId);
+    })();
   }
 
   interruptRecoverable(sessionId: string): DurableToolCall[] {

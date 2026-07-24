@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { unknownExecution } from "../execution/errors.js";
 import { buildDeadlineAt, fromExecutionRow, toExecutionRow, type ExecutionRow } from "./executionRows.js";
+import { buildLeaseDeadline, DEFAULT_LEASE_MS, LeaseOwnershipLostError } from "./lease.js";
 import { createControlPlaneId } from "./shared.js";
 import type { ExecutionOwnership, ExecutionRecord, ExecutionStatus } from "./types.js";
 import type { ExecutionKind } from "../execution/kinds.js";
@@ -28,7 +29,7 @@ export class ExecutionLedgerRepo {
     deadlineAt?: string;
   }): ExecutionRecord {
     const now = new Date().toISOString();
-    const controllerLeaseExpiresAt = new Date(Date.now() + 30_000).toISOString();
+    const controllerLeaseExpiresAt = buildLeaseDeadline(new Date(), DEFAULT_LEASE_MS);
     const record: ExecutionRecord = {
       id: input.id ?? createControlPlaneId("exec"),
       kind: input.kind ?? "background",
@@ -169,12 +170,21 @@ export class ExecutionLedgerRepo {
     if (!isAllowedExecutionTransition(persisted.status, record.status)) {
       throw new Error(`Execution ${record.id} rejected transition ${persisted.status} -> ${record.status}.`);
     }
-    const next = { ...record, version: record.version + 1 };
-    const row = toExecutionRow(record);
+    const now = new Date();
+    const active = !isTerminalExecutionStatus(record.status);
+    const next = {
+      ...record,
+      version: record.version + 1,
+      controllerHeartbeatAt: active ? now.toISOString() : record.controllerHeartbeatAt,
+      controllerLeaseExpiresAt: active
+        ? buildLeaseDeadline(now, DEFAULT_LEASE_MS)
+        : record.controllerLeaseExpiresAt,
+    };
+    const row = toExecutionRow(next);
     delete row.kind;
     const result = this.db.prepare(`
       UPDATE executions SET
-        status=@status, version=@nextVersion, command=@command, cwd=@cwd, requested_by=@requestedBy,
+        status=@status, version=@version, command=@command, cwd=@cwd, requested_by=@requestedBy,
         owner_session_id=@ownerSessionId, created_by_session_id=@createdBySessionId,
         parent_turn_id=@parentTurnId, origin_tool_call_id=@originToolCallId,
         controller_token=@controllerToken, controller_generation=@controllerGeneration,
@@ -184,10 +194,9 @@ export class ExecutionLedgerRepo {
         last_output_at=@lastOutputAt, close_reason=@closeReason, terminated_by=@terminatedBy,
         error=@error, created_at=@createdAt, started_at=@startedAt, updated_at=@updatedAt,
         finished_at=@finishedAt, timeout_ms=@timeoutMs
-      WHERE id=@id AND version=@version
+      WHERE id=@id AND version=@expectedVersion
         AND controller_token=@controllerToken AND controller_generation=@controllerGeneration
-        AND controller_lease_expires_at > @now
-    `).run({ ...row, nextVersion: next.version, now: new Date().toISOString() });
+    `).run({ ...row, expectedVersion: record.version });
     if (result.changes !== 1) {
       throw new Error(`Execution ${record.id} rejected a stale version ${record.version} transition.`);
     }
@@ -202,9 +211,8 @@ export class ExecutionLedgerRepo {
           version=version + 1
       WHERE id=@id AND controller_token=@controllerToken AND controller_generation=@controllerGeneration
         AND status IN ('created', 'running', 'cancelling')
-        AND controller_lease_expires_at > @now
-    `).run({ ...ownership, id, now: now.toISOString(), lease: new Date(now.getTime() + leaseMs).toISOString() });
-    if (result.changes !== 1) throw new Error(`Execution ${id} no longer owns its controller lease.`);
+    `).run({ ...ownership, id, now: now.toISOString(), lease: buildLeaseDeadline(now, leaseMs) });
+    if (result.changes !== 1) throw new LeaseOwnershipLostError("execution", id);
     return this.load(id)!;
   }
 
@@ -218,7 +226,7 @@ export class ExecutionLedgerRepo {
           version=version + 1
       WHERE id=@id AND status IN ('created', 'running', 'cancelling')
         AND controller_lease_expires_at <= @now
-    `).run({ id, token, now: nowIso, lease: new Date(now.getTime() + 30_000).toISOString() });
+    `).run({ id, token, now: nowIso, lease: buildLeaseDeadline(now, DEFAULT_LEASE_MS) });
     return result.changes === 1 ? this.load(id) : undefined;
   }
 
@@ -238,7 +246,7 @@ export class ExecutionLedgerRepo {
       ownerSessionId: ownerSessionId ?? null,
       token,
       now: now.toISOString(),
-      lease: new Date(now.getTime() + 30_000).toISOString(),
+      lease: buildLeaseDeadline(now, DEFAULT_LEASE_MS),
     });
     return result.changes === 1 ? this.load(id) : undefined;
   }

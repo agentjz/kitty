@@ -122,8 +122,10 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 1. 将输入写入 durable turn queue。
 2. 按 session 队首原子 claim owner token 与单调 generation，并维持 lease heartbeat。
 3. 记录带 turn ID 的 `turn.started` 事实并创建工具注册表。
-4. 运行当前 session 的 agent turn；所有 session、steer 与工具写入都校验 token、generation 和有效 lease。
+4. 运行当前 session 的 agent turn；所有 session、steer 与工具写入都按 token、generation 和 active state 原子续租或 fencing。lease deadline 只决定 recovery 是否可以尝试接管，不单独证明当前 owner 已失权。
 5. 在同一事务提交最终 session revision 与 completed、failed 或 aborted 终态。
+
+Lease 的 ownership proof 是资源 ID、owner token、owner generation 和 active state 的匹配。原 owner 在 deadline 之后、尚未发生 generation/token/state takeover 时，heartbeat、session save、steer consume、tool transition、closing 和 terminal commit 仍可原子续租；真实 takeover 后旧 generation 的所有写入必须失败。Host 只有 durable session 与 turn 终态同一提交成功后才返回 `completed`；ownership loss 返回可恢复的中断文案，不把内部 lease、generation 或 token 错误暴露给用户。
 
 `runAgentTurn()` 负责模型/工具循环。每一轮循环：
 
@@ -290,7 +292,7 @@ Reconcile 以 lease 和 heartbeat 判断 ownership；PID 只用于诊断和进�
 
 Ctrl+C 或 controlled detach 通过 turn AbortSignal 立即中断正在等待的 `background_wait`，不伪造成功结果，也不改写 execution 终态。宿主强杀或断电后，进程内 signal 丢失；watchdog、turn/execution lease 和 tool journal 继续负责恢复。已激活但未落结果的 wait 按 read effect 结算为 `interrupted`，不能升级为未知副作用，也不能触发 `background_run` 重放。
 
-每个 execution controller 持有随机 token、单调 generation 和有限 lease。任何进入 active 状态并持久化 PID 的 execution 必须同时保存平台 creation identity；无法取得 identity 的存活进程不能进入 running，已经在登记前结束的极短进程可以从 created 直接结算 terminal 且不保存 PID。停止前必须确认 identity，避免 PID 复用误杀。普通 status、wait 和 UI projection 不取得 recovery ownership；只有 lease 过期后 recovery 才能提升 generation。
+每个 execution controller 持有随机 token、单调 generation 和有限 lease。任何进入 active 状态并持久化 PID 的 execution 必须同时保存平台 creation identity；无法取得 identity 的存活进程不能进入 running，已经在登记前结束的极短进程可以从 created 直接结算 terminal 且不保存 PID。停止前必须确认 identity，避免 PID 复用误杀。active execution 写入与 heartbeat 会在 token、generation 和 active state 匹配时刷新 lease；deadline 只开启 recovery 资格，只有 recovery 成功提升 generation 后旧 controller 才失权。普通 status、wait 和 UI projection 不取得 recovery ownership。
 
 ## 9. Runtime 事实与 Observability
 
@@ -304,7 +306,7 @@ Ctrl+C 或 controlled detach 通过 turn AbortSignal 立即中断正在等待的
 
 Observability 记录：
 
-- host turn 开始与结束；
+- host turn 开始与结束（均带 durable turn ID）；
 - provider logical request、每次 HTTP attempt、完成、失败、usage 与 request/attempt ID；
 - tool-output projection 事实；
 - session event；
@@ -326,7 +328,7 @@ Terminal log 使用 UTF-8，记录可读的用户输入、reasoning、assistant 
 
 `kitty` TUI、`kitty run`、`kitty resume`、Telegram、微信和本地 API 都进入同一条 host/agent turn 主链路。Web 是配置与运行管理壳，不创建第二条 Agent loop。`status` 与 `background` CLI 命令只暴露已存事实，不能创建平行生命周期语义。Evaluation harness 是开发脚本，不属于公共 CLI。
 
-Telegram 与微信 service 使用同一套 SQLite service lease、signal shutdown、per-peer queue、turn state、durable inbox 和 durable outbox。每个 host 的 token、generation 与 heartbeat 保证单 owner；lease 丢失立即停止 service。远端消息 ID 按 host 分区进入 `remote_inbox` 并与唯一 turn ID 绑定；`processing` 在崩溃后可重新 claim，`completed` 与 `failed` 是终态。回复和显式文件进入 `remote_outbox`，状态为 queued、sending、sent 或 uncertain；远端调用后无法确认本地提交时不得自动盲重试。发送前缺少微信 context token 时保持 queued，等待后续入站消息补全协议上下文。
+Telegram 与微信 service 使用同一套 SQLite service lease、signal shutdown、per-peer queue、turn state、durable inbox 和 durable outbox。每个 host 的 token、generation 与 heartbeat 保证单 owner；同 token/generation 在 deadline 后仍可原子 heartbeat，只有过期后被新 acquire 提升 generation 才算真正丢失 lease，旧 service 随即停止。远端消息 ID 按 host 分区进入 `remote_inbox` 并与唯一 turn ID 绑定；`processing` 在崩溃后可重新 claim，`completed` 与 `failed` 是终态。回复和显式文件进入 `remote_outbox`，状态为 queued、sending、sent 或 uncertain；远端调用后无法确认本地提交时不得自动盲重试。发送前缺少微信 context token 时保持 queued，等待后续入站消息补全协议上下文。
 
 Telegram 使用 Bot API 长轮询。微信使用 iLink SDK：`kitty weixin login` 扫码取得项目本地凭证，`kitty weixin serve` 使用 sync buffer 长轮询私聊消息，`kitty weixin logout` 清除凭证、sync buffer 与 context token。微信只接受白名单私聊，不处理群聊；文本、图片、视频、语音和文件进入同一 host turn，入站二进制先持久化为本地附件。微信正常 turn 只投影最后一条 assistant 回复和 `send_file` 显式文件，不投影 reasoning、tool、todo 或中间 assistant 文本。
 

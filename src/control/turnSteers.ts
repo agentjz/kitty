@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import type { ControlDatabase } from "./sqlite.js";
+import { renewTurnLease } from "./turnLease.js";
 
 export type TurnSteerStatus = "pending" | "consumed" | "rejected";
 
@@ -40,18 +41,16 @@ export class TurnSteerLedgerRepo {
     return this.db.transaction(() => {
       const now = new Date().toISOString();
       const turn = this.db.prepare(`
-        SELECT status, session_id, lease_expires_at
+        SELECT status, session_id
         FROM session_turns
         WHERE id = ?
       `).get(input.turnId) as {
         status: string;
         session_id: string;
-        lease_expires_at: string | null;
       } | undefined;
 
       if (!turn || turn.session_id !== input.sessionId) return undefined;
       if (turn.status !== "queued" && turn.status !== "running") return undefined;
-      if (turn.status === "running" && turn.lease_expires_at && turn.lease_expires_at <= now) return undefined;
 
       const sequence = Number((this.db.prepare(`
         SELECT COALESCE(MAX(sequence), 0) + 1 AS sequence
@@ -97,35 +96,34 @@ export class TurnSteerLedgerRepo {
   }
 
   markConsumed(input: { steerId: string; turnId: string; ownerToken: string; ownerGeneration: number }): TurnSteerRecord {
-    const now = new Date().toISOString();
-    const result = this.db.prepare(`
-      UPDATE turn_steers
-      SET status = 'consumed', consumed_at = @now,
-          consumed_generation = (
-            SELECT owner_generation FROM session_turns WHERE id = @turnId
-          )
-      WHERE id = @steerId
-        AND turn_id = @turnId
-        AND status = 'pending'
-        AND EXISTS (
-          SELECT 1 FROM session_turns
-          WHERE id = @turnId
-            AND owner_token = @ownerToken
-            AND owner_generation=@ownerGeneration
-            AND status = 'running'
-            AND lease_expires_at > @now
-        )
-    `).run({ ...input, now });
-    if (result.changes !== 1) {
+    return this.db.transaction(() => {
       const existing = this.load(input.steerId);
       const owner = this.db.prepare(`
         SELECT owner_generation AS generation FROM session_turns
-        WHERE id=@turnId AND owner_token=@ownerToken
-      `).get({ turnId: input.turnId, ownerToken: input.ownerToken }) as { generation: number } | undefined;
+        WHERE id=@turnId AND owner_token=@ownerToken AND owner_generation=@ownerGeneration
+      `).get({
+        turnId: input.turnId,
+        ownerToken: input.ownerToken,
+        ownerGeneration: input.ownerGeneration,
+      }) as { generation: number } | undefined;
       if (existing?.status === "consumed" && owner && existing.consumedGeneration === owner.generation) return existing;
-      throw new Error(`Steer ${input.steerId} cannot be consumed without the active turn lease.`);
-    }
-    return this.load(input.steerId)!;
+      renewTurnLease(this.db, input);
+      const now = new Date().toISOString();
+      const result = this.db.prepare(`
+        UPDATE turn_steers
+        SET status='consumed', consumed_at=@now, consumed_generation=@ownerGeneration
+        WHERE id=@steerId AND turn_id=@turnId AND status='pending'
+      `).run({
+        steerId: input.steerId,
+        turnId: input.turnId,
+        ownerGeneration: input.ownerGeneration,
+        now,
+      });
+      if (result.changes !== 1) {
+        throw new Error(`Steer ${input.steerId} cannot be consumed from its current state.`);
+      }
+      return this.load(input.steerId)!;
+    })();
   }
 
   rejectPending(turnId: string, reason: string): number {

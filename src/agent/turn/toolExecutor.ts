@@ -63,7 +63,7 @@ function assertExplicitOwnership(options: RunTurnOptions, session: SessionRecord
     }
     const ledger = new ControlPlaneLedger(options.stateRootDir);
     try {
-      ledger.turns.assertOwner(options.turnId, options.turnOwnerToken, options.turnOwnerGeneration);
+      ledger.turns.renewLease(options.turnId, options.turnOwnerToken, options.turnOwnerGeneration);
     } finally {
       ledger.close();
     }

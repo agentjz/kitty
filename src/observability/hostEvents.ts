@@ -8,6 +8,7 @@ export async function recordHostTurnStarted(
   input: {
     host: string;
     sessionId: string;
+    turnId: string;
     cwd: string;
   },
 ): Promise<void> {
@@ -16,6 +17,7 @@ export async function recordHostTurnStarted(
     status: "started",
     host: input.host,
     sessionId: input.sessionId,
+    turnId: input.turnId,
     details: {
       cwd: input.cwd,
     },
@@ -27,6 +29,7 @@ export async function recordHostTurnFinished(
   input: {
     host: string;
     sessionId: string;
+    turnId: string;
     status: "completed" | "aborted" | "failed";
     durationMs: number;
     cwd: string;
@@ -39,6 +42,7 @@ export async function recordHostTurnFinished(
     status: input.status,
     host: input.host,
     sessionId: input.sessionId,
+    turnId: input.turnId,
     durationMs: input.durationMs,
     error: input.error,
     details: {
