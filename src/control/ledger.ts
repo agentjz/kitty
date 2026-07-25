@@ -15,6 +15,7 @@ import { TurnSteerLedgerRepo } from "./turnSteers.js";
 import { ServiceLeaseLedgerRepo } from "./serviceLeases.js";
 import { RemoteMessageLedgerRepo } from "./remoteMessages.js";
 import { ScheduledTaskLedgerRepo } from "./scheduledTasks.js";
+import { CapabilityStateLedgerRepo } from "./capabilities.js";
 import { openControlDatabase, type ControlDatabase } from "./sqlite.js";
 
 export type {
@@ -45,6 +46,7 @@ export class ControlPlaneLedger {
   readonly serviceLeases: ServiceLeaseLedgerRepo;
   readonly remoteMessages: RemoteMessageLedgerRepo;
   readonly scheduledTasks: ScheduledTaskLedgerRepo;
+  readonly capabilities: CapabilityStateLedgerRepo;
   private readonly db: ControlDatabase;
 
   constructor(rootDir: string) {
@@ -70,6 +72,7 @@ export class ControlPlaneLedger {
     this.serviceLeases = new ServiceLeaseLedgerRepo(this.db);
     this.remoteMessages = new RemoteMessageLedgerRepo(this.db);
     this.scheduledTasks = new ScheduledTaskLedgerRepo(this.db);
+    this.capabilities = new CapabilityStateLedgerRepo(this.db);
   }
 
   transaction<T>(operation: () => T): T {
@@ -91,6 +94,7 @@ export class ControlPlaneLedger {
         throw new Error(`Project reset refused while lifecycle owners are active: ${activeTurn?.id ?? activeExecution?.id}.`);
       }
       for (const table of [
+        "capability_states",
         "turn_steers", "tool_calls", "context_epochs", "interaction_drafts", "runtime_events",
         "remote_inbox", "remote_outbox", "scheduled_triggers", "scheduled_tasks", "service_leases",
         "task_lifecycle", "session_turns", "session_messages", "wake_signals", "executions", "sessions",

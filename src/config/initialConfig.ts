@@ -1,5 +1,5 @@
 import { INITIAL_TELEGRAM_CONFIG, INITIAL_WEIXIN_CONFIG } from "./hosts.js";
-import { getInitialExtensionSwitches } from "./extensions.js";
+import { INITIAL_CAPABILITY_CONFIG } from "./capabilities.js";
 import { getDefaultProviderPreset, getProviderPresetBaseUrl } from "./providerPresets.js";
 import type { AppConfig } from "../types.js";
 import { DEFAULT_MEDIA_CONFIG } from "./media.js";
@@ -25,6 +25,6 @@ export function getInitialRuntimeConfig(): AppConfig {
     media: structuredClone(DEFAULT_MEDIA_CONFIG),
     telegram: structuredClone(INITIAL_TELEGRAM_CONFIG),
     weixin: structuredClone(INITIAL_WEIXIN_CONFIG),
-    extensions: getInitialExtensionSwitches(),
+    capabilities: structuredClone(INITIAL_CAPABILITY_CONFIG),
   };
 }

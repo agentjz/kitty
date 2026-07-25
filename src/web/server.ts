@@ -5,7 +5,7 @@ import path from "node:path";
 import { WebSocketServer } from "ws";
 
 import packageJson from "../../package.json";
-import { EXTENSION_DEFINITIONS } from "../extensions/definitions.js";
+import { closeProjectCapabilityRuntime, getProjectCapabilityManager, replaceProjectCapabilityRuntime, withProjectCapabilityManager } from "../capabilities/index.js";
 import { getProviderPresetBaseUrl, PROVIDER_PRESETS } from "../config/providerPresets.js";
 import { resolveRuntimeConfig } from "../config/runtime.js";
 import { probeProviderConnection } from "../provider/connection.js";
@@ -29,6 +29,8 @@ import { WebChatShell } from "./chatShell.js";
 import { WebSessionBindingStore } from "./sessionBinding.js";
 import { WebSkillService } from "./skillService.js";
 import { WebMediaService } from "./mediaService.js";
+import type { CapabilityManagerDependencies } from "../capabilities/manager.js";
+import type { WebChannelManagerDependencies } from "./channelManager.js";
 
 const MAX_BODY_BYTES = 1_000_000;
 
@@ -40,7 +42,12 @@ export interface LocalConsoleHandle {
   wait(): Promise<void>;
 }
 
-export async function startLocalConsole(cwd: string): Promise<LocalConsoleHandle> {
+export interface LocalConsoleDependencies {
+  capabilities?: CapabilityManagerDependencies;
+  channels?: WebChannelManagerDependencies;
+}
+
+export async function startLocalConsole(cwd: string, dependencies: LocalConsoleDependencies = {}): Promise<LocalConsoleHandle> {
   const projectRoots = await resolveProjectRoots(cwd).catch(() => ({ rootDir: cwd, stateRootDir: cwd }));
   const stateRootDir = projectRoots.stateRootDir;
   const token = crypto.randomBytes(24).toString("base64url");
@@ -48,9 +55,14 @@ export async function startLocalConsole(cwd: string): Promise<LocalConsoleHandle
   const config = new WebConfigService(cwd);
   const mediaService = new WebMediaService(cwd, stateRootDir);
   const skills = new WebSkillService(cwd);
-  const scheduler = ensureScheduledTaskRuntime(stateRootDir);
-  const channels = new WebChannelManager(cwd, events);
-  const runtime = await resolveRuntimeConfig({ cwd });
+  const channels = new WebChannelManager(cwd, events, dependencies.channels);
+  let runtime = await resolveRuntimeConfig({ cwd });
+  await skills.initialize();
+  const capabilityManager = await getProjectCapabilityManager({ cwd, stateRootDir, config: runtime, dependencies: dependencies.capabilities });
+  let activeCapabilityManager = capabilityManager;
+  capabilityManager.snapshot();
+  const initialSkillPackages = await skills.load();
+  capabilityManager.snapshot(initialSkillPackages);
   const presentation = buildWebMessages(runtime.locale);
   const sessionStore = new SessionStore(runtime.paths.sessionsDir);
   const sessionBinding = new WebSessionBindingStore(path.join(stateRootDir, ".kitty", "web", "session.json"));
@@ -63,8 +75,13 @@ export async function startLocalConsole(cwd: string): Promise<LocalConsoleHandle
   const webShell = new WebChatShell(presentation.shell);
   const webSockets = new WebSocketServer({ noServer: true });
   let catalogPublish = Promise.resolve();
+  let bindingSave = Promise.resolve();
+  const persistSessionBinding = (sessionId: string): Promise<void> => {
+    bindingSave = bindingSave.catch(() => undefined).then(() => sessionBinding.save(sessionId));
+    return bindingSave;
+  };
   const publishSessionCatalog = (): Promise<void> => {
-    catalogPublish = catalogPublish.then(async () => {
+    catalogPublish = catalogPublish.catch(() => undefined).then(async () => {
       const sessions = await sessionStore.list(20);
       webShell.broadcastSessionCatalog(webSession?.id, sessions.map((session) => ({
         id: session.id,
@@ -78,29 +95,56 @@ export async function startLocalConsole(cwd: string): Promise<LocalConsoleHandle
   const webDriver = new InteractiveSessionDriver({
     cwd,
     config: runtime,
+    getConfig: () => runtime,
     session: webSession,
     sessionStore,
     shell: webShell,
     stateRootDir,
     surface: "web",
-    onSessionChanged: (session) => { webSession = session; void sessionBinding.save(session.id); void publishSessionCatalog(); },
-    onSessionUpdated: (session) => { webSession = session; void sessionBinding.save(session.id); void publishSessionCatalog(); },
+    ownsProcessSignals: false,
+    onSessionChanged: (session) => {
+      webSession = session;
+      void persistSessionBinding(session.id).catch(() => undefined);
+      void publishSessionCatalog().catch(() => undefined);
+    },
+    onSessionUpdated: (session) => {
+      webSession = session;
+      void persistSessionBinding(session.id).catch(() => undefined);
+      void publishSessionCatalog().catch(() => undefined);
+    },
   });
+  const scheduler = ensureScheduledTaskRuntime(stateRootDir);
   const webDriverTask = webDriver.run().catch(() => undefined);
   const unsubscribeRemote = subscribeRemoteRuntimeEvents((event) => {
     if (path.resolve(event.rootDir) === path.resolve(stateRootDir)) events.publish("transcript", event);
   });
   let origin = "";
-  let closed = false;
+  let closing = false;
+  let closePromise: Promise<void> | undefined;
   let resolveClosed!: () => void;
   const closedPromise = new Promise<void>((resolve) => { resolveClosed = resolve; });
+  const shutdownController = new AbortController();
+  const activeRequests = new Set<Promise<void>>();
+  let configApplyTail = Promise.resolve();
 
   const server = http.createServer((request, response) => {
-    void route(request, response).catch((error) => {
-      sendJson(response, statusForRequestError(request), { error: error instanceof Error ? error.message : String(error) });
-    });
+    if (closing) {
+      sendJson(response, 503, { error: "The local console is closing." });
+      return;
+    }
+    let task!: Promise<void>;
+    task = route(request, response)
+      .catch((error) => {
+        sendJson(response, statusForRequestError(request), { error: describeError(error) });
+      })
+      .finally(() => activeRequests.delete(task));
+    activeRequests.add(task);
   });
   server.on("upgrade", (request, socket, head) => {
+    if (closing) {
+      socket.destroy();
+      return;
+    }
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
     if (url.pathname !== "/web" || url.searchParams.get("token") !== token) {
       socket.destroy();
@@ -122,14 +166,12 @@ export async function startLocalConsole(cwd: string): Promise<LocalConsoleHandle
       })),
     });
     if (current) webShell.replaySession(current, send);
-  }, (message) => {
-    void (async () => {
-      const selected = await sessionStore.load(message.sessionId).catch(() => null);
-      if (selected && await webDriver.selectSession(selected)) {
-        await publishSessionCatalog();
-        webShell.broadcastSessionReplay(selected);
-      }
-    })();
+  }, async (message) => {
+    const selected = await sessionStore.load(message.sessionId).catch(() => null);
+    if (selected && await webDriver.selectSession(selected)) {
+      await publishSessionCatalog();
+      webShell.broadcastSessionReplay(selected);
+    }
   });
 
   async function route(request: IncomingMessage, response: ServerResponse): Promise<void> {
@@ -151,9 +193,12 @@ export async function startLocalConsole(cwd: string): Promise<LocalConsoleHandle
       return;
     }
     if (request.method === "GET" && url.pathname === "/api/bootstrap") {
-      const [configuration, preflight, skillList] = await Promise.all([config.read(), config.preflight(), skills.list()]);
+      const [configuration, preflight, skillList, skillPackages, currentRuntime] = await Promise.all([
+        config.read(), config.preflight(), skills.list(), skills.load(), resolveRuntimeConfig({ cwd }),
+      ]);
       const locale = parseKittyLocale(configuration.values.KITTY_LOCALE) ?? DEFAULT_LOCALE;
       const messages = buildWebMessages(locale);
+      const capabilityManager = await getProjectCapabilityManager({ cwd, stateRootDir, config: currentRuntime, dependencies: dependencies.capabilities });
       return sendJson(response, 200, {
         locale,
         messages,
@@ -174,12 +219,7 @@ export async function startLocalConsole(cwd: string): Promise<LocalConsoleHandle
           videoModel: provider.videoModels.at(-1),
           officialLinks: findProviderOfficialLinks(provider.id),
         })),
-        extensions: EXTENSION_DEFINITIONS.map(({ id, envKey, defaultEnabled }) => ({
-          id,
-          envKey,
-          summary: messages.extensionSummaries[id],
-          defaultEnabled,
-        })),
+        capabilities: capabilityManager.snapshot(skillPackages),
         skills: skillList,
         channels: await channels.refreshStatus(),
       });
@@ -190,11 +230,22 @@ export async function startLocalConsole(cwd: string): Promise<LocalConsoleHandle
     }
     if (request.method === "PUT" && url.pathname === "/api/config") {
       const body = await readJsonBody(request);
-      const result = await config.save({
-        values: isRecord(body.values) ? body.values : undefined,
-        clear: Array.isArray(body.clear) ? body.clear.map(String) : undefined,
-      });
-      events.publish("config", result);
+      return sendJson(response, 200, await applyConfiguration(body));
+    }
+    const capabilityMatch = url.pathname.match(/^\/api\/capabilities\/([^/]+)$/u);
+    if (request.method === "PUT" && capabilityMatch) {
+      const body = await readJsonBody(request);
+      if (typeof body.enabled !== "boolean") throw new Error("Capability enabled must be a boolean.");
+      const enabled = body.enabled;
+      const [currentRuntime, skillPackages] = await Promise.all([resolveRuntimeConfig({ cwd }), skills.load()]);
+      const result = await withProjectCapabilityManager(
+        { cwd, stateRootDir, config: currentRuntime, dependencies: dependencies.capabilities },
+        async (manager) => {
+          const capability = await manager.setEnabled(decodeURIComponent(capabilityMatch[1]!), enabled, skillPackages);
+          return { capability, capabilities: manager.snapshot(skillPackages) };
+        },
+      );
+      events.publish("capabilities", result);
       return sendJson(response, 200, result);
     }
     if (request.method === "POST" && url.pathname === "/api/provider/probe") {
@@ -209,7 +260,7 @@ export async function startLocalConsole(cwd: string): Promise<LocalConsoleHandle
     if (request.method === "POST" && url.pathname === "/api/media/images") {
       const runtime = await resolveRuntimeConfig({ cwd });
       const body = await readJsonBody(request);
-      const controller = requestAbortController(request);
+      const controller = requestAbortController(request, response, shutdownController.signal);
       try {
         return sendJson(response, 200, await mediaService.generateImage(runtime.media, body, controller.signal));
       } finally {
@@ -219,7 +270,7 @@ export async function startLocalConsole(cwd: string): Promise<LocalConsoleHandle
     if (request.method === "POST" && url.pathname === "/api/media/videos") {
       const runtime = await resolveRuntimeConfig({ cwd });
       const body = await readJsonBody(request);
-      const controller = requestAbortController(request);
+      const controller = requestAbortController(request, response, shutdownController.signal);
       try {
         return sendJson(response, 202, await mediaService.createVideo(runtime.media, body, controller.signal));
       } finally {
@@ -230,7 +281,7 @@ export async function startLocalConsole(cwd: string): Promise<LocalConsoleHandle
     if (request.method === "POST" && pollVideoMatch) {
       const runtime = await resolveRuntimeConfig({ cwd });
       const body = await readJsonBody(request);
-      const controller = requestAbortController(request);
+      const controller = requestAbortController(request, response, shutdownController.signal);
       try {
         return sendJson(response, 200, await mediaService.pollVideo(runtime.media, decodeURIComponent(pollVideoMatch[1]!), body, controller.signal));
       } finally {
@@ -265,17 +316,126 @@ export async function startLocalConsole(cwd: string): Promise<LocalConsoleHandle
       await channels[action](name);
       return sendJson(response, 200, channels.status());
     }
+    if (request.method === "POST" && url.pathname === "/api/skills") {
+      const body = await readJsonBody(request);
+      if (typeof body.name !== "string" || typeof body.description !== "string" || typeof body.instructions !== "string") {
+        throw new Error("Skill name, description, and instructions must be strings.");
+      }
+      const skill = await skills.create({ name: body.name, description: body.description, instructions: body.instructions });
+      const [currentRuntime, skillPackages, skillList] = await Promise.all([
+        resolveRuntimeConfig({ cwd }), skills.load(), skills.list(),
+      ]);
+      const manager = await getProjectCapabilityManager({ cwd, stateRootDir, config: currentRuntime, dependencies: dependencies.capabilities });
+      const result = { skill, skills: skillList, capabilities: manager.snapshot(skillPackages) };
+      events.publish("capabilities", result);
+      return sendJson(response, 201, result);
+    }
     const skillMatch = url.pathname.match(/^\/api\/skills\/([^/]+)$/u);
     if (skillMatch && request.method === "GET") {
-      return sendJson(response, 200, { source: await skills.read(decodeURIComponent(skillMatch[1]!)) });
+      return sendJson(response, 200, await skills.inspect(decodeURIComponent(skillMatch[1]!)));
+    }
+    if (skillMatch && request.method === "PUT") {
+      const body = await readJsonBody(request);
+      if (typeof body.description !== "string" || typeof body.instructions !== "string") {
+        throw new Error("Skill description and instructions must be strings.");
+      }
+      const name = decodeURIComponent(skillMatch[1]!);
+      const skill = await skills.update(name, { description: body.description, instructions: body.instructions });
+      const [currentRuntime, skillPackages, skillList] = await Promise.all([
+        resolveRuntimeConfig({ cwd }), skills.load(), skills.list(),
+      ]);
+      const manager = await getProjectCapabilityManager({ cwd, stateRootDir, config: currentRuntime, dependencies: dependencies.capabilities });
+      const result = { skill, skills: skillList, capabilities: manager.snapshot(skillPackages) };
+      events.publish("capabilities", result);
+      return sendJson(response, 200, result);
+    }
+    if (skillMatch && request.method === "DELETE") {
+      const name = decodeURIComponent(skillMatch[1]!);
+      await skills.delete(name);
+      const currentRuntime = await resolveRuntimeConfig({ cwd });
+      const manager = await getProjectCapabilityManager({ cwd, stateRootDir, config: currentRuntime, dependencies: dependencies.capabilities });
+      manager.removeSkill(name);
+      const [skillPackages, skillList] = await Promise.all([skills.load(), skills.list()]);
+      const result = { deleted: name, skills: skillList, capabilities: manager.snapshot(skillPackages) };
+      events.publish("capabilities", result);
+      return sendJson(response, 200, result);
     }
     sendJson(response, 404, { error: "Unknown local console route." });
   }
 
-  await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => resolve());
-  });
+  function applyConfiguration(body: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const operation = configApplyTail.catch(() => undefined).then(async () => {
+      const result = await config.save({
+        values: isRecord(body.values) ? body.values : undefined,
+        clear: Array.isArray(body.clear) ? body.clear.map(String) : undefined,
+      });
+      const skillPackages = await skills.load();
+      let manager = activeCapabilityManager;
+      let runtimeApplyError: string | undefined;
+      try {
+        const nextRuntime = await resolveRuntimeConfig({ cwd });
+        runtime = nextRuntime;
+        webShell.setLabels(buildWebMessages(runtime.locale).shell);
+        manager = await replaceProjectCapabilityRuntime({ cwd, stateRootDir, config: runtime, dependencies: dependencies.capabilities });
+        activeCapabilityManager = manager;
+      } catch (error) {
+        runtimeApplyError = describeError(error);
+        try {
+          manager = await getProjectCapabilityManager({ cwd, stateRootDir, config: runtime, dependencies: dependencies.capabilities });
+          activeCapabilityManager = manager;
+        } catch {
+          // The committed configuration remains accepted; the existing projection carries the cleanup evidence.
+        }
+      }
+      const capabilities = manager.snapshot(skillPackages);
+      events.publish("config", result);
+      events.publish("capabilities", { capabilities, runtimeApplyError });
+      return { ...result, capabilities, runtimeApplyError };
+    });
+    configApplyTail = operation.then(() => undefined, () => undefined);
+    return operation;
+  }
+
+  const close = (): Promise<void> => {
+    closePromise ??= closeOwned();
+    return closePromise;
+  };
+
+  const closeOwned = async (): Promise<void> => {
+    closing = true;
+    const errors: unknown[] = [];
+    const serverClose = closeHttpServer(server);
+    shutdownController.abort(new Error("The local console is closing."));
+    webShell.stopAdmission();
+    events.close();
+    server.closeIdleConnections?.();
+    try {
+      await settleAll([webShell.waitForIdle()], errors);
+      webShell.input.close();
+      await settleAll([...activeRequests], errors);
+      await settleAll([configApplyTail], errors);
+      await settleAll([catalogPublish, bindingSave], errors);
+      webShell.dispose();
+      await settleAll([channels.close(), scheduler.stop(), webDriverTask], errors);
+      await settleAll([closeProjectCapabilityRuntime(stateRootDir)], errors);
+      await settleAll([closeWebSocketServer(webSockets), serverClose], errors);
+    } finally {
+      unsubscribeRemote();
+      resolveClosed();
+    }
+    if (errors.length > 0) throw new AggregateError(errors, "Local console cleanup was incomplete.");
+  };
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(0, "127.0.0.1", () => resolve());
+    });
+  } catch (error) {
+    const errors: unknown[] = [error];
+    await close().catch((cleanupError) => errors.push(cleanupError));
+    throw new AggregateError(errors, "Local console startup failed.");
+  }
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("Local console did not receive a TCP address.");
   origin = `http://127.0.0.1:${address.port}`;
@@ -284,19 +444,7 @@ export async function startLocalConsole(cwd: string): Promise<LocalConsoleHandle
     url: `${origin}/?token=${encodeURIComponent(token)}`,
     token,
     wait: () => closedPromise,
-    async close() {
-      if (closed) return;
-      closed = true;
-      unsubscribeRemote();
-      await channels.stopAll();
-      await scheduler.stop();
-      webShell.dispose();
-      await webDriverTask;
-      await new Promise<void>((resolve) => webSockets.close(() => resolve()));
-      events.close();
-      await new Promise<void>((resolve) => server.close(() => resolve()));
-      resolveClosed();
-    },
+    close,
     webUrl: `${origin}/web?token=${encodeURIComponent(token)}`,
   };
 }
@@ -308,8 +456,8 @@ async function serveStatic(pathname: string, response: ServerResponse): Promise<
     "/web": ["chat.html", "text/html; charset=utf-8"],
     "/web/": ["chat.html", "text/html; charset=utf-8"],
     "/app.js": ["app.js", "text/javascript; charset=utf-8"],
-    "/channelStream.js": ["channelStream.js", "text/javascript; charset=utf-8"],
     "/workflowViews.js": ["workflowViews.js", "text/javascript; charset=utf-8"],
+    "/channelStream.js": ["channelStream.js", "text/javascript; charset=utf-8"],
     "/styles.css": ["styles.css", "text/css; charset=utf-8"],
     "/vendor/bootstrap.min.css": ["vendor/bootstrap.min.css", "text/css; charset=utf-8"],
     "/vendor/bootstrap.bundle.min.js": ["vendor/bootstrap.bundle.min.js", "text/javascript; charset=utf-8"],
@@ -370,19 +518,50 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function sendJson(response: ServerResponse, status: number, value: unknown): void {
-  if (response.headersSent) return;
+  if (response.headersSent || response.destroyed) return;
   response.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
   response.end(`${JSON.stringify(value)}\n`);
 }
 
-function requestAbortController(request: IncomingMessage): { signal: AbortSignal; cleanup: () => void } {
+function requestAbortController(
+  request: IncomingMessage,
+  response: ServerResponse,
+  shutdownSignal: AbortSignal,
+): { signal: AbortSignal; cleanup: () => void } {
   const controller = new AbortController();
-  const abort = () => controller.abort();
+  const abort = () => controller.abort(new Error("The local request was disconnected."));
+  const shutdown = () => controller.abort(shutdownSignal.reason);
   request.once("aborted", abort);
+  response.once("close", abort);
+  shutdownSignal.addEventListener("abort", shutdown, { once: true });
   return {
     signal: controller.signal,
-    cleanup: () => request.removeListener("aborted", abort),
+    cleanup: () => {
+      request.removeListener("aborted", abort);
+      response.removeListener("close", abort);
+      shutdownSignal.removeEventListener("abort", shutdown);
+    },
   };
+}
+
+async function settleAll(promises: readonly Promise<unknown>[], errors: unknown[]): Promise<void> {
+  const results = await Promise.allSettled(promises);
+  for (const result of results) {
+    if (result.status === "rejected") errors.push(result.reason);
+  }
+}
+
+function closeHttpServer(server: http.Server): Promise<void> {
+  if (!server.listening) return Promise.resolve();
+  return new Promise<void>((resolve, reject) => {
+    server.close((error) => error ? reject(error) : resolve());
+  });
+}
+
+function closeWebSocketServer(server: WebSocketServer): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    server.close((error) => error ? reject(error) : resolve());
+  });
 }
 
 function statusForRequestError(request: IncomingMessage): number {
@@ -390,4 +569,12 @@ function statusForRequestError(request: IncomingMessage): number {
   if (pathname.startsWith("/api/config") || pathname.startsWith("/api/skills")) return 400;
   if (pathname.startsWith("/api/provider") || pathname.startsWith("/api/media") || pathname.startsWith("/api/telegram") || pathname.startsWith("/api/weixin") || pathname.startsWith("/api/channels")) return 422;
   return 500;
+}
+
+function describeError(error: unknown): string {
+  if (error instanceof AggregateError) {
+    const details = error.errors.map(describeError).filter(Boolean);
+    return details.length > 0 ? `${error.message}: ${details.join("; ")}` : error.message;
+  }
+  return error instanceof Error ? error.message : String(error);
 }

@@ -1,5 +1,28 @@
 # 版本记录
 
+## 2026-07-25 - 统一能力系统与本地控制台生命周期重建
+
+状态：发布版本。
+
+包版本：`@jun133/kitty@4.0.11`。
+
+验证结果：
+
+- `npm.cmd run verify`：458 项，457 通过、0 失败、1 项 POSIX 平台跳过。
+- `node dist/cli.js --version`：输出 `4.0.11`；`node dist/cli.js --help` 公共命令正常。
+- 真实 Web 能力返回 8 条搜索结果，读取 Node.js 页面并下载校验 326,014 bytes。
+- 真实 Playwright MCP 发现 24 个工具，连续借用复用同一 PID，关闭后确认进程消失。
+- `node dist/cli.js run` 真实调用 `playwright_browser_navigate` 成功，工具派发结算为 `settled`。
+- `npm.cmd publish --dry-run --access public`：21 个文件，无原生 addon，public `latest` 包合同通过。
+
+这个版本重要的原因：
+
+- 核心工具、内置能力、项目 Skill、Playwright MCP 与基础 Web 进入同一个能力管理器；`ToolRegistry` 继续独占模型工具执行和工具账本。
+- 基础 Web 无需凭证，提供真实搜索、有界网页读取和原子下载；外部派发丢失响应时结算为 `uncertain`，不盲目重放。
+- Playwright 使用项目范围持久客户端池、owner token、generation、heartbeat、lease 与进程 identity，并修复生产 ESM TUI 中 MCP 工具无法注册的问题。
+- `kitty start` 保留欢迎便签、Web、媒体、微信和 Telegram，按独立工作流展示模型、工具与扩展、Skill 和其他设置；Skill 只从 `skills/**/SKILL.md` 加载并支持同权 CRUD。
+- 本地控制台关闭、配置提交、WebSocket 控制、远程通道和能力运行时替换收敛为可排空、可恢复、幂等的单 owner 生命周期。
+
 ## 2026-07-24 - 租约连续性与 Host 收口修复
 
 状态：发布版本。

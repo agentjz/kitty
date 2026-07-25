@@ -1,5 +1,5 @@
 import type { TelegramConfig, TelegramRuntimeConfig, WeixinConfig, WeixinRuntimeConfig } from "../config/hosts.js";
-import type { ExtensionToggleConfig } from "../config/extensions.js";
+import type { CapabilityConfig, CapabilityRuntimeConfig } from "../config/capabilities.js";
 import type { KittyLocale } from "../i18n/index.js";
 
 export type ModelThinkingMode = "enabled" | "disabled";
@@ -46,7 +46,7 @@ export interface AppConfig {
   media: MediaConfig;
   telegram: TelegramConfig;
   weixin: WeixinConfig;
-  extensions: ExtensionToggleConfig;
+  capabilities: CapabilityConfig;
 }
 
 export interface RuntimeConfig extends AppConfig {
@@ -55,6 +55,7 @@ export interface RuntimeConfig extends AppConfig {
   paths: AppPaths;
   telegram: TelegramRuntimeConfig;
   weixin: WeixinRuntimeConfig;
+  capabilities: CapabilityRuntimeConfig;
 }
 
 export interface CliOverrides {

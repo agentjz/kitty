@@ -13,6 +13,10 @@ export type {
   RuntimeConfig,
 } from "./types/config.js";
 export type {
+  CapabilityConfig,
+  CapabilityRuntimeConfig,
+} from "./config/capabilities.js";
+export type {
   ContextBudgetHotspot,
   ContextBudgetReport,
 } from "./types/contextBudget.js";

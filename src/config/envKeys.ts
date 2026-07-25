@@ -1,5 +1,3 @@
-import { EXTENSION_ENV_KEYS } from "../extensions/definitions.js";
-
 export const KITTY_BASE_ENV = {
   locale: "KITTY_LOCALE",
   apiKey: "KITTY_API_KEY",
@@ -17,6 +15,8 @@ export const KITTY_BASE_ENV = {
   projectDocMaxBytes: "KITTY_PROJECT_DOC_MAX_BYTES",
   commandStallTimeoutMs: "KITTY_COMMAND_STALL_TIMEOUT_MS",
   showReasoning: "KITTY_SHOW_REASONING",
+  playwrightHeadless: "KITTY_PLAYWRIGHT_HEADLESS",
+  playwrightTimeoutMs: "KITTY_PLAYWRIGHT_TIMEOUT_MS",
   mediaProvider: "KITTY_MEDIA_PROVIDER",
   mediaBaseUrl: "KITTY_MEDIA_BASE_URL",
   mediaApiKey: "KITTY_MEDIA_API_KEY",
@@ -49,7 +49,6 @@ export const KITTY_BASE_ENV = {
 
 export const KITTY_ENV = {
   ...KITTY_BASE_ENV,
-  extensions: EXTENSION_ENV_KEYS,
 } as const;
 
-export type KittyEnvKey = (typeof KITTY_BASE_ENV)[keyof typeof KITTY_BASE_ENV] | (typeof EXTENSION_ENV_KEYS)[keyof typeof EXTENSION_ENV_KEYS];
+export type KittyEnvKey = (typeof KITTY_BASE_ENV)[keyof typeof KITTY_BASE_ENV];

@@ -4,7 +4,7 @@ export const LOCAL_EVALUATION_CHECK_IDS: readonly EvaluationCheckId[] = [
   "runtime-status-builds",
   "project-map-builds",
   "context-epochs-readable",
-  "extension-surface-current",
+  "capability-surface-current",
   "skill-packages-readable",
   "config-preflight-readable",
   "cache-economy-ready",
@@ -39,11 +39,11 @@ export const EVALUATION_SCENARIOS: readonly EvaluationScenario[] = [
     evidence: "读取 SQLite context epoch，并确认 source count、last message、prefix hash 和 budget 可用。",
   },
   {
-    id: "extension-surface-current",
+    id: "capability-surface-current",
     suite: "local",
     title: "工具面只暴露当前能力",
-    userPath: "默认 agent 打开当前真实 extensions，不复活已删除能力。",
-    evidence: "读取 extension registry，并确认默认启用面来自当前定义。",
+    userPath: "默认 agent 打开当前真实能力，不复活已删除能力。",
+    evidence: "读取能力管理器定义，并确认默认启用面来自当前定义。",
   },
   {
     id: "skill-packages-readable",

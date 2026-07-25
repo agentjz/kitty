@@ -115,13 +115,15 @@ export async function runCacheEconomyCheck(id: EvaluationCheckId): Promise<Evalu
       cached_tokens: 960,
     },
   });
+  const initialConfig = getInitialRuntimeConfig();
   const config = {
-    ...getInitialRuntimeConfig(),
+    ...initialConfig,
     apiKey: "eval-key",
-    media: { ...getInitialRuntimeConfig().media, apiKey: "eval-key" },
+    media: { ...initialConfig.media, apiKey: "eval-key" },
+    capabilities: structuredClone(initialConfig.capabilities),
     model: "agnes-2.0-flash",
-    telegram: resolveTelegramRuntimeConfig(getInitialRuntimeConfig().telegram, process.cwd()),
-    weixin: resolveWeixinRuntimeConfig(getInitialRuntimeConfig().weixin, process.cwd()),
+    telegram: resolveTelegramRuntimeConfig(initialConfig.telegram, process.cwd()),
+    weixin: resolveWeixinRuntimeConfig(initialConfig.weixin, process.cwd()),
     paths: getAppPaths(process.cwd()),
   };
   const projectContext = {

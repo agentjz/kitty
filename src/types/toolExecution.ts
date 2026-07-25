@@ -3,6 +3,11 @@ import type { ToolDiagnosticsReport } from "./diagnostics.js";
 import type { ToolOutputGovernance } from "../tools/outputGovernance/index.js";
 
 export interface ToolExecutionMetadata {
+  external?: {
+    operationId: string;
+    dispatchState: "dispatched" | "settled";
+    outcome?: "uncertain";
+  };
   artifacts?: Array<{
     kind: "file";
     path: string;

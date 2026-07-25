@@ -29,6 +29,7 @@ export interface InteractiveTurnContext {
 export interface InteractiveSessionDriverOptions {
   cwd: string;
   config: RuntimeConfig;
+  getConfig?: () => RuntimeConfig;
   session: SessionRecord;
   sessionStore: SessionStoreLike;
   shell: InteractionShell;
@@ -40,6 +41,7 @@ export interface InteractiveSessionDriverOptions {
   onSessionChanged?: (session: SessionRecord) => void;
   stateRootDir: string;
   surface?: LocalCommandSurface;
+  ownsProcessSignals?: boolean;
 }
 
 interface ActiveTurnOperation {
@@ -84,7 +86,9 @@ export class InteractiveSessionDriver {
     const releaseInterrupt = this.options.shell.input.bindInterrupt(() => {
       this.handleInterrupt();
     });
-    const releaseProcessTermination = this.bindProcessTerminationCleanup();
+    const releaseProcessTermination = this.options.ownsProcessSignals === false
+      ? () => undefined
+      : this.bindProcessTerminationCleanup();
 
     try {
       this.resumePendingTurns();
@@ -139,7 +143,7 @@ export class InteractiveSessionDriver {
           cwd: this.options.cwd,
           stateRootDir: this.options.stateRootDir,
           session: this.session,
-          config: this.options.config,
+          config: this.runtimeConfig(),
           sessionStore: this.options.sessionStore,
         },
         this.options.shell.output,
@@ -338,10 +342,11 @@ export class InteractiveSessionDriver {
 
   private async executeTurn(operation: ActiveTurnOperation, admittedTurnId?: string): Promise<void> {
     const { input, controller } = operation;
+    const config = this.runtimeConfig();
     this.options.shell.output.plain(formatSubmittedInput(input));
     const turnDisplay = this.options.shell.createTurnDisplay({
       cwd: this.options.cwd,
-      config: this.options.config,
+      config,
       abortSignal: controller.signal,
     });
 
@@ -352,7 +357,7 @@ export class InteractiveSessionDriver {
         input,
         cwd: turnContext?.cwd ?? this.options.cwd,
         stateRootDir: this.options.stateRootDir,
-        config: this.options.config,
+        config,
         session: this.session,
         sessionStore: this.options.sessionStore,
         builtinToolFilter: turnContext?.builtinToolFilter,
@@ -468,7 +473,11 @@ export class InteractiveSessionDriver {
   }
 
   private t(key: MessageKey, values: Readonly<Record<string, string | number>> = {}): string {
-    return translate(this.options.config.locale, key, values);
+    return translate(this.runtimeConfig().locale, key, values);
+  }
+
+  private runtimeConfig(): RuntimeConfig {
+    return this.options.getConfig?.() ?? this.options.config;
   }
 }
 

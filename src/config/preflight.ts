@@ -145,10 +145,7 @@ function buildPreflightNextSteps(input: {
 }
 
 function readExpectedEnvKeys(): string[] {
-  return [
-    ...Object.values(KITTY_BASE_ENV),
-    ...Object.values(KITTY_ENV.extensions),
-  ].sort();
+  return [...Object.values(KITTY_BASE_ENV)].sort();
 }
 
 async function inspectFile(targetPath: string): Promise<ConfigPreflightFile> {

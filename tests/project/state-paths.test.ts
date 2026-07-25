@@ -10,7 +10,7 @@ import {
 } from "../../src/project/statePaths.js";
 import { createTempWorkspace } from "../helpers.js";
 
-test("project state paths centralize extension and observability state", async (t) => {
+test("project state paths centralize capability and observability state", async (t) => {
   const root = await createTempWorkspace("project-state", t);
   const paths = getProjectStatePaths(root);
 
@@ -18,15 +18,15 @@ test("project state paths centralize extension and observability state", async (
   assert.equal(paths.sessionsDir.startsWith(paths.kittyDir), true);
   assert.equal(paths.changesDir.startsWith(paths.kittyDir), true);
   assert.equal(paths.eventsDir.startsWith(paths.kittyDir), true);
-  assert.equal(paths.extensionsDir.startsWith(paths.kittyDir), true);
+  assert.equal(paths.capabilitiesDir.startsWith(paths.kittyDir), true);
   assert.equal(paths.controlPlaneLedgerFile.startsWith(paths.kittyDir), true);
   assert.equal(paths.observabilityEventsDir.includes("observability"), true);
   assert.deepEqual(Object.keys(paths).sort(), [
     "cacheDir",
+    "capabilitiesDir",
     "changesDir",
     "controlPlaneLedgerFile",
     "eventsDir",
-    "extensionsDir",
     "kittyDir",
     "observabilityCrashesDir",
     "observabilityDir",
@@ -39,6 +39,6 @@ test("project state paths centralize extension and observability state", async (
   assert.equal((await fs.stat(paths.sessionsDir)).isDirectory(), true);
   assert.equal((await fs.stat(paths.changesDir)).isDirectory(), true);
   assert.equal((await fs.stat(paths.eventsDir)).isDirectory(), true);
-  assert.equal((await fs.stat(paths.extensionsDir)).isDirectory(), true);
+  assert.equal((await fs.stat(paths.capabilitiesDir)).isDirectory(), true);
   assert.equal((await fs.stat(paths.observabilityEventsDir)).isDirectory(), true);
 });

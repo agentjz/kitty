@@ -18,6 +18,7 @@ test("project env template provides a complete active runtime configuration", ()
   assert.equal(local.get(KITTY_ENV.model), initialConfig.model);
   assert.equal(local.get(KITTY_ENV.thinking), initialConfig.thinking);
   assert.equal(local.get(KITTY_ENV.reasoningEffort), initialConfig.reasoningEffort ?? "");
+  assert.equal(local.get(KITTY_ENV.playwrightHeadless), "false");
 });
 
 function readEnvAssignments(content: string): Map<string, string> {
@@ -32,8 +33,5 @@ function readEnvAssignments(content: string): Map<string, string> {
 }
 
 function expectedActiveEnvKeys(): string[] {
-  return [
-    ...Object.values(KITTY_BASE_ENV),
-    ...Object.values(KITTY_ENV.extensions),
-  ].sort();
+  return [...Object.values(KITTY_BASE_ENV)].sort();
 }

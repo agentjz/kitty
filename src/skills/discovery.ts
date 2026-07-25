@@ -5,7 +5,13 @@ import fg from "fast-glob";
 
 import type { LoadedSkill, ProjectIgnoreRule } from "../types.js";
 import { isPathIgnored } from "../utils/ignore.js";
-import { parseSkillSource } from "./schema.js";
+import {
+  parseSkillSource,
+  SKILL_FILE_NAME,
+  SkillSchemaError,
+  STANDARD_SKILLS_DIR_NAME,
+  validateSkillName,
+} from "./schema.js";
 
 const SKILL_RESOURCE_GLOBS = [
   "references/**",
@@ -27,7 +33,7 @@ export async function discoverSkills(
   cwd: string,
   ignoreRules: ProjectIgnoreRule[],
 ): Promise<LoadedSkill[]> {
-  const skillFiles = await findSkillFiles(rootDir, cwd);
+  const skillFiles = await findSkillFiles(cwd);
   const seenPaths = new Set<string>();
   const seenNames = new Map<string, string>();
   const skills: LoadedSkill[] = [];
@@ -43,6 +49,14 @@ export async function discoverSkills(
       absolutePath: normalizedPath,
       rootDir,
     });
+    const packageName = path.basename(path.dirname(normalizedPath));
+    validateSkillName(packageName, normalizedPath);
+    if (skill.name !== packageName) {
+      throw new SkillSchemaError(
+        `Skill metadata field "name" must match its package directory "${packageName}".`,
+        normalizedPath,
+      );
+    }
     skill.resources = await listSkillResources(skill.absolutePath, rootDir, ignoreRules);
     skill.health = buildSkillPackageHealth(skill);
     const existingPath = seenNames.get(skill.name);
@@ -67,15 +81,24 @@ async function listSkillResources(
     absolute: true,
     dot: true,
     onlyFiles: true,
+    followSymbolicLinks: false,
     suppressErrors: true,
     ignore: [...IGNORED_SKILL_RESOURCE_GLOBS],
   });
   const resources = [];
+  const realSkillDir = await fs.realpath(skillDir);
   for (const file of uniquePaths(files).sort((left, right) => left.localeCompare(right))) {
     if (isPathIgnored(file, ignoreRules)) {
       continue;
     }
-    const stat = await fs.stat(file);
+    const stat = await fs.lstat(file);
+    if (stat.isSymbolicLink() || !stat.isFile()) {
+      continue;
+    }
+    const realFile = await fs.realpath(file);
+    if (!isPathInside(realSkillDir, realFile)) {
+      continue;
+    }
     resources.push({
       path: path.relative(rootDir, file),
       size: stat.size,
@@ -129,56 +152,71 @@ function buildSkillPackageHealth(skill: LoadedSkill): LoadedSkill["health"] {
   };
 }
 
-async function findSkillFiles(rootDir: string, cwd: string): Promise<string[]> {
-  const candidates = uniquePaths([
-    path.join(rootDir, "SKILL.md"),
-    path.join(cwd, "SKILL.md"),
-  ]);
-  const roots = uniquePaths([
-    path.join(rootDir, ".skills"),
-    path.join(rootDir, "skills"),
-    path.join(cwd, ".skills"),
-    path.join(cwd, "skills"),
-  ]);
-
-  const files: string[] = [];
-  for (const candidate of candidates) {
-    if (await isRegularFile(candidate)) {
-      files.push(candidate);
-    }
+async function findSkillFiles(cwd: string): Promise<string[]> {
+  const skillRoot = path.join(cwd, STANDARD_SKILLS_DIR_NAME);
+  const realSkillRoot = await readRealDirectory(skillRoot);
+  if (!realSkillRoot) {
+    return [];
   }
-
-  for (const root of roots) {
-    if (!(await isDirectory(root))) {
+  const candidates = await fg(`**/${SKILL_FILE_NAME}`, {
+    cwd: skillRoot,
+    absolute: true,
+    dot: true,
+    onlyFiles: true,
+    followSymbolicLinks: false,
+    suppressErrors: true,
+    ignore: ["**/node_modules/**", "**/.git/**", "**/dist/**"],
+  });
+  const files: string[] = [];
+  for (const skillFile of uniquePaths(candidates)) {
+    const packageRoot = path.dirname(skillFile);
+    const realPackageRoot = await readRealDirectory(packageRoot);
+    if (!realPackageRoot || !isPathInside(realSkillRoot, realPackageRoot)) {
       continue;
     }
-    files.push(...await fg("**/SKILL.md", {
-      cwd: root,
-      absolute: true,
-      dot: true,
-      onlyFiles: true,
-      suppressErrors: true,
-      ignore: ["**/node_modules/**", "**/.git/**", "**/dist/**"],
-    }));
+    if (await isRealFileAt(skillFile, path.join(realPackageRoot, SKILL_FILE_NAME))) {
+      files.push(skillFile);
+    }
   }
 
   return uniquePaths(files).sort((left, right) => left.localeCompare(right));
 }
 
-async function isRegularFile(filePath: string): Promise<boolean> {
+async function readRealDirectory(directoryPath: string): Promise<string | undefined> {
   try {
-    return (await fs.stat(filePath)).isFile();
+    const stat = await fs.lstat(directoryPath);
+    if (stat.isSymbolicLink() || !stat.isDirectory()) {
+      return undefined;
+    }
+    return await fs.realpath(directoryPath);
+  } catch {
+    return undefined;
+  }
+}
+
+async function isRealFileAt(filePath: string, expectedRealPath: string): Promise<boolean> {
+  try {
+    const stat = await fs.lstat(filePath);
+    if (stat.isSymbolicLink() || !stat.isFile()) {
+      return false;
+    }
+    return pathsEqual(await fs.realpath(filePath), expectedRealPath);
   } catch {
     return false;
   }
 }
 
-async function isDirectory(filePath: string): Promise<boolean> {
-  try {
-    return (await fs.stat(filePath)).isDirectory();
-  } catch {
-    return false;
-  }
+function isPathInside(parent: string, target: string): boolean {
+  const relative = path.relative(parent, target);
+  return relative.length > 0 && !relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative);
+}
+
+function pathsEqual(left: string, right: string): boolean {
+  const normalizedLeft = path.resolve(left);
+  const normalizedRight = path.resolve(right);
+  return process.platform === "win32"
+    ? normalizedLeft.toLowerCase() === normalizedRight.toLowerCase()
+    : normalizedLeft === normalizedRight;
 }
 
 function uniquePaths(paths: string[]): string[] {

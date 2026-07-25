@@ -5,7 +5,7 @@ import test from "node:test";
 
 import { runAgentTurn } from "../../src/agent/turn/run.js";
 import { ControlPlaneLedger } from "../../src/control/ledger.js";
-import { createBackgroundTools } from "../../src/extensions/tools/background/index.js";
+import { createBackgroundTools } from "../../src/capabilities/tools/background/index.js";
 import { createTurnScopedSessionStore } from "../../src/host/turnSessionStore.js";
 import { SessionStore } from "../../src/session/store.js";
 import { createToolRegistry } from "../../src/tools/core/registry.js";

@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 
 import dotenv from "dotenv";
@@ -8,10 +9,10 @@ import { KITTY_BASE_ENV, KITTY_ENV } from "../config/envKeys.js";
 import { resolveRuntimeConfig } from "../config/runtime.js";
 import { PROJECT_STATE_DIR_NAME, PROJECT_STATE_ENV_FILE_NAME } from "../project/statePaths.js";
 import { atomicWriteFile } from "../utils/fs.js";
+import { loadDotEnvFiles } from "../config/env.js";
 
 const KNOWN_KEYS: ReadonlySet<string> = new Set<string>([
   ...Object.values(KITTY_BASE_ENV),
-  ...Object.values(KITTY_ENV.extensions),
 ]);
 const SECRET_KEYS: ReadonlySet<string> = new Set<string>([
   KITTY_ENV.apiKey,
@@ -66,13 +67,27 @@ export class WebConfigService {
     for (const [key, value] of Object.entries(updates)) {
       if (!consumed.has(key)) next.push(`${key}=${encodeEnvValue(value)}`);
     }
-    await atomicWriteFile(this.envPath, `${next.join("\n").replace(/\n+$/u, "")}\n`);
-    await resolveRuntimeConfig({ cwd: this.cwd });
+    const candidate = `${next.join("\n").replace(/\n+$/u, "")}\n`;
+    await this.validateCandidate(candidate);
+    await atomicWriteFile(this.envPath, candidate);
     return this.read();
   }
 
   async preflight() {
     return inspectConfigPreflight(this.cwd);
+  }
+
+  private async validateCandidate(candidate: string): Promise<void> {
+    const validationRoot = await fs.mkdtemp(path.join(os.tmpdir(), "kitty-config-validation-"));
+    try {
+      const configDir = path.join(validationRoot, PROJECT_STATE_DIR_NAME);
+      await fs.mkdir(configDir, { recursive: true });
+      await fs.writeFile(path.join(configDir, PROJECT_STATE_ENV_FILE_NAME), candidate, "utf8");
+      await resolveRuntimeConfig({ cwd: validationRoot });
+    } finally {
+      loadDotEnvFiles(this.cwd);
+      await fs.rm(validationRoot, { recursive: true, force: true });
+    }
   }
 }
 

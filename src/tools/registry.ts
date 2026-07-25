@@ -1,20 +1,21 @@
-import { createRuntimeToolRegistry } from "./core/runtimeRegistry.js";
-import { createToolSource } from "./core/sources.js";
-import { createExtensionRegistry } from "../extensions/index.js";
-import type { RuntimeConfig } from "../types.js";
-import { getBuiltinToolNames } from "./toolCatalog.js";
+import path from "node:path";
 
-export function createDefaultAgentToolRegistry(config: RuntimeConfig) {
-  const extensionRegistry = createExtensionRegistry(config);
-  const extensionSources = extensionRegistry.entries
-    .filter((entry) => entry.enabled && entry.tools.length > 0)
-    .map((entry) => createToolSource("host", `extension:${entry.id}`, entry.tools));
-  const extensionToolNames = extensionRegistry.entries
-    .filter((entry) => entry.enabled)
-    .flatMap((entry) => entry.tools.map((tool) => tool.definition.function.name));
+import { createRuntimeToolRegistry } from "./core/runtimeRegistry.js";
+import { acquireProjectCapabilityRuntime } from "../capabilities/index.js";
+import type { RuntimeConfig } from "../types.js";
+
+export async function createDefaultAgentToolRegistry(config: RuntimeConfig, input: {
+  cwd?: string;
+  stateRootDir?: string;
+} = {}) {
+  const cwd = input.cwd ?? path.dirname(config.paths.dataDir);
+  const stateRootDir = input.stateRootDir ?? cwd;
+  const runtime = await acquireProjectCapabilityRuntime({ cwd, stateRootDir, config });
 
   return createRuntimeToolRegistry(config, {
-    onlyNames: [...getBuiltinToolNames(), ...extensionToolNames],
-    sources: extensionSources,
+    onlyNames: runtime.toolNames,
+    sources: runtime.sources,
+  }, {
+    close: async () => runtime.release(),
   });
 }

@@ -22,6 +22,7 @@ import { createDefaultAgentToolRegistry } from "../../tools/registry.js";
 import { throwIfAborted } from "../../utils/abort.js";
 import { missingConfigValue } from "../../config/errors.js";
 import { KITTY_ENV } from "../../config/envKeys.js";
+import { getProjectCapabilityManager } from "../../capabilities/index.js";
 
 export type { AgentCallbacks, RunTurnOptions } from "../types.js";
 
@@ -29,9 +30,18 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
   const loadedProjectContext = await loadProjectContext(options.cwd, {
     projectDocMaxBytes: options.config.projectDocMaxBytes,
   });
-  const projectContext = options.stateRootDir
+  let projectContext = options.stateRootDir
     ? { ...loadedProjectContext, stateRootDir: options.stateRootDir }
     : loadedProjectContext;
+  const capabilityManager = await getProjectCapabilityManager({
+    cwd: options.cwd,
+    stateRootDir: projectContext.stateRootDir,
+    config: options.config,
+  });
+  projectContext = {
+    ...projectContext,
+    skills: capabilityManager.filterEnabledSkills(projectContext.skills),
+  };
   const turnModelConfig = options.config;
   const profile = resolveAgentProfile(options.config.profile);
   if (!turnModelConfig.apiKey) {
@@ -55,7 +65,10 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
   }
   const client = createProviderClientPool(turnModelConfig);
   const ownsToolRegistry = !options.toolRegistry;
-  const toolRegistry = options.toolRegistry ?? (await createDefaultAgentToolRegistry(options.config));
+  const toolRegistry = options.toolRegistry ?? (await createDefaultAgentToolRegistry(options.config, {
+    cwd: options.cwd,
+    stateRootDir: projectContext.stateRootDir,
+  }));
   const changeStore = new ChangeStore(options.config.paths.changesDir);
   let changedPaths = new Set<string>();
   let toolLoopProgress = createToolLoopProgressState();

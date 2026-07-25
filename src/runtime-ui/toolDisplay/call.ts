@@ -26,48 +26,6 @@ export function buildToolCallDisplay(
   const path = normalizeDisplayPath(readStringField(args, "path"), cwd);
 
   switch (name) {
-    case "download_url":
-      return {
-        summary: `${name} ${readStringField(args, "url") ?? "(missing url)"} -> ${path ?? "(missing path)"}`,
-      };
-    case "http_probe": {
-      const method = readStringField(args, "method") ?? "HEAD";
-      return {
-        summary: `${name} ${method.toUpperCase()} ${readStringField(args, "url") ?? "(missing url)"}`,
-      };
-    }
-    case "http_request": {
-      const method = readStringField(args, "method") ?? "GET";
-      const sessionId = readStringField(args, "session_id");
-      return {
-        summary:
-          `${name} ${method.toUpperCase()} ${readStringField(args, "url") ?? "(missing url)"}` +
-          (sessionId ? ` session=${sessionId}` : ""),
-      };
-    }
-    case "http_session": {
-      const action = readStringField(args, "action") ?? "list";
-      const sessionId = readStringField(args, "session_id");
-      return {
-        summary: `${name} ${action}${sessionId ? ` ${sessionId}` : ""}`,
-      };
-    }
-    case "http_suite": {
-      const steps = Array.isArray(args.steps) ? args.steps : [];
-      const sessionId = readStringField(args, "session_id");
-      return {
-        summary: `${name} steps=${steps.length}${sessionId ? ` session=${sessionId}` : ""}`,
-      };
-    }
-    case "network_trace":
-      return {
-        summary: `${name} ${readStringField(args, "trace_id") ?? "(missing trace_id)"}`,
-      };
-    case "openapi_inspect":
-    case "openapi_lint":
-      return {
-        summary: `${name} ${readStringField(args, "source") ?? "(missing source)"}`,
-      };
     case "worktree_create": {
       const branch = readStringField(args, "branch");
       return {
@@ -96,7 +54,31 @@ export function buildToolCallDisplay(
         summary: `${name} items=${items.length}`,
       };
     }
+    case "web_search": {
+      const query = readStringField(args, "query");
+      return {
+        summary: query ? `${name} ${truncate(query, maxChars)}` : name,
+      };
+    }
+    case "web_fetch": {
+      const url = readStringField(args, "url");
+      return { summary: url ? `${name} ${truncate(url, maxChars)}` : name };
+    }
+    case "web_download": {
+      const url = readStringField(args, "url");
+      return {
+        summary: `${name} ${path ?? "(missing path)"}${url ? ` ${truncate(url, maxChars)}` : ""}`,
+      };
+    }
     default:
+      if (name.startsWith("playwright_")) {
+        const target = readStringField(args, "url")
+          ?? readStringField(args, "element")
+          ?? readStringField(args, "ref");
+        return {
+          summary: target ? `${name} ${truncate(target, maxChars)}` : name,
+        };
+      }
       return {
         summary: `${name} ${truncate(rawArgs, maxChars)}`,
       };

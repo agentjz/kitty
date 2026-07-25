@@ -7,7 +7,6 @@ import {
   parseThinkingEnv,
 } from "./runtimeEnv.js";
 import { KITTY_BASE_ENV, KITTY_ENV } from "./envKeys.js";
-import { EXTENSION_IDS } from "../extensions/definitions.js";
 import { normalizeRuntimeConfig } from "./schema.js";
 import { invalidConfigValue, missingConfigValue } from "./errors.js";
 import { resolveAgentProfile } from "../agent/profiles/registry.js";
@@ -82,7 +81,12 @@ export async function resolveRuntimeConfig(overrides: CliOverrides = {}): Promis
       qrTimeoutMs: readIntegerEnv("weixinQrTimeoutMs", env.weixinQrTimeoutMs),
       routeTag: env.weixinRouteTag,
     },
-    extensions: readExtensionEnv(),
+    capabilities: {
+      playwright: {
+        headless: readBooleanEnv("playwrightHeadless", env.playwrightHeadless),
+        timeoutMs: readIntegerEnv("playwrightTimeoutMs", env.playwrightTimeoutMs),
+      },
+    },
   });
 
   if (!merged.profile) {
@@ -100,6 +104,7 @@ export async function resolveRuntimeConfig(overrides: CliOverrides = {}): Promis
       ...merged.media,
       apiKey: env.mediaApiKey || env.apiKey,
     },
+    capabilities: merged.capabilities,
     paths,
     telegram: resolveTelegramRuntimeConfig(merged.telegram, projectRoots.stateRootDir),
     weixin: resolveWeixinRuntimeConfig(merged.weixin, projectRoots.stateRootDir),
@@ -110,12 +115,6 @@ function readRuntimeEnv(): Record<keyof typeof KITTY_BASE_ENV, string> {
   return Object.fromEntries(
     Object.entries(KITTY_BASE_ENV).map(([name, key]) => [name, process.env[key] ?? ""]),
   ) as Record<keyof typeof KITTY_BASE_ENV, string>;
-}
-
-function readExtensionEnv() {
-  return Object.fromEntries(
-    EXTENSION_IDS.map((id) => [id, readBooleanValue(KITTY_ENV.extensions[id], process.env[KITTY_ENV.extensions[id]] ?? "")]),
-  ) as Record<(typeof EXTENSION_IDS)[number], boolean>;
 }
 
 function readIntegerEnv(name: keyof typeof KITTY_BASE_ENV, value: string): number {

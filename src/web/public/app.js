@@ -1,5 +1,5 @@
 import { appendChannelEvent, appendChannelHistory, initializeChannelStreams } from "/channelStream.js";
-import { escapeAttribute, escapeHtml, localizeDocument, renderExtensionSettings, renderSettings, renderSkillList, resolveMessage } from "/workflowViews.js";
+import { escapeAttribute, escapeHtml, localizeDocument, renderCapabilitySettings, renderSettings, renderSkillList, resolveMessage } from "/workflowViews.js";
 
 const params = new URLSearchParams(location.search);
 const token = params.get("token") || sessionStorage.getItem("kitty-console-token") || "";
@@ -23,6 +23,7 @@ const ENV = {
   telegramToken: "KITTY_TELEGRAM_TOKEN",
   telegramUsers: "KITTY_TELEGRAM_ALLOWED_USER_IDS",
   weixinUsers: "KITTY_WEIXIN_ALLOWED_USER_IDS",
+  playwrightHeadless: "KITTY_PLAYWRIGHT_HEADLESS",
 };
 
 let state;
@@ -34,6 +35,7 @@ const loadingChannelHistory = new Map();
 let mediaVideoPollTimer;
 let mediaVideoRestored = false;
 let mediaPreviewUrl;
+let activeSkillName = "";
 const MEDIA_VIDEO_STORAGE_KEY = "kitty-media-video-task";
 
 async function api(path, options = {}) {
@@ -60,7 +62,8 @@ function render() {
   text("#config-location", state.configuration.file);
   text("#model-summary", `${values[ENV.provider] || message("common.notConfigured")} · ${values[ENV.model] || message("common.notConfigured")}`);
   text("#media-summary", `${values[ENV.mediaImageModel] || message("common.notConfigured")} · ${values[ENV.mediaVideoModel] || message("common.notConfigured")}`);
-  text("#plugins-summary", `${state.extensions.filter((extension) => values[extension.envKey] === "true").length} / ${state.extensions.length}`);
+  updateCapabilitySummary();
+  text("#skills-summary", message("common.skills", { count: state.skills.length }));
   text("#weixin-summary", describeChannel(state.channels.weixin, state.channels.weixinLogin?.status));
   text("#telegram-summary", describeChannel(state.channels.telegram));
   document.querySelector("#open-web-shell").href = `/web?token=${encodeURIComponent(token)}`;
@@ -107,10 +110,12 @@ function render() {
   value("#telegram-users", values[ENV.telegramUsers]);
   value("#telegram-token", values[ENV.telegramToken]);
   renderChannels(state.channels, false);
-  renderExtensionSettings(state.extensions, values);
+  renderCapabilitySettings(state.capabilities, state.messages);
+  document.querySelector("#playwright-headless").checked = values[ENV.playwrightHeadless] === "true";
   renderSettings("#model-settings", state.messages.runtime.modelFields, values);
+  renderSettings("#browser-settings", state.messages.runtime.browserFields, values);
   renderSettings("#other-settings", state.messages.runtime.otherFields, values);
-  renderSkillList(state.skills, message("skills.empty"));
+  renderSkillList(state.skills, state.messages);
   initializeChannelStreams({ ...state.messages.stream, eventUpdated: state.messages.common.eventUpdated });
   syncWorkflowFromLocation();
 }
@@ -237,6 +242,9 @@ document.addEventListener("click", async (event) => {
     });
     if (action === "start-channel" || action === "stop-channel") await controlChannel(button, action);
     if (action === "open-skill") await openSkill(button.dataset.name);
+    if (action === "toggle-capability") await toggleCapability(button);
+    if (action === "delete-skill") await deleteSkill(button);
+    if (action === "cancel-delete-skill") cancelSkillDelete();
   } catch (error) {
     const host = button.dataset.channel;
     if (host) appendChannelEvent(host, { kind: "error", text: error.message, createdAt: new Date().toISOString() });
@@ -300,11 +308,54 @@ document.querySelector("#model-form").addEventListener("submit", async (event) =
   await submitConfig(values, "#config-result", "config.saved");
 });
 
-document.querySelector("#plugins-form").addEventListener("submit", async (event) => {
+document.querySelector("#skill-create-form").addEventListener("submit", async (event) => {
   event.preventDefault();
-  const values = Object.fromEntries([...document.querySelectorAll("#extension-switches [data-env]")]
-    .map((input) => [input.dataset.env, String(input.checked)]));
-  await submitConfig(values, "#plugins-result", "plugins.saved");
+  const form = event.currentTarget;
+  const button = event.submitter || form.querySelector("button[type=submit]");
+  await runButton(button, async () => {
+    try {
+      const created = await api("/api/skills", {
+        method: "POST",
+        body: JSON.stringify({
+          name: field("#skill-name"),
+          description: field("#skill-description"),
+          instructions: field("#skill-instructions"),
+        }),
+      });
+      form.reset();
+      await refresh();
+      showResult("#skill-create-result", message("skills.created"), true);
+      await openSkill(created.skill.name);
+    } catch (error) {
+      showResult("#skill-create-result", error.message, false);
+    }
+  });
+});
+
+document.querySelector("#skill-edit-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!activeSkillName) return;
+  const form = event.currentTarget;
+  const button = event.submitter || form.querySelector("button[type=submit]");
+  await runButton(button, async () => {
+    try {
+      const result = await api(`/api/skills/${encodeURIComponent(activeSkillName)}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          description: field("#skill-edit-description"),
+          instructions: field("#skill-edit-instructions"),
+        }),
+      });
+      state.skills = result.skills;
+      state.capabilities = result.capabilities;
+      renderSkillList(state.skills, state.messages);
+      renderCapabilitySettings(state.capabilities, state.messages);
+      showResult("#skill-edit-result", message("skills.updated"), true);
+      await openSkill(activeSkillName, false);
+    } catch (error) {
+      showResult("#skill-edit-result", error.message, false);
+    }
+  });
 });
 
 document.querySelector("#media-form").addEventListener("submit", async (event) => {
@@ -371,7 +422,11 @@ document.querySelector("#media-video-form").addEventListener("submit", async (ev
 
 document.querySelector("#other-form").addEventListener("submit", async (event) => {
   event.preventDefault();
-  await submitConfig(Object.fromEntries(readSettings("#other-settings")), "#other-result", "other.saved");
+  await submitConfig(Object.fromEntries([
+    [ENV.playwrightHeadless, String(document.querySelector("#playwright-headless").checked)],
+    ...readSettings("#browser-settings"),
+    ...readSettings("#other-settings"),
+  ]), "#other-result", "other.saved");
 });
 
 document.querySelector("#weixin-form").addEventListener("submit", async (event) => {
@@ -451,12 +506,77 @@ async function runButton(button, task) {
   finally { button.disabled = false; }
 }
 
-async function openSkill(name) {
+async function openSkill(name, scroll = true) {
   const result = await api(`/api/skills/${encodeURIComponent(name)}`);
+  activeSkillName = name;
+  cancelSkillDelete();
   text("#skill-reader-title", name);
+  text("#skill-reader-path", message("skills.path", { path: result.skill.path }));
   text("#skill-source", result.source);
+  value("#skill-edit-description", result.skill.description);
+  value("#skill-edit-instructions", result.instructions);
+  document.querySelector("#skill-edit-description").readOnly = false;
+  document.querySelector("#skill-edit-instructions").readOnly = false;
+  document.querySelector("#skill-edit-actions").classList.remove("d-none");
   document.querySelector("#skill-reader").classList.remove("d-none");
-  document.querySelector("#skill-reader").scrollIntoView({ behavior: "smooth", block: "start" });
+  if (scroll) document.querySelector("#skill-reader").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function deleteSkill(button) {
+  if (button.dataset.confirm !== "true") {
+    button.dataset.confirm = "true";
+    button.querySelector("span").textContent = message("skills.deleteConfirm");
+    document.querySelector("#skill-delete-cancel").classList.remove("d-none");
+    return;
+  }
+  await runButton(button, async () => {
+    try {
+      const result = await api(`/api/skills/${encodeURIComponent(activeSkillName)}`, { method: "DELETE" });
+      state.skills = result.skills;
+      state.capabilities = result.capabilities;
+      activeSkillName = "";
+      document.querySelector("#skill-reader").classList.add("d-none");
+      renderSkillList(state.skills, state.messages);
+      renderCapabilitySettings(state.capabilities, state.messages);
+      text("#skills-summary", message("common.skills", { count: state.skills.length }));
+      showResult("#skill-create-result", message("skills.deleted"), true);
+    } catch (error) {
+      showResult("#skill-edit-result", error.message, false);
+    }
+  });
+}
+
+function cancelSkillDelete() {
+  const button = document.querySelector("[data-action='delete-skill']");
+  if (!button) return;
+  delete button.dataset.confirm;
+  button.querySelector("span").textContent = message("skills.delete");
+  document.querySelector("#skill-delete-cancel").classList.add("d-none");
+}
+
+async function toggleCapability(button) {
+  const previousEnabled = button.dataset.enabled === "true";
+  await runButton(button, async () => {
+    try {
+      const result = await api(`/api/capabilities/${encodeURIComponent(button.dataset.capability)}`, {
+        method: "PUT",
+        body: JSON.stringify({ enabled: !previousEnabled }),
+      });
+      state.capabilities = result.capabilities;
+      renderCapabilitySettings(state.capabilities, state.messages);
+      updateCapabilitySummary();
+    } catch (error) {
+      button.checked = previousEnabled;
+      throw error;
+    }
+  });
+}
+
+function updateCapabilitySummary() {
+  const capabilities = state.capabilities.filter((capability) => capability.kind !== "skill");
+  const ready = capabilities.filter((capability) => capability.status === "ready").length;
+  const disabled = capabilities.filter((capability) => capability.status === "disabled").length;
+  text("#capabilities-summary", message("workflow.capabilitiesSummary", { ready, attention: capabilities.length - ready - disabled }));
 }
 
 function startEventStream() {
@@ -466,6 +586,12 @@ function startEventStream() {
   eventSource.addEventListener("channels", (event) => {
     state.channels = JSON.parse(event.data);
     renderChannels(state.channels);
+  });
+  eventSource.addEventListener("capabilities", (event) => {
+    const result = JSON.parse(event.data);
+    state.capabilities = result.capabilities;
+    renderCapabilitySettings(state.capabilities, state.messages);
+    updateCapabilitySummary();
   });
   eventSource.addEventListener("transcript", (event) => {
     const item = JSON.parse(event.data);

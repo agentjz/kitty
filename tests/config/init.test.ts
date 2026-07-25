@@ -15,13 +15,14 @@ test("init adds missing current settings without replacing existing env values",
   const envPath = path.join(kittyDir, ".env");
   const examplePath = path.join(kittyDir, ".env.example");
   const ignorePath = path.join(kittyDir, ".kittyignore");
+  const skillsDir = path.join(root, "skills");
   await fs.mkdir(kittyDir, { recursive: true });
   await fs.writeFile(envPath, "KITTY_API_KEY=keep-secret\nCUSTOM_SETTING=keep-me\n", "utf8");
   await fs.writeFile(examplePath, "KITTY_API_KEY=keep-placeholder\n", "utf8");
   await fs.writeFile(ignorePath, "custom-cache/\n", "utf8");
 
   const first = await initializeProjectFiles(root);
-  assert.deepEqual(first.created, []);
+  assert.deepEqual(first.created, [skillsDir]);
   assert.deepEqual(first.updated.sort(), [envPath, examplePath].sort());
   assert.deepEqual(first.skipped, [ignorePath]);
   assert.equal(first.preflight.env.missingKeys.length, 0);
@@ -37,5 +38,5 @@ test("init adds missing current settings without replacing existing env values",
   const second = await initializeProjectFiles(root);
   assert.deepEqual(second.created, []);
   assert.deepEqual(second.updated, []);
-  assert.deepEqual(second.skipped.sort(), [envPath, examplePath, ignorePath].sort());
+  assert.deepEqual(second.skipped.sort(), [envPath, examplePath, ignorePath, skillsDir].sort());
 });

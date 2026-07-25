@@ -1,4 +1,4 @@
-export type ToolResultStatus = "success" | "error";
+export type ToolResultStatus = "success" | "error" | "uncertain";
 
 export type ToolResultFactValue = string | number | boolean | null | string[];
 

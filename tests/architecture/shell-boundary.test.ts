@@ -11,7 +11,7 @@ const PRODUCER_DIRECTORIES = [
   "context",
   "control",
   "execution",
-  "extensions",
+  "capabilities",
   "host",
   "interaction",
   "observability",

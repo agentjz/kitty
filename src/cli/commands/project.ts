@@ -7,6 +7,8 @@ import { writeStdoutLine } from "../../utils/stdio.js";
 import { registerRuntimeStatusCommand } from "./runtimeStatus.js";
 import { translate, type KittyLocale } from "../../i18n/index.js";
 
+const START_SHUTDOWN_DEADLINE_MS = 8_000;
+
 export function registerProjectCommands(
   program: Command,
   options: {
@@ -35,23 +37,34 @@ export function registerProjectCommands(
       const startConsole = options.startLocalConsole ?? (await import("../../web/server.js")).startLocalConsole;
       const open = options.openBrowser ?? (await import("../../web/openBrowser.js")).openBrowser;
       const consoleHandle = await startConsole(cwd);
-      ui.success(translate(options.locale, "cli.start.ready"));
-      writeStdoutLine(consoleHandle.url);
-      if (consoleHandle.webUrl) writeStdoutLine(consoleHandle.webUrl);
-      if (!await open(consoleHandle.url)) ui.info(translate(options.locale, "cli.start.browserFailed"));
-
-      let closing = false;
-      const close = () => {
-        if (closing) return;
-        closing = true;
-        void consoleHandle.close();
+      const signals: NodeJS.Signals[] = ["SIGINT", "SIGTERM", "SIGHUP", "SIGBREAK"];
+      let receivedSignal: NodeJS.Signals | undefined;
+      let shutdownDeadline: NodeJS.Timeout | undefined;
+      const close = (signal: NodeJS.Signals) => {
+        const exitCode = startSignalExitCode(signal);
+        if (receivedSignal) {
+          process.exit(exitCode);
+        }
+        receivedSignal = signal;
+        process.exitCode = exitCode;
+        shutdownDeadline = setTimeout(() => process.exit(exitCode), START_SHUTDOWN_DEADLINE_MS);
+        shutdownDeadline.unref();
+        void consoleHandle.close().then(
+          () => process.exit(exitCode),
+          () => process.exit(exitCode),
+        );
       };
-      process.once("SIGINT", close);
-      process.once("SIGTERM", close);
-      try { await consoleHandle.wait(); }
+      for (const signal of signals) process.on(signal, close);
+      try {
+        ui.success(translate(options.locale, "cli.start.ready"));
+        writeStdoutLine(consoleHandle.url);
+        if (consoleHandle.webUrl) writeStdoutLine(consoleHandle.webUrl);
+        if (!await open(consoleHandle.url)) ui.info(translate(options.locale, "cli.start.browserFailed"));
+        await consoleHandle.wait();
+      }
       finally {
-        process.off("SIGINT", close);
-        process.off("SIGTERM", close);
+        for (const signal of signals) process.off(signal, close);
+        if (shutdownDeadline) clearTimeout(shutdownDeadline);
         await consoleHandle.close();
       }
     });
@@ -71,4 +84,12 @@ export function registerProjectCommands(
         writeStdoutLine(filePath);
       }
     });
+}
+
+function startSignalExitCode(signal: NodeJS.Signals): number {
+  if (signal === "SIGINT") return 130;
+  if (signal === "SIGHUP") return 129;
+  if (signal === "SIGTERM") return 143;
+  if (signal === "SIGBREAK") return 149;
+  return 1;
 }

@@ -15,7 +15,7 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 - 每个 session 一个 agent loop；
 - 可持久保存的 session 与任务事实；
 - 支持长任务的有界上下文；
-- core 工具与可选 extension；
+- 语言模型与统一能力系统；
 - 后台命令；
 - 机器驱动的持久定时任务；
 - 可观测、可恢复的宿主运行边界。
@@ -49,7 +49,7 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 .kitty/.env
 .kitty/events/
 .kitty/changes/
-.kitty/extensions/
+.kitty/capabilities/
 .kitty/control-plane.sqlite
 .kitty/observability/{events,crashes,terminal}/
 ```
@@ -80,7 +80,7 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 - `KITTY_MEDIA_IMAGE_MODEL`、`KITTY_MEDIA_VIDEO_MODEL`
 - `KITTY_MEDIA_REQUEST_TIMEOUT_MS`、`KITTY_MEDIA_POLL_INTERVAL_MS`
 - thinking、reasoning effort、输出和上下文限制
-- extension 开关
+- Playwright MCP 能力配置；基础 Web 无凭证、无专属环境变量
 - Telegram 与微信 iLink 配置
 
 未知 provider、不支持的 provider/model 组合、缺失必填项和非法值必须在配置 schema 显式失败。运行时不能静默猜测 model 或 provider。
@@ -97,9 +97,11 @@ Kitty 是一个智能体。它接收用户任务，构建上下文，调用模�
 
 图片生成遵循 Agnes 官方合同：`POST /v1/images/generations`，URL 输出位于 `extra_body.response_format`。只对 Provider 已明确返回的 408、429、502、503、504、520、522、524 做有界重试；429 无 `Retry-After` 时等待一分钟，网络中断、客户端超时和用户取消不自动重放。`agnes-image-2.1-flash` 连续 503 后回退到当前账户可用的 `agnes-image-2.0-flash`，两模型合计最多四次请求。Abort 会中断请求或退避并阻止 fallback；未知外部副作用边界继续由 tool journal 结算为 interrupted/uncertain。Web 实时错误与 session replay 复用 typed tool presentation，展示精简 HTTP 状态和 Agnes request ID，不暴露嵌套上游错误体。
 
-`kitty start` 是唯一初始化与本地控制台入口。它创建或补齐 `.kitty/.env`、`.env.example` 与 `.kittyignore`，再监听 `127.0.0.1` 随机端口并尝试打开浏览器；浏览器失败只保留可手动打开的 URL，不停止服务。文件已存在时只向两个 env 文件补充当前模板缺失的配置键，不覆盖已有值、自定义内容或 ignore 规则。独立 `kitty init` 不存在。
+`kitty start` 是唯一初始化与本地控制台入口。它创建或补齐 `.kitty/.env`、`.env.example`、`.kittyignore` 与当前工作目录的 `skills/` 工作区，初始化能力状态 owner 后递归加载 `skills/**/SKILL.md`，再监听 `127.0.0.1` 随机端口并尝试打开浏览器；浏览器失败只保留可手动打开的 URL，不停止服务。文件已存在时只向两个 env 文件补充当前模板缺失的配置键，不覆盖已有值、自定义内容或 ignore 规则。独立 `kitty init` 不存在。
 
-本地控制台是引导式工作流壳：首页按任务展示 Kitty 网页端控制、语言模型设置、插件与 Skill 开关、微信远程控制、Telegram 远程控制及其他设置，不使用后台管理侧栏。语言模型设置只负责 Provider、模型、密钥、连接测试和模型行为；插件与 Skill 开关在同一工作流中管理 Extension 开关并只读查看项目 Skill；其他设置承载语言、人格、上下文、文件和渠道参数。人格选项从当前 agent profile registry 投影，当前内置 `INTP` 与 `毒舌`，后者用于证据优先、直接且不攻击人的需求分析和代码审查。点击模块后进入单任务的配置、验证与运行详情，通过工作台按钮返回。渠道信息流在用户位于底部时继续跟随，离开底部后保持阅读位置，用户通过原生滚动回到底部。Web 从 `KITTY_LOCALE` 读取 `zh-CN`、`en`、`ja` 或 `ko`，由现有 typed catalog 投影页面、运行参数、人格选项、Extension 说明、状态和事件 presentation；外部 Web 壳在 WebSocket 首包接收同一套 locale 文案，Markdown assistant 内容由 `marked` 渲染，工具只显示已经投影的名称、目标、进度和结果摘要，不把原始 JSON 参数或返回暴露给用户。默认简体中文，provider/model、env key、Skill 内容与模型输出保持原文。后端拥有配置、Provider 探测、微信登录、channel lifecycle 和只读 Skill API；定时任务只通过 Agent scheduler 工具管理，不进入 Web。写请求必须携带启动期随机 token 且 Origin 必须等于当前 loopback origin；配置只接受已知 env key。`KITTY_API_KEY` 是运行时和持久配置唯一使用的 Provider 密钥；选择其他 Provider 时，页面清空密钥输入并要求在保存前填入对应密钥，不保存 Provider 专属副本。注释中的替代 Provider 预设只用于人工参考，不进入运行或展示判断。loopback 页面读取并显示 `.kitty/.env` 的当前值，包括 API Key 和 Bot Token；空 secret 更新保留原值，显式 clear 才删除。除远程渠道的 SSE 信息流外，`kitty start` 还提供带启动 token 的 `/web` WebSocket 工作壳；它复用同一 session、InteractiveSessionDriver 和 typed runtime events，不复制 Agent 核心。所有写入只在用户点击保存后发生，不自动保存或切换模型。
+本地控制台是引导式工作流壳。首页保持欢迎便签，把 Kitty 网页端、模型设置、工具与扩展、Skill 管理、图片与视频、微信远程控制、Telegram 远程控制和其他设置作为扁平的独立模块，不设置“模型 / 能力”产品层容器。语言模型设置只负责 Provider、模型、密钥、连接测试和模型行为；工具与扩展页只投影 `CapabilityManager` 的当前状态、用途和工具目录，不从浏览器开关猜测健康。媒体生成、微信与 Telegram 的配置、登录、启停和信息流继续保留原工作流。其他设置承载 Playwright 浏览器运行方式、后台开关、单次操作超时，以及语言、人格、上下文、文件和渠道参数。人格选项从当前 agent profile registry 投影，当前内置 `INTP` 与 `毒舌`。Skill 管理页支持创建、查看、修改和删除当前工作目录 `skills/` 树内包含 `SKILL.md` 与标准资源目录的项目内容包；其他来源不进入运行时。内置工具只读展示，不能从页面新建。Playwright 默认显示浏览器窗口，只有用户持久保存“后台运行浏览器”后才以无头模式启动。点击模块后进入单任务详情，通过工作台按钮返回。
+
+Web 从 `KITTY_LOCALE` 读取 `zh-CN`、`en`、`ja` 或 `ko`，由 typed catalog 投影页面、运行参数、状态和事件 presentation；外部 Web 壳在 WebSocket 首包接收同一套 locale 文案。Markdown assistant 内容由 `marked` 渲染，工具只显示已投影的名称、目标、进度和结果摘要。写请求必须携带启动期随机 token 且 Origin 等于当前 loopback origin；配置只接受已知 env key。配置写入先在临时项目中完成完整运行时校验，再同步临时文件并原子替换 `.kitty/.env`；替换成功即显示已接受。随后项目运行时按新配置串行重建，失败时返回 `runtimeApplyError` 并投影真实 `degraded` owner，不能把已落盘配置伪装成保存失败。`KITTY_API_KEY` 是语言模型 Provider 的唯一密钥；空 secret 更新保留原值，显式 clear 才删除。`/web` 工作壳复用同一 session、`InteractiveSessionDriver` 和 typed runtime events，不复制 Agent 核心。
 
 `kitty start` 页面加载后显示作者便签；用户可以使用关闭图标、Esc 或点击遮罩关闭。
 
@@ -190,7 +192,7 @@ Chat Completions 的 HTTP abort signal 必须作为 SDK request options 传递�
 
 Provider request 边界把 adapter、transport 和 SDK 失败归一为 `ProviderError`。错误 kind 驱动 retry、stream fallback 和 alternate base URL；CLI 只展示结构化错误事实。没有可用工具时，Chat Completions request 必须省略 `tools` 字段，不能发送空工具数组。Provider 层不增加任务策略。
 
-## 7. Tools 与 Extensions
+## 7. Tools 与能力系统
 
 ### Core 工具
 
@@ -206,7 +208,7 @@ Provider request 边界把 adapter、transport 和 SDK 失败归一为 `Provider
 
 每个 tool result 同时保存当前唯一的 typed evidence：call id、tool、status、summary、provenance、facts、error、artifact、truncation、model view 和 compact view。Tool intent 以 `(turn_id, call_id)` 写入 `tool_calls`，状态为 `planned -> running -> success/error/interrupted/uncertain`。每个工具紧邻真实调用前校验 turn token、generation、lease 与 abort，再从 planned 激活；恢复时未激活 intent 进入 interrupted，已激活但无法确认的副作用进入 uncertain，副作用工具不自动重放。工具实现拥有原始结果；evidence builder 拥有模型证据合同；session 保存 canonical evidence；context 只选择 full 或 compact view；宿主展示继续读取 display/raw result。
 
-模型证据遵循充分事实原则：必须足以判断本次操作是否成功、作用于哪里、实际返回了什么、失败根因是什么、下一步如何恢复。工作区内目标使用相对路径；工作区外目标保留绝对路径。`read` 完整返回其已经受 offset、limit 与 `KITTY_MAX_READ_BYTES` 约束的当前窗口；`edit` / `write` 保留全部相关 diff hunk；skill、document 与 extension 工具保留各自工具边界已经约束的结果。`bash` 在 48,000 字符以内完整回放；超过后保存全文，只把等量头尾、明确省略规模和可执行的 `read` 恢复参数送入当前模型请求。工具投影不得在这些 owner 边界之后再次静默裁剪。
+模型证据遵循充分事实原则：必须足以判断本次操作是否成功、作用于哪里、实际返回了什么、失败根因是什么、下一步如何恢复。工作区内目标使用相对路径；工作区外目标保留绝对路径。`read` 完整返回其已经受 offset、limit 与 `KITTY_MAX_READ_BYTES` 约束的当前窗口；`edit` / `write` 保留全部相关 diff hunk；Skill、document 与能力工具保留各自工具边界已经约束的结果。`bash` 在 48,000 字符以内完整回放；超过后保存全文，只把等量头尾、明确省略规模和可执行的 `read` 恢复参数送入当前模型请求。工具投影不得在这些 owner 边界之后再次静默裁剪。
 
 Context 压缩与工具结果边界分离。新产生的当前工具结果先按上述合同完整进入下一次模型请求；只有整个请求真实超过 provider budget 时，context 才能压缩较旧历史，并继续保护当前用户输入、当前工具批次的调用/结果配对和最新事实。当前用户输入与最新完整工具批次本身无法容纳时必须在本地明确失败，不能丢弃批次后伪装成压缩成功。不能为了预防超长对话，把每次正常工具结果预先压成短摘要。
 
@@ -214,23 +216,22 @@ Context 压缩与工具结果边界分离。新产生的当前工具结果先按
 
 同一模型批次只对连续、声明为 read effect 且 parallel-safe 的工具并发执行。write、process、external 和 state effect 保持模型给出的顺序。并发读取产生的 session/workset 事实必须归并后持久化，不能用吞掉状态更新换延迟。
 
-### Extensions
+### 统一能力
 
-`src/extensions/definitions.ts` 是 extension 注册表。当前 extension：
+`src/capabilities/` 定义能力包协议与 `CapabilityManager`。协议统一发现、持久启用状态、配置要求、默认启用、健康、生命周期、命名空间、呈现和专属持久路径；不同能力类型保留自己的执行器。`ToolRegistry` 仍是唯一模型工具执行 owner，能力管理器只贡献已经就绪的 typed tool source，不执行工具、不接管 `tool_calls`，也不建立第二套调用状态。
 
-- `todo`：session checklist 事实。
-- `worktree`：Git worktree 生命周期。
-- `network`：结构化 HTTP 工作。
-- `background`：可持久追踪的非阻塞命令执行。
-- `scheduler`：持久提醒与预写本地命令的机器调度 CRUD。
-- `documents`：分页读取 DOCX 与带文字层 PDF，并以原子写和二进制变更记录创建 Word DOCX。
-- `media`：通过 Agnes Provider 生成图片、编辑图片，以及创建/查询异步视频任务；图片和完成视频进入项目内 typed file artifact，视频任务的不透明 `video_id` 持久在 `.kitty/extensions/media/video-tasks/`。
-- `skills`：运行时 skill 发现与显式加载。
+当前能力包括：core 工具；`todo`、`scheduler`、`worktree`、`background`、`documents`、`media` 与 `skills` 内置能力；项目 Skill 内容包；Playwright MCP；以及基础 Web。core、内置能力和 Web 默认启用；core 可整体停用，停用后 `read`、`write`、`edit`、`bash`、`send_file` 不能从默认注册表、宿主过滤器或额外工具路径重新进入模型工具面。缺少真实必填配置的能力显示 `needs_config` 且不贡献工具。统一健康状态为 `disabled`、`needs_config`、`starting`、`ready`、`degraded` 和 `stopped`。启停操作具有稳定 operation ID；MCP owner 具有 token、单调 generation、PID identity、心跳与 lease。
 
-Extension 只在配置启用时进入同一工具注册表。它们不是另一条 agent loop，也不是 core 工具。
+Playwright 是第一版唯一外部 MCP。官方 MCP 客户端由项目范围运行时池持有，工具使用 `playwright_` 命名空间；默认注册表和带宿主额外工具的注册表都把运行时借用保持到自身真实关闭，每轮 `ToolRegistry.close()` 只释放借用，不能关闭客户端或浏览器。配置替换停止新借用并等待已有借用排空，旧 manager 完整关闭后才发布新 manager。项目宿主关闭时幂等清理连接与进程树；启动失败或关闭期间只要连接、子进程 identity、进程终止或 owner 结算任一未确认，就保留 `degraded` owner、lease 和子进程证据，后续幂等清理成功后才能释放。宿主强杀时父死亡监护器清理子进程；重启后只依据控制平面中过期 owner 和进程 identity 对账。无法确认活进程身份时拒绝创建第二 owner。
 
-运行时 skill 是项目能力包。Context 只暴露 skill 清单；模型在相关时显式加载 skill 或资源。Skill 不自动路由模型行为。
-仓库当前提供 `dev`、`read-only` 与 `agnes-media` 运行时 skill。`read-only` 用于不改变项目或外部状态的通用项目研究、进度审计、生命周期阶段判断、同类成果对标、架构调查、风险与缺口报告；它禁止编辑、安装、构建、测试和启动服务，只使用可证明无副作用的证据采集。`agnes-media` 只约束图片工具、视频 create/poll 顺序、`video_id`、低频轮询和产物恢复；协议事实仍由媒体 Provider/工具 owner 维护。
+基础 Web 是独立的 bundled 能力，默认就绪且不要求搜索凭证。它固定贡献三个结果级工具：`web_search` 通过 Bing RSS 返回最多 8 条编号结果并把有界原始响应保存到 `.kitty/capabilities/web/evidence/`；`web_fetch` 对 HTTP(S) 执行受控 GET，最多读取 1,000,000 bytes，把 HTML、JSON、XML 或纯文本投影成最多 32,000 字符的正文并保存响应证据；`web_download` 最多接收 50 MiB，完整收包后原子替换目标文件并返回 hash 与 artifact。Playwright 不是搜索后端。
+
+Web 不暴露任意方法、请求体、认证头、cookie session、请求套件、探测、追踪、OpenAPI 或代理入口。Bing RSS 当前无需凭证，但其响应版权声明把使用限制在个人、非商业 RSS 阅读器场景并可能改变或停止；这是明确的上游约束，不把该入口描述为无约束公共 API。
+
+外部 MCP 和 Web 请求在派发前由 `tool_calls` 写入稳定 operation ID，再把 `dispatch_state` 从 `pending` 改为 `dispatched`。完整响应、明确 HTTP 状态、解析失败或本地大小拒绝结算为 `settled`；派发后超时、断连、取消或丢失响应结算为 `uncertain`，恢复不得盲目重放。证据文件落在 `.kitty/capabilities/<id>/evidence/` 并受字节上限约束；下载在完整收包前不改目标文件。
+
+运行时 Skill 是内容能力。Context 只暴露启用且健康的 Skill 索引；正文、资源和声明脚本由 `skill_*` 工具按需读取或运行，不把全部内容注入每轮上下文。Skill 不自动路由模型行为。
+仓库当前只提供 `read-only` 运行时 Skill。它用于不改变项目或外部状态的通用项目研究、进度审计、生命周期阶段判断、同类成果对标、架构调查、风险与缺口报告；它禁止编辑、安装、构建、测试和启动服务，只使用可证明无副作用的证据采集。媒体生成由媒体能力和工具 owner 维护，不再通过运行时 Skill 重复包装。
 
 ## 8. Control Plane 与 Execution
 
@@ -324,7 +325,7 @@ Terminal log 使用 UTF-8，记录可读的用户输入、reasoning、assistant 
 - `src/telegram/`：Telegram polling host。
 - `src/weixin/`：微信 iLink 扫码登录、消息轮询、媒体收发和最终回复投影。
 - `src/remote/`：远程宿主共用的进程所有权、排队、turn 状态与投递生命周期。
-- `src/web/`：loopback HTTP、显式配置、只读 Skill、channel manager、SSE 与静态 Bootstrap 工作流。
+- `src/web/`：loopback HTTP、显式配置、项目 Skill CRUD、channel manager、SSE 与静态 Bootstrap 工作流。
 
 `kitty` TUI、`kitty run`、`kitty resume`、Telegram、微信和本地 API 都进入同一条 host/agent turn 主链路。Web 是配置与运行管理壳，不创建第二条 Agent loop。`status` 与 `background` CLI 命令只暴露已存事实，不能创建平行生命周期语义。Evaluation harness 是开发脚本，不属于公共 CLI。
 
@@ -335,6 +336,10 @@ Telegram 使用 Bot API 长轮询。微信使用 iLink SDK：`kitty weixin login
 TUI、Telegram 和微信只从 `localCommandDefinitions.ts` 投影命令元数据。TUI 支持 `/status`、`/export`、`/exit`、`/stop`、`/new`；远程支持 `/help`、`/status`、`/stop`、`/new`。`/stop` 只 abort 接收命令时的 active turn，不武装未来任务；`/new` 在当前 peer 队列内创建并持久化新 session、原子替换 binding，旧 session 保留。TUI `/new` 同时清空当前窗口 transcript、历史和草稿 owner。
 
 Web 启动的 Telegram/微信服务仍取得各自 process lock 和 SQLite lease。`remote/events.ts` 只 tee 已有 Agent callbacks，把入站、reasoning、工具、assistant、final 和 error 事件按 host 实时投影到各自工作流的信息流；它不改变远端回复规则，也不保存第二套 turn 状态。Markdown 由本地打包的 `marked` 解析并在浏览器按允许元素和属性清理。
+
+`kitty start` 是本地控制台进程信号的唯一 owner；Web 内嵌 `InteractiveSessionDriver` 不另绑宿主信号。关闭事务先停止 HTTP/WebSocket admission，结束 SSE 并 fencing 新 WebSocket 输入，排空已接受的 replay/control，关闭输入并中断可取消 turn，再等待已接受的 HTTP/config 路由、session binding 和 catalog 写入，随后停止微信、Telegram、scheduler、Web driver 和项目能力运行时，最后关闭 WebSocket/HTTP server。并发 `close()` 共享同一 Promise，全部 cleanup 都执行并聚合错误，`wait()` 无论清理成功或失败都结束。首次 SIGINT、SIGTERM、SIGHUP 或 SIGBREAK 进入该事务；第二次信号或八秒 deadline 强制退出，退出钩子只做同步子进程兜底，不创建第二个优雅关闭 owner。
+
+Web 启动远程服务时先取得对应进程锁，再创建并发布 service；启动、停止和关闭按 generation fencing。停止超时保持 `failed` 和 lock/task 证据并向控制台关闭事务报错，不能显示成已停止。微信扫码登录是受跟踪的可取消任务；关闭或登出会提升 generation，迟到的二维码、扫码和凭证结果不能更新当前状态。iLink SDK 不支持真正取消的底层请求在进程终止信号完成优雅清理后由显式进程退出收口。
 
 两个远程 service 在 TTY 启动时复用 TUI 的 Kitty 字标事实，分别显示 `kitty weixin` 与 `kitty telegram` banner；非 TTY 日志降级为单行。启动事实只包含版本、状态目录、白名单数量与连接方式，不输出 token 或用户 ID。
 

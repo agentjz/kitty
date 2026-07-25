@@ -25,6 +25,8 @@ export async function executeToolCallWithRecovery(
       ownerSessionId: options.ownerSessionId ?? session.id,
       turnId: options.turnId ?? "",
       toolCallId: toolCall.id,
+      turnOwnerToken: options.turnOwnerToken,
+      turnOwnerGeneration: options.turnOwnerGeneration,
       callbacks: options.callbacks,
       abortSignal: options.abortSignal,
       runtimeState: {

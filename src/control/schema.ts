@@ -1,12 +1,13 @@
 import type { ControlDatabase } from "./sqlite.js";
 
-export const CONTROL_PLANE_SCHEMA_VERSION = 4;
+export const CONTROL_PLANE_SCHEMA_VERSION = 5;
 
 export function initializeControlPlaneSchema(db: ControlDatabase): void {
   const initialize = db.transaction(() => {
     const version = Number(db.prepare<{ user_version: number }>("PRAGMA user_version").get()?.user_version ?? 0);
     if (version !== CONTROL_PLANE_SCHEMA_VERSION) {
       db.exec(`
+        DROP TABLE IF EXISTS capability_states;
         DROP TABLE IF EXISTS remote_outbox;
         DROP TABLE IF EXISTS remote_inbox;
         DROP TABLE IF EXISTS scheduled_triggers;
@@ -174,7 +175,12 @@ export function initializeControlPlaneSchema(db: ControlDatabase): void {
       arguments_json TEXT NOT NULL,
       effect TEXT NOT NULL,
       status TEXT NOT NULL,
+      operation_id TEXT NOT NULL,
+      dispatch_state TEXT NOT NULL,
+      owner_token TEXT,
       owner_generation INTEGER,
+      heartbeat_at TEXT,
+      lease_expires_at TEXT,
       result_json TEXT,
       before_hash TEXT,
       after_hash TEXT,
@@ -187,6 +193,29 @@ export function initializeControlPlaneSchema(db: ControlDatabase): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_tool_calls_turn ON tool_calls(turn_id, updated_at);
+
+    CREATE TABLE IF NOT EXISTS capability_states (
+      capability_id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL,
+      version TEXT NOT NULL,
+      enabled INTEGER NOT NULL,
+      status TEXT NOT NULL,
+      health_message TEXT,
+      operation_id TEXT,
+      operation_kind TEXT,
+      owner_token TEXT,
+      owner_generation INTEGER NOT NULL DEFAULT 0,
+      owner_pid INTEGER,
+      owner_identity_json TEXT,
+      child_pid INTEGER,
+      child_identity_json TEXT,
+      heartbeat_at TEXT,
+      lease_expires_at TEXT,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_capability_states_owner
+      ON capability_states(status, lease_expires_at);
 
     CREATE TABLE IF NOT EXISTS context_epochs (
       id TEXT PRIMARY KEY,

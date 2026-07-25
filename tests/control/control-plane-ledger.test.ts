@@ -220,7 +220,7 @@ test("tool journal converts abandoned side effects into explicit recovery eviden
 
   const [recovered] = ledger.toolCalls.interruptRecoverable(session.id);
   assert.equal(recovered?.status, "uncertain");
-  assert.equal(recovered?.result?.error?.code, "TOOL_EXECUTION_INTERRUPTED");
+  assert.equal(recovered?.result?.error?.code, "TOOL_RESULT_UNCERTAIN");
   assert.equal(recovered?.result?.provenance?.targetPath, "src/app.ts");
   assert.match(recovered?.result?.error?.recoveryHint ?? "", /Inspect the target state/);
   ledger.close();

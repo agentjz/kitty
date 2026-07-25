@@ -34,13 +34,17 @@ export function buildToolResultEnvelope(input: {
       bytes: artifact.bytes,
     });
   }
+  const uncertain = input.result.metadata?.external?.outcome === "uncertain";
+  const status = uncertain ? "uncertain" : input.result.ok ? "success" : "error";
   const error = input.result.ok
     ? undefined
     : buildErrorEvidence(payload, input.result.output, governance?.recoveryHint);
-  const summary = buildSummary(input.toolName, input.result.ok, modelView, error?.message);
+  const summary = uncertain
+    ? `${input.toolName} was dispatched, but its result is uncertain.`
+    : buildSummary(input.toolName, input.result.ok, modelView, error?.message);
   const compactView = buildCompactView({
     toolName: input.toolName,
-    status: input.result.ok ? "success" : "error",
+    status,
     summary,
     provenance,
     facts,
@@ -54,7 +58,7 @@ export function buildToolResultEnvelope(input: {
   return {
     callId: input.callId,
     toolName: input.toolName,
-    status: input.result.ok ? "success" : "error",
+    status,
     summary,
     modelView,
     compactView,
@@ -166,7 +170,7 @@ function buildSummary(toolName: string, ok: boolean, modelView: string, errorMes
 
 function buildCompactView(input: {
   toolName: string;
-  status: "success" | "error";
+  status: "success" | "error" | "uncertain";
   summary: string;
   provenance?: ToolResultProvenance;
   facts: Record<string, ToolResultFactValue>;

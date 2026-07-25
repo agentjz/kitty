@@ -9,7 +9,7 @@ import {
   terminateBackgroundExecution,
   waitForRegisteredBackgroundProcess,
 } from "../execution/background.js";
-import { createBackgroundTools } from "../extensions/tools/background/index.js";
+import { createBackgroundTools } from "../capabilities/tools/background/index.js";
 import { runHostTurn } from "../host/turn.js";
 import { SessionEventStore } from "../session/events.js";
 import { SessionStore } from "../session/store.js";

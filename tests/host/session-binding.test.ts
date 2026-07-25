@@ -8,6 +8,8 @@ import { SessionStore } from "../../src/session/store.js";
 import type { RegisteredTool } from "../../src/tools/index.js";
 import { getBuiltinTools } from "../../src/tools/toolCatalog.js";
 import { createTempWorkspace, createTestRuntimeConfig } from "../helpers.js";
+import { CapabilityManager } from "../../src/capabilities/manager.js";
+import { closeProjectCapabilityRuntime, replaceProjectCapabilityRuntime } from "../../src/capabilities/runtimePool.js";
 
 test("host session binding creates and persists a session binding", async (t) => {
   const root = await createTempWorkspace("host-session", t);
@@ -51,6 +53,7 @@ test("host tool registry mounts extra tools as host tools beside the core surfac
   assert.equal(names.includes("host_extra"), true);
   assert.equal(entry?.origin.kind, "host");
   assert.equal(entry?.origin.sourceId, "host:extra-tools");
+  await registry.close?.();
 });
 
 test("host tool registry can expose a focused core surface with extra workflow tools", async (t) => {
@@ -67,6 +70,46 @@ test("host tool registry can expose a focused core surface with extra workflow t
   const builtinNames = new Set(getBuiltinTools().map((tool) => tool.definition.function.name));
   assert.deepEqual(names.filter((name) => builtinNames.has(name)), ["read", "bash"]);
   assert.equal(names.includes("workflow_note"), true);
+  await registry.close?.();
+});
+
+test("host tool registries retain the project capability runtime until their real close", async (t) => {
+  const root = await createTempWorkspace("host-tool-registry-runtime-borrow", t);
+  const config = createTestRuntimeConfig(root);
+  const registry = await createHostToolRegistry(config, {
+    cwd: root,
+    stateRootDir: root,
+    extraTools: [createHostTestTool("workflow_note")],
+  });
+  let replaced = false;
+  const replacement = replaceProjectCapabilityRuntime({ cwd: root, stateRootDir: root, config })
+    .then(() => { replaced = true; });
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(replaced, false);
+  await registry.close?.();
+  await replacement;
+  assert.equal(replaced, true);
+  await closeProjectCapabilityRuntime(root);
+});
+
+test("host filters and extra tools cannot re-inject disabled core tools", async (t) => {
+  const root = await createTempWorkspace("host-tool-registry-core-disabled", t);
+  const config = createTestRuntimeConfig(root);
+  const manager = new CapabilityManager(root, root, config);
+  await manager.setEnabled("core-tools", false);
+  await manager.close();
+
+  const registry = await createHostToolRegistry(config, {
+    cwd: root,
+    stateRootDir: root,
+    builtinToolFilter: () => true,
+    extraTools: [createHostTestTool("host_extra")],
+  });
+  t.after(() => registry.close?.());
+  const names = registry.definitions.map((tool) => tool.function.name);
+  const builtinNames = new Set(getBuiltinTools().map((tool) => tool.definition.function.name));
+  assert.deepEqual(names.filter((name) => builtinNames.has(name)), []);
+  assert.equal(names.includes("host_extra"), true);
 });
 
 function createHostTestTool(name: string): RegisteredTool {

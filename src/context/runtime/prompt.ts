@@ -28,7 +28,7 @@ export function buildContextRuntimePromptLayers(
   const sessionBriefBlock = buildSessionConversationBriefBlock(snapshot.sessionBrief);
   const taskLifecycleBlock = buildTaskLifecyclePromptBlock(snapshot.taskLifecycle);
   const projectMapBlock = buildProjectMapPromptBlock(snapshot.projectMap);
-  const skillIndexBlock = input.config.extensions.skills
+  const skillIndexBlock = input.projectContext.skills.length > 0
     ? buildSkillIndexPromptBlock(input.projectContext.skills)
     : undefined;
   const runtimeFactBlocks = resolvedProfile.runtimeFacts.buildBlocks({

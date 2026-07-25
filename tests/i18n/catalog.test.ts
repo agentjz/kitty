@@ -54,16 +54,28 @@ test("typed catalogs interpolate dynamic values in every supported locale", () =
 });
 
 test("the Web presentation projects every supported runtime locale", () => {
+  const capabilityNames = {
+    "zh-CN": "网页搜索与下载",
+    en: "Web search and downloads",
+    ja: "Web 検索とダウンロード",
+    ko: "웹 검색 및 다운로드",
+  } as const;
   for (const locale of SUPPORTED_LOCALES) {
     const messages = buildWebMessages(locale);
     assert.equal(messages.welcome, translate(locale, "tui.authorTip"));
     assert.equal(messages.authorNote.title, translate(locale, "web.authorNote.title"));
-    const runtimeFields = [...messages.runtime.modelFields, ...messages.runtime.otherFields];
+    const runtimeFields = [...messages.runtime.modelFields, ...messages.runtime.browserFields, ...messages.runtime.otherFields];
     assert.equal(runtimeFields.some((field) => field.envKey === "KITTY_LOCALE" && field.label.length > 0), true);
     const profileField = messages.runtime.otherFields.find((field) => field.envKey === "KITTY_PROFILE");
     assert.ok(profileField);
     assert.equal(profileField.options?.some((option) => option.value === "sharp" && option.label === "毒舌"), true);
-    assert.equal(Object.values(messages.extensionSummaries).every((summary) => summary.length > 0), true);
+    assert.equal(messages.capabilities.catalog.web.name, capabilityNames[locale]);
+    assert.equal(messages.other.browserHeadless, translate(locale, "web.other.browserHeadless"));
+    const browserTimeout = messages.runtime.browserFields.find((field) => field.envKey === "KITTY_PLAYWRIGHT_TIMEOUT_MS");
+    assert.deepEqual({ min: browserTimeout?.min, max: browserTimeout?.max, step: browserTimeout?.step }, { min: 5000, max: 600000, step: 1000 });
+    assert.equal(browserTimeout?.hint, translate(locale, "web.runtime.playwrightTimeoutHint"));
+    assert.equal(messages.skills.save, translate(locale, "web.skills.save"));
+    assert.equal(messages.skills.deleteConfirm, translate(locale, "web.skills.deleteConfirm"));
   }
 });
 

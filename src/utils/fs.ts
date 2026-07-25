@@ -40,12 +40,32 @@ export async function ensureParentDirectory(filePath: string): Promise<void> {
 export async function atomicWriteFile(filePath: string, content: string | Uint8Array): Promise<void> {
   const directory = path.dirname(filePath);
   const temporaryPath = path.join(directory, `.${path.basename(filePath)}.${crypto.randomUUID()}.tmp`);
-  await fs.writeFile(temporaryPath, content);
+  const temporary = await fs.open(temporaryPath, "wx");
+  try {
+    await temporary.writeFile(content);
+    await temporary.sync();
+  } finally {
+    await temporary.close();
+  }
   try {
     await fs.rename(temporaryPath, filePath);
+    await syncDirectory(directory);
   } catch (error) {
     await fs.rm(temporaryPath, { force: true }).catch(() => undefined);
     throw error;
+  }
+}
+
+async function syncDirectory(directory: string): Promise<void> {
+  let handle: Awaited<ReturnType<typeof fs.open>> | undefined;
+  try {
+    handle = await fs.open(directory, "r");
+    await handle.sync();
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (process.platform !== "win32" || !["EISDIR", "EINVAL", "EPERM", "EACCES"].includes(code ?? "")) throw error;
+  } finally {
+    await handle?.close().catch(() => undefined);
   }
 }
 

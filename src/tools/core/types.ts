@@ -70,6 +70,8 @@ export interface ToolContext {
   ownerSessionId: string;
   turnId: string;
   toolCallId: string;
+  turnOwnerToken?: string;
+  turnOwnerGeneration?: number;
   callbacks?: AgentCallbacks;
   abortSignal?: AbortSignal;
   runtimeState?: {

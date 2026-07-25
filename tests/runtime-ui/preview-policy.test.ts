@@ -63,23 +63,26 @@ test("todo marker styling preserves visible checklist text", () => {
   assert.equal(stripAnsi(colorizeTodoMarkers(input)), input);
 });
 
-test("extension tool call display keeps summaries readable", () => {
+test("capability tool call display keeps summaries readable", () => {
   assert.equal(
-    buildToolCallDisplay("http_request", JSON.stringify({
-      method: "post",
-      url: "/items",
-      session_id: "local",
-      headers: { authorization: "secret" },
-      body: "x".repeat(500),
+    buildToolCallDisplay("web_search", JSON.stringify({
+      query: "current Kitty capability architecture",
     }), 80).summary,
-    "http_request POST /items session=local",
+    "web_search current Kitty capability architecture",
   );
   assert.equal(
-    buildToolCallDisplay("download_url", JSON.stringify({
-      url: "https://example.com/file.txt",
-      path: "tmp/file.txt",
-    }), 80, "C:\\repo").summary,
-    "download_url https://example.com/file.txt -> tmp/file.txt",
+    buildToolCallDisplay("web_download", JSON.stringify({
+      url: "https://example.test/file.zip",
+      path: "downloads/file.zip",
+    }), 80).summary,
+    "web_download downloads/file.zip https://example.test/file.zip",
+  );
+  assert.equal(
+    buildToolCallDisplay("playwright_browser_navigate", JSON.stringify({
+      url: "https://example.com/current",
+      secretFormValue: "must not be projected",
+    }), 80).summary,
+    "playwright_browser_navigate https://example.com/current",
   );
   assert.equal(
     buildToolCallDisplay("worktree_create", JSON.stringify({

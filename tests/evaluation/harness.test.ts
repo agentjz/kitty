@@ -15,7 +15,7 @@ test("evaluation harness defines current local acceptance checks", () => {
     "runtime-status-builds",
     "project-map-builds",
     "context-epochs-readable",
-    "extension-surface-current",
+    "capability-surface-current",
     "skill-packages-readable",
     "config-preflight-readable",
     "cache-economy-ready",

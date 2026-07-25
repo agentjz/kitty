@@ -1,7 +1,7 @@
 import { normalizeTelegramConfig, normalizeWeixinConfig } from "../config/hosts.js";
 import { resolveModelProfile } from "../provider/catalog.js";
 import { normalizeModelReasoningEffort, normalizeModelThinkingMode } from "./modelOptions.js";
-import { normalizeExtensions } from "./extensions.js";
+import { normalizeCapabilityConfig } from "./capabilities.js";
 import { invalidConfigValue, missingConfigValue } from "./errors.js";
 import type { AppConfig } from "../types.js";
 import { DEFAULT_LOCALE, parseKittyLocale, SUPPORTED_LOCALES } from "../i18n/index.js";
@@ -39,7 +39,7 @@ export function normalizeRuntimeConfig(
     media: normalizeMediaConfig(config.media),
     telegram: normalizeTelegramConfig(config.telegram),
     weixin: normalizeWeixinConfig(config.weixin),
-    extensions: normalizeExtensions(config.extensions),
+    capabilities: normalizeCapabilityConfig(config.capabilities),
   };
 
   validateProviderModelConfig(normalized);

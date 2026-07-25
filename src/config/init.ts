@@ -12,6 +12,7 @@ import {
 } from "../project/statePaths.js";
 import { inspectConfigPreflight, type ConfigPreflightReport } from "./preflight.js";
 import { atomicWriteFile } from "../utils/fs.js";
+import { STANDARD_SKILLS_DIR_NAME } from "../skills/schema.js";
 
 export interface InitProjectResult {
   created: string[];
@@ -29,10 +30,17 @@ export async function initializeProjectFiles(cwd: string): Promise<InitProjectRe
   const envPath = path.join(kittyDir, PROJECT_STATE_ENV_FILE_NAME);
   const envExamplePath = path.join(kittyDir, PROJECT_STATE_ENV_EXAMPLE_FILE_NAME);
   const ignorePath = path.join(kittyDir, PROJECT_STATE_IGNORE_FILE_NAME);
+  const skillsDir = path.join(cwd, STANDARD_SKILLS_DIR_NAME);
   const envTemplate = buildProjectEnvTemplate(false);
   const envExampleTemplate = buildProjectEnvTemplate(true);
 
   await fs.mkdir(kittyDir, { recursive: true });
+  if (await fileExists(skillsDir)) {
+    skipped.push(skillsDir);
+  } else {
+    await fs.mkdir(skillsDir, { recursive: true });
+    created.push(skillsDir);
+  }
 
   await reconcileEnvFile(envPath, envTemplate, { created, updated, skipped });
   await reconcileEnvFile(envExamplePath, envExampleTemplate, { created, updated, skipped });

@@ -11,6 +11,7 @@ import { resolveRuntimeConfig } from "../../src/config/runtime.js";
 import { createMessage } from "../../src/session/messages.js";
 import { SessionStore } from "../../src/session/store.js";
 import { startLocalConsole } from "../../src/web/server.js";
+import { WebSocket } from "ws";
 import { WeixinSessionMapStore } from "../../src/weixin/state.js";
 import packageJson from "../../package.json";
 import { createTempWorkspace } from "../helpers.js";
@@ -33,6 +34,10 @@ test("local console binds loopback, authenticates API, and rejects foreign write
     version: packageJson.version,
   });
   assert.equal((bootstrap.body.configuration as { file: string }).file, ".kitty/.env");
+  const capabilities = bootstrap.body.capabilities as Array<{ id: string; status: string; enabled: boolean }>;
+  assert.equal(capabilities.find(({ id }) => id === "core-tools")?.status, "ready");
+  assert.equal(capabilities.find(({ id }) => id === "playwright")?.status, "disabled");
+  assert.equal(capabilities.find(({ id }) => id === "web")?.status, "ready");
   const providers = bootstrap.body.providers as Array<{
     id: string;
     label: string;
@@ -72,6 +77,21 @@ test("local console binds loopback, authenticates API, and rejects foreign write
   assert.match(consoleSource, /<h1 class="kitty-hero-title">Kitty Agent<\/h1>/u);
   assert.match(consoleSource, /id="author-note"/u);
   assert.match(consoleSource, /data-action="close-author-note"/u);
+  assert.deepEqual([...consoleSource.matchAll(/data-open-workflow="([^"]+)"/gu)].map((match) => match[1]), [
+    "model", "capabilities", "skills", "media", "weixin", "telegram", "other",
+  ]);
+  assert.match(consoleSource, /id="capability-groups"/u);
+  assert.match(consoleSource, /id="capability-overview"/u);
+  assert.match(consoleSource, /class="ui-switch-input" id="playwright-headless" type="checkbox" role="switch"/u);
+  assert.match(consoleSource, /id="other-form"[\s\S]*id="browser-settings"/u);
+  const workflowViews = await (await fetch(new URL("/workflowViews.js", handle.url))).text();
+  assert.match(workflowViews, /class="ui-switch-input"/u);
+  assert.match(workflowViews, /type="checkbox" role="switch"/u);
+  assert.match(consoleSource, /data-workflow-panel="skills"/u);
+  assert.match(consoleSource, /data-workflow-panel="media"/u);
+  assert.match(consoleSource, /data-workflow-panel="weixin"/u);
+  assert.match(consoleSource, /data-workflow-panel="telegram"/u);
+  assert.match(consoleSource, /id="skill-create-form"/u);
 
   const foreign = await fetch(new URL("/api/config", url), {
     method: "PUT",
@@ -85,8 +105,8 @@ test("local console preserves visible secrets and reads current skills", async (
   const root = await createTempWorkspace("web-crud", t);
   await initializeProjectFiles(root);
   const skillSource = "---\nname: web-skill\ndescription: Read from Web.\n---\n\n# Instructions\n";
-  await fs.mkdir(path.join(root, ".skills", "web-skill"), { recursive: true });
-  await fs.writeFile(path.join(root, ".skills", "web-skill", "SKILL.md"), skillSource, "utf8");
+  await fs.mkdir(path.join(root, "skills", "web-skill"), { recursive: true });
+  await fs.writeFile(path.join(root, "skills", "web-skill", "SKILL.md"), skillSource, "utf8");
   const handle = await startLocalConsole(root);
   t.after(() => handle.close());
 
@@ -233,8 +253,10 @@ test("local console projects and saves independent media configuration", async (
 
   const page = await fetch(handle.url);
   const html = await page.text();
-  assert.match(html, /data-workflow-panel="media"/u);
-  assert.match(html, /id="media-form"/u);
+  assert.match(html, /data-open-workflow="capabilities"/u);
+  assert.match(html, /data-open-workflow="skills"/u);
+  assert.match(html, /id="other-form"[\s\S]*id="playwright-headless"/u);
+  assert.match(html, /id="media-key"/u);
 });
 
 test("local console lets humans generate and retrieve image and video artifacts", async (t) => {
@@ -316,7 +338,7 @@ test("local console lets humans generate and retrieve image and video artifacts"
   });
   assert.equal(created.response.status, 202);
   assert.equal(created.body.videoId, "video_web");
-  const taskFile = path.join(root, ".kitty", "extensions", "media", "video-tasks", "video_web.json");
+  const taskFile = path.join(root, ".kitty", "capabilities", "media", "video-tasks", "video_web.json");
   const task = JSON.parse(await fs.readFile(taskFile, "utf8")) as Record<string, unknown>;
   task.nextPollAt = new Date(0).toISOString();
   await fs.writeFile(taskFile, `${JSON.stringify(task)}\n`, "utf8");
@@ -333,19 +355,266 @@ test("local console lets humans generate and retrieve image and video artifacts"
 
   const traversal = await request(handle, "/api/media/artifacts?path=..%2F.kitty%2F.env");
   assert.equal(traversal.response.status, 422);
-  const page = await fetch(handle.url);
-  const html = await page.text();
-  const mediaPanelStart = html.indexOf('data-workflow-panel="media"');
-  const nextPanelStart = html.indexOf('data-workflow-panel="plugins"', mediaPanelStart);
-  const imagePrompt = html.indexOf('id="media-image-prompt"');
-  const videoPrompt = html.indexOf('id="media-video-prompt"');
-  assert.equal(mediaPanelStart >= 0 && nextPanelStart > mediaPanelStart, true);
-  assert.equal(imagePrompt > mediaPanelStart && imagePrompt < nextPanelStart, true);
-  assert.equal(videoPrompt > mediaPanelStart && videoPrompt < nextPanelStart, true);
-  assert.match(html, /id="media-image-prompt"/u);
-  assert.match(html, /id="media-video-prompt"/u);
-  assert.match(html, /id="media-image-preview"/u);
-  assert.match(html, /id="media-video-preview"/u);
+});
+
+test("local console commits capability configuration before projecting accepted values", async (t) => {
+  const root = await createTempWorkspace("web-capability-commit", t);
+  await initializeProjectFiles(root);
+  const handle = await startLocalConsole(root);
+  t.after(() => handle.close());
+
+  const envPath = path.join(root, ".kitty", ".env");
+  const before = await fs.readFile(envPath, "utf8");
+  const rejected = await request(handle, "/api/config", {
+    method: "PUT",
+    body: JSON.stringify({ values: { [KITTY_ENV.playwrightTimeoutMs]: "0" } }),
+  });
+  assert.equal(rejected.response.status, 400);
+  assert.equal(await fs.readFile(envPath, "utf8"), before);
+
+  const saved = await request(handle, "/api/config", {
+    method: "PUT",
+    body: JSON.stringify({ values: { [KITTY_ENV.playwrightTimeoutMs]: "90000" } }),
+  });
+  assert.equal(saved.response.status, 200);
+  assert.match(await fs.readFile(envPath, "utf8"), /KITTY_PLAYWRIGHT_TIMEOUT_MS=90000/u);
+  const projected = await request(handle, "/api/bootstrap");
+  const capabilities = projected.body.capabilities as Array<{ id: string; status: string }>;
+  assert.equal(capabilities.find(({ id }) => id === "web")?.status, "ready");
+
+  const disabled = await request(handle, "/api/capabilities/web", {
+    method: "PUT",
+    body: JSON.stringify({ enabled: false }),
+  });
+  assert.equal((disabled.body.capability as { status: string }).status, "disabled");
+  const disabledAgain = await request(handle, "/api/capabilities/web", {
+    method: "PUT",
+    body: JSON.stringify({ enabled: false }),
+  });
+  assert.equal((disabledAgain.body.capability as { status: string }).status, "disabled");
+});
+
+test("saving configuration rebuilds an enabled Playwright runtime before reporting ready", async (t) => {
+  const root = await createTempWorkspace("web-playwright-reconfigure", t);
+  await initializeProjectFiles(root);
+  let connects = 0;
+  let closes = 0;
+  const timeouts: number[] = [];
+  const handle = await startLocalConsole(root, {
+    capabilities: {
+      playwright: {
+        connect: async ({ config }) => {
+          connects += 1;
+          timeouts.push(config.timeoutMs);
+          return {
+            pid: null,
+            listTools: async () => [],
+            callTool: async () => ({}),
+            close: async () => { closes += 1; },
+          };
+        },
+      },
+    },
+  });
+  t.after(() => handle.close());
+
+  const enabled = await request(handle, "/api/capabilities/playwright", {
+    method: "PUT",
+    body: JSON.stringify({ enabled: true }),
+  });
+  assert.equal((enabled.body.capability as { status: string }).status, "ready");
+  const saved = await request(handle, "/api/config", {
+    method: "PUT",
+    body: JSON.stringify({ values: { [KITTY_ENV.playwrightTimeoutMs]: "91000" } }),
+  });
+  const playwright = (saved.body.capabilities as Array<{ id: string; enabled: boolean; status: string }>).find(({ id }) => id === "playwright");
+  assert.deepEqual({ enabled: playwright?.enabled, status: playwright?.status }, { enabled: true, status: "ready" });
+  assert.deepEqual(timeouts, [120_000, 91_000]);
+  assert.equal(connects, 2);
+  assert.equal(closes, 1);
+  await handle.close();
+  assert.equal(closes, 2);
+});
+
+test("committed configuration remains accepted when Playwright runtime cleanup is degraded", async (t) => {
+  const root = await createTempWorkspace("web-playwright-reconfigure-degraded", t);
+  await initializeProjectFiles(root);
+  let failClose = true;
+  const handle = await startLocalConsole(root, {
+    capabilities: {
+      playwright: {
+        connect: async () => ({
+          pid: null,
+          listTools: async () => [],
+          callTool: async () => ({}),
+          close: async () => {
+            if (failClose) {
+              failClose = false;
+              throw new Error("fake runtime cleanup failed");
+            }
+          },
+        }),
+      },
+    },
+  });
+  t.after(() => handle.close());
+  const enabled = await request(handle, "/api/capabilities/playwright", {
+    method: "PUT",
+    body: JSON.stringify({ enabled: true }),
+  });
+  assert.equal(enabled.response.status, 200);
+
+  const saved = await request(handle, "/api/config", {
+    method: "PUT",
+    body: JSON.stringify({ values: { [KITTY_ENV.playwrightTimeoutMs]: "92000" } }),
+  });
+  assert.equal(saved.response.status, 200);
+  assert.match(String(saved.body.runtimeApplyError), /fake runtime cleanup failed/u);
+  assert.match(await fs.readFile(path.join(root, ".kitty", ".env"), "utf8"), /KITTY_PLAYWRIGHT_TIMEOUT_MS=92000/u);
+  const playwright = (saved.body.capabilities as Array<{ id: string; status: string }>).find(({ id }) => id === "playwright");
+  assert.equal(playwright?.status, "degraded");
+  await handle.close();
+});
+
+test("local console close is shared and ends SSE and WebSocket connections", async (t) => {
+  const root = await createTempWorkspace("web-lifecycle-close", t);
+  await initializeProjectFiles(root);
+  const handle = await startLocalConsole(root);
+  const eventsResponse = await fetch(new URL(`/api/events?token=${encodeURIComponent(handle.token)}`, handle.url));
+  assert.equal(eventsResponse.status, 200);
+  const reader = eventsResponse.body!.getReader();
+  assert.equal((await reader.read()).done, false);
+  const socket = new WebSocket(handle.webUrl);
+  await new Promise<void>((resolve, reject) => {
+    socket.once("open", resolve);
+    socket.once("error", reject);
+  });
+  const socketClosed = new Promise<void>((resolve) => socket.once("close", () => resolve()));
+  await Promise.all([handle.close(), handle.close(), handle.close()]);
+  await handle.wait();
+  await socketClosed;
+  assert.equal((await reader.read()).done, true);
+});
+
+test("local console initializes and immediately discovers a new Skill package", async (t) => {
+  const root = await createTempWorkspace("web-skill-create", t);
+  await initializeProjectFiles(root);
+  const handle = await startLocalConsole(root);
+  t.after(() => handle.close());
+
+  const created = await request(handle, "/api/skills", {
+    method: "POST",
+    body: JSON.stringify({
+      name: "release-audit",
+      description: "Audit a release before delivery.",
+      instructions: "Read the release facts and report blocking inconsistencies.",
+    }),
+  });
+  assert.equal(created.response.status, 201);
+  assert.equal((created.body.skill as { name: string }).name, "release-audit");
+  const skillDir = path.join(root, "skills", "release-audit");
+  const source = await fs.readFile(path.join(skillDir, "SKILL.md"), "utf8");
+  assert.match(source, /name: release-audit/u);
+  assert.match(source, /Read the release facts/u);
+  for (const directory of ["references", "scripts", "examples", "assets"]) {
+    assert.equal((await fs.stat(path.join(skillDir, directory))).isDirectory(), true);
+  }
+
+  const bootstrap = await request(handle, "/api/bootstrap");
+  assert.equal((bootstrap.body.skills as Array<{ name: string }>).some(({ name }) => name === "release-audit"), true);
+  const capabilities = bootstrap.body.capabilities as Array<{ id: string; kind: string; status: string }>;
+  const skillCapability = capabilities.find(({ id }) => id === "skill:release-audit");
+  assert.equal(skillCapability?.kind, "skill");
+  assert.equal(skillCapability?.status, "ready");
+  const loaded = await request(handle, "/api/skills/release-audit");
+  assert.equal(loaded.body.source, source);
+  assert.match(loaded.body.instructions as string, /Read the release facts and report blocking inconsistencies\./u);
+
+  await fs.writeFile(path.join(skillDir, "SKILL.md"), source.replace("description:", "requires: node\ndescription:"), "utf8");
+  const updated = await request(handle, "/api/skills/release-audit", {
+    method: "PUT",
+    body: JSON.stringify({
+      description: "Review release evidence before delivery.",
+      instructions: "Check the release evidence, list blockers, and give a decision.",
+    }),
+  });
+  assert.equal(updated.response.status, 200);
+  assert.equal((updated.body.skill as { description: string }).description, "Review release evidence before delivery.");
+  const updatedSource = await fs.readFile(path.join(skillDir, "SKILL.md"), "utf8");
+  assert.match(updatedSource, /requires: node/u);
+  assert.match(updatedSource, /Check the release evidence/u);
+
+  const duplicate = await request(handle, "/api/skills", {
+    method: "POST",
+    body: JSON.stringify({ name: "release-audit", description: "Duplicate.", instructions: "Duplicate." }),
+  });
+  assert.equal(duplicate.response.status, 400);
+
+  const deleted = await request(handle, "/api/skills/release-audit", { method: "DELETE" });
+  assert.equal(deleted.response.status, 200);
+  assert.equal(deleted.body.deleted, "release-audit");
+  assert.equal((deleted.body.skills as Array<{ name: string }>).some(({ name }) => name === "release-audit"), false);
+  assert.equal((deleted.body.capabilities as Array<{ id: string }>).some(({ id }) => id === "skill:release-audit"), false);
+  await assert.rejects(fs.stat(skillDir), /ENOENT/u);
+
+});
+
+test("local console updates and deletes an existing standard Skill package", async (t) => {
+  const root = await createTempWorkspace("web-skill-existing", t);
+  await initializeProjectFiles(root);
+  const skillDir = path.join(root, "skills", "shared-audit");
+  const skillPath = path.join(skillDir, "SKILL.md");
+  await fs.mkdir(skillDir, { recursive: true });
+  await fs.writeFile(skillPath, "---\nname: shared-audit\ndescription: Shared package.\n---\n\nRead shared evidence.\n", "utf8");
+  const handle = await startLocalConsole(root);
+  t.after(() => handle.close());
+
+  const loaded = await request(handle, "/api/skills/shared-audit");
+  assert.equal(loaded.response.status, 200);
+  assert.equal((loaded.body.skill as { name: string }).name, "shared-audit");
+  const updated = await request(handle, "/api/skills/shared-audit", {
+    method: "PUT",
+    body: JSON.stringify({ description: "Changed.", instructions: "Changed." }),
+  });
+  assert.equal(updated.response.status, 200);
+  assert.match(await fs.readFile(skillPath, "utf8"), /description: "Changed\."/u);
+  assert.match(await fs.readFile(skillPath, "utf8"), /Changed\./u);
+  const deleted = await request(handle, "/api/skills/shared-audit", { method: "DELETE" });
+  assert.equal(deleted.response.status, 200);
+  await assert.rejects(fs.stat(skillDir), /ENOENT/u);
+});
+
+test("local console excludes Skill links that escape the standard skills workspace", async (t) => {
+  const root = await createTempWorkspace("web-skill-link", t);
+  await initializeProjectFiles(root);
+  const externalSkillDir = path.join(root, "external-linked-audit");
+  const externalSkillPath = path.join(externalSkillDir, "SKILL.md");
+  const linkedSkillDir = path.join(root, "skills", "linked-audit");
+  const source = "---\nname: linked-audit\ndescription: Linked package.\n---\n\nRead linked evidence.\n";
+  await fs.mkdir(externalSkillDir, { recursive: true });
+  await fs.writeFile(externalSkillPath, source, "utf8");
+  try {
+    await fs.symlink(externalSkillDir, linkedSkillDir, process.platform === "win32" ? "junction" : "dir");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EPERM") return t.skip("Directory links require additional host permission.");
+    throw error;
+  }
+
+  const handle = await startLocalConsole(root);
+  t.after(() => handle.close());
+
+  const bootstrap = await request(handle, "/api/bootstrap");
+  assert.equal((bootstrap.body.skills as Array<{ name: string }>).some(({ name }) => name === "linked-audit"), false);
+  const loaded = await request(handle, "/api/skills/linked-audit");
+  assert.equal(loaded.response.status, 400);
+  const updated = await request(handle, "/api/skills/linked-audit", {
+    method: "PUT",
+    body: JSON.stringify({ description: "Changed.", instructions: "Changed." }),
+  });
+  assert.equal(updated.response.status, 400);
+  const deleted = await request(handle, "/api/skills/linked-audit", { method: "DELETE" });
+  assert.equal(deleted.response.status, 400);
+  assert.equal(await fs.readFile(externalSkillPath, "utf8"), source);
 });
 
 async function request(handle: Awaited<ReturnType<typeof startLocalConsole>>, pathname: string, init: RequestInit = {}) {

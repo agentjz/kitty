@@ -75,14 +75,12 @@ export function createTestRuntimeConfig(root: string): RuntimeConfig {
     provider: "agnes",
     apiKey: "test-key",
     media: { ...initialConfig.media, apiKey: "test-key" },
+    capabilities: structuredClone(initialConfig.capabilities),
     baseUrl: "https://apihub.agnes-ai.com/v1",
     model: "agnes-2.0-flash",
     thinking: "enabled",
     telegram: resolveTelegramRuntimeConfig(initialConfig.telegram, root),
     weixin: resolveWeixinRuntimeConfig(initialConfig.weixin, root),
-    extensions: {
-      ...initialConfig.extensions,
-    },
     paths: getAppPaths(root),
   };
 }

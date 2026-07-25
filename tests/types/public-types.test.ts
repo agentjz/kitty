@@ -18,12 +18,12 @@ test("public type barrel exposes runtime, session, transition, and tool result c
     provider: "agnes",
     apiKey: "test",
     media: { ...initialConfig.media, apiKey: "test" },
+    capabilities: structuredClone(initialConfig.capabilities),
     baseUrl: "https://apihub.agnes-ai.com/v1",
     model: "agnes-2.0-flash",
     thinking: "enabled",
     telegram: resolveTelegramRuntimeConfig(initialConfig.telegram, "."),
     weixin: resolveWeixinRuntimeConfig(initialConfig.weixin, "."),
-    extensions: { ...initialConfig.extensions },
     paths: getAppPaths("."),
   } satisfies RuntimeConfig;
 

@@ -54,10 +54,10 @@ export async function runEvaluationCheck(id: EvaluationCheckId, rootDir: string)
           ledger.close();
         }
       }
-      case "extension-surface-current": {
-        const { EXTENSION_DEFINITIONS } = await import("../extensions/definitions.js");
-        const enabled = EXTENSION_DEFINITIONS.filter((extension) => extension.defaultEnabled).map((extension) => extension.id);
-        return passed(id, `extension surface ready: default=${enabled.join(",")}`);
+      case "capability-surface-current": {
+        const { STATIC_CAPABILITY_DEFINITIONS } = await import("../capabilities/definitions.js");
+        const enabled = STATIC_CAPABILITY_DEFINITIONS.filter((capability) => capability.defaultEnabled).map((capability) => capability.id);
+        return passed(id, `capability surface ready: default=${enabled.join(",")}`);
       }
       case "skill-packages-readable": {
         const { loadProjectContext } = await import("../context/projectContext.js");

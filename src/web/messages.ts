@@ -1,6 +1,5 @@
 import { KITTY_BASE_ENV } from "../config/envKeys.js";
 import { listAgentProfiles } from "../agent/profiles/registry.js";
-import type { ExtensionId } from "../extensions/definitions.js";
 import { SUPPORTED_LOCALES, translate, type KittyLocale, type MessageKey } from "../i18n/index.js";
 import { listSlashCommands } from "../interaction/localCommandDefinitions.js";
 
@@ -11,12 +10,18 @@ interface RuntimeFieldDefinition {
   labelKey: MessageKey;
   control: RuntimeControl;
   option?: "locale" | "profile" | "thinking" | "reasoning" | "boolean";
-  group: "model" | "other";
+  group: "model" | "browser" | "other";
+  min?: number;
+  max?: number;
+  step?: number;
+  required?: boolean;
+  hintKey?: MessageKey;
 }
 
 const RUNTIME_FIELDS = [
   { envKey: KITTY_BASE_ENV.locale, labelKey: "web.runtime.locale", control: "select", option: "locale", group: "other" },
   { envKey: KITTY_BASE_ENV.profile, labelKey: "web.runtime.profile", control: "select", option: "profile", group: "other" },
+  { envKey: KITTY_BASE_ENV.playwrightTimeoutMs, labelKey: "web.runtime.playwrightTimeout", control: "number", group: "browser", min: 5000, max: 600000, step: 1000, required: true, hintKey: "web.runtime.playwrightTimeoutHint" },
   { envKey: KITTY_BASE_ENV.thinking, labelKey: "web.runtime.thinking", control: "select", option: "thinking", group: "model" },
   { envKey: KITTY_BASE_ENV.reasoningEffort, labelKey: "web.runtime.reasoningEffort", control: "select", option: "reasoning", group: "model" },
   { envKey: KITTY_BASE_ENV.maxOutputTokens, labelKey: "web.runtime.maxOutputTokens", control: "number", group: "model" },
@@ -47,17 +52,6 @@ const RUNTIME_FIELDS = [
   { envKey: KITTY_BASE_ENV.weixinRouteTag, labelKey: "web.runtime.weixinRouteTag", control: "text", group: "other" },
 ] as const satisfies readonly RuntimeFieldDefinition[];
 
-const EXTENSION_SUMMARY_KEYS = {
-  todo: "web.extension.todo",
-  scheduler: "web.extension.scheduler",
-  worktree: "web.extension.worktree",
-  network: "web.extension.network",
-  media: "web.extension.media",
-  background: "web.extension.background",
-  documents: "web.extension.documents",
-  skills: "web.extension.skills",
-} as const satisfies Record<ExtensionId, MessageKey>;
-
 export function buildWebMessages(locale: KittyLocale) {
   const t = (key: MessageKey) => translate(locale, key);
   return {
@@ -85,20 +79,56 @@ export function buildWebMessages(locale: KittyLocale) {
       waiting: t("web.login.waiting"), scanned: t("web.login.scanned"), connected: t("web.login.connected"), failed: t("web.login.failed"),
     },
     workflow: {
-      basic: t("web.workflow.basic"), config: t("web.workflow.config"), media: t("web.workflow.media"), plugins: t("web.workflow.plugins"), other: t("web.workflow.other"),
+      basic: t("web.workflow.basic"), config: t("web.workflow.config"), capabilities: t("web.workflow.capabilities"), media: t("web.workflow.media"), other: t("web.workflow.other"),
       weixin: t("web.workflow.weixin"), telegram: t("web.workflow.telegram"), skills: t("web.workflow.skills"), web: t("web.workflow.web"),
       loadingConfig: t("web.workflow.loadingConfig"), loadingService: t("web.workflow.loadingService"), loadingSkills: t("web.workflow.loadingSkills"),
-      basicNote: t("web.workflow.basicNote"), configNote: t("web.workflow.configNote"), mediaNote: t("web.workflow.mediaNote"), mediaSummary: t("web.workflow.mediaSummary"), pluginsNote: t("web.workflow.pluginsNote"), otherNote: t("web.workflow.otherNote"), otherSummary: t("web.workflow.otherSummary"),
+      basicNote: t("web.workflow.basicNote"), configNote: t("web.workflow.configNote"), mediaNote: t("web.workflow.mediaNote"), mediaSummary: t("web.workflow.mediaSummary"), otherNote: t("web.workflow.otherNote"), otherSummary: t("web.workflow.otherSummary"),
       weixinNote: t("web.workflow.weixinNote"), telegramNote: t("web.workflow.telegramNote"), skillsNote: t("web.workflow.skillsNote"), webNote: t("web.workflow.webNote"), webSummary: t("web.workflow.webSummary"),
+      capabilitiesNote: t("web.workflow.capabilitiesNote"), capabilitiesSummary: t("web.workflow.capabilitiesSummary"),
       guide: t("web.workflow.guide"),
     },
     config: {
       description: t("web.config.description"), currentTitle: t("web.config.currentTitle"), providerTitle: t("web.config.providerTitle"),
       providerHint: t("web.config.providerHint"), validationTitle: t("web.config.validationTitle"), validationHint: t("web.config.validationHint"),
-      settingsTitle: t("web.config.settingsTitle"), settingsHint: t("web.config.settingsHint"), extensionsTitle: t("web.config.extensionsTitle"),
+      settingsTitle: t("web.config.settingsTitle"), settingsHint: t("web.config.settingsHint"),
       runtimeTitle: t("web.config.runtimeTitle"), preset: t("web.config.preset"), provider: t("web.config.provider"), model: t("web.config.model"),
       baseUrl: t("web.config.baseUrl"), apiKey: t("web.config.apiKey"), apiKeyHint: t("web.config.apiKeyHint"),
       currentLoaded: t("web.config.currentLoaded"), saved: t("web.config.saved"), probeSuccess: t("web.config.probeSuccess"),
+    },
+    capabilities: {
+      description: t("web.capabilities.description"), builtinGroup: t("web.capabilities.builtinGroup"), skillGroup: t("web.capabilities.skillGroup"),
+      externalGroup: t("web.capabilities.externalGroup"), builtinGroupHint: t("web.capabilities.builtinGroupHint"),
+      externalGroupHint: t("web.capabilities.externalGroupHint"),
+      overviewTitle: t("web.capabilities.overviewTitle"), overviewReady: t("web.capabilities.overviewReady"),
+      overviewAttention: t("web.capabilities.overviewAttention"), overviewDisabled: t("web.capabilities.overviewDisabled"),
+      details: t("web.capabilities.details"), toolsLabel: t("web.capabilities.toolsLabel"), sourceLabel: t("web.capabilities.sourceLabel"),
+      runtimeDetail: t("web.capabilities.runtimeDetail"), alwaysOn: t("web.capabilities.alwaysOn"),
+      installation: {
+        installed: t("web.capabilities.installed"), unavailable: t("web.capabilities.unavailable"),
+        bundled: t("web.capabilities.source.bundled"), project: t("web.capabilities.source.project"), npm: t("web.capabilities.source.npm"),
+      },
+      status: {
+        disabled: t("web.capabilities.status.disabled"), needs_config: t("web.capabilities.status.needsConfig"),
+        starting: t("web.capabilities.status.starting"), ready: t("web.capabilities.status.ready"),
+        degraded: t("web.capabilities.status.degraded"), stopped: t("web.capabilities.status.stopped"),
+      },
+      statusHelp: {
+        disabled: t("web.capabilities.statusHelp.disabled"), needs_config: t("web.capabilities.statusHelp.needsConfig"),
+        starting: t("web.capabilities.statusHelp.starting"), ready: t("web.capabilities.statusHelp.ready"),
+        degraded: t("web.capabilities.statusHelp.degraded"), stopped: t("web.capabilities.statusHelp.stopped"),
+      },
+      catalog: {
+        "core-tools": { name: t("web.capabilities.catalog.coreTools.name"), summary: t("web.capabilities.catalog.coreTools.summary") },
+        todo: { name: t("web.capabilities.catalog.todo.name"), summary: t("web.capabilities.catalog.todo.summary") },
+        scheduler: { name: t("web.capabilities.catalog.scheduler.name"), summary: t("web.capabilities.catalog.scheduler.summary") },
+        worktree: { name: t("web.capabilities.catalog.worktree.name"), summary: t("web.capabilities.catalog.worktree.summary") },
+        background: { name: t("web.capabilities.catalog.background.name"), summary: t("web.capabilities.catalog.background.summary") },
+        documents: { name: t("web.capabilities.catalog.documents.name"), summary: t("web.capabilities.catalog.documents.summary") },
+        media: { name: t("web.capabilities.catalog.media.name"), summary: t("web.capabilities.catalog.media.summary") },
+        skills: { name: t("web.capabilities.catalog.skills.name"), summary: t("web.capabilities.catalog.skills.summary") },
+        web: { name: t("web.capabilities.catalog.web.name"), summary: t("web.capabilities.catalog.web.summary") },
+        playwright: { name: t("web.capabilities.catalog.playwright.name"), summary: t("web.capabilities.catalog.playwright.summary") },
+      },
     },
     media: {
       description: t("web.media.description"), currentTitle: t("web.media.currentTitle"), providerTitle: t("web.media.providerTitle"),
@@ -115,8 +145,11 @@ export function buildWebMessages(locale: KittyLocale) {
       videoWaiting: t("web.media.videoWaiting"), videoInProgress: t("web.media.videoInProgress"), videoCompleted: t("web.media.videoCompleted"),
     },
     basic: { description: t("web.basic.description"), saved: t("web.basic.saved") },
-    plugins: { description: t("web.plugins.description"), saved: t("web.plugins.saved") },
-    other: { description: t("web.other.description"), saved: t("web.other.saved") },
+    other: {
+      description: t("web.other.description"), saved: t("web.other.saved"),
+      browserTitle: t("web.other.browserTitle"), browserDescription: t("web.other.browserDescription"),
+      browserHeadless: t("web.other.browserHeadless"), browserHeadlessHint: t("web.other.browserHeadlessHint"),
+    },
     weixin: {
       description: t("web.weixin.description"), allowedTitle: t("web.weixin.allowedTitle"), userId: t("web.weixin.userId"),
       usersPlaceholder: t("web.weixin.usersPlaceholder"), saved: t("web.weixin.saved"), loginTitle: t("web.weixin.loginTitle"),
@@ -134,6 +167,12 @@ export function buildWebMessages(locale: KittyLocale) {
     },
     skills: {
       description: t("web.skills.description"), empty: t("web.skills.empty"), source: t("web.skills.source"),
+      name: t("web.skills.name"), packageDescription: t("web.skills.packageDescription"), instructions: t("web.skills.instructions"),
+      create: t("web.skills.create"), created: t("web.skills.created"), updated: t("web.skills.updated"), deleted: t("web.skills.deleted"),
+      createTitle: t("web.skills.createTitle"),
+      createHint: t("web.skills.createHint"), listTitle: t("web.skills.listTitle"), listHint: t("web.skills.listHint"),
+      resources: t("web.skills.resources"), commands: t("web.skills.commands"), path: t("web.skills.path"),
+      save: t("web.skills.save"), delete: t("web.skills.delete"), deleteConfirm: t("web.skills.deleteConfirm"), cancelDelete: t("web.skills.cancelDelete"),
     },
     stream: {
       inbound: t("web.stream.inbound"), status: t("web.stream.status"), reasoning: t("web.stream.reasoning"),
@@ -156,11 +195,9 @@ export function buildWebMessages(locale: KittyLocale) {
     },
     runtime: {
       modelFields: projectRuntimeFields(locale, "model", t),
+      browserFields: projectRuntimeFields(locale, "browser", t),
       otherFields: projectRuntimeFields(locale, "other", t),
     },
-    extensionSummaries: Object.fromEntries(
-      Object.entries(EXTENSION_SUMMARY_KEYS).map(([id, key]) => [id, t(key)]),
-    ) as Record<ExtensionId, string>,
   };
 }
 
@@ -170,6 +207,11 @@ function projectRuntimeFields(locale: KittyLocale, group: RuntimeFieldDefinition
     label: t(field.labelKey),
     control: field.control,
     options: buildOptions(locale, "option" in field ? field.option : undefined),
+    min: "min" in field ? field.min : undefined,
+    max: "max" in field ? field.max : undefined,
+    step: "step" in field ? field.step : undefined,
+    required: "required" in field ? field.required : undefined,
+    hint: "hintKey" in field && field.hintKey ? t(field.hintKey) : undefined,
   }));
 }
 

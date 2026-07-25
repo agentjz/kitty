@@ -6,7 +6,7 @@ import type { WeixinLoginState } from "./state.js";
 import type { WeixinPollingBatch, WeixinRawMessage } from "./types.js";
 
 export interface WeixinClientLike {
-  loginWithQr(options: { timeoutMs: number; onQrCode?: (content: string) => void; onScanned?: () => void }): Promise<WeixinLoginState>;
+  loginWithQr(options: { timeoutMs: number; signal?: AbortSignal; onQrCode?: (content: string) => void; onScanned?: () => void }): Promise<WeixinLoginState>;
   getUpdates(syncBuf?: string | null, timeoutMs?: number, signal?: AbortSignal): Promise<WeixinPollingBatch>;
   getTypingConfig(userId: string, contextToken: string): Promise<string | null>;
   sendTyping(userId: string, ticket: string): Promise<void>;
@@ -19,9 +19,9 @@ export interface WeixinClientLike {
 export class OpenILinkWeixinClient implements WeixinClientLike {
   private clientPromise: Promise<RuntimeClient> | null = null;
   constructor(private readonly options: { token?: string; baseUrl: string; cdnBaseUrl: string; routeTag?: string }) {}
-  async loginWithQr(options: { timeoutMs: number; onQrCode?: (content: string) => void; onScanned?: () => void }): Promise<WeixinLoginState> {
-    const client = await this.client();
-    const result = await client.loginWithQr({ on_qrcode: options.onQrCode, on_scanned: options.onScanned }, options.timeoutMs);
+  async loginWithQr(options: { timeoutMs: number; signal?: AbortSignal; onQrCode?: (content: string) => void; onScanned?: () => void }): Promise<WeixinLoginState> {
+    const client = await abortable(this.client(), options.signal);
+    const result = await abortable(client.loginWithQr({ on_qrcode: options.onQrCode, on_scanned: options.onScanned }, options.timeoutMs), options.signal);
     if (!result.connected || !result.bot_token) throw new Error(result.message || "Weixin iLink QR login failed.");
     const now = new Date().toISOString();
     return { token: result.bot_token, baseUrl: result.base_url || client.baseUrl, cdnBaseUrl: client.cdnBaseUrl, botId: result.bot_id, userId: result.user_id, connectedAt: now, updatedAt: now };

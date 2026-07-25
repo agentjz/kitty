@@ -8,7 +8,7 @@ import { ConfigError } from "../../src/config/errors.js";
 import { normalizeRuntimeConfig } from "../../src/config/schema.js";
 import { INITIAL_WEIXIN_CONFIG, resolveWeixinRuntimeConfig } from "../../src/config/hosts.js";
 
-test("runtime config schema normalizes model, context, telegram, and extensions", () => {
+test("runtime config schema normalizes model, context, telegram, and capabilities", () => {
   const defaultPreset = getDefaultProviderPreset();
   const config = getInitialRuntimeConfig();
   const normalized = normalizeRuntimeConfig({
@@ -18,10 +18,6 @@ test("runtime config schema normalizes model, context, telegram, and extensions"
     contextSummaryChars: 1,
     maxReadBytes: 1,
     commandStallTimeoutMs: 1,
-    extensions: {
-      ...config.extensions,
-      network: true,
-    },
   });
 
   assert.equal(normalized.provider, defaultPreset.provider);
@@ -37,7 +33,7 @@ test("runtime config schema normalizes model, context, telegram, and extensions"
   assert.equal(config.maxContextChars, 900_000);
   assert.equal(config.contextSummaryChars, 120_000);
   assert.equal(config.maxOutputTokens, 384_000);
-  assert.equal(normalized.extensions.network, true);
+  assert.equal(normalized.capabilities.playwright.headless, false);
 });
 
 test("runtime config schema accepts model option registries from the shared model option source", () => {
@@ -67,8 +63,13 @@ test("runtime config schema rejects missing required values instead of hiding de
     /Missing Telegram API base URL/,
   );
   assert.throws(
-    () => normalizeRuntimeConfig({ ...config, extensions: { ...config.extensions, skills: undefined as unknown as boolean } }),
-    /Missing or invalid extension switch: skills/,
+    () => normalizeRuntimeConfig({
+      ...config,
+      capabilities: {
+        playwright: { ...config.capabilities.playwright, timeoutMs: 1_000_000 },
+      },
+    }),
+    /capabilities\.playwright\.timeoutMs/,
   );
 });
 

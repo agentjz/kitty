@@ -40,10 +40,10 @@ test("tool result projection uses output governance as the model-facing evidence
 test("tool result projection never returns an empty model message", () => {
   assert.equal(
     projectToolResultForModel({
-      toolName: "network_probe",
+      toolName: "custom_probe",
       result: { ok: true, output: "" },
     }),
-    "network_probe completed without text output.",
+    "custom_probe completed without text output.",
   );
 });
 
@@ -57,10 +57,10 @@ test("generic success projection states completion and preserves returned JSON",
   );
 });
 
-test("generic projection preserves nested extension facts", () => {
+test("generic projection preserves nested capability facts", () => {
   const raw = JSON.stringify({
     ok: true,
-    skills: [{ name: "dev", path: "skills/dev/SKILL.md" }],
+    skills: [{ name: "review", path: "skills/review/SKILL.md" }],
     total: 1,
   }, null, 2);
   const projection = projectToolResultForModel({
@@ -69,8 +69,8 @@ test("generic projection preserves nested extension facts", () => {
   });
 
   assert.match(projection, /skill_list completed successfully/);
-  assert.match(projection, /"name": "dev"/);
-  assert.match(projection, /"path": "skills\/dev\/SKILL\.md"/);
+  assert.match(projection, /"name": "review"/);
+  assert.match(projection, /"path": "skills\/review\/SKILL\.md"/);
 });
 
 test("read and write projections do not silently discard tool facts", () => {

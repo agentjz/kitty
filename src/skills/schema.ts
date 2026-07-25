@@ -4,6 +4,10 @@ import type { LoadedSkill } from "../types.js";
 
 const FRONTMATTER_PATTERN = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
 
+export const STANDARD_SKILLS_DIR_NAME = "skills";
+export const SKILL_FILE_NAME = "SKILL.md";
+export const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/u;
+
 export class SkillSchemaError extends Error {
   constructor(message: string, readonly filePath: string) {
     super(`${message} (${filePath})`);
@@ -23,7 +27,7 @@ export function parseSkillSource(
   const frontmatter = match?.[1] ?? "";
   const body = (match?.[2] ?? normalized).trim();
   const metadata = parseSimpleFrontmatter(frontmatter);
-  const name = readRequiredText(metadata.name, "name", input.absolutePath);
+  const name = validateSkillName(readRequiredText(metadata.name, "name", input.absolutePath), input.absolutePath);
   const description = readRequiredText(metadata.description, "description", input.absolutePath);
 
   return {
@@ -49,6 +53,43 @@ export function parseSkillSource(
       issues: body ? [] : ["SKILL.md body is empty"],
     },
   };
+}
+
+export function validateSkillName(input: string, filePath?: string): string {
+  const name = input.trim();
+  if (SKILL_NAME_PATTERN.test(name)) {
+    return name;
+  }
+  const message = "Skill name must use 1-64 lowercase letters, numbers, dots, underscores, or hyphens and start with a letter or number.";
+  if (filePath) {
+    throw new SkillSchemaError(message, filePath);
+  }
+  throw new Error(message);
+}
+
+export function updateSkillSource(
+  text: string,
+  input: { name: string; description: string; instructions: string; filePath: string },
+): string {
+  const normalized = text.replace(/^\uFEFF/, "");
+  const match = normalized.match(FRONTMATTER_PATTERN);
+  if (!match) throw new SkillSchemaError("Skill source requires frontmatter", input.filePath);
+  const lines = (match[1] ?? "").split(/\r?\n/);
+  replaceFrontmatterField(lines, "name", input.name);
+  replaceFrontmatterField(lines, "description", JSON.stringify(input.description));
+  return ["---", ...lines, "---", "", input.instructions.trim(), ""].join("\n");
+}
+
+function replaceFrontmatterField(lines: string[], field: string, value: string): void {
+  const index = lines.findIndex((line) => {
+    const separator = line.indexOf(":");
+    return separator > 0 && line.slice(0, separator).trim().toLowerCase() === field;
+  });
+  if (index >= 0) {
+    lines[index] = `${field}: ${value}`;
+  } else {
+    lines.push(`${field}: ${value}`);
+  }
 }
 
 function parseSimpleFrontmatter(frontmatter: string): Record<string, string> {

@@ -20,7 +20,7 @@ export function formatRuntimeStatusText(
     lines.push(`- ${translate(locale, "preflight.providerProfile")}: ${status.config.profile}`);
     lines.push(`- ${translate(locale, "status.thinking")}: ${status.config.thinking ?? translate(locale, "common.none")}`);
     lines.push(`- ${translate(locale, "status.reasoningEffort")}: ${status.config.reasoningEffort ?? translate(locale, "common.none")}`);
-    lines.push(`- ${translate(locale, "status.extensions")}: ${status.config.enabledExtensions.join(", ") || translate(locale, "common.none")}`);
+    lines.push(`- ${translate(locale, "status.capabilities")}: ${status.config.enabledCapabilities.join(", ") || translate(locale, "common.none")}`);
   }
   lines.push("");
   lines.push(`${translate(locale, "status.currentScene")}:`);

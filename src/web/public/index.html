@@ -38,34 +38,14 @@
         <a class="github-link" href="https://github.com/luckymaomi/kitty" target="_blank" rel="noreferrer" data-message-title="common.github"><i class="bi bi-github" aria-hidden="true"></i></a>
       </div>
       <div class="workflow-list" role="list">
-        <a class="workflow-card" id="open-web-shell" href="/web" role="listitem">
-          <span class="workflow-icon"><i class="bi bi-window"></i></span>
-          <span class="workflow-copy"><span class="workflow-title"><strong data-message="workflow.web"></strong><small data-message="workflow.webNote"></small></span><small data-message="workflow.webSummary"></small></span>
-        </a>
-        <button class="workflow-card" type="button" data-open-workflow="model" role="listitem">
-          <span class="workflow-icon"><i class="bi bi-cpu"></i></span>
-          <span class="workflow-copy"><span class="workflow-title"><strong data-message="workflow.config"></strong><small data-message="workflow.configNote"></small></span><small id="model-summary" data-message="workflow.loadingConfig"></small><code id="config-location"></code></span>
-        </button>
-        <button class="workflow-card" type="button" data-open-workflow="media" role="listitem">
-          <span class="workflow-icon"><i class="bi bi-images"></i></span>
-          <span class="workflow-copy"><span class="workflow-title"><strong data-message="workflow.media"></strong><small data-message="workflow.mediaNote"></small></span><small id="media-summary" data-message="workflow.mediaSummary"></small></span>
-        </button>
-        <button class="workflow-card" type="button" data-open-workflow="plugins" role="listitem">
-          <span class="workflow-icon"><i class="bi bi-toggles"></i></span>
-          <span class="workflow-copy"><span class="workflow-title"><strong data-message="workflow.plugins"></strong><small data-message="workflow.pluginsNote"></small></span><small id="plugins-summary"></small></span>
-        </button>
-        <button class="workflow-card" type="button" data-open-workflow="weixin" role="listitem">
-          <span class="workflow-icon"><i class="bi bi-wechat"></i></span>
-          <span class="workflow-copy"><span class="workflow-title"><strong data-message="workflow.weixin"></strong><small data-message="workflow.weixinNote"></small></span><small id="weixin-summary" data-message="workflow.loadingService"></small></span>
-        </button>
-        <button class="workflow-card" type="button" data-open-workflow="telegram" role="listitem">
-          <span class="workflow-icon"><i class="bi bi-telegram"></i></span>
-          <span class="workflow-copy"><span class="workflow-title"><strong data-message="workflow.telegram"></strong><small data-message="workflow.telegramNote"></small></span><small id="telegram-summary" data-message="workflow.loadingService"></small></span>
-        </button>
-        <button class="workflow-card" type="button" data-open-workflow="other" role="listitem">
-          <span class="workflow-icon"><i class="bi bi-three-dots"></i></span>
-          <span class="workflow-copy"><span class="workflow-title"><strong data-message="workflow.other"></strong><small data-message="workflow.otherNote"></small></span><small data-message="workflow.otherSummary"></small></span>
-        </button>
+        <a class="workflow-card" id="open-web-shell" href="/web" role="listitem"><span class="workflow-icon"><i class="bi bi-window"></i></span><span class="workflow-copy"><span class="workflow-title"><strong data-message="workflow.web"></strong><small data-message="workflow.webNote"></small></span><small data-message="workflow.webSummary"></small></span></a>
+        <button class="workflow-card" type="button" data-open-workflow="model" role="listitem"><span class="workflow-icon"><i class="bi bi-cpu"></i></span><span class="workflow-copy"><span class="workflow-title"><strong data-message="workflow.config"></strong><small data-message="workflow.configNote"></small></span><small id="model-summary" data-message="workflow.loadingConfig"></small><code id="config-location"></code></span></button>
+        <button class="workflow-card" type="button" data-open-workflow="capabilities" role="listitem"><span class="workflow-icon"><i class="bi bi-toggles"></i></span><span class="workflow-copy"><span class="workflow-title"><strong data-message="workflow.capabilities"></strong><small data-message="workflow.capabilitiesNote"></small></span><small id="capabilities-summary" data-message="workflow.loadingSkills"></small></span></button>
+        <button class="workflow-card" type="button" data-open-workflow="skills" role="listitem"><span class="workflow-icon"><i class="bi bi-journal-code"></i></span><span class="workflow-copy"><span class="workflow-title"><strong data-message="workflow.skills"></strong><small data-message="workflow.skillsNote"></small></span><small id="skills-summary" data-message="workflow.loadingSkills"></small></span></button>
+        <button class="workflow-card" type="button" data-open-workflow="media" role="listitem"><span class="workflow-icon"><i class="bi bi-images"></i></span><span class="workflow-copy"><span class="workflow-title"><strong data-message="workflow.media"></strong><small data-message="workflow.mediaNote"></small></span><small id="media-summary" data-message="workflow.mediaSummary"></small></span></button>
+        <button class="workflow-card" type="button" data-open-workflow="weixin" role="listitem"><span class="workflow-icon"><i class="bi bi-wechat"></i></span><span class="workflow-copy"><span class="workflow-title"><strong data-message="workflow.weixin"></strong><small data-message="workflow.weixinNote"></small></span><small id="weixin-summary" data-message="workflow.loadingService"></small></span></button>
+        <button class="workflow-card" type="button" data-open-workflow="telegram" role="listitem"><span class="workflow-icon"><i class="bi bi-telegram"></i></span><span class="workflow-copy"><span class="workflow-title"><strong data-message="workflow.telegram"></strong><small data-message="workflow.telegramNote"></small></span><small id="telegram-summary" data-message="workflow.loadingService"></small></span></button>
+        <button class="workflow-card" type="button" data-open-workflow="other" role="listitem"><span class="workflow-icon"><i class="bi bi-three-dots"></i></span><span class="workflow-copy"><span class="workflow-title"><strong data-message="workflow.other"></strong><small data-message="workflow.otherNote"></small></span><small data-message="workflow.otherSummary"></small></span></button>
       </div>
     </section>
 
@@ -181,10 +161,16 @@
         </ol>
       </article>
 
-      <article class="workflow-panel d-none" data-workflow-panel="plugins">
-        <div class="detail-heading"><h1 data-message="workflow.plugins"></h1><p data-message="plugins.description"></p></div>
-        <form id="plugins-form"><div id="extension-switches" class="switch-grid"></div><div class="sticky-actions"><button class="btn btn-kitty" type="submit"><i class="bi bi-save"></i><span data-message="common.save"></span></button><div id="plugins-result" class="inline-result d-none" role="status"></div></div></form>
-        <section class="skill-section"><div class="section-heading"><h2 data-message="workflow.skills"></h2><p data-message="skills.description"></p></div><div id="skill-list" class="skill-list"></div><section id="skill-reader" class="skill-reader d-none"><div class="skill-reader-heading"><div><p class="eyebrow" data-message="skills.source"></p><h2 id="skill-reader-title"></h2></div></div><pre id="skill-source"></pre></section></section>
+      <article class="workflow-panel d-none" data-workflow-panel="capabilities">
+        <div class="detail-heading"><h1 data-message="workflow.capabilities"></h1><p data-message="capabilities.description"></p></div>
+        <section class="capability-overview" aria-labelledby="capability-overview-title"><h2 id="capability-overview-title" data-message="capabilities.overviewTitle"></h2><div id="capability-overview" class="capability-overview-facts"></div></section>
+        <div id="capability-groups" class="capability-groups" aria-live="polite"></div>
+      </article>
+
+      <article class="workflow-panel d-none" data-workflow-panel="skills">
+        <div class="detail-heading"><h1 data-message="workflow.skills"></h1><p data-message="skills.description"></p></div>
+        <section class="skill-create-section"><div class="section-heading"><h2 data-message="skills.createTitle"></h2><p data-message="skills.createHint"></p></div><form id="skill-create-form" class="form-grid skill-create-form"><div><label class="form-label" for="skill-name" data-message="skills.name"></label><input class="form-control" id="skill-name" pattern="[a-z0-9][a-z0-9._-]{0,63}" required></div><div><label class="form-label" for="skill-description" data-message="skills.packageDescription"></label><input class="form-control" id="skill-description" maxlength="240" required></div><div class="span-2"><label class="form-label" for="skill-instructions" data-message="skills.instructions"></label><textarea class="form-control" id="skill-instructions" rows="5" maxlength="12000" required></textarea></div><div class="span-2 action-row"><button class="btn btn-kitty" type="submit"><i class="bi bi-plus-lg"></i><span data-message="skills.create"></span></button><div id="skill-create-result" class="inline-result d-none" role="status"></div></div></form></section>
+        <section class="skill-section"><div class="section-heading"><h2 data-message="skills.listTitle"></h2><p data-message="skills.listHint"></p></div><div id="skill-list" class="skill-list"></div><section id="skill-reader" class="skill-reader d-none"><form id="skill-edit-form"><div class="skill-reader-heading"><div><p class="eyebrow" data-message="skills.source"></p><h2 id="skill-reader-title"></h2><p id="skill-reader-path" class="skill-reader-path"></p></div><div id="skill-edit-actions" class="action-row"><button class="btn btn-kitty" type="submit"><i class="bi bi-save"></i><span data-message="skills.save"></span></button><button class="btn btn-quiet-danger" type="button" data-action="delete-skill"><i class="bi bi-trash3"></i><span data-message="skills.delete"></span></button><button class="btn btn-outline-secondary d-none" id="skill-delete-cancel" type="button" data-action="cancel-delete-skill"><i class="bi bi-x-lg"></i><span data-message="skills.cancelDelete"></span></button></div></div><div class="form-grid skill-editor-fields"><div class="span-2"><label class="form-label" for="skill-edit-description" data-message="skills.packageDescription"></label><input class="form-control" id="skill-edit-description" maxlength="240" required></div><div class="span-2"><label class="form-label" for="skill-edit-instructions" data-message="skills.instructions"></label><textarea class="form-control" id="skill-edit-instructions" rows="12" maxlength="12000" required></textarea></div></div><div id="skill-edit-result" class="inline-result d-none" role="status"></div></form><pre id="skill-source" class="d-none"></pre></section></section>
       </article>
 
       <article class="workflow-panel d-none" data-workflow-panel="weixin">
@@ -207,7 +193,7 @@
 
       <article class="workflow-panel d-none" data-workflow-panel="other">
         <div class="detail-heading"><h1 data-message="workflow.other"></h1><p data-message="other.description"></p></div>
-        <form id="other-form"><div id="other-settings" class="form-grid"></div><div class="sticky-actions"><button class="btn btn-kitty" type="submit"><i class="bi bi-save"></i><span data-message="common.save"></span></button><div id="other-result" class="inline-result d-none" role="status"></div></div></form>
+        <form id="other-form"><section class="settings-section"><div class="section-heading"><h2 data-message="other.browserTitle"></h2><p data-message="other.browserDescription"></p></div><div class="form-grid"><label class="switch-item" for="playwright-headless"><span><strong data-message="other.browserHeadless"></strong><small data-message="other.browserHeadlessHint"></small></span><span class="ui-switch"><input class="ui-switch-input" id="playwright-headless" type="checkbox" role="switch"><span class="ui-switch-track" aria-hidden="true"><span class="ui-switch-thumb"></span></span></span></label><div id="browser-settings"></div></div></section><div id="other-settings" class="form-grid"></div><div class="sticky-actions"><button class="btn btn-kitty" type="submit"><i class="bi bi-save"></i><span data-message="common.save"></span></button><div id="other-result" class="inline-result d-none" role="status"></div></div></form>
       </article>
     </section>
   </main>

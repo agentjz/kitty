@@ -7,7 +7,7 @@ import { summarizeExecutionSet } from "./executionSummary.js";
 import { buildRuntimeScene } from "./scene.js";
 import type { SessionRecord } from "../types.js";
 import type { RuntimeConfig } from "../types.js";
-import { readEnabledExtensionIds } from "../config/extensions.js";
+import { getProjectCapabilityManager } from "../capabilities/index.js";
 import { SessionEventStore, type SessionEventRecord } from "../session/events.js";
 import type {
   ObservabilityEventRecord,
@@ -53,11 +53,16 @@ export async function buildRuntimeStatus(
     .filter((record) => record.event === "tool.output")
     .slice(0, DEFAULT_RECENT_LIMIT)
     .map(summarizeToolOutput);
+  const capabilitySnapshots = scope.config
+    ? (await getProjectCapabilityManager({ cwd: rootDir, stateRootDir: paths.rootDir, config: scope.config }))
+        .snapshot(projectContext.skills)
+    : undefined;
 
   const statusWithoutScene = {
     rootDir: paths.rootDir,
     stateDir: paths.kittyDir,
-    config: scope.config ? summarizeConfig(scope.config) : undefined,
+    config: scope.config ? summarizeConfig(scope.config, capabilitySnapshots ?? []) : undefined,
+    capabilities: capabilitySnapshots?.map(({ id, kind, enabled, status, message }) => ({ id, kind, enabled, status, message })),
     sessions: {
       total: sessions.length,
       latest: sessions[0],
@@ -135,7 +140,10 @@ function summarizeSession(session: SessionRecord): RuntimeSessionSummary {
   };
 }
 
-function summarizeConfig(config: RuntimeConfig): NonNullable<RuntimeStatus["config"]> {
+function summarizeConfig(
+  config: RuntimeConfig,
+  capabilities: readonly { id: string; enabled: boolean }[],
+): NonNullable<RuntimeStatus["config"]> {
   return {
     provider: config.provider,
     model: config.model,
@@ -144,7 +152,7 @@ function summarizeConfig(config: RuntimeConfig): NonNullable<RuntimeStatus["conf
     thinking: config.thinking,
     reasoningEffort: config.reasoningEffort,
     showReasoning: config.showReasoning,
-    enabledExtensions: readEnabledExtensionIds(config),
+    enabledCapabilities: capabilities.filter((item) => item.enabled).map((item) => item.id),
   };
 }
 

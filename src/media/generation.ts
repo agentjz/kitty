@@ -289,7 +289,7 @@ export async function pollMediaVideo(input: {
 
 async function videoTaskPath(root: string, videoId: string): Promise<string> {
   const paths = await ensureProjectStateDirectories(root);
-  const mediaDir = path.join(paths.extensionsDir, "media", "video-tasks");
+  const mediaDir = path.join(paths.capabilitiesDir, "media", "video-tasks");
   return path.join(mediaDir, `${sanitizeStateSegment(videoId)}.json`);
 }
 

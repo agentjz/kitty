@@ -1,6 +1,6 @@
 export const DEFAULT_LEASE_MS = 30_000;
 
-export type LeaseResourceKind = "turn" | "execution" | "service";
+export type LeaseResourceKind = "turn" | "execution" | "service" | "capability" | "tool_call";
 
 export class LeaseOwnershipLostError extends Error {
   readonly code = "LEASE_OWNERSHIP_LOST";

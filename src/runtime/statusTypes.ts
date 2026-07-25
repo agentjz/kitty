@@ -2,6 +2,13 @@ export interface RuntimeStatus {
   rootDir: string;
   stateDir: string;
   config?: RuntimeConfigSummary;
+  capabilities?: Array<{
+    id: string;
+    kind: string;
+    enabled: boolean;
+    status: string;
+    message?: string;
+  }>;
   scene: RuntimeSceneSummary;
   sessions: {
     total: number;
@@ -44,7 +51,7 @@ export interface RuntimeConfigSummary {
   thinking?: string;
   reasoningEffort?: string;
   showReasoning: boolean;
-  enabledExtensions: string[];
+  enabledCapabilities: string[];
 }
 
 export interface RuntimeSessionEventSummary {

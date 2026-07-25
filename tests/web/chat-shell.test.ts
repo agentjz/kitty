@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import test from "node:test";
+import { WebSocket, type WebSocketServer } from "ws";
 
 import { buildWebMessages } from "../../src/web/messages.js";
 import { WebChatShell } from "../../src/web/chatShell.js";
@@ -72,6 +74,40 @@ test("web live tool failures preserve their actionable error fact", () => {
   assert.match(events.at(-1)?.summary ?? "", /HTTP 503.*req_test/u);
 });
 
+test("web shell shutdown drains accepted replay and control tasks", async () => {
+  const shell = new WebChatShell(buildWebMessages("zh-CN").shell);
+  const server = new EventEmitter() as WebSocketServer;
+  const socket = new EventEmitter() as EventEmitter & {
+    readyState: number;
+    sent: string[];
+    send(value: string): void;
+    close(): void;
+    terminate(): void;
+  };
+  socket.readyState = WebSocket.OPEN;
+  socket.sent = [];
+  socket.send = (value) => { socket.sent.push(value); };
+  socket.close = () => { socket.readyState = WebSocket.CLOSING; };
+  socket.terminate = () => { socket.readyState = WebSocket.CLOSED; socket.emit("close"); };
+  let releaseReplay!: () => void;
+  const replayGate = new Promise<void>((resolve) => { releaseReplay = resolve; });
+  let releaseControl!: () => void;
+  const controlGate = new Promise<void>((resolve) => { releaseControl = resolve; });
+  shell.attach(server, async () => replayGate, async () => controlGate);
+  server.emit("connection", socket);
+  socket.emit("message", Buffer.from(JSON.stringify({ type: "session_select", sessionId: "session-2" })));
+  shell.stopAdmission();
+  let drained = false;
+  const drain = shell.waitForIdle().then(() => { drained = true; });
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(drained, false);
+  releaseReplay();
+  releaseControl();
+  await drain;
+  assert.equal(drained, true);
+  shell.dispose();
+});
+
 test("interactive driver can switch the bound session without creating a second host", async (t) => {
   const root = await createTempWorkspace("web-session-switch", t);
   const config = createTestRuntimeConfig(root);
@@ -88,10 +124,13 @@ test("interactive driver can switch the bound session without creating a second 
     sessionStore: store,
     shell: createTuiInteractionShell(controller),
     surface: "web",
+    ownsProcessSignals: false,
     onSessionChanged: (session) => { changedId = session.id; },
   });
 
+  const signalCounts = ["SIGHUP", "SIGTERM", "SIGBREAK"].map((signal) => process.listenerCount(signal));
   const running = driver.run();
+  assert.deepEqual(["SIGHUP", "SIGTERM", "SIGBREAK"].map((signal) => process.listenerCount(signal)), signalCounts);
   assert.equal(await driver.selectSession(second), true);
   assert.equal(changedId, second.id);
   controller.closeInput();

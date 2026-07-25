@@ -7,52 +7,46 @@ import { buildContextRuntimePromptLayers } from "../../src/context/runtime/promp
 import { projectToolResultForModel } from "../../src/agent/toolResults/modelProjection.js";
 import { ControlPlaneLedger } from "../../src/control/ledger.js";
 import { loadProjectContext } from "../../src/context/projectContext.js";
-import { createSkillTools } from "../../src/extensions/tools/skills/index.js";
+import { discoverSkills } from "../../src/skills/discovery.js";
+import { createSkillTools } from "../../src/capabilities/tools/skills/index.js";
+import { CapabilityManager } from "../../src/capabilities/manager.js";
+import { SkillSchemaError } from "../../src/skills/schema.js";
 import { createToolRegistry } from "../../src/tools/core/registry.js";
 import { createTempWorkspace, createTestRuntimeConfig, createToolContext, parseToolJson } from "../helpers.js";
 
-test("project runtime skills do not load development skills from .agents", async (t) => {
+test("project runtime recursively loads only the current skills tree", async (t) => {
   const root = await createTempWorkspace("skill-discovery", t);
   await writeSkill(root, "skills/skepticism/SKILL.md", "skepticism", "Skeptical review method.", "VISIBLE_BODY");
   await writeFile(root, "skills/skepticism/references/checklist.md", "CHECKLIST_BODY");
   await writeSkill(root, ".agents/skills/dev/SKILL.md", "dev-only", "Development-agent-only method.", "HIDDEN_BODY");
+  await writeSkill(root, ".skills/hidden/SKILL.md", "hidden", "Hidden legacy method.", "HIDDEN_BODY");
+  await writeSkill(root, "SKILL.md", "root-only", "Root package.", "HIDDEN_BODY");
+  await writeSkill(root, "skills/group/nested/SKILL.md", "nested", "Nested package.", "HIDDEN_BODY");
 
   const context = await loadProjectContext(root, { projectDocMaxBytes: 24_576 });
 
-  assert.deepEqual(context.skills.map((skill) => skill.name), ["skepticism"]);
-  assert.equal(context.skills[0]?.body.includes("VISIBLE_BODY"), true);
-  assert.deepEqual(context.skills[0]?.resources.map((resource) => resource.path), [
+  const skepticism = context.skills.find((skill) => skill.name === "skepticism");
+  const nested = context.skills.find((skill) => skill.name === "nested");
+  assert.ok(skepticism);
+  assert.ok(nested);
+  assert.equal(context.skills.every((skill) => skill.path.replace(/\\/g, "/").startsWith("skills/")), true);
+  assert.equal(skepticism?.body.includes("VISIBLE_BODY"), true);
+  assert.deepEqual(skepticism?.resources.map((resource) => resource.path), [
     path.join("skills", "skepticism", "references", "checklist.md"),
   ]);
-  assert.equal(context.skills[0]?.resources[0]?.kind, "references");
-  assert.equal(context.skills[0]?.health.status, "ready");
-  assert.equal(context.skills[0]?.health.resourceGroups.references, 1);
+  assert.equal(skepticism?.resources[0]?.kind, "references");
+  assert.equal(skepticism?.health.status, "ready");
+  assert.equal(skepticism?.health.resourceGroups.references, 1);
 });
 
-test("repository runtime skills expose development, media, and read-only audit workflows", async () => {
-  const context = await loadProjectContext(process.cwd(), { projectDocMaxBytes: 24_576 });
-  const runtimeSkillNames = context.skills.map((skill) => skill.name);
+test("project runtime rejects a standard package whose directory and metadata names differ", async (t) => {
+  const root = await createTempWorkspace("skill-name-mismatch", t);
+  await writeSkill(root, "skills/directory-name/SKILL.md", "metadata-name", "Mismatched package.", "BODY");
 
-  assert.deepEqual(runtimeSkillNames, ["agnes-media", "dev", "read-only"]);
-  assert.equal(runtimeSkillNames.includes("development"), false);
-  const media = context.skills.find((skill) => skill.name === "agnes-media");
-  assert.ok(media);
-  assert.match(media.body, /generate_image/);
-  assert.match(media.body, /generate_video/);
-  assert.match(media.body, /video_id/);
-  const dev = context.skills.find((skill) => skill.name === "dev");
-  assert.ok(dev);
-  assert.match(dev.description, /完整开发工作流/);
-  assert.match(dev.body, /## 一、调研/);
-  assert.match(dev.body, /## 二、计划/);
-  assert.match(dev.body, /## 三、实施/);
-  assert.match(dev.body, /## 四、验证/);
-  assert.match(dev.body, /中断、崩溃与恶劣用户路径/);
-  assert.match(dev.body, /# \[任务名\] Plan/);
-  const audit = context.skills.find((skill) => skill.name === "read-only");
-  assert.ok(audit);
-  assert.equal(audit.path, path.join("skills", "read-only", "SKILL.md"));
-  assert.equal(audit.health.status, "ready");
+  await assert.rejects(
+    discoverSkills(root, root, []),
+    (error: unknown) => error instanceof SkillSchemaError && /must match its package directory/u.test(error.message),
+  );
 });
 
 test("runtime prompt shows the skill index without loading full skill bodies", async (t) => {
@@ -75,12 +69,18 @@ test("runtime prompt shows the skill index without loading full skill bodies", a
   assert.doesNotMatch(prompt, /SECRET_RESOURCE_BODY/);
 });
 
-test("runtime prompt hides skill index when the skills extension is disabled", async (t) => {
+test("runtime prompt hides skill index when the skill capability is disabled", async (t) => {
   const root = await createTempWorkspace("skill-prompt-disabled", t);
   await writeSkill(root, "skills/skepticism/SKILL.md", "skepticism", "Skeptical review method.", "SECRET_FULL_SKILL_BODY");
   const config = createTestRuntimeConfig(root);
-  config.extensions.skills = false;
-  const projectContext = await loadProjectContext(root, { projectDocMaxBytes: config.projectDocMaxBytes });
+  const manager = new CapabilityManager(root, root, config);
+  t.after(() => manager.close());
+  await manager.setEnabled("skills", false);
+  const loadedProjectContext = await loadProjectContext(root, { projectDocMaxBytes: config.projectDocMaxBytes });
+  const projectContext = {
+    ...loadedProjectContext,
+    skills: manager.filterEnabledSkills(loadedProjectContext.skills),
+  };
 
   const prompt = buildContextRuntimePromptLayers({
     cwd: root,
@@ -93,7 +93,7 @@ test("runtime prompt hides skill index when the skills extension is disabled", a
   assert.doesNotMatch(prompt, /skill_load/);
 });
 
-test("skills extension lists summaries and explicitly loads full skill content", async (t) => {
+test("skills capability lists summaries and explicitly loads full skill content", async (t) => {
   const root = await createTempWorkspace("skill-tools", t);
   await writeSkill(root, "skills/skepticism/SKILL.md", "skepticism", "Skeptical review method.", "FULL_SKILL_BODY");
   await writeFile(root, "skills/skepticism/references/checklist.md", "RESOURCE_BODY");
@@ -113,13 +113,14 @@ test("skills extension lists summaries and explicitly loads full skill content",
   });
 
   const list = parseToolJson((await registry.execute("skill_list", "{}", context)).output);
-  assert.equal(list.total, 1);
   assert.equal(JSON.stringify(list).includes("FULL_SKILL_BODY"), false);
   assert.equal(JSON.stringify(list).includes("RESOURCE_BODY"), false);
-  assert.deepEqual(((list.skills as Array<Record<string, unknown>>)[0]?.resources as Array<Record<string, unknown>>).map((resource) => resource.path), [
+  const listedSkill = (list.skills as Array<Record<string, unknown>>).find((item) => item.name === "skepticism");
+  assert.ok(listedSkill);
+  assert.deepEqual((listedSkill.resources as Array<Record<string, unknown>>).map((resource) => resource.path), [
     path.join("skills", "skepticism", "references", "checklist.md"),
   ]);
-  assert.equal(((list.skills as Array<Record<string, unknown>>)[0]?.health as Record<string, unknown>).status, "ready");
+  assert.equal((listedSkill.health as Record<string, unknown>).status, "ready");
 
   const loaded = parseToolJson((await registry.execute("skill_load", JSON.stringify({ name: "skepticism" }), context)).output);
   assert.equal(loaded.ok, true);
@@ -153,7 +154,7 @@ test("skills extension lists summaries and explicitly loads full skill content",
   assert.match(privateRead.output, /does not declare resource/);
 });
 
-test("skills extension exposes examples and checks declared command dependencies", async (t) => {
+test("skills capability exposes examples and checks declared command dependencies", async (t) => {
   const root = await createTempWorkspace("skill-check", t);
   await writeSkill(
     root,
@@ -179,7 +180,7 @@ test("skills extension exposes examples and checks declared command dependencies
   });
 
   const list = parseToolJson((await registry.execute("skill_list", "{}", context)).output);
-  const skill = (list.skills as Array<Record<string, unknown>>)[0]!;
+  const skill = (list.skills as Array<Record<string, unknown>>).find((item) => item.name === "runner")!;
   assert.deepEqual(skill.dependencies, [{ command: "node" }, { command: "definitely_missing_kitty_command" }]);
   assert.deepEqual((skill.resources as Array<Record<string, unknown>>).map((resource) => resource.path), [
     path.join("skills", "runner", "examples", "basic.md"),
@@ -199,7 +200,7 @@ test("skills extension exposes examples and checks declared command dependencies
   assert.equal(dependencies.find((item) => item.command === "definitely_missing_kitty_command")?.available, false);
 });
 
-test("skills extension runs only declared script resources", async (t) => {
+test("skills capability runs only declared script resources", async (t) => {
   const root = await createTempWorkspace("skill-script", t);
   await writeSkill(root, "skills/runner/SKILL.md", "runner", "Script runner method.", "Use scripts when needed.");
   await writeFile(root, "skills/runner/scripts/hello.js", "console.log('hello from skill script');\n");

@@ -1,5 +1,4 @@
 import { KITTY_ENV } from "./envKeys.js";
-import { EXTENSION_DEFINITIONS } from "../extensions/definitions.js";
 import { INITIAL_TELEGRAM_CONFIG, INITIAL_WEIXIN_CONFIG } from "./hosts.js";
 import { INITIAL_PROJECT_DOC_MAX_BYTES } from "./projectDocs.js";
 import { getInitialRuntimeConfig } from "./initialConfig.js";
@@ -77,9 +76,9 @@ function formatCommonEnvSections(input: {
     `${KITTY_ENV.telegramDeliveryBaseDelayMs}=${INITIAL_TELEGRAM_CONFIG.delivery.baseDelayMs}`,
     `${KITTY_ENV.telegramDeliveryMaxDelayMs}=${INITIAL_TELEGRAM_CONFIG.delivery.maxDelayMs}`,
     "",
-    "# Extension 开关",
-    ...EXTENSION_DEFINITIONS.map((definition) =>
-      `${definition.envKey}=${String(input.initialConfig.extensions[definition.id])}`),
+    "# 能力配置",
+    `${KITTY_ENV.playwrightHeadless}=${String(input.initialConfig.capabilities.playwright.headless)}`,
+    `${KITTY_ENV.playwrightTimeoutMs}=${input.initialConfig.capabilities.playwright.timeoutMs}`,
     "",
     "# 运行参数",
     `${KITTY_ENV.maxOutputTokens}=${input.initialConfig.maxOutputTokens}`,

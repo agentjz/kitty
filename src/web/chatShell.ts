@@ -47,9 +47,11 @@ export class WebChatShell implements InteractionShell {
   private readonly queuedInputs: string[] = [];
   private readonly interruptHandlers = new Set<() => void>();
   private readonly pendingTools = new Map<string, number[]>();
+  private readonly lifecycleTasks = new Set<Promise<void>>();
   private toolSequence = 0;
+  private closing = false;
 
-  constructor(private readonly labels: WebShellLabels) {}
+  constructor(private labels: WebShellLabels) {}
   private pendingInput: ((result: ShellInputResult) => void) | undefined;
 
   readonly input = {
@@ -79,23 +81,29 @@ export class WebChatShell implements InteractionShell {
     interrupt: (text: string): void => this.broadcast({ type: "interrupt", text }),
   };
 
-  attach(server: WebSocketServer, replay: (send: (event: WebEvent) => void) => Promise<void>, onControl?: (message: { type: "session_select"; sessionId: string }) => void): void {
+  attach(server: WebSocketServer, replay: (send: (event: WebEvent) => void) => Promise<void>, onControl?: (message: { type: "session_select"; sessionId: string }) => void | Promise<void>): void {
     server.on("connection", (socket) => {
+      if (this.closing) {
+        socket.close();
+        return;
+      }
       this.clients.add(socket);
       this.sendRaw(socket, { type: "presentation", labels: this.labels });
       this.replaying.add(socket);
       this.replayQueues.set(socket, []);
-      void (async () => {
+      this.trackLifecycleTask((async () => {
         try {
           await replay((event) => this.sendRaw(socket, event));
+        } catch (error) {
+          this.sendRaw(socket, { type: "status", text: error instanceof Error ? error.message : String(error) });
         } finally {
           this.replaying.delete(socket);
           const queued = this.replayQueues.get(socket) ?? [];
           this.replayQueues.delete(socket);
           for (const event of queued) this.sendRaw(socket, event);
         }
-      })();
-      socket.on("message", (raw) => this.handleMessage(raw.toString(), onControl));
+      })());
+      socket.on("message", (raw) => this.handleMessage(socket, raw.toString(), onControl));
       socket.on("close", () => this.removeClient(socket));
       socket.on("error", () => this.removeClient(socket));
     });
@@ -107,6 +115,11 @@ export class WebChatShell implements InteractionShell {
 
   broadcastSessionReplay(session: SessionRecord): void {
     this.replaySession(session, (event) => this.broadcast(event));
+  }
+
+  setLabels(labels: WebShellLabels): void {
+    this.labels = labels;
+    this.broadcast({ type: "presentation", labels });
   }
 
   createTurnDisplay(options: { cwd: string; config: RuntimeConfig; abortSignal: AbortSignal }) {
@@ -188,14 +201,28 @@ export class WebChatShell implements InteractionShell {
   }
 
   dispose(): void {
+    this.stopAdmission();
     this.input.close();
-    for (const client of this.clients) client.close();
+    for (const client of this.clients) client.terminate();
     this.clients.clear();
     this.replaying.clear();
     this.replayQueues.clear();
   }
 
-  private handleMessage(raw: string, onControl?: (message: { type: "session_select"; sessionId: string }) => void): void {
+  stopAdmission(): void {
+    if (this.closing) return;
+    this.closing = true;
+    for (const client of this.clients) client.close();
+  }
+
+  async waitForIdle(): Promise<void> {
+    while (this.lifecycleTasks.size > 0) {
+      await Promise.allSettled([...this.lifecycleTasks]);
+    }
+  }
+
+  private handleMessage(socket: WebSocket, raw: string, onControl?: (message: { type: "session_select"; sessionId: string }) => void | Promise<void>): void {
+    if (this.closing) return;
     let message: { type?: string; text?: string };
     try { message = JSON.parse(raw) as { type?: string; text?: string }; } catch { return; }
     if (message.type === "input" && typeof message.text === "string") {
@@ -212,8 +239,17 @@ export class WebChatShell implements InteractionShell {
       return;
     }
     if (message.type === "session_select" && typeof (message as { sessionId?: unknown }).sessionId === "string") {
-      onControl?.({ type: "session_select", sessionId: (message as { sessionId: string }).sessionId });
+      this.trackLifecycleTask(
+        Promise.resolve(onControl?.({ type: "session_select", sessionId: (message as { sessionId: string }).sessionId }))
+          .then(() => undefined)
+          .catch((error) => this.sendRaw(socket, { type: "status", text: error instanceof Error ? error.message : String(error) })),
+      );
     }
+  }
+
+  private trackLifecycleTask(task: Promise<void>): void {
+    this.lifecycleTasks.add(task);
+    void task.finally(() => this.lifecycleTasks.delete(task)).catch(() => undefined);
   }
 
   private broadcast(event: WebEvent): void {

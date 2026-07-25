@@ -40,13 +40,13 @@ Agent 应该更忠于用户，还是更忠于事实？
 
 小猫智能体的核心固定为 `read / write / edit / bash / send_file`。前四个工具负责基础编程闭环，`send_file` 在宿主支持时交付本地文件。
 
-复杂能力通过 extension 独立存在。当前 extension 是 `todo`、`worktree`、`network`、`background`、`skills`。它们可启用、可禁用，打开后进入同一个 agent 工具面，关闭后从工具面移除。
+复杂能力通过统一能力管理器独立存在。当前 bundled 能力包括 `todo`、`scheduler`、`worktree`、`background`、`documents`、`media`、`skills` 和基础 Web；Playwright 是第一版唯一外部 MCP。可禁用能力只有在启用且就绪时才向同一个工具注册表贡献工具。
 
-默认 agent 打开 `todo`、`worktree`、`network`、`background`、`skills`。
+基础 Web 默认打开，提供免凭证的 `web_search`、受控页面读取 `web_fetch` 和原子文件下载 `web_download`。它不把任意 HTTP 方法、会话、追踪或协议零件直接交给模型。
 
-扩展是工具集合。核心保持清楚，扩展保持独立。
+能力包是发现、配置、健康和呈现单元，不是工具集合的同义词。工具执行仍只有一张注册表和一份账本；不同能力类型保留各自执行器。
 
-Skills 也是 extension，不是第三套工具体系。它把可复用方法、资料、脚本、示例和素材组织成 runtime 能力包。默认上下文只出现 skill 索引、健康状态和资源索引；是否加载正文、读取资源、运行脚本，由模型根据当前请求和工作焦点决定。机器只负责发现、分组、读取、执行、检查依赖和记录事实。
+Skills 是内容能力，不是第三套工具体系。它把可复用方法、资料、脚本、示例和素材组织成 runtime 能力包。默认上下文只出现 skill 索引、健康状态和资源索引；是否加载正文、读取资源、运行脚本，由模型根据当前请求和工作焦点决定。机器只负责发现、分组、读取、执行、检查依赖和记录事实。
 
 Skill 默认不把正文和资源塞进上下文。索引负责发现，加载负责取证，模型负责判断是否值得花 token。
 

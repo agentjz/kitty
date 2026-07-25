@@ -22,6 +22,7 @@ export async function runHostTurnBoundaryCheck(id: EvaluationCheckId, rootDir: s
     ...initial,
     apiKey: "eval-key",
     media: { ...initial.media, apiKey: "eval-key" },
+    capabilities: structuredClone(initial.capabilities),
     telegram: resolveTelegramRuntimeConfig(initial.telegram, workspace),
     weixin: resolveWeixinRuntimeConfig(initial.weixin, workspace),
     paths: getAppPaths(workspace),
