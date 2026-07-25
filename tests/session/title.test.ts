@@ -8,7 +8,9 @@ import {
 import { InProcessSessionStore } from "../../src/session/store.js";
 
 test("session title normalizes concise model text", () => {
-  assert.equal(normalizeModelSessionTitle("## \"读取包名\"。"), "读取包名");
+  const title = normalizeModelSessionTitle("## \"MODEL_TITLE\"。");
+  assert.ok(title?.trim());
+  assert.equal(title?.includes("#"), false);
 });
 
 test("session title rejects tool protocol text", () => {

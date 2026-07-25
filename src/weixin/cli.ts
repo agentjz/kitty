@@ -23,27 +23,27 @@ export async function createWeixinService(options: { cwd: string; config: Runtim
   const logger = createConsoleWeixinLogger();
   const rootDir = path.dirname(options.config.paths.dataDir);
   const delivery = new WeixinDeliveryQueue({ rootDir, client, contextTokens: contexts, onDelivered: (entry) => logger.info("delivery sent", { kind: entry.kind, userId: entry.userId }), onDeliveryFailed: (entry, error) => logger.error("delivery failed", { kind: entry.kind, userId: entry.userId, error: getErrorMessage(error) }) });
-  return new WeixinService({ cwd: options.cwd, config: options.config, client, sessionStore: new SessionStore(options.config.paths.sessionsDir), sessionMap: new WeixinSessionMapStore(options.config.weixin.sessionMapFile), syncBuf: new WeixinSyncBufStore(options.config.weixin.syncBufFile), contextTokens: contexts, attachments: new WeixinAttachmentStore(options.config.weixin.attachmentStoreFile), delivery, logger });
+  return new WeixinService({ cwd: options.cwd, config: options.config, client, boundUserId: credentials.userId, sessionStore: new SessionStore(options.config.paths.sessionsDir), sessionMap: new WeixinSessionMapStore(options.config.weixin.sessionMapFile), syncBuf: new WeixinSyncBufStore(options.config.weixin.syncBufFile), contextTokens: contexts, attachments: new WeixinAttachmentStore(options.config.weixin.attachmentStoreFile), delivery, logger });
 }
 
 export function registerWeixinCommands(program: Command, dependencies: {
   locale: KittyLocale;
   getCliOverrides: () => CliOverrides;
   resolveRuntime: (overrides: CliOverrides) => Promise<{ cwd: string; config: RuntimeConfig }>;
+  createWeixinLoginClient?: (options: { baseUrl: string; cdnBaseUrl: string; routeTag: string }) => Pick<OpenILinkWeixinClient, "loginWithQr">;
   createWeixinService?: (options: { cwd: string; config: RuntimeConfig }) => Promise<{ run(signal?: AbortSignal): Promise<void>; stop?(): void }>;
   acquireProcessLock?: (options: { stateDir: string }) => Promise<{ signal?: AbortSignal; release(): Promise<void> }>;
 }): void {
   const command = program.command("weixin").description(translate(dependencies.locale, "cli.command.weixin"));
   command.command("login").description(translate(dependencies.locale, "cli.command.weixinLogin")).action(async () => {
     const runtime = await dependencies.resolveRuntime(dependencies.getCliOverrides());
-    const client = new OpenILinkWeixinClient({ baseUrl: runtime.config.weixin.baseUrl, cdnBaseUrl: runtime.config.weixin.cdnBaseUrl, routeTag: runtime.config.weixin.routeTag });
+    const client = dependencies.createWeixinLoginClient?.({ baseUrl: runtime.config.weixin.baseUrl, cdnBaseUrl: runtime.config.weixin.cdnBaseUrl, routeTag: runtime.config.weixin.routeTag }) ?? new OpenILinkWeixinClient({ baseUrl: runtime.config.weixin.baseUrl, cdnBaseUrl: runtime.config.weixin.cdnBaseUrl, routeTag: runtime.config.weixin.routeTag });
     const state = await client.loginWithQr({ timeoutMs: runtime.config.weixin.qrTimeoutMs, onQrCode: (value) => console.log(translate(runtime.config.locale, "weixin.qrCode", { value })), onScanned: () => console.log(translate(runtime.config.locale, "weixin.scanned")) });
     await new WeixinCredentialStore(runtime.config.weixin.credentialsFile).save(state);
-    console.log(translate(runtime.config.locale, "weixin.loginSucceeded", { userId: state.userId ?? "unknown" }));
+    console.log(translate(runtime.config.locale, "weixin.loginSucceeded"));
   });
   command.command("serve").description(translate(dependencies.locale, "cli.command.weixinServe")).action(async () => {
     const runtime = await dependencies.resolveRuntime(dependencies.getCliOverrides());
-    if (runtime.config.weixin.allowedUserIds.length === 0) throw new Error(translate(runtime.config.locale, "weixin.whitelistEmpty"));
     const acquire = dependencies.acquireProcessLock ?? (await import("./processLock.js")).acquireWeixinProcessLock;
     const lock = await acquire({ stateDir: runtime.config.weixin.stateDir });
     const factory = dependencies.createWeixinService ?? createWeixinService;
@@ -54,7 +54,7 @@ export function registerWeixinCommands(program: Command, dependencies: {
         product: "weixin",
         locale: runtime.config.locale,
         stateDir: runtime.config.weixin.stateDir,
-        allowedUserCount: runtime.config.weixin.allowedUserIds.length,
+        allowedUserCount: 1,
         transport: "iLink",
       }),
     });

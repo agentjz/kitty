@@ -331,7 +331,7 @@ Terminal log 使用 UTF-8，记录可读的用户输入、reasoning、assistant 
 
 Telegram 与微信 service 使用同一套 SQLite service lease、signal shutdown、per-peer queue、turn state、durable inbox 和 durable outbox。每个 host 的 token、generation 与 heartbeat 保证单 owner；同 token/generation 在 deadline 后仍可原子 heartbeat，只有过期后被新 acquire 提升 generation 才算真正丢失 lease，旧 service 随即停止。远端消息 ID 按 host 分区进入 `remote_inbox` 并与唯一 turn ID 绑定；`processing` 在崩溃后可重新 claim，`completed` 与 `failed` 是终态。回复和显式文件进入 `remote_outbox`，状态为 queued、sending、sent 或 uncertain；远端调用后无法确认本地提交时不得自动盲重试。发送前缺少微信 context token 时保持 queued，等待后续入站消息补全协议上下文。
 
-Telegram 使用 Bot API 长轮询。微信使用 iLink SDK：`kitty weixin login` 扫码取得项目本地凭证，`kitty weixin serve` 使用 sync buffer 长轮询私聊消息，`kitty weixin logout` 清除凭证、sync buffer 与 context token。微信只接受白名单私聊，不处理群聊；文本、图片、视频、语音和文件进入同一 host turn，入站二进制先持久化为本地附件。微信正常 turn 只投影最后一条 assistant 回复和 `send_file` 显式文件，不投影 reasoning、tool、todo 或中间 assistant 文本。
+Telegram 使用 Bot API 长轮询。微信使用 iLink SDK：`kitty weixin login` 扫码取得项目本地凭证和扫码账户 ID，`kitty weixin serve` 使用 sync buffer 长轮询私聊消息，`kitty weixin logout` 清除凭证、sync buffer 与 context token。微信只接受与当前凭证绑定账户相同的私聊发送者，不处理群聊；文本、图片、视频、语音和文件进入同一 host turn，入站二进制先持久化为本地附件。微信正常 turn 只投影最后一条 assistant 回复和 `send_file` 显式文件，不投影 reasoning、tool、todo 或中间 assistant 文本。
 
 TUI、Telegram 和微信只从 `localCommandDefinitions.ts` 投影命令元数据。TUI 支持 `/status`、`/export`、`/exit`、`/stop`、`/new`；远程支持 `/help`、`/status`、`/stop`、`/new`。`/stop` 只 abort 接收命令时的 active turn，不武装未来任务；`/new` 在当前 peer 队列内创建并持久化新 session、原子替换 binding，旧 session 保留。TUI `/new` 同时清空当前窗口 transcript、历史和草稿 owner。
 
@@ -341,7 +341,7 @@ Web 启动的 Telegram/微信服务仍取得各自 process lock 和 SQLite lease
 
 Web 启动远程服务时先取得对应进程锁，再创建并发布 service；启动、停止和关闭按 generation fencing。停止超时保持 `failed` 和 lock/task 证据并向控制台关闭事务报错，不能显示成已停止。微信扫码登录是受跟踪的可取消任务；关闭或登出会提升 generation，迟到的二维码、扫码和凭证结果不能更新当前状态。iLink SDK 不支持真正取消的底层请求在进程终止信号完成优雅清理后由显式进程退出收口。
 
-两个远程 service 在 TTY 启动时复用 TUI 的 Kitty 字标事实，分别显示 `kitty weixin` 与 `kitty telegram` banner；非 TTY 日志降级为单行。启动事实只包含版本、状态目录、白名单数量与连接方式，不输出 token 或用户 ID。
+两个远程 service 在 TTY 启动时复用 TUI 的 Kitty 字标事实，分别显示 `kitty weixin` 与 `kitty telegram` banner；非 TTY 日志降级为单行。启动事实只包含版本、状态目录、已授权账户数量与连接方式，不输出 token 或用户 ID。
 
 SIGINT、SIGTERM 或 service lease 丢失会 abort active turn，并在固定等待上限后清理该 host 活动 session 的 execution 进程树。进程强杀、终端关闭、断电或主机重启不能依赖 finally：`remote_inbox` 保留已接收消息，`remote_outbox` 的遗留 `sending` 在新 owner 启动时转为 `uncertain`，不会把可能已经送达的回复或文件盲目重发。iLink SDK 的底层长轮询不提供原生 AbortSignal；宿主会立即停止等待，但底层请求最多仍可存活到协议超时。
 

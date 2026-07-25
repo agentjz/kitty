@@ -1,13 +1,21 @@
 import { readJsonFile, writeJsonFileAtomically } from "./storage.js";
 
 export interface WeixinLoginState {
-  token: string; baseUrl: string; cdnBaseUrl: string; botId?: string; userId?: string; connectedAt: string; updatedAt: string;
+  token: string; baseUrl: string; cdnBaseUrl: string; botId?: string; userId: string; connectedAt: string; updatedAt: string;
 }
 export class WeixinCredentialStore {
   constructor(private readonly filePath: string) {}
   async load(): Promise<WeixinLoginState | null> {
     const value = await readJsonFile<WeixinLoginState | null>(this.filePath, null);
-    return value?.token?.trim() ? { ...value, token: value.token.trim() } : null;
+    const token = String(value?.token ?? "").trim();
+    const userId = String(value?.userId ?? "").trim();
+    const baseUrl = String(value?.baseUrl ?? "").trim();
+    const cdnBaseUrl = String(value?.cdnBaseUrl ?? "").trim();
+    const connectedAt = String(value?.connectedAt ?? "").trim();
+    const updatedAt = String(value?.updatedAt ?? "").trim();
+    return token && userId && baseUrl && cdnBaseUrl && connectedAt && updatedAt
+      ? { token, userId, baseUrl, cdnBaseUrl, botId: value?.botId?.trim() || undefined, connectedAt, updatedAt }
+      : null;
   }
   async save(value: WeixinLoginState): Promise<void> { await writeJsonFileAtomically(this.filePath, value, { mode: 0o600 }); }
   async clear(): Promise<void> { await writeJsonFileAtomically(this.filePath, null, { mode: 0o600 }); }

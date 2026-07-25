@@ -14,7 +14,6 @@ import { resolveProjectRoots } from "../context/repoRoots.js";
 import {
   parseTelegramAllowedUserIds,
   resolveTelegramRuntimeConfig,
-  parseWeixinAllowedUserIds,
   resolveWeixinRuntimeConfig,
 } from "../config/hosts.js";
 import type { CliOverrides, RuntimeConfig } from "../types.js";
@@ -26,7 +25,6 @@ export async function resolveRuntimeConfig(overrides: CliOverrides = {}): Promis
   const projectRoots = await resolveProjectRoots(cwd);
   const env = readRuntimeEnv();
   const telegramAllowedUserIds = parseTelegramAllowedUserIds(env.telegramAllowedUserIds);
-  const weixinAllowedUserIds = parseWeixinAllowedUserIds(env.weixinAllowedUserIds);
 
   const merged = normalizeRuntimeConfig({
     locale: env.locale,
@@ -73,7 +71,6 @@ export async function resolveRuntimeConfig(overrides: CliOverrides = {}): Promis
     weixin: {
       baseUrl: env.weixinBaseUrl,
       cdnBaseUrl: env.weixinCdnBaseUrl,
-      allowedUserIds: weixinAllowedUserIds,
       pollingTimeoutMs: readIntegerEnv("weixinPollingTimeoutMs", env.weixinPollingTimeoutMs),
       pollingRetryBackoffMs: readIntegerEnv("weixinPollingRetryBackoffMs", env.weixinPollingRetryBackoffMs),
       messageChunkBytes: readIntegerEnv("weixinMessageChunkBytes", env.weixinMessageChunkBytes),

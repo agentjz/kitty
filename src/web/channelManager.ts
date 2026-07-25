@@ -93,8 +93,6 @@ export class WebChannelManager {
       if (name === "telegram") {
         if (!config.telegram.token) throw new Error("Telegram token is not configured.");
         if (config.telegram.allowedUserIds.length === 0) throw new Error("Telegram allowed user list is empty.");
-      } else {
-        if (config.weixin.allowedUserIds.length === 0) throw new Error("Weixin allowed user list is empty.");
       }
       lock = name === "telegram"
         ? await acquireTelegramProcessLock({ stateDir: config.telegram.stateDir })

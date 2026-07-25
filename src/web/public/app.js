@@ -22,7 +22,6 @@ const ENV = {
   mediaPollInterval: "KITTY_MEDIA_POLL_INTERVAL_MS",
   telegramToken: "KITTY_TELEGRAM_TOKEN",
   telegramUsers: "KITTY_TELEGRAM_ALLOWED_USER_IDS",
-  weixinUsers: "KITTY_WEIXIN_ALLOWED_USER_IDS",
   playwrightHeadless: "KITTY_PLAYWRIGHT_HEADLESS",
 };
 
@@ -106,7 +105,6 @@ function render() {
     [message("media.apiKey"), (values[ENV.mediaApiKey] || values[ENV.apiKey]) ? message("config.currentLoaded") : message("common.notConfigured")],
   ].map(([label, current]) => `<span><small>${escapeHtml(label)}</small><strong>${escapeHtml(current)}</strong></span>`).join("");
 
-  value("#weixin-users", values[ENV.weixinUsers]);
   value("#telegram-users", values[ENV.telegramUsers]);
   value("#telegram-token", values[ENV.telegramToken]);
   renderChannels(state.channels, false);
@@ -427,11 +425,6 @@ document.querySelector("#other-form").addEventListener("submit", async (event) =
     ...readSettings("#browser-settings"),
     ...readSettings("#other-settings"),
   ]), "#other-result", "other.saved");
-});
-
-document.querySelector("#weixin-form").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  await submitConfig({ [ENV.weixinUsers]: field("#weixin-users") }, "#weixin-config-result", "weixin.saved");
 });
 
 document.querySelector("#telegram-form").addEventListener("submit", async (event) => {

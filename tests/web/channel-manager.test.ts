@@ -6,7 +6,7 @@ import { initializeProjectFiles } from "../../src/config/init.js";
 import { resolveRuntimeConfig } from "../../src/config/runtime.js";
 import { WebChannelManager } from "../../src/web/channelManager.js";
 import { WebEventHub } from "../../src/web/events.js";
-import type { WeixinLoginState } from "../../src/weixin/state.js";
+import { WeixinCredentialStore, type WeixinLoginState } from "../../src/weixin/state.js";
 import { createTempWorkspace } from "../helpers.js";
 
 test("closing the Web channel manager fences a pending Weixin login", async (t) => {
@@ -44,4 +44,22 @@ test("closing the Web channel manager fences a pending Weixin login", async (t) 
 
   const config = await resolveRuntimeConfig({ cwd: root });
   await assert.rejects(fs.access(config.weixin.credentialsFile));
+});
+
+test("Web Weixin login persists the account bound by QR confirmation", async (t) => {
+  const root = await createTempWorkspace("web-weixin-login-binding", t);
+  await initializeProjectFiles(root);
+  const events = new WebEventHub();
+  const manager = new WebChannelManager(root, events, {
+    createWeixinLoginClient: () => ({
+      loginWithQr: async () => ({ token: "secret", userId: "wxid_owner", baseUrl: "https://example.com", cdnBaseUrl: "https://cdn.example.com", connectedAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" }),
+    }),
+  });
+
+  await manager.loginWeixin();
+  await new Promise<void>((resolve) => setImmediate(resolve));
+
+  const config = await resolveRuntimeConfig({ cwd: root });
+  assert.equal((await new WeixinCredentialStore(config.weixin.credentialsFile).load())?.userId, "wxid_owner");
+  assert.equal(manager.status().weixinLogin.status, "connected");
 });

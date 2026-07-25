@@ -54,7 +54,6 @@ function formatCommonEnvSections(input: {
     "# 微信 iLink 私聊",
     `${KITTY_ENV.weixinBaseUrl}=${INITIAL_WEIXIN_CONFIG.baseUrl}`,
     `${KITTY_ENV.weixinCdnBaseUrl}=${INITIAL_WEIXIN_CONFIG.cdnBaseUrl}`,
-    `${KITTY_ENV.weixinAllowedUserIds}=`,
     `${KITTY_ENV.weixinPollingTimeoutMs}=${INITIAL_WEIXIN_CONFIG.pollingTimeoutMs}`,
     `${KITTY_ENV.weixinPollingRetryBackoffMs}=${INITIAL_WEIXIN_CONFIG.pollingRetryBackoffMs}`,
     `${KITTY_ENV.weixinMessageChunkBytes}=${INITIAL_WEIXIN_CONFIG.messageChunkBytes}`,

@@ -34,6 +34,7 @@ export class WeixinService {
   private stopped = false;
   constructor(private readonly options: {
     cwd: string; config: RuntimeConfig; client: WeixinClientLike;
+    boundUserId: string;
     sessionStore: SessionStoreLike & { load(id: string): Promise<SessionRecord> };
     sessionMap: WeixinSessionMapStore; syncBuf: WeixinSyncBufStore; contextTokens: WeixinContextTokenStore;
     attachments: WeixinAttachmentStore; delivery: WeixinDeliveryQueue; logger: WeixinLogger;
@@ -86,7 +87,7 @@ export class WeixinService {
 
   private async process(raw: WeixinRawMessage): Promise<{ task: Promise<void> } | null> {
     const messageKey = `${Number(raw.seq ?? 0)}:${Number(raw.message_id ?? 0)}`;
-    const classified = classifyWeixinMessage(raw, this.options.config.weixin.allowedUserIds);
+    const classified = classifyWeixinMessage(raw, this.options.boundUserId);
     const root = resolveHostStateRoot(this.options.config.weixin.stateDir, this.options.cwd);
     const ledger = new ControlPlaneLedger(root);
     let claimed: boolean;

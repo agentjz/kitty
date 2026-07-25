@@ -31,7 +31,19 @@ test("init adds missing current settings without replacing existing env values",
   const env = dotenv.parse(envContent);
   assert.equal(env[KITTY_ENV.apiKey], "keep-secret");
   assert.equal(env.CUSTOM_SETTING, "keep-me");
-  assert.equal(Object.keys(env).filter((key) => key.startsWith("KITTY_WEIXIN_")).length, 9);
+  assert.deepEqual(
+    Object.keys(env).filter((key) => key.startsWith("KITTY_WEIXIN_")).sort(),
+    [
+      KITTY_ENV.weixinBaseUrl,
+      KITTY_ENV.weixinCdnBaseUrl,
+      KITTY_ENV.weixinPollingTimeoutMs,
+      KITTY_ENV.weixinPollingRetryBackoffMs,
+      KITTY_ENV.weixinMessageChunkBytes,
+      KITTY_ENV.weixinTypingIntervalMs,
+      KITTY_ENV.weixinQrTimeoutMs,
+      KITTY_ENV.weixinRouteTag,
+    ].sort(),
+  );
   assert.equal(dotenv.parse(await fs.readFile(examplePath, "utf8"))[KITTY_ENV.apiKey], "keep-placeholder");
   assert.equal(await fs.readFile(ignorePath, "utf8"), "custom-cache/\n");
 

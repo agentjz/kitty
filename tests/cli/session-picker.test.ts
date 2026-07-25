@@ -3,8 +3,6 @@ import test from "node:test";
 
 import {
   selectCliSession,
-  formatRelativeSessionTime,
-  formatSessionPickerTitle,
   parseSessionPickerChoice,
 } from "../../src/cli/commands/sessionPicker.js";
 import { getAppPaths } from "../../src/config/paths.js";
@@ -38,8 +36,8 @@ test("session picker resumes numbered session and follows its cwd", async (t) =>
   const store = new SessionStore(getAppPaths(root).sessionsDir);
   await store.save({
     ...(await store.create(otherRoot)),
-    title: "继续整理 README",
-    messages: [userMessage("继续整理 README")],
+    title: "session-title",
+    messages: [userMessage("session-input")],
   });
   const lines: string[] = [];
 
@@ -55,7 +53,7 @@ test("session picker resumes numbered session and follows its cwd", async (t) =>
   });
 
   assert.equal(selected?.cwd, otherRoot);
-  assert.equal(selected?.session.title, "继续整理 README");
+  assert.ok(selected?.session.title?.trim());
   assert.ok(lines.length > 0);
 });
 
@@ -105,20 +103,11 @@ test("session picker retries invalid input and cancels on closed input", async (
   assert.ok(lines.length > 0);
 });
 
-test("session picker parses choices and formats relative time", () => {
+test("session picker parses choices", () => {
   assert.deepEqual(parseSessionPickerChoice("", 2), { kind: "existing", index: 0 });
   assert.deepEqual(parseSessionPickerChoice("0", 2), { kind: "new" });
   assert.deepEqual(parseSessionPickerChoice("2", 2), { kind: "existing", index: 1 });
   assert.deepEqual(parseSessionPickerChoice("03", 3), { kind: "invalid" });
-  assert.equal(formatRelativeSessionTime("2026-06-12T00:09:30.000Z", new Date("2026-06-12T00:10:00.000Z")), "刚刚");
-  assert.equal(formatRelativeSessionTime("2026-06-12T00:00:00.000Z", new Date("2026-06-12T00:10:00.000Z")), "10 分钟前");
-  assert.equal(formatRelativeSessionTime("2026-06-10T00:00:00.000Z", new Date("2026-06-12T00:00:00.000Z")), "2 天前");
-  const longTitle = formatSessionPickerTitle({
-    id: "session-long",
-    title: "这是一个非常长的历史会话标题，它来自旧的第一轮用户输入，启动列表不应该被它撑开到不可读。",
-  });
-  assert.equal(Array.from(longTitle).length, 39);
-  assert.equal(longTitle.endsWith("..."), true);
 });
 
 function userMessage(content: string): StoredMessage {

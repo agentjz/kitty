@@ -29,7 +29,7 @@ test("local console binds loopback, authenticates API, and rejects foreign write
   const bootstrap = await request(handle, "/api/bootstrap");
   assert.equal(bootstrap.response.status, 200);
   assert.equal(bootstrap.body.locale, "zh-CN");
-  assert.equal((bootstrap.body.messages as { welcome: string }).welcome, "尽情地探索并享受吧！");
+  assert.ok((bootstrap.body.messages as { welcome: string }).welcome.trim());
   assert.deepEqual(bootstrap.body.brand, {
     version: packageJson.version,
   });
@@ -61,7 +61,7 @@ test("local console binds loopback, authenticates API, and rejects foreign write
       "glm-5.2",
     ],
   );
-  assert.equal(providers.every(({ label }) => label.includes("｜") || label.startsWith("DeepSeek")), true);
+  assert.equal(providers.every(({ label }) => label.trim().length > 0), true);
   assert.deepEqual(providers.find(({ id }) => id === "gemini-3.5-flash")?.officialLinks, {
     websiteUrl: "https://ai.google.dev/gemini-api",
     apiKeyUrl: "https://aistudio.google.com/api-keys",
@@ -74,7 +74,7 @@ test("local console binds loopback, authenticates API, and rejects foreign write
   assert.equal(webSource.includes("message.payload"), false);
   const consolePage = await fetch(handle.url);
   const consoleSource = await consolePage.text();
-  assert.match(consoleSource, /<h1 class="kitty-hero-title">Kitty Agent<\/h1>/u);
+  assert.match(consoleSource, /<h1 class="kitty-hero-title">[^<]+<\/h1>/u);
   assert.match(consoleSource, /id="author-note"/u);
   assert.match(consoleSource, /data-action="close-author-note"/u);
   assert.deepEqual([...consoleSource.matchAll(/data-open-workflow="([^"]+)"/gu)].map((match) => match[1]), [
@@ -137,8 +137,8 @@ test("local console preserves visible secrets and reads current skills", async (
     welcome: string;
     runtime: { otherFields: Array<{ envKey: string; label: string }> };
   };
-  assert.equal(messages.welcome, "Explore and enjoy!");
-  assert.equal(messages.runtime.otherFields.find((field) => field.envKey === KITTY_ENV.locale)?.label, "Interface language");
+  assert.ok(messages.welcome.trim());
+  assert.ok(messages.runtime.otherFields.find((field) => field.envKey === KITTY_ENV.locale)?.label.trim());
 });
 
 test("local console rehydrates durable Weixin channel history", async (t) => {

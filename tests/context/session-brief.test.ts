@@ -24,14 +24,16 @@ test("session brief projects durable turn counts and tool activity without copyi
     { role: "user", content: "continue", createdAt: "2026-05-21T10:00:03.000Z" },
   ];
 
-  const block = buildSessionConversationBriefBlock(buildSessionConversationBrief({
+  const brief = buildSessionConversationBrief({
     messages,
     timestamp: "2026-05-21T10:00:04.000Z",
-  }));
+  });
+  const block = buildSessionConversationBriefBlock(brief);
 
-  assert.match(block ?? "", /2 user turn/);
-  assert.match(block ?? "", /1 assistant response/);
-  assert.match(block ?? "", /tools: read/);
+  assert.equal(brief?.userTurnCount, 2);
+  assert.equal(brief?.assistantTurnCount, 1);
+  assert.equal(brief?.toolActivity.length, 1);
+  assert.ok(block?.trim());
   assert.doesNotMatch(block ?? "", /private historical requirement/);
 });
 

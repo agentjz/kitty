@@ -151,8 +151,7 @@ export function buildWebMessages(locale: KittyLocale) {
       browserHeadless: t("web.other.browserHeadless"), browserHeadlessHint: t("web.other.browserHeadlessHint"),
     },
     weixin: {
-      description: t("web.weixin.description"), allowedTitle: t("web.weixin.allowedTitle"), userId: t("web.weixin.userId"),
-      usersPlaceholder: t("web.weixin.usersPlaceholder"), saved: t("web.weixin.saved"), loginTitle: t("web.weixin.loginTitle"),
+      description: t("web.weixin.description"), loginTitle: t("web.weixin.loginTitle"),
       loginHint: t("web.weixin.loginHint"), generateQr: t("web.weixin.generateQr"), logout: t("web.weixin.logout"),
       startTitle: t("web.weixin.startTitle"), startHint: t("web.weixin.startHint"), streamEmpty: t("web.weixin.streamEmpty"),
       waitingLogin: t("web.weixin.waitingLogin"), credentialsCleared: t("web.weixin.credentialsCleared"), qrGenerating: t("web.weixin.qrGenerating"),

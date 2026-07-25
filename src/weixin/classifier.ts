@@ -1,6 +1,6 @@
 import type { WeixinClassifiedMessage, WeixinRawMessage } from "./types.js";
 
-export function classifyWeixinMessage(message: WeixinRawMessage, allowedUserIds: readonly string[]): WeixinClassifiedMessage {
+export function classifyWeixinMessage(message: WeixinRawMessage, boundUserId: string): WeixinClassifiedMessage {
   const userId = String(message.from_user_id ?? "").trim();
   const recipient = String(message.to_user_id ?? "").trim();
   const groupId = String(message.group_id ?? "").trim();
@@ -9,7 +9,7 @@ export function classifyWeixinMessage(message: WeixinRawMessage, allowedUserIds:
   const text = items.map((item) => item.type === 1 ? String(item.text_item?.text ?? "").trim() : item.type === 3 ? String(item.voice_item?.text ?? "").trim() : "").find(Boolean) ?? "";
   if (groupId) return { kind: "ignore", reason: "group_chat_unsupported", userId: userId || undefined, raw: message };
   if (messageType === 2) return { kind: "outbound_echo", peerKey: `weixin:private:${recipient}`, userId: recipient, messageId: integer(message.message_id), seq: integer(message.seq), raw: message };
-  if (!userId || !allowedUserIds.includes(userId)) return { kind: "ignore", reason: "unauthorized_user", userId: userId || undefined, raw: message };
+  if (!userId || userId !== boundUserId) return { kind: "ignore", reason: "unauthorized_user", userId: userId || undefined, raw: message };
   if (messageType !== 0 && messageType !== 1) return { kind: "ignore", reason: "unsupported_message", userId, raw: message };
   const base = { peerKey: `weixin:private:${userId}`, userId, messageId: integer(message.message_id), seq: integer(message.seq), contextToken: String(message.context_token ?? "").trim(), text, raw: message };
   const image = items.find((item) => item.type === 2 && item.image_item?.media)?.image_item?.media;

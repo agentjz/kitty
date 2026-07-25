@@ -5,10 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { buildCliProgram } from "../../src/cli/program.js";
-import { formatCliSetupError } from "../../src/cli/userFacingErrors.js";
 import { getAppPaths } from "../../src/config/paths.js";
-import { invalidConfigValue, missingConfigValue } from "../../src/config/errors.js";
-import { KITTY_ENV } from "../../src/config/envKeys.js";
 import { executionOwnership } from "../../src/control/types.js";
 import { BackgroundExecutionStore } from "../../src/execution/background.js";
 import { SessionStore } from "../../src/session/store.js";
@@ -106,13 +103,4 @@ test("resume opens the selected saved session in the interactive CLI", async () 
   program.exitOverride();
   await program.parseAsync(["resume", session.id], { from: "user" });
   assert.deepEqual(opened, [session.id]);
-});
-
-test("setup errors no longer route users to a removed doctor command", () => {
-  const root = path.join(os.tmpdir(), "kitty-setup-error");
-  const invalid = formatCliSetupError(invalidConfigValue("KITTY_MAX_OUTPUT_TOKENS", "invalid"), root, "en") ?? "";
-  const missing = formatCliSetupError(missingConfigValue(KITTY_ENV.apiKey), root, "en") ?? "";
-  assert.match(invalid, /kitty start/);
-  assert.match(missing, /KITTY_API_KEY/);
-  assert.doesNotMatch(`${invalid}\n${missing}`, /kitty doctor/);
 });

@@ -89,6 +89,5 @@ test("weixin runtime config resolves an omitted section from current defaults", 
   const resolved = resolveWeixinRuntimeConfig(undefined, ".");
   assert.equal(resolved.baseUrl, INITIAL_WEIXIN_CONFIG.baseUrl);
   assert.equal(resolved.pollingTimeoutMs, INITIAL_WEIXIN_CONFIG.pollingTimeoutMs);
-  assert.deepEqual(resolved.allowedUserIds, []);
   assert.match(resolved.credentialsFile, /[\\/]\.kitty[\\/]weixin[\\/]credentials\.json$/u);
 });

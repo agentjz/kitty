@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
+import { Command } from "commander";
 
 import { ControlPlaneLedger } from "../../src/control/ledger.js";
 import { classifyWeixinMessage } from "../../src/weixin/classifier.js";
@@ -10,31 +11,68 @@ import { WeixinAttachmentStore } from "../../src/weixin/attachments.js";
 import { WeixinDeliveryQueue } from "../../src/weixin/deliveryQueue.js";
 import { WeixinFinalReplyDisplay } from "../../src/weixin/finalReplyDisplay.js";
 import { WeixinService } from "../../src/weixin/service.js";
+import { createWeixinLoginState } from "../../src/weixin/client.js";
+import { registerWeixinCommands } from "../../src/weixin/cli.js";
 import { WeixinContextTokenStore, WeixinCredentialStore, WeixinSessionMapStore, WeixinSyncBufStore } from "../../src/weixin/state.js";
 import type { WeixinPollingSourceLike, WeixinRawMessage } from "../../src/weixin/types.js";
 import { SessionStore } from "../../src/session/store.js";
 import { createTempWorkspace, createTestRuntimeConfig } from "../helpers.js";
 import { subscribeRemoteRuntimeEvents } from "../../src/remote/events.js";
 
-test("weixin classifier accepts whitelisted iLink text and rejects groups", () => {
-  const text = classifyWeixinMessage(rawMessage({ from: "wxid_owner", text: "run tests" }), ["wxid_owner"]);
+test("weixin classifier accepts only the QR-bound iLink account and rejects groups", () => {
+  const text = classifyWeixinMessage(rawMessage({ from: "wxid_owner", text: "run tests" }), "wxid_owner");
   assert.equal(text.kind, "private_text_message");
   if (text.kind === "private_text_message") {
     assert.equal(text.peerKey, "weixin:private:wxid_owner");
     assert.equal(text.contextToken, "ctx-1");
   }
-  const group = classifyWeixinMessage(rawMessage({ from: "wxid_owner", text: "ignored", group: "group-1" }), ["wxid_owner"]);
+  const stranger = classifyWeixinMessage(rawMessage({ from: "wxid_stranger", text: "ignored" }), "wxid_owner");
+  assert.equal(stranger.kind, "ignore");
+  if (stranger.kind === "ignore") assert.equal(stranger.reason, "unauthorized_user");
+  const group = classifyWeixinMessage(rawMessage({ from: "wxid_owner", text: "ignored", group: "group-1" }), "wxid_owner");
   assert.equal(group.kind, "ignore");
   if (group.kind === "ignore") assert.equal(group.reason, "group_chat_unsupported");
 });
 
-test("weixin credentials are atomically stored with owner-only permissions", async (t) => {
+test("weixin credentials atomically persist a complete QR account binding", async (t) => {
   const root = await createTempWorkspace("weixin-credentials", t);
   const filePath = path.join(root, ".kitty", "weixin", "credentials.json");
   const store = new WeixinCredentialStore(filePath);
-  await store.save({ token: "secret", baseUrl: "https://example.com", cdnBaseUrl: "https://cdn.example.com", connectedAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
-  assert.equal((await store.load())?.token, "secret");
+  await store.save({ token: "secret", userId: "wxid_owner", baseUrl: "https://example.com", cdnBaseUrl: "https://cdn.example.com", connectedAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+  const saved = await store.load();
+  assert.equal(saved?.token, "secret");
+  assert.equal(saved?.userId, "wxid_owner");
   if (process.platform !== "win32") assert.equal((await fs.stat(filePath)).mode & 0o777, 0o600);
+  await fs.writeFile(filePath, JSON.stringify({ token: "secret" }), "utf8");
+  assert.equal(await store.load(), null);
+});
+
+test("weixin QR login requires the account identity returned by iLink", () => {
+  assert.throws(
+    () => createWeixinLoginState({ connected: true, bot_token: "secret", message: "connected" }, { baseUrl: "https://example.com", cdnBaseUrl: "https://cdn.example.com" }),
+    /did not return a user ID/u,
+  );
+  assert.equal(
+    createWeixinLoginState({ connected: true, bot_token: "secret", user_id: " wxid_owner ", message: "connected" }, { baseUrl: "https://example.com", cdnBaseUrl: "https://cdn.example.com" }).userId,
+    "wxid_owner",
+  );
+});
+
+test("kitty weixin login stores the account returned by QR confirmation", async (t) => {
+  const root = await createTempWorkspace("weixin-cli-login", t);
+  const config = createTestRuntimeConfig(root);
+  const program = new Command();
+  registerWeixinCommands(program, {
+    locale: "en",
+    getCliOverrides: () => ({}),
+    resolveRuntime: async () => ({ cwd: root, config }),
+    createWeixinLoginClient: () => ({
+      loginWithQr: async () => ({ token: "secret", userId: "wxid_owner", baseUrl: "https://example.com", cdnBaseUrl: "https://cdn.example.com", connectedAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" }),
+    }),
+  });
+
+  await program.parseAsync(["node", "kitty", "weixin", "login"]);
+  assert.equal((await new WeixinCredentialStore(config.weixin.credentialsFile).load())?.userId, "wxid_owner");
 });
 
 test("weixin display emits only the final assistant answer", async () => {
@@ -53,7 +91,6 @@ test("weixin display emits only the final assistant answer", async () => {
 test("weixin service runs a durable remote turn and sends final reply plus files", async (t) => {
   const root = await createTempWorkspace("weixin-remote", t);
   const config = createTestRuntimeConfig(root);
-  config.weixin.allowedUserIds = ["wxid_owner"];
   const sentText: string[] = [];
   const sentFiles: string[] = [];
   const observed: string[] = [];
@@ -74,6 +111,7 @@ test("weixin service runs a durable remote turn and sends final reply plus files
     cwd: root,
     config,
     client,
+    boundUserId: "wxid_owner",
     sessionStore: new SessionStore(config.paths.sessionsDir),
     sessionMap: new WeixinSessionMapStore(config.weixin.sessionMapFile),
     syncBuf: new WeixinSyncBufStore(config.weixin.syncBufFile),
@@ -113,7 +151,6 @@ test("weixin service runs a durable remote turn and sends final reply plus files
 test("weixin keeps polling during a long turn so stop arrives and the next message still runs", async (t) => {
   const root = await createTempWorkspace("weixin-stop-live", t);
   const config = createTestRuntimeConfig(root);
-  config.weixin.allowedUserIds = ["wxid_owner"];
   const sentText: string[] = [];
   const client = fakeClient(sentText, []);
   const contexts = new WeixinContextTokenStore(config.weixin.contextTokenFile);
@@ -134,6 +171,7 @@ test("weixin keeps polling during a long turn so stop arrives and the next messa
     cwd: root,
     config,
     client,
+    boundUserId: "wxid_owner",
     sessionStore: new SessionStore(config.paths.sessionsDir),
     sessionMap: new WeixinSessionMapStore(config.weixin.sessionMapFile),
     syncBuf: new WeixinSyncBufStore(config.weixin.syncBufFile),

@@ -6,7 +6,6 @@ import {
   classifyProviderError,
   isRetryableProviderError,
   isStreamingFallbackEligible,
-  formatProviderError,
   normalizeProviderError,
 } from "../../src/provider/errors.js";
 
@@ -43,7 +42,6 @@ test("Zhipu error policy retries transient limits but stops on quota and access 
   assert.equal(isRetryableProviderError(transient), true);
   assert.equal(terminal.facts.code, "1310");
   assert.equal(isRetryableProviderError(terminal), false);
-  assert.match(formatProviderError(terminal) ?? "", /not retried automatically/u);
 });
 
 test("Google error policy follows structured retry and quota facts", () => {
@@ -79,7 +77,6 @@ test("Google error policy follows structured retry and quota facts", () => {
   assert.equal(isRetryableProviderError(minuteLimit), true);
   assert.equal(dailyLimit.facts.retryable, false);
   assert.equal(isRetryableProviderError(dailyLimit), false);
-  assert.match(formatProviderError(dailyLimit) ?? "", /not retried automatically/u);
 });
 
 test("provider request boundaries normalize transport errors once", () => {

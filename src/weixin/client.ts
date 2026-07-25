@@ -22,9 +22,7 @@ export class OpenILinkWeixinClient implements WeixinClientLike {
   async loginWithQr(options: { timeoutMs: number; signal?: AbortSignal; onQrCode?: (content: string) => void; onScanned?: () => void }): Promise<WeixinLoginState> {
     const client = await abortable(this.client(), options.signal);
     const result = await abortable(client.loginWithQr({ on_qrcode: options.onQrCode, on_scanned: options.onScanned }, options.timeoutMs), options.signal);
-    if (!result.connected || !result.bot_token) throw new Error(result.message || "Weixin iLink QR login failed.");
-    const now = new Date().toISOString();
-    return { token: result.bot_token, baseUrl: result.base_url || client.baseUrl, cdnBaseUrl: client.cdnBaseUrl, botId: result.bot_id, userId: result.user_id, connectedAt: now, updatedAt: now };
+    return createWeixinLoginState(result, client);
   }
   async getUpdates(syncBuf?: string | null, timeoutMs?: number, signal?: AbortSignal): Promise<WeixinPollingBatch> {
     const client = await this.client();
@@ -53,9 +51,26 @@ export class OpenILinkWeixinClient implements WeixinClientLike {
   }
 }
 
+export function createWeixinLoginState(result: WeixinQrLoginResult, client: { baseUrl: string; cdnBaseUrl: string }): WeixinLoginState {
+  if (!result.connected || !result.bot_token) throw new Error(result.message || "Weixin iLink QR login failed.");
+  const userId = result.user_id?.trim();
+  if (!userId) throw new Error("Weixin iLink QR login did not return a user ID.");
+  const now = new Date().toISOString();
+  return { token: result.bot_token, baseUrl: result.base_url || client.baseUrl, cdnBaseUrl: client.cdnBaseUrl, botId: result.bot_id, userId, connectedAt: now, updatedAt: now };
+}
+
+export interface WeixinQrLoginResult {
+  connected: boolean;
+  bot_token?: string;
+  bot_id?: string;
+  base_url?: string;
+  user_id?: string;
+  message: string;
+}
+
 interface RuntimeClient {
   baseUrl: string; cdnBaseUrl: string;
-  loginWithQr(callbacks: { on_qrcode?: (url: string) => void; on_scanned?: () => void }, timeout: number): Promise<{ connected: boolean; bot_token?: string; bot_id?: string; base_url?: string; user_id?: string; message: string }>;
+  loginWithQr(callbacks: { on_qrcode?: (url: string) => void; on_scanned?: () => void }, timeout: number): Promise<WeixinQrLoginResult>;
   getUpdates(sync?: string, timeout?: number): Promise<{ msgs?: unknown[]; sync_buf?: string; longpolling_timeout_ms?: number }>;
   getConfig(userId: string, token: string): Promise<{ typing_ticket?: string }>;
   sendTyping(userId: string, ticket: string, status: number): Promise<void>;

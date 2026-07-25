@@ -29,7 +29,6 @@ export interface TelegramRuntimeConfig extends TelegramConfig {
 export interface WeixinConfig {
   baseUrl: string;
   cdnBaseUrl: string;
-  allowedUserIds: string[];
   pollingTimeoutMs: number;
   pollingRetryBackoffMs: number;
   messageChunkBytes: number;
@@ -50,7 +49,6 @@ export interface WeixinRuntimeConfig extends WeixinConfig {
 export const INITIAL_WEIXIN_CONFIG: WeixinConfig = {
   baseUrl: "https://ilinkai.weixin.qq.com",
   cdnBaseUrl: "https://novac2c.cdn.weixin.qq.com/c2c",
-  allowedUserIds: [],
   pollingTimeoutMs: 30_000,
   pollingRetryBackoffMs: 1_000,
   messageChunkBytes: 3_500,
@@ -63,7 +61,6 @@ export function normalizeWeixinConfig(config: Partial<WeixinConfig> = {}): Weixi
   return {
     baseUrl: normalizeUrl(config.baseUrl, INITIAL_WEIXIN_CONFIG.baseUrl),
     cdnBaseUrl: normalizeUrl(config.cdnBaseUrl, INITIAL_WEIXIN_CONFIG.cdnBaseUrl),
-    allowedUserIds: normalizeStringIds(config.allowedUserIds),
     pollingTimeoutMs: clampNumber(config.pollingTimeoutMs ?? INITIAL_WEIXIN_CONFIG.pollingTimeoutMs, 1_000, 120_000, "weixin.pollingTimeoutMs"),
     pollingRetryBackoffMs: clampNumber(config.pollingRetryBackoffMs ?? INITIAL_WEIXIN_CONFIG.pollingRetryBackoffMs, 250, 60_000, "weixin.pollingRetryBackoffMs"),
     messageChunkBytes: clampNumber(config.messageChunkBytes ?? INITIAL_WEIXIN_CONFIG.messageChunkBytes, 128, 12_000, "weixin.messageChunkBytes"),
@@ -85,10 +82,6 @@ export function resolveWeixinRuntimeConfig(config: Partial<WeixinConfig> | undef
     attachmentStoreFile: path.join(stateDir, "attachments.json"),
     contextTokenFile: path.join(stateDir, "context-tokens.json"),
   };
-}
-
-export function parseWeixinAllowedUserIds(raw: string | undefined): string[] {
-  return normalizeStringIds(raw?.split(/[,\r\n]+/u));
 }
 
 export const INITIAL_TELEGRAM_CONFIG: TelegramConfig = {
@@ -200,10 +193,6 @@ function normalizeProxyUrl(raw: string | undefined): string {
 
 function normalizeUrl(raw: string | undefined, fallback: string): string {
   return String(raw ?? fallback).trim().replace(/\/+$/u, "") || fallback;
-}
-
-function normalizeStringIds(values: readonly string[] | undefined): string[] {
-  return [...new Set((values ?? []).map((value) => String(value).trim()).filter(Boolean))];
 }
 
 function normalizeAllowedUserIds(values: readonly number[] | undefined): number[] {
