@@ -19,7 +19,7 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     provider: "agnes",
     model: "agnes-2.0-flash",
     thinking: "enabled",
-    activeByDefault: true,
+    activeByDefault: false,
   },
   {
     id: "agnes-2.5-flash",
@@ -36,7 +36,7 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     model: "model-from-llm2api-models",
     thinking: "enabled",
     configurationNote: "# 使用 LLM2API 签发的下游 API 密钥；模型以 /v1/models 返回为准，上游 API Key 由网关资源池维护。",
-    activeByDefault: false,
+    activeByDefault: true,
   },
   {
     id: "gemini-3.5-flash",

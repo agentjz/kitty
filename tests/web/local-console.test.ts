@@ -76,7 +76,7 @@ test("local console binds loopback, authenticates API, and rejects foreign write
       baseUrl: "http://127.0.0.1:8080/v1",
       thinking: "enabled",
       configurationNote: "# 使用 LLM2API 签发的下游 API 密钥；模型以 /v1/models 返回为准，上游 API Key 由网关资源池维护。",
-      activeByDefault: false,
+      activeByDefault: true,
     },
   );
   const webPage = await fetch(handle.webUrl);
