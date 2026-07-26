@@ -206,6 +206,7 @@ export async function runHostTurn(
     }
     toolRegistry = await createToolRegistry(options.config, {
       builtinToolFilter: options.builtinToolFilter,
+      hostToolFilter: options.hostToolFilter,
       extraTools: options.extraTools,
       cwd: options.cwd,
       stateRootDir,

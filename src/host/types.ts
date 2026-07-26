@@ -18,6 +18,7 @@ export interface HostTurnOptions {
   callbacks?: AgentCallbacks;
   abortSignal?: AbortSignal;
   builtinToolFilter?: ToolFilter;
+  hostToolFilter?: ToolFilter;
   extraTools?: readonly RegisteredTool[];
   runtimePromptState?: RunTurnOptions["runtimePromptState"];
   admittedTurnId?: string;

@@ -30,6 +30,15 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     activeByDefault: false,
   },
   {
+    id: "llm2api-local",
+    label: "LLM2API｜本机网关｜动态模型",
+    provider: "llm2api",
+    model: "model-from-llm2api-models",
+    thinking: "enabled",
+    configurationNote: "# 使用 LLM2API 签发的下游 API 密钥；模型以 /v1/models 返回为准，上游 API Key 由网关资源池维护。",
+    activeByDefault: false,
+  },
+  {
     id: "gemini-3.5-flash",
     label: "Google Gemini｜Gemini 3.5 Flash｜免费｜1M 上下文",
     provider: "google",

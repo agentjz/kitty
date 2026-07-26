@@ -19,6 +19,7 @@ export type ProductionEvaluationCheckId =
   | "production-real-turn"
   | "production-context-pressure"
   | "production-background-turn"
+  | "production-browser-turn"
   | "production-tool-turn"
   | "production-runtime-status";
 

@@ -184,7 +184,7 @@ Context budget 记录当前有效 limit、estimate、remaining、compression mod
 - `src/provider/chatRequestDialect.ts`：Chat Completions provider/model 请求方言投影。
 - `src/provider/chatCompletionsAdapter.ts`：统一 Chat Completions wire adapter。
 
-Provider 与 model 是独立事实。Provider 决定默认 endpoint 和 probe 行为；model 决定限制、工具、usage、cache、reasoning replay、工具调用 metadata replay 和 Chat Completions 请求方言。当前语言请求统一使用 Bearer 与 Chat Completions；通用 `openai-compatible` 使用标准方言和用户显式填写的 model/base URL，Agnes、Google、DeepSeek 与 Zhipu 的 wire 差异由 catalog model profile 投影，request body 不按 provider 名称散落判断。Google 工具调用必须把响应中的 `extra_content.google.thought_signature` 作为 provider metadata 持久化并在后续 assistant tool-call message 原样回放；Zhipu 标准 API 的 Agent 请求使用 `thinking.type` 并设置 `clear_thinking: false`，工具调用后的 assistant 消息必须原样回放 `reasoning_content`。
+Provider 与 model 是独立事实。Provider 决定默认 endpoint 和 probe 行为；model 决定限制、工具、usage、cache、reasoning replay、工具调用 metadata replay 和 Chat Completions 请求方言。当前语言请求统一使用 Bearer 与 Chat Completions；通用 `openai-compatible` 使用标准方言和用户显式填写的 model/base URL，Agnes、Google、DeepSeek 与 Zhipu 的 wire 差异由 catalog model profile 投影，request body 不按 provider 名称散落判断。`llm2api` 是内置的 OpenAI-compatible 中转 Provider，默认连接 `http://127.0.0.1:8080/v1`，使用 LLM2API 签发的下游 API 密钥并要求模型来自其 `/v1/models`；Kitty 对 `llm2api` 不内置任何上游模型 preset，不按 Agnes、Zhipu 或其他上游厂商重建事实，而是从 `/v1/models` 读取公开能力后决定 thinking、reasoning effort、usage 与流式工具请求边界。Kitty 只发送 LLM2API 公共协议，资源池资格、上游 API Key 分配、重试、额度和厂商 wire 差异全部由 LLM2API 拥有；普通无工具对话可以流式，公开能力未声明流式工具调用时，工具请求从一开始使用非流式，不在 4xx 后重放。Google 工具调用必须把响应中的 `extra_content.google.thought_signature` 作为 provider metadata 持久化并在后续 assistant tool-call message 原样回放；Zhipu 标准 API 的 Agent 请求使用 `thinking.type` 并设置 `clear_thinking: false`，工具调用后的 assistant 消息必须原样回放 `reasoning_content`。
 
 Chat Completions 的 HTTP abort signal 必须作为 SDK request options 传递，不能进入 JSON body。只有明确的无状态 stream framing 故障可以降级为一次非流式请求；认证、参数校验、限流和 HTTP provider error 不得被非流式 fallback 重放。
 
@@ -416,9 +416,10 @@ node --test .test-build/tests/shell/tui-command-menu.test.js .test-build/tests/s
 ```powershell
 npm.cmd run eval:local
 npm.cmd run eval:production
+npm.cmd run eval:llm2api
 ```
 
-`eval:production` 使用当前 `.kitty/.env`，可能消耗真实 API；它不能进入普通确定性测试。
+`eval:production` 使用当前 `.kitty/.env`，可能消耗真实 API；它不能进入普通确定性测试。`eval:llm2api` 只用于 LLM2API 隔离验收进程：下游 API 密钥与临时 Base URL 由该进程通过环境变量注入，入口验证 `/models`、动态模型能力、真实多轮会话、上下文压力、后台等待、Playwright 浏览器任务和真实工具修复任务，不把生成的密钥写入项目文件或日志。
 
 Production tool acceptance 是真实修复任务，不是固定字符串工具演示。隔离工作区先处于失败状态；真实模型必须检查文件、运行失败验证、从长输出尾部读取根因、修改目标、重新验证通过，并在最终回答中引用成功 sentinel。缺少失败证据、真实变更、复验通过或最终消费中的任一项都判失败。
 

@@ -4,6 +4,7 @@ import type { FunctionToolDefinition } from "../tools/index.js";
 import type { ModelReasoningEffort, ToolCallRecord } from "../types.js";
 import type { AgentCallbacks, AssistantResponse } from "../agent/types.js";
 import type { ModelRequestMetric } from "./metrics.js";
+import type { ProviderCapabilities } from "./capabilities.js";
 
 export interface ProviderMessage {
   role: "system" | "user" | "assistant" | "tool";
@@ -24,6 +25,7 @@ export interface ProviderAdapterRequest {
   thinking?: "enabled" | "disabled";
   reasoningEffort?: ModelReasoningEffort;
   maxOutputTokens?: number;
+  capabilities?: ProviderCapabilities;
   abortSignal?: AbortSignal;
   onRequestMetric?: (metric: ModelRequestMetric) => void;
 }

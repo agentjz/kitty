@@ -1,6 +1,6 @@
 {
   "name": "@jun133/kitty",
-  "version": "4.0.12",
+  "version": "4.0.13",
   "description": "Agent",
   "license": "MIT",
   "keywords": [
@@ -37,6 +37,7 @@
     "test:eval": "npm run test:build && node scripts/run-tests.mjs evaluation",
     "eval:local": "npm run test:build && node .test-build/scripts/run-evaluation.js local",
     "eval:production": "npm run test:build && node .test-build/scripts/run-evaluation.js production",
+    "eval:llm2api": "npm run test:build && node .test-build/scripts/run-llm2api-evaluation.js",
     "verify": "npm test",
     "typecheck": "tsc --noEmit",
     "postinstall": "node scripts/postinstall.cjs",

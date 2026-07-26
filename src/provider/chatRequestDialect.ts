@@ -15,6 +15,19 @@ export function applyChatRequestDialect(
   capabilities: ProviderCapabilities,
 ): void {
   switch (capabilities.chat.reasoning) {
+    case "standard-thinking":
+      const thinkingEnabled = resolveAgnesThinking({
+        thinking: input.thinking,
+        forceReasoning: input.forceReasoning,
+        defaultReasoningEnabled: capabilities.defaultReasoningEnabled,
+      });
+      body.thinking = {
+        type: thinkingEnabled ? "enabled" : "disabled",
+      };
+      if (thinkingEnabled && input.reasoningEffort && capabilities.reasoningEfforts?.includes(input.reasoningEffort)) {
+        body.reasoning_effort = input.reasoningEffort;
+      }
+      break;
     case "deepseek-thinking": {
       const thinking = resolveDeepSeekThinking(input.messages, input.thinking ?? "enabled");
       body.thinking = { type: thinking };

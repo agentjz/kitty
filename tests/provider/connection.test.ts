@@ -41,6 +41,43 @@ test("Agnes connection test reads model metadata without generating tokens", () 
   assert.deepEqual(request.headers, { Authorization: "Bearer test-key" });
 });
 
+test("LLM2API connection test probes the local relay model catalog", async () => {
+  const profile = resolveModelProfile({ provider: "llm2api", model: "gateway-model" });
+  const request = buildProviderProbeRequest({
+    baseUrl: profile.provider.defaultBaseUrl,
+    apiKey: "test-key",
+  });
+  assert.equal(request.endpoint, "http://127.0.0.1:8080/v1/models");
+  assert.equal(request.method, "GET");
+  assert.deepEqual(request.headers, { Authorization: "Bearer test-key" });
+
+  const result = await probeProviderConnection({
+    provider: "llm2api",
+    model: "gateway-model",
+    baseUrl: "http://127.0.0.1:8080/v1",
+    apiKey: "test-key",
+    fetchImpl: async () => Response.json({
+      data: [{ id: "gateway-model", owned_by: "llm2api" }],
+    }),
+  });
+  assert.equal(result.kind, "ok");
+});
+
+test("LLM2API connection test rejects a model outside the downstream key catalog", async () => {
+  const result = await probeProviderConnection({
+    provider: "llm2api",
+    model: "missing-model",
+    baseUrl: "http://127.0.0.1:8080/v1",
+    apiKey: "test-key",
+    fetchImpl: async () => Response.json({
+      data: [{ id: "other-model", owned_by: "llm2api" }],
+    }),
+  });
+
+  assert.equal(result.kind, "user");
+  assert.match(result.message, /did not expose model missing-model/u);
+});
+
 test("Zhipu connection test reads model metadata without generating tokens", () => {
   const profile = resolveModelProfile({ provider: "zhipu", model: "glm-4.7-flash" });
   const request = buildProviderProbeRequest({

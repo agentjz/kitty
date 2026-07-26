@@ -7,6 +7,7 @@ import type { RuntimeConfig } from "../types.js";
 
 export interface HostToolRegistryOptions {
   builtinToolFilter?: ToolFilter;
+  hostToolFilter?: ToolFilter;
   extraTools?: readonly RegisteredTool[];
   cwd?: string;
   stateRootDir?: string;
@@ -17,7 +18,7 @@ export async function createHostToolRegistry(
   options: HostToolRegistryOptions = {},
 ): Promise<ToolRegistry> {
   const extraTools = options.extraTools ?? [];
-  if (extraTools.length === 0 && !options.builtinToolFilter) {
+  if (extraTools.length === 0 && !options.builtinToolFilter && !options.hostToolFilter) {
     return createDefaultAgentToolRegistry(config, {
       cwd: options.cwd,
       stateRootDir: options.stateRootDir,
@@ -29,6 +30,7 @@ export async function createHostToolRegistry(
   });
   const capabilitySources = (capabilityRegistry.entries ?? [])
     .filter((entry) => entry.origin.kind === "host")
+    .filter((entry) => options.hostToolFilter?.(entry.tool) ?? true)
     .map((entry) => createToolSource("host", entry.origin.sourceId ?? "capability", [entry.tool]));
   const enabledBuiltinNames = (capabilityRegistry.entries ?? [])
     .filter((entry) => entry.origin.kind === "builtin")

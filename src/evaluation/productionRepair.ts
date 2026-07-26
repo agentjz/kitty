@@ -43,11 +43,13 @@ export async function runProductionRepairCheck(
     host: "eval-production",
     input: [
       "Fix this workspace production defect end to end.",
-      "Before modifying any file, you MUST run `node verify.cjs` while status.txt is still broken.",
-      "That first run must fail and expose EVIDENCE_ROOT_CAUSE in its tool result; reading the source is not a substitute.",
-      "Use that observed failure evidence to repair status.txt,",
-      "then rerun `node verify.cjs` until it passes.",
-      "Finish with one short plain English sentence containing PRODUCTION_REPAIR_SENTINEL.",
+      "Use real tools only; prose claims do not count.",
+      "Step 1: before modifying any file, you MUST run `node verify.cjs` with the bash tool while status.txt is still broken.",
+      "Step 2: that first bash result must fail and expose EVIDENCE_ROOT_CAUSE; reading the source is not a substitute.",
+      "Step 3: use that observed failure evidence to repair status.txt with write or edit.",
+      "Step 4: after the repair, you MUST run `node verify.cjs` again with the bash tool.",
+      "The task is not complete until the second bash tool result succeeds and contains PRODUCTION_REPAIR_SENTINEL.",
+      "Finish with one short completion sentence that includes PRODUCTION_REPAIR_SENTINEL.",
       "Do not stop after explaining the failure.",
     ].join(" "),
     cwd: workspace,
@@ -55,6 +57,7 @@ export async function runProductionRepairCheck(
     config,
     session,
     sessionStore,
+    hostToolFilter: () => false,
   });
   if (outcome.status !== "completed") {
     return {
@@ -123,9 +126,10 @@ export async function runProductionRepairCheck(
 
   if (
     assistantToolCalls.length < 1 || toolMessages.length < 3 || !finalAssistant ||
-    !String(finalAssistant.content).includes("PRODUCTION_REPAIR_SENTINEL") || repairedValue !== "READY" ||
+    repairedValue !== "READY" ||
     !failedVerification || !passedVerification || !changedTarget ||
     !durableLedgerComplete ||
+    !finalAssistant.content?.includes("PRODUCTION_REPAIR_SENTINEL") ||
     !eventTypes.includes("tool.completed") || !eventTypes.includes("tool.failed") ||
     !eventTypes.includes("turn.completed")
   ) {

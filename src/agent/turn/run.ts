@@ -23,6 +23,7 @@ import { throwIfAborted } from "../../utils/abort.js";
 import { missingConfigValue } from "../../config/errors.js";
 import { KITTY_ENV } from "../../config/envKeys.js";
 import { getProjectCapabilityManager } from "../../capabilities/index.js";
+import { fetchLlm2apiModelCapabilities } from "../../provider/llm2apiModels.js";
 
 export type { AgentCallbacks, RunTurnOptions } from "../types.js";
 
@@ -64,6 +65,13 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
     controlLedger.close();
   }
   const client = createProviderClientPool(turnModelConfig);
+  const dynamicCapabilities = turnModelConfig.provider === "llm2api"
+    ? await fetchLlm2apiModelCapabilities({
+      baseUrl: turnModelConfig.baseUrl,
+      apiKey: turnModelConfig.apiKey,
+      model: turnModelConfig.model,
+    })
+    : undefined;
   const ownsToolRegistry = !options.toolRegistry;
   const toolRegistry = options.toolRegistry ?? (await createDefaultAgentToolRegistry(options.config, {
     cwd: options.cwd,
@@ -153,6 +161,7 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
             thinking: turnModelConfig.thinking,
             reasoningEffort: turnModelConfig.reasoningEffort,
             maxOutputTokens: turnModelConfig.maxOutputTokens,
+            capabilities: dynamicCapabilities,
           },
           tools: turnToolDefinitions,
           callbacks: options.callbacks,
@@ -220,6 +229,7 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<RunTurnResu
           options,
           client,
           requestModel,
+          capabilities: dynamicCapabilities,
           rootDir: projectContext.stateRootDir,
         });
         const completionLedger = new ControlPlaneLedger(projectContext.stateRootDir);

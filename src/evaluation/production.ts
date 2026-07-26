@@ -18,6 +18,7 @@ import { summarizeChecks } from "./types.js";
 import { runProductionRepairCheck } from "./productionRepair.js";
 import { runProductionBackgroundCheck } from "./productionBackground.js";
 import { runProductionContextPressureCheck } from "./productionContextPressure.js";
+import { runProductionBrowserCheck } from "./productionBrowser.js";
 import { prepareCheckWorkspace } from "./workspace.js";
 
 export const PRODUCTION_EVALUATION_CHECK_IDS: readonly ProductionEvaluationCheckId[] = [
@@ -26,6 +27,7 @@ export const PRODUCTION_EVALUATION_CHECK_IDS: readonly ProductionEvaluationCheck
   "production-real-turn",
   "production-context-pressure",
   "production-background-turn",
+  "production-browser-turn",
   "production-tool-turn",
   "production-runtime-status",
 ];
@@ -67,6 +69,13 @@ export const PRODUCTION_EVALUATION_SCENARIOS: readonly EvaluationScenario[] = [
     evidence: "确认真实 provider 调用 background_run、至少两次 background_wait，消费 running progress 和 settled sentinel，并留下唯一 durable wake。",
   },
   {
+    id: "production-browser-turn",
+    suite: "production",
+    title: "真实 provider 浏览器任务可完成",
+    userPath: "维护者显式运行生产验收时，Kitty 让真实模型通过 Playwright 浏览器操作动态页面，并把页面最终事实写入隔离工作区。",
+    evidence: "确认真实 provider 调用 Playwright navigate/click/type、消费动态页面事实、写入结果文件，并留下 tool.completed/turn.completed 事件。",
+  },
+  {
     id: "production-tool-turn",
     suite: "production",
     title: "真实 provider 修复任务可完成",
@@ -99,6 +108,7 @@ export async function runProductionEvaluationChecks(rootDir: string): Promise<Ev
     checks.push(await runProductionEvaluationCheck("production-real-turn", rootDir));
     checks.push(await runProductionEvaluationCheck("production-context-pressure", rootDir));
     checks.push(await runProductionEvaluationCheck("production-background-turn", rootDir));
+    checks.push(await runProductionEvaluationCheck("production-browser-turn", rootDir));
     checks.push(await runProductionEvaluationCheck("production-tool-turn", rootDir));
   } else {
     checks.push({
@@ -120,6 +130,11 @@ export async function runProductionEvaluationChecks(rootDir: string): Promise<Ev
       id: "production-background-turn",
       status: "skipped",
       fact: "production background turn skipped because project config is not ready",
+    });
+    checks.push({
+      id: "production-browser-turn",
+      status: "skipped",
+      fact: "production browser turn skipped because project config is not ready",
     });
     checks.push({
       id: "production-tool-turn",
@@ -185,6 +200,9 @@ async function runProductionEvaluationCheck(
       case "production-background-turn": {
         return await runProductionBackgroundCheck(id, rootDir);
       }
+      case "production-browser-turn": {
+        return await runProductionBrowserCheck(id, rootDir);
+      }
       case "production-tool-turn": {
         return await runProductionRepairCheck(id, rootDir);
       }
@@ -207,7 +225,7 @@ async function runProductionEvaluationCheck(
   }
 }
 
-async function runProductionRealTurnCheck(
+export async function runProductionRealTurnCheck(
   id: ProductionEvaluationCheckId,
   rootDir: string,
 ): Promise<EvaluationCheckResult> {

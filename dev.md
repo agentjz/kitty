@@ -201,9 +201,10 @@ npm.cmd run verify
 ```powershell
 npm.cmd run eval:local
 npm.cmd run eval:production
+npm.cmd run eval:llm2api
 ```
 
-`eval:production` 使用真实 provider，不进入普通 verify。
+`eval:production` 使用真实 provider，不进入普通 verify。`eval:llm2api` 由 LLM2API 的隔离真实 Provider 验收调用，使用进程内生成的下游 API 密钥验证中转模型目录、动态模型能力、真实多轮、上下文压力、后台等待、Playwright 浏览器任务和工具修复任务；它同样不进入普通 verify。
 
 ## 11. 收口规则
 

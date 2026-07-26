@@ -5,6 +5,7 @@ import type { ModelRequestMetric } from "./metrics.js";
 import { isAbortError } from "../utils/abort.js";
 import type { AssistantResponse, AgentCallbacks } from "../agent/types.js";
 import { resolveProviderCapabilities } from "./capabilities.js";
+import type { ProviderCapabilities } from "./capabilities.js";
 import type { ProviderErrorPolicy } from "./catalog.js";
 import type { ProviderMessage, ProviderWireAdapter } from "./contract.js";
 import { chatCompletionsAdapter } from "./chatCompletionsAdapter.js";
@@ -31,6 +32,7 @@ export async function fetchAssistantResponse(
     thinking?: ModelThinkingMode;
     reasoningEffort?: ModelReasoningEffort;
     maxOutputTokens?: number;
+    capabilities?: ProviderCapabilities;
   },
   tools: FunctionToolDefinition[] | undefined,
   callbacks: AgentCallbacks | undefined,
@@ -38,7 +40,7 @@ export async function fetchAssistantResponse(
   onRequestMetric?: (metric: ModelRequestMetric) => void,
   observability?: ProviderRequestObservability,
 ): Promise<AssistantResponse> {
-  const capabilities = resolveProviderCapabilities(request);
+  const capabilities = request.capabilities ?? resolveProviderCapabilities(request);
   const adapter = chatCompletionsAdapter;
 
   return tryFetch(
@@ -46,10 +48,12 @@ export async function fetchAssistantResponse(
     client,
     messages,
     request,
+    capabilities,
     tools,
     callbacks,
     false,
     capabilities.errorPolicy,
+    capabilities.supportsStreamingTools || !tools?.length,
     abortSignal,
     onRequestMetric,
     observability,
@@ -67,10 +71,12 @@ async function tryFetch(
     reasoningEffort?: ModelReasoningEffort;
     maxOutputTokens?: number;
   },
+  capabilities: ProviderCapabilities,
   tools: FunctionToolDefinition[] | undefined,
   callbacks: AgentCallbacks | undefined,
   forceReasoning: boolean,
   errorPolicy: ProviderErrorPolicy,
+  useStreaming: boolean,
   abortSignal?: AbortSignal,
   onRequestMetric?: (metric: ModelRequestMetric) => void,
   observability?: ProviderRequestObservability,
@@ -127,7 +133,8 @@ async function tryFetch(
         try {
           const result = await invokeWithProviderClients(client, errorPolicy, async (providerClient, baseUrl) => {
             resolvedBaseUrl = baseUrl;
-            return adapter.fetchStreaming(providerClient, {
+            const fetchResponse = useStreaming ? adapter.fetchStreaming : adapter.fetchNonStreaming;
+            return fetchResponse(providerClient, {
               provider: request.provider,
               model: request.model,
               messages,
@@ -137,6 +144,7 @@ async function tryFetch(
               thinking: request.thinking,
               reasoningEffort: request.reasoningEffort,
               maxOutputTokens: request.maxOutputTokens,
+              capabilities,
               abortSignal,
               onRequestMetric: forwardMetric,
             });
@@ -170,7 +178,7 @@ async function tryFetch(
       throw error;
     }
 
-    if (!isStreamingFallbackEligible(error)) {
+    if (!useStreaming || !isStreamingFallbackEligible(error)) {
       await recordProviderRequestEvent({
         observability,
         request,
@@ -206,6 +214,7 @@ async function tryFetch(
                 thinking: request.thinking,
                 reasoningEffort: request.reasoningEffort,
                 maxOutputTokens: request.maxOutputTokens,
+                capabilities,
                 abortSignal,
                 onRequestMetric: forwardMetric,
               });

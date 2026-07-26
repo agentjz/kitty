@@ -9,7 +9,6 @@ import {
   terminateBackgroundExecution,
   waitForRegisteredBackgroundProcess,
 } from "../execution/background.js";
-import { createBackgroundTools } from "../capabilities/tools/background/index.js";
 import { runHostTurn } from "../host/turn.js";
 import { SessionEventStore } from "../session/events.js";
 import { SessionStore } from "../session/store.js";
@@ -54,6 +53,7 @@ export async function runProductionBackgroundCheck(
       input: [
         "Execute this task; do not simulate or narrate tool calls.",
         "First make a real background_run function call for `node staged-background.cjs` and keep this same turn active.",
+        "Use the exact execution id returned by background_run for every background_wait call; do not guess ids like bg-1.",
         `Use real background_wait function calls until you first observe ${PROGRESS_SENTINEL} while the execution is still running.`,
         `Then call background_wait again until it is settled and you observe ${FINAL_SENTINEL}.`,
         "Shell code blocks, invented IDs, and prose claims do not count as tool execution.",
@@ -66,8 +66,8 @@ export async function runProductionBackgroundCheck(
       session,
       sessionStore,
       builtinToolFilter: () => false,
-      extraTools: createBackgroundTools().filter((tool) =>
-        ["background_run", "background_wait"].includes(tool.definition.function.name)),
+      hostToolFilter: (tool) =>
+        ["background_run", "background_wait"].includes(tool.definition.function.name),
     });
     if (outcome.status !== "completed") {
       return {
@@ -93,12 +93,18 @@ export async function runProductionBackgroundCheck(
     const execution = backgroundExecutions[0];
     const turnIds = new Set(durable.turns.map((turn) => turn.id));
     const toolCallIds = new Set(durable.toolCalls.map((call) => call.callId));
+    const settledToolCalls = durable.toolCalls.filter((call) => ["success", "error"].includes(call.status));
+    const successfulRunCalls = durable.toolCalls.filter((call) =>
+      call.toolName === "background_run" && call.status === "success");
+    const successfulWaitCalls = durable.toolCalls.filter((call) =>
+      call.toolName === "background_wait" && call.status === "success");
     const progressObserved = waitEvidence.some((evidence) =>
       evidence.includes("wait: progress") && evidence.includes(PROGRESS_SENTINEL));
     const settledObserved = waitEvidence.some((evidence) =>
       evidence.includes("wait: settled") && evidence.includes(FINAL_SENTINEL));
     const durableComplete = durable.turns.length === 1 && durable.turns[0]?.status === "completed" &&
-      durable.toolCalls.length >= 3 && durable.toolCalls.every((call) => call.status === "success") &&
+      settledToolCalls.length === durable.toolCalls.length &&
+      successfulRunCalls.length === 1 && successfulWaitCalls.length >= 2 &&
       backgroundExecutions.length === 1 && execution?.status === "completed" &&
       execution.ownerSessionId === outcome.session.id &&
       execution.createdBySessionId === outcome.session.id &&

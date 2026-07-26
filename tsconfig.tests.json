@@ -11,6 +11,7 @@
     "src/**/*.ts",
     "src/**/*.tsx",
     "scripts/run-evaluation.ts",
+    "scripts/run-llm2api-evaluation.ts",
     "scripts/verify-live-capabilities.ts",
     "tests/**/*.ts",
     "tests/**/*.tsx"

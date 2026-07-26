@@ -6,6 +6,7 @@ import type {
 
 import { collapseContentParts, readReasoningContent } from "../session/messages.js";
 import { buildProviderRequestBody } from "./chatRequestBody.js";
+import type { ProviderCapabilities } from "./capabilities.js";
 import { resolveModelProfile } from "./catalog.js";
 import type { ProviderAdapterRequest, ProviderMessage, ProviderWireAdapter } from "./contract.js";
 import type { ProviderUsageSnapshot } from "./metrics.js";
@@ -39,6 +40,7 @@ export const chatCompletionsAdapter: ProviderWireAdapter = {
           thinking: request.thinking,
           reasoningEffort: request.reasoningEffort,
           maxOutputTokens: request.maxOutputTokens,
+          capabilities: request.capabilities,
         }) as never,
         { signal: request.abortSignal },
       );
@@ -138,6 +140,7 @@ export const chatCompletionsAdapter: ProviderWireAdapter = {
           thinking: request.thinking,
           reasoningContent,
           toolCallCount: toolCallParts.size,
+          capabilities: request.capabilities,
         }),
         streamedAssistantContent: content.length > 0,
         streamedReasoningContent: reasoningContent.length > 0,
@@ -176,6 +179,7 @@ export const chatCompletionsAdapter: ProviderWireAdapter = {
           thinking: request.thinking,
           reasoningEffort: request.reasoningEffort,
           maxOutputTokens: request.maxOutputTokens,
+          capabilities: request.capabilities,
         }) as never,
         { signal: request.abortSignal },
       );
@@ -195,6 +199,7 @@ export const chatCompletionsAdapter: ProviderWireAdapter = {
           thinking: request.thinking,
           reasoningContent: readChatReasoningContent(message),
           toolCallCount: message.tool_calls?.length ?? 0,
+          capabilities: request.capabilities,
         }),
         streamedAssistantContent: false,
         streamedReasoningContent: false,
@@ -227,12 +232,10 @@ function resolveToolCallReasoningContent(input: {
   thinking?: "enabled" | "disabled";
   reasoningContent: string | undefined;
   toolCallCount: number;
+  capabilities?: ProviderCapabilities;
 }): string | undefined {
   if (
-    resolveModelProfile({
-      provider: input.provider,
-      model: input.model,
-    }).model.capabilities.reasoningContentReplay === "tool-call-required" &&
+    shouldReplayReasoningContent(input) &&
     input.thinking !== "disabled" &&
     input.toolCallCount > 0
   ) {
@@ -242,6 +245,21 @@ function resolveToolCallReasoningContent(input: {
   return input.reasoningContent && input.reasoningContent.length > 0
     ? input.reasoningContent
     : undefined;
+}
+
+function shouldReplayReasoningContent(input: {
+  provider: string;
+  model: string;
+  capabilities?: ProviderCapabilities;
+}): boolean {
+  if (input.capabilities) {
+    return input.capabilities.supportsReasoningContent;
+  }
+
+  return resolveModelProfile({
+    provider: input.provider,
+    model: input.model,
+  }).model.capabilities.reasoningContentReplay === "tool-call-required";
 }
 
 function readChatReasoningContent(message: unknown): string | undefined {

@@ -1,5 +1,5 @@
 import type { FunctionToolDefinition } from "../tools/index.js";
-import { resolveProviderCapabilities } from "./capabilities.js";
+import { resolveProviderCapabilities, type ProviderCapabilities } from "./capabilities.js";
 import type { ProviderMessage } from "./contract.js";
 import { applyChatRequestDialect } from "./chatRequestDialect.js";
 import { toChatCompletionMessages } from "./chatCompletionsAdapter.js";
@@ -16,12 +16,13 @@ export interface BuildProviderRequestBodyInput {
   thinking?: "enabled" | "disabled";
   reasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
   maxOutputTokens?: number;
+  capabilities?: ProviderCapabilities;
 }
 
 export function buildProviderRequestBody(
   input: BuildProviderRequestBodyInput,
 ): Record<string, unknown> {
-  const capabilities = resolveProviderCapabilities(input);
+  const capabilities = input.capabilities ?? resolveProviderCapabilities(input);
   const body: Record<string, unknown> = {
     model: input.model,
     messages: toChatCompletionMessages(input.messages, {

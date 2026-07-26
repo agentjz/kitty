@@ -4,6 +4,7 @@ import {
   type ProviderErrorPolicy,
   type ToolCallProviderMetadataReplayPolicy,
 } from "./catalog.js";
+import type { ModelReasoningEffort } from "../types.js";
 
 export interface ProviderCapabilities {
   provider: string;
@@ -11,10 +12,12 @@ export interface ProviderCapabilities {
   wireApi: "chat.completions";
   errorPolicy: ProviderErrorPolicy;
   supportsTools: boolean;
+  supportsStreamingTools: boolean;
   supportsReasoningContent: boolean;
   toolCallProviderMetadataReplay: ToolCallProviderMetadataReplayPolicy;
   defaultReasoningEnabled: boolean;
-  defaultReasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+  defaultReasoningEffort?: ModelReasoningEffort;
+  reasoningEfforts?: ModelReasoningEffort[];
   maxOutputTokensParam: "max_tokens" | "max_completion_tokens" | "max_output_tokens";
   maxOutputTokensLimit: number;
   chat: {
@@ -40,6 +43,7 @@ export function resolveProviderCapabilities(input: ProviderProfileInput): Provid
     wireApi: profile.model.wireApi,
     errorPolicy: profile.provider.errorPolicy,
     supportsTools: profile.model.capabilities.tools,
+    supportsStreamingTools: profile.model.capabilities.streamingTools,
     supportsReasoningContent: profile.model.capabilities.reasoningContentReplay !== "never",
     toolCallProviderMetadataReplay: profile.model.capabilities.toolCallProviderMetadataReplay,
     defaultReasoningEnabled: profile.model.capabilities.reasoning,

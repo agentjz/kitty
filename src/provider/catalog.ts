@@ -8,6 +8,7 @@ export type ToolCallProviderMetadataReplayPolicy = "never" | "google-thought-sig
 export type ModelCacheMode = "provider-automatic" | "none";
 export type ChatReasoningRequestMode =
   | "none"
+  | "standard-thinking"
   | "deepseek-thinking"
   | "agnes-thinking"
   | "gemini-thinking"
@@ -35,6 +36,7 @@ export interface ModelInfo {
     reasoningContentReplay: ReasoningContentReplayPolicy;
     toolCallProviderMetadataReplay: ToolCallProviderMetadataReplayPolicy;
     streaming: boolean;
+    streamingTools: boolean;
     usage: boolean;
     cache: ModelCacheMode;
   };
@@ -109,6 +111,15 @@ export const PROVIDER_CATALOG: readonly ProviderInfo[] = [
     doctorProbeTimeoutMs: DEFAULT_DOCTOR_PROBE_TIMEOUT_MS,
   },
   {
+    id: "llm2api",
+    label: "LLM2API",
+    apiKind: "openai-compatible",
+    errorPolicy: "generic",
+    defaultBaseUrl: "http://127.0.0.1:8080/v1",
+    requestTimeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
+    doctorProbeTimeoutMs: DEFAULT_DOCTOR_PROBE_TIMEOUT_MS,
+  },
+  {
     id: "openai-compatible",
     label: "OpenAI-compatible",
     apiKind: "openai-compatible",
@@ -127,6 +138,7 @@ const DEEPSEEK_MODEL_BASE = {
     reasoningContentReplay: "tool-call-required" as const,
     toolCallProviderMetadataReplay: "never" as const,
     streaming: true,
+    streamingTools: true,
     usage: true,
     cache: "provider-automatic" as const,
   },
@@ -155,6 +167,7 @@ const OPENAI_COMPATIBLE_CHAT_MODEL_BASE = {
     reasoningContentReplay: "never" as const,
     toolCallProviderMetadataReplay: "never" as const,
     streaming: true,
+    streamingTools: true,
     usage: true,
     cache: "none" as const,
   },
@@ -193,6 +206,24 @@ const AGNES_MODEL_BASE = {
   limit: {
     context: 512_000,
     output: 65_500,
+  },
+};
+
+const LLM2API_PUBLIC_CHAT_MODEL_BASE = {
+  ...OPENAI_COMPATIBLE_CHAT_MODEL_BASE,
+  capabilities: {
+    ...OPENAI_COMPATIBLE_CHAT_MODEL_BASE.capabilities,
+    streamingTools: false,
+  },
+  request: {
+    thinkingDefault: "disabled" as const,
+    maxOutputTokensParam: "max_tokens" as const,
+    chat: {
+      reasoning: "standard-thinking" as const,
+      toolChoice: "auto" as const,
+      streamUsage: "include_usage" as const,
+      toolSchema: "standard" as const,
+    },
   },
 };
 
@@ -333,8 +364,8 @@ export function findModelInfo(providerId: string | undefined, modelId: string): 
     return known;
   }
 
-  if (normalizedProvider === "openai-compatible") {
-    return createOpenAiCompatibleModelInfo(normalizedModel);
+  if (normalizedProvider === "openai-compatible" || normalizedProvider === "llm2api") {
+    return createOpenAiCompatibleModelInfo(normalizedProvider, normalizedModel);
   }
 
   return undefined;
@@ -373,10 +404,19 @@ export function normalizeModelId(value: string): string {
   return String(value ?? "").trim();
 }
 
-function createOpenAiCompatibleModelInfo(modelId: string): ModelInfo {
+function createOpenAiCompatibleModelInfo(providerId: string, modelId: string): ModelInfo {
+  if (providerId === "llm2api") {
+    return {
+      id: modelId,
+      providerId,
+      label: modelId,
+      ...LLM2API_PUBLIC_CHAT_MODEL_BASE,
+    };
+  }
+
   return {
     id: modelId,
-    providerId: "openai-compatible",
+    providerId,
     label: modelId,
     ...OPENAI_COMPATIBLE_CHAT_MODEL_BASE,
   };
