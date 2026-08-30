@@ -11,6 +11,7 @@ import { INITIAL_WEIXIN_CONFIG, resolveWeixinRuntimeConfig } from "../../src/con
 test("runtime config schema normalizes model, context, telegram, and capabilities", () => {
   const defaultPreset = getDefaultProviderPreset();
   const config = getInitialRuntimeConfig();
+  assert.equal(defaultPreset.id, "agnes-2.0-flash");
   const normalized = normalizeRuntimeConfig({
     ...config,
     contextWindowMessages: 1,

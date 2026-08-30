@@ -6,7 +6,6 @@ import {
 } from "../../session/title.js";
 import { recordObservabilityEvent } from "../../observability/writer.js";
 import type { createProviderClientPool } from "../../provider/client.js";
-import type { ProviderCapabilities } from "../../provider/capabilities.js";
 import type { AssistantResponse, RunTurnOptions, RunTurnResult } from "../types.js";
 
 export interface TurnLifecycleUpdateInput {
@@ -16,7 +15,6 @@ export interface TurnLifecycleUpdateInput {
   options: RunTurnOptions;
   client: ReturnType<typeof createProviderClientPool>;
   requestModel: string;
-  capabilities?: ProviderCapabilities;
   rootDir: string;
 }
 
@@ -46,7 +44,6 @@ export async function updateSessionTitleAfterTurn(
       model: input.requestModel,
       thinking: "disabled" as const,
       maxOutputTokens: Math.min(input.options.config.maxOutputTokens ?? 512, 512),
-      capabilities: input.capabilities,
     },
     tools: [],
     callbacks: undefined,

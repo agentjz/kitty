@@ -111,15 +111,6 @@ export const PROVIDER_CATALOG: readonly ProviderInfo[] = [
     doctorProbeTimeoutMs: DEFAULT_DOCTOR_PROBE_TIMEOUT_MS,
   },
   {
-    id: "llm2api",
-    label: "LLM2API",
-    apiKind: "openai-compatible",
-    errorPolicy: "generic",
-    defaultBaseUrl: "http://127.0.0.1:8080/v1",
-    requestTimeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
-    doctorProbeTimeoutMs: DEFAULT_DOCTOR_PROBE_TIMEOUT_MS,
-  },
-  {
     id: "openai-compatible",
     label: "OpenAI-compatible",
     apiKind: "openai-compatible",
@@ -206,24 +197,6 @@ const AGNES_MODEL_BASE = {
   limit: {
     context: 512_000,
     output: 65_500,
-  },
-};
-
-const LLM2API_PUBLIC_CHAT_MODEL_BASE = {
-  ...OPENAI_COMPATIBLE_CHAT_MODEL_BASE,
-  capabilities: {
-    ...OPENAI_COMPATIBLE_CHAT_MODEL_BASE.capabilities,
-    streamingTools: false,
-  },
-  request: {
-    thinkingDefault: "disabled" as const,
-    maxOutputTokensParam: "max_tokens" as const,
-    chat: {
-      reasoning: "standard-thinking" as const,
-      toolChoice: "auto" as const,
-      streamUsage: "include_usage" as const,
-      toolSchema: "standard" as const,
-    },
   },
 };
 
@@ -364,7 +337,7 @@ export function findModelInfo(providerId: string | undefined, modelId: string): 
     return known;
   }
 
-  if (normalizedProvider === "openai-compatible" || normalizedProvider === "llm2api") {
+  if (normalizedProvider === "openai-compatible") {
     return createOpenAiCompatibleModelInfo(normalizedProvider, normalizedModel);
   }
 
@@ -405,15 +378,6 @@ export function normalizeModelId(value: string): string {
 }
 
 function createOpenAiCompatibleModelInfo(providerId: string, modelId: string): ModelInfo {
-  if (providerId === "llm2api") {
-    return {
-      id: modelId,
-      providerId,
-      label: modelId,
-      ...LLM2API_PUBLIC_CHAT_MODEL_BASE,
-    };
-  }
-
   return {
     id: modelId,
     providerId,

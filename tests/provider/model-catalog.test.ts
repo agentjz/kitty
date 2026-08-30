@@ -95,17 +95,3 @@ test("generic OpenAI-compatible endpoints accept an explicitly configured model"
   assert.equal(profile.model.wireApi, "chat.completions");
   assert.equal(profile.model.request.chat?.toolChoice, "auto");
 });
-
-test("LLM2API owns a generic relay endpoint and does not add upstream model presets", () => {
-  const explicit = resolveModelProfile({
-    provider: "llm2api",
-    model: "model-from-llm2api-models",
-  });
-  assert.equal(explicit.provider.defaultBaseUrl, "http://127.0.0.1:8080/v1");
-  assert.equal(explicit.provider.apiKind, "openai-compatible");
-  assert.equal(explicit.model.providerId, "llm2api");
-  assert.equal(explicit.model.id, "model-from-llm2api-models");
-  assert.equal(explicit.model.request.chat?.reasoning, "standard-thinking");
-  assert.equal(explicit.model.capabilities.streamingTools, false);
-  assert.equal(explicit.model.limit.context, 128_000);
-});

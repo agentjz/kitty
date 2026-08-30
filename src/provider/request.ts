@@ -32,7 +32,6 @@ export async function fetchAssistantResponse(
     thinking?: ModelThinkingMode;
     reasoningEffort?: ModelReasoningEffort;
     maxOutputTokens?: number;
-    capabilities?: ProviderCapabilities;
   },
   tools: FunctionToolDefinition[] | undefined,
   callbacks: AgentCallbacks | undefined,
@@ -40,7 +39,7 @@ export async function fetchAssistantResponse(
   onRequestMetric?: (metric: ModelRequestMetric) => void,
   observability?: ProviderRequestObservability,
 ): Promise<AssistantResponse> {
-  const capabilities = request.capabilities ?? resolveProviderCapabilities(request);
+  const capabilities = resolveProviderCapabilities(request);
   const adapter = chatCompletionsAdapter;
 
   return tryFetch(

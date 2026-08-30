@@ -94,24 +94,6 @@ export async function probeProviderConnection(
     const payload = await response.json().catch(() => null) as { data?: unknown } | null;
     const modelItems = Array.isArray(payload?.data) ? payload.data : [];
     const models = modelItems.length;
-    if (profile.provider.id === "llm2api") {
-      const currentModel = modelItems.find((item) =>
-        item && typeof item === "object" && (item as { id?: unknown }).id === profile.model.id);
-      if (!currentModel) {
-        return {
-          kind: "user",
-          message: `User-fixable error: LLM2API did not expose model ${profile.model.id} for this downstream API key. Check the member API key routes and subscription.`,
-          probeTimeoutMs,
-        };
-      }
-      if ((currentModel as { owned_by?: unknown }).owned_by !== "llm2api") {
-        return {
-          kind: "provider",
-          message: `Provider error: LLM2API model ${profile.model.id} returned an unexpected owned_by value.`,
-          probeTimeoutMs,
-        };
-      }
-    }
     return {
       kind: "ok",
       probe: "models",

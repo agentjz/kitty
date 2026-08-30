@@ -2,7 +2,6 @@ import type { SessionStoreLike } from "../session/store.js";
 import type { ToolRegistry } from "../tools/core/types.js";
 import type { RuntimeConfig, RuntimeTerminalTransition, SessionRecord, ToolCallRecord } from "../types.js";
 import type { FunctionToolDefinition } from "../tools/index.js";
-import type { ProviderCapabilities } from "../provider/capabilities.js";
 import type { ProviderMessage } from "../provider/contract.js";
 import type { PromptRuntimeState } from "./prompt/types.js";
 
@@ -67,7 +66,6 @@ export interface ModelRequestInput {
     thinking?: RuntimeConfig["thinking"];
     reasoningEffort?: RuntimeConfig["reasoningEffort"];
     maxOutputTokens?: RuntimeConfig["maxOutputTokens"];
-    capabilities?: ProviderCapabilities;
   };
   tools: FunctionToolDefinition[];
   callbacks?: AgentCallbacks;

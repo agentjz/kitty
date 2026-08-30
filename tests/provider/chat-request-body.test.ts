@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { buildProviderRequestBody } from "../../src/provider/chatRequestBody.js";
-import { mapLlm2apiCapabilities } from "../../src/provider/llm2apiModels.js";
 
 const tool = {
   type: "function" as const,
@@ -52,49 +51,6 @@ test("Agnes chat request can disable chat template thinking", () => {
   assert.deepEqual(body.chat_template_kwargs, { enable_thinking: false });
   assert.equal("reasoning_effort" in body, false);
   assert.equal("stream_options" in body, false);
-});
-
-test("LLM2API request uses only dynamically discovered relay public capabilities", () => {
-  const capabilities = mapLlm2apiCapabilities("agnes-2.0-flash", {
-    streaming: true,
-    tools: {
-      function_calling: true,
-      tool_choice: ["auto", "function"],
-      streaming_tool_calls: false,
-    },
-    reasoning: {
-      enabled: true,
-      configurable: true,
-      default_enabled: true,
-      efforts: ["max"],
-      preserve: false,
-    },
-    usage: {
-      stream: true,
-    },
-    limits: {
-      output_tokens: 65_500,
-    },
-  });
-  const body = buildProviderRequestBody({
-    provider: "llm2api",
-    model: "agnes-2.0-flash",
-    messages: [{ role: "user", content: "hello" }],
-    tools: [tool],
-    stream: true,
-    forceReasoning: false,
-    thinking: "enabled",
-    reasoningEffort: "max",
-    maxOutputTokens: 384_000,
-    capabilities,
-  });
-
-  assert.deepEqual(body.thinking, { type: "enabled" });
-  assert.equal("chat_template_kwargs" in body, false);
-  assert.equal(body.reasoning_effort, "max");
-  assert.equal(body.max_tokens, 65_500);
-  assert.equal(body.tool_choice, "auto");
-  assert.deepEqual(body.stream_options, { include_usage: true });
 });
 
 test("Google Gemini sends supported reasoning effort, schema, and thought signature", () => {

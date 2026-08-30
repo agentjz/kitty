@@ -66,19 +66,6 @@ test("local console binds loopback, authenticates API, and rejects foreign write
     websiteUrl: "https://ai.google.dev/gemini-api",
     apiKeyUrl: "https://aistudio.google.com/api-keys",
   });
-  assert.deepEqual(
-    providers.find(({ id }) => id === "llm2api-local"),
-    {
-      id: "llm2api-local",
-      label: "LLM2API｜本机网关｜动态模型",
-      provider: "llm2api",
-      model: "model-from-llm2api-models",
-      baseUrl: "http://127.0.0.1:8080/v1",
-      thinking: "enabled",
-      configurationNote: "# 使用 LLM2API 签发的下游 API 密钥；模型以 /v1/models 返回为准，上游 API Key 由网关资源池维护。",
-      activeByDefault: true,
-    },
-  );
   const webPage = await fetch(handle.webUrl);
   assert.equal(webPage.status, 200);
   const webSource = await webPage.text();
@@ -233,24 +220,6 @@ test("local console switches providers through the single runtime API key", asyn
   assert.equal(runtime.baseUrl, "https://apihub.agnes-ai.com/v1");
   assert.equal(runtime.apiKey, "agnes-active-key");
 
-  const relayPreset = PROVIDER_PRESETS.find((preset) => preset.provider === "llm2api")!;
-  const relayed = await request(handle, "/api/config", {
-    method: "PUT",
-    body: JSON.stringify({ values: {
-      [KITTY_ENV.provider]: relayPreset.provider,
-      [KITTY_ENV.baseUrl]: getProviderPresetBaseUrl(relayPreset),
-      [KITTY_ENV.model]: relayPreset.model,
-      [KITTY_ENV.thinking]: relayPreset.thinking,
-      [KITTY_ENV.reasoningEffort]: relayPreset.reasoningEffort,
-      [KITTY_ENV.apiKey]: "llm2api-downstream-key",
-    } }),
-  });
-  assert.equal(relayed.response.status, 200);
-  const relayRuntime = await resolveRuntimeConfig({ cwd: root });
-  assert.equal(relayRuntime.provider, "llm2api");
-  assert.equal(relayRuntime.model, "model-from-llm2api-models");
-  assert.equal(relayRuntime.baseUrl, "http://127.0.0.1:8080/v1");
-  assert.equal(relayRuntime.apiKey, "llm2api-downstream-key");
 });
 
 test("local console projects and saves independent media configuration", async (t) => {
